@@ -1,0 +1,14 @@
+services:
+  plotmapai:
+    build: .
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./app/data:/app/data
+      - ./app/uploads:/app/uploads
+    environment:
+      - SECRET_KEY=${SECRET_KEY:-dev_secret_key_change_me_in_prod}
+      - DATABASE_URL=sqlite:////app/data/plotmap.db
+      - UPLOAD_DIR=/app/uploads
+      - MAX_CONTENT_LENGTH=104857600
+    restart: unless-stopped

@@ -1,0 +1,113 @@
+@import "tailwindcss";
+
+@theme {
+  --color-gold-400: #eab308;
+  --color-gold-500: #ca8a04;
+  --color-gold-600: #a16207;
+  
+  --color-brand-900: #0f172a;
+  --color-brand-800: #1e293b;
+  --color-brand-700: #334155;
+  --color-brand-100: #f1f5f9;
+  --color-brand-50: #f8fafc;
+
+  /* Semantic colors linked to responsive variables */
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-bg-primary: var(--bg-primary);
+  --color-bg-secondary: var(--bg-secondary);
+  --color-card-bg: var(--card-bg);
+  --color-muted-bg: var(--muted-bg);
+  --color-border-color: var(--border-color);
+}
+
+@layer base {
+  :root {
+    --bg-primary: #f8fafc; /* brand-50 */
+    --bg-secondary: #ffffff;
+    --card-bg: #ffffff;
+    --muted-bg: #f1f5f9; /* brand-100 */
+    --text-primary: #0f172a; /* brand-900 */
+    --text-secondary: #475569; /* slate-600 */
+    --accent: var(--color-gold-500);
+    --accent-hover: var(--color-gold-600);
+    --border-color: #e2e8f0;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg-primary: #0f172a; /* brand-900 */
+      --bg-secondary: #1e293b; /* brand-800 */
+      --card-bg: rgba(30, 41, 59, 0.5); /* brand-800/50 */
+      --muted-bg: rgba(15, 23, 42, 0.5); /* brand-900/50 */
+      --text-primary: #f8fafc; /* brand-50 */
+      --text-secondary: #cbd5e1;
+      --accent: var(--color-gold-400);
+      --accent-hover: var(--color-gold-500);
+      --border-color: #334155; /* brand-700 */
+    }
+  }
+
+  body {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: 'Inter', system-ui, sans-serif;
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+}
+
+@layer utilities {
+  .glass {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+  }
+  
+  @media (prefers-color-scheme: dark) {
+    .glass {
+      background: rgba(30, 41, 59, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+  }
+
+  .glass-dark {
+    background: rgba(15, 23, 42, 0.8);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .text-shadow-sm {
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  }
+  
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
+}

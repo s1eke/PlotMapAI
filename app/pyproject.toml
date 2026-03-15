@@ -1,0 +1,32 @@
+[project]
+name = "plotmapai"
+version = "0.1.0"
+description = "AI-powered novel analysis and reading platform"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "flask>=3.1.0",
+    "flask-cors>=5.0.0",
+    "sqlalchemy>=2.0.0",
+    "chardet>=5.0.0",
+    "ebooklib>=0.18",
+    "Pillow>=11.0.0",
+    "gunicorn>=23.0.0",
+    "python-dotenv>=1.0.0",
+    "regex>=2026.2.28",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=6.0.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]
