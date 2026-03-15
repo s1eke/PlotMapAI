@@ -3,6 +3,7 @@ import { BookOpen, Settings } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import LanguageSwitcher from './LanguageSwitcher';
+import ThemeToggle from './ThemeToggle';
 
 interface LayoutProps {
   children: ReactNode;
@@ -25,6 +26,7 @@ export default function Layout({ children }: LayoutProps) {
             </Link>
 
             <nav className="flex items-center gap-2 sm:gap-4">
+              <ThemeToggle />
               <LanguageSwitcher />
               <Link 
                 to="/settings" 

@@ -21,6 +21,10 @@
       "bookshelf": "Bookshelf",
       "settings": "Settings",
       "reader": "Reader"
+    },
+    "theme": {
+      "light": "Light Mode",
+      "dark": "Dark Mode"
     }
   },
   "bookshelf": {
