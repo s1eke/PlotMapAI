@@ -38,7 +38,9 @@
     "uploadFailed": "Upload failed",
     "uploadAndProcessing": "Uploading & Processing...",
     "maxSize": "Max size: 100MB",
-    "clickOrDrag": "Click or drag file here"
+    "clickOrDrag": "Click or drag file here",
+    "subtitle": "Manage and read your personal collection",
+    "noBooksHint": "Upload a .txt or .epub file to start your reading journey. Our engine will automatically parse chapters for you."
   },
   "bookDetail": {
     "author": "Author",
@@ -56,7 +58,11 @@
     "deleteTitle": "Delete Novel",
     "deleteConfirm": "Are you sure you want to delete {{title}}? This action cannot be undone and will remove all associated reading progress and parsed data.",
     "aiAnalysisSoon": "AI Analysis (Soon)",
-    "deleteBook": "Delete Book"
+    "deleteBook": "Delete Book",
+    "byAuthor": "by {{author}}",
+    "aiAnalysisData": "AI Analysis Data",
+    "aiAnalysisPending": "Pending AI Analysis. Characters, themes, and plot points will appear here.",
+    "aiPhase2Tooltip": "Coming in Phase 2"
   },
   "reader": {
     "contents": "Contents",

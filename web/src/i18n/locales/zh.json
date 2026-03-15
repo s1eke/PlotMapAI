@@ -38,7 +38,9 @@
     "uploadFailed": "上传失败",
     "uploadAndProcessing": "正在上传并解析...",
     "maxSize": "最大限制：100MB",
-    "clickOrDrag": "点击或拖拽文件至此处"
+    "clickOrDrag": "点击或拖拽文件至此处",
+    "subtitle": "管理和阅读您的个人藏书",
+    "noBooksHint": "上传 .txt 或 .epub 文件即可开始阅读。我们的引擎会自动为您解析章节。"
   },
   "bookDetail": {
     "author": "作者",
@@ -56,7 +58,11 @@
     "deleteTitle": "删除书籍",
     "deleteConfirm": "确定要删除 {{title}} 吗？此操作无法撤销，且会移除所有相关的阅读进度和解析数据。",
     "aiAnalysisSoon": "AI 分析（即将推出）",
-    "deleteBook": "删除书籍"
+    "deleteBook": "删除书籍",
+    "byAuthor": "作者：{{author}}",
+    "aiAnalysisData": "AI 分析数据",
+    "aiAnalysisPending": "等待 AI 分析。角色、主题和剧情要点将在此处显示。",
+    "aiPhase2Tooltip": "核心分析功能即将推出"
   },
   "reader": {
     "contents": "目录",

@@ -100,7 +100,7 @@ export default function BookDetailPage() {
             
             <button 
               className="w-full py-3 px-4 bg-muted-bg text-text-secondary/60 cursor-not-allowed font-medium rounded-xl flex items-center justify-center gap-2 transition-colors border border-border-color/20"
-              title="Coming in Phase 2"
+              title={t('bookDetail.aiPhase2Tooltip')}
             >
               <Wand2 className="w-5 h-5" />
               {t('bookDetail.aiAnalysisSoon')}
@@ -124,7 +124,7 @@ export default function BookDetailPage() {
             </h1>
             {novel.author && (
               <p className="text-xl text-text-secondary">
-                by {novel.author}
+                {t('bookDetail.byAuthor', { author: novel.author })}
               </p>
             )}
           </div>
@@ -132,7 +132,7 @@ export default function BookDetailPage() {
           <div className="flex flex-wrap items-center gap-4 mb-8">
             <span className="inline-flex flex-col bg-muted-bg px-4 py-2 rounded-lg border border-border-color/20">
               <span className="text-xs text-text-secondary uppercase tracking-wider font-semibold mb-1 flex items-center gap-1">
-                <FileText className="w-3 h-3" /> Format
+                <FileText className="w-3 h-3" /> {t('bookDetail.format')}
               </span>
               <span className="font-semibold text-text-primary">{novel.fileType.toUpperCase()}</span>
             </span>
@@ -165,9 +165,9 @@ export default function BookDetailPage() {
             </div>
 
             <div>
-              <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-wider mb-3">AI Analysis Data</h3>
+              <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-wider mb-3">{t('bookDetail.aiAnalysisData')}</h3>
               <div className="p-4 rounded-xl border border-dashed border-border-color/30 bg-muted-bg/50 text-text-secondary text-sm flex items-center justify-center min-h-[120px]">
-                Pending AI Analysis. Characters, themes, and plot points will appear here.
+                {t('bookDetail.aiAnalysisPending')}
               </div>
             </div>
           </div>

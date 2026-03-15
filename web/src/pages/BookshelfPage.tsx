@@ -35,7 +35,7 @@ export default function BookshelfPage() {
       <div className="flex items-end justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold text-text-primary tracking-tight">{t('bookshelf.title')}</h1>
-          <p className="text-text-secondary mt-1">Manage and read your personal collection</p>
+          <p className="text-text-secondary mt-1">{t('bookshelf.subtitle')}</p>
         </div>
         <button
           onClick={() => setIsUploadModalOpen(true)}
@@ -66,7 +66,7 @@ export default function BookshelfPage() {
           </div>
           <h2 className="text-xl font-semibold text-text-primary mb-2">{t('bookshelf.noBooks')}</h2>
           <p className="text-text-secondary max-w-md mb-6">
-            Upload a .txt or .epub file to start your reading journey. Our engine will automatically parse chapters for you.
+            {t('bookshelf.noBooksHint')}
           </p>
           <button
             onClick={() => setIsUploadModalOpen(true)}
