@@ -6,9 +6,10 @@ interface ChapterListProps {
   chapters: Chapter[];
   currentIndex: number;
   onSelect: (index: number) => void;
+  contentTextColor?: string;
 }
 
-export default function ChapterList({ chapters, currentIndex, onSelect }: ChapterListProps) {
+export default function ChapterList({ chapters, currentIndex, onSelect, contentTextColor }: ChapterListProps) {
   const listRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to active chapter
@@ -38,7 +39,7 @@ export default function ChapterList({ chapters, currentIndex, onSelect }: Chapte
               "text-left px-3 py-2.5 rounded-lg text-sm transition-all duration-200",
                 isActive 
                 ? "bg-accent/20 text-accent font-medium shadow-sm"
-                : "text-text-secondary hover:bg-muted-bg hover:text-text-primary"
+                : cn(contentTextColor || "text-text-secondary", "hover:bg-brand-500/10 hover:text-text-primary opacity-80 hover:opacity-100")
             )}
           >
             <div className="line-clamp-2 leading-relaxed">

@@ -4,11 +4,13 @@ import BookshelfPage from './pages/BookshelfPage';
 import BookDetailPage from './pages/BookDetailPage';
 import ReaderPage from './pages/ReaderPage';
 import SettingsPage from './pages/SettingsPage';
+import { ThemeProvider } from './context/ThemeContext';
 
 function App() {
   return (
-    <Router>
-      <Layout>
+    <ThemeProvider>
+      <Router>
+        <Layout>
         <Routes>
           <Route path="/" element={<BookshelfPage />} />
           <Route path="/novel/:id" element={<BookDetailPage />} />
@@ -17,6 +19,7 @@ function App() {
         </Routes>
       </Layout>
     </Router>
+    </ThemeProvider>
   );
 }
 

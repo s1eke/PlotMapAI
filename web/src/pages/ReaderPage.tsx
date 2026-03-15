@@ -7,6 +7,7 @@ import type { Chapter, ChapterContent } from '../api/reader';
 import ChapterList from '../components/ChapterList';
 import ReaderToolbar from '../components/ReaderToolbar';
 import { cn } from '../utils/cn';
+import { READER_THEMES } from '../constants/readerThemes';
 
 export default function ReaderPage() {
   const { t } = useTranslation();
@@ -154,18 +155,10 @@ export default function ReaderPage() {
   const handleNext = () => currentChapter?.hasNext && setChapterIndex(prev => prev + 1);
   const handlePrev = () => currentChapter?.hasPrev && setChapterIndex(prev => prev - 1);
 
-  const themeStyles: Record<string, string> = {
-    paper: 'bg-[#ffffff] text-[#1a1a1a]',
-    parchment: 'bg-[#f4ecd8] text-[#5b4636]',
-    green: 'bg-[#c7edcc] text-[#2c3e50]',
-    night: 'bg-[#1a1a1a] text-[#d1d1d1]',
-    auto: 'bg-bg-primary text-text-primary'
-  };
-
-  const currentThemeStyles = themeStyles[readerTheme] || themeStyles.auto;
+  const currentTheme = READER_THEMES[readerTheme] || READER_THEMES.auto;
 
   return (
-    <div className={cn("flex h-screen w-full overflow-hidden transition-colors duration-300", currentThemeStyles)}>
+    <div className={cn("flex h-screen w-full overflow-hidden transition-colors duration-300", currentTheme.bg)}>
       
       {/* Mobile Sidebar Backdrop */}
       <div 
@@ -179,8 +172,8 @@ export default function ReaderPage() {
       {/* Sidebar TOC - Layout adaptive (pushes content on desktop) */}
       <aside 
         className={cn(
-          "flex flex-col transition-all duration-300 ease-in-out overflow-hidden z-20",
-          readerTheme === 'auto' ? "bg-bg-secondary" : currentThemeStyles,
+          "flex flex-col transition-all duration-300 ease-in-out overflow-hidden z-20 text-text-primary",
+          currentTheme.sidebarBg,
           "fixed inset-y-0 left-0 md:relative md:translate-x-0 h-full",
           isSidebarOpen 
             ? "w-72 translate-x-0 shadow-2xl md:shadow-none border-r border-border-color/30" 
@@ -188,7 +181,7 @@ export default function ReaderPage() {
         )}
       >
         <div className="w-72 flex flex-col h-full shrink-0">
-          <div className="flex items-center justify-between p-4 border-b border-border-color/20 shrink-0">
+          <header className="h-14 flex items-center justify-between px-4 border-b border-border-color/20 shrink-0 glass z-10">
             <button 
               onClick={() => setIsSidebarOpen(false)}
               className="font-semibold text-lg text-text-primary flex items-center gap-2 hover:opacity-70 transition-opacity cursor-pointer text-left"
@@ -196,33 +189,34 @@ export default function ReaderPage() {
             >
               <Menu className="w-5 h-5 text-accent" /> {t('reader.contents')}
             </button>
-            <button onClick={() => setIsSidebarOpen(false)} className="md:hidden p-1 rounded-full hover:bg-muted-bg text-text-secondary">
+            <button onClick={() => setIsSidebarOpen(false)} className="md:hidden p-1 rounded-full hover:bg-white/10 text-text-secondary transition-colors">
               <X className="w-5 h-5" />
             </button>
-          </div>
+          </header>
           <div className="flex-1 overflow-hidden min-h-0">
              <ChapterList 
                 chapters={chapters} 
                 currentIndex={chapterIndex} 
                 onSelect={handleSelectChapter} 
+                contentTextColor={currentTheme.text}
              />
           </div>
         </div>
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col min-w-0 relative">
+      <main className="flex-1 flex flex-col min-w-0 relative text-text-primary">
         {/* Top Header */}
         <header className="h-14 flex items-center justify-between px-4 sm:px-6 shrink-0 border-b border-border-color/20 glass z-10 sticky top-0">
           <div className="flex items-center gap-3">
             <button 
               onClick={toggleSidebar} 
-              className="p-2 rounded-full hover:bg-white/10 transition-colors"
+              className="p-2 rounded-full hover:bg-white/10 transition-colors text-text-primary"
               title={t('reader.contents')}
             >
               {isSidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
-            <Link to={`/novel/${novelId}`} className="text-sm font-medium hover:text-accent transition-colors hidden sm:block">
+            <Link to={`/novel/${novelId}`} className="text-sm font-medium hover:text-accent transition-colors hidden sm:block text-text-primary">
               {t('reader.exit')}
             </Link>
           </div>
@@ -264,7 +258,7 @@ export default function ReaderPage() {
                <Loader2 className="w-8 h-8 animate-spin text-accent" />
             </div>
           ) : currentChapter ? (
-            <div className="h-full px-4 sm:px-8 md:px-12 py-8 max-w-[1200px] mx-auto w-full relative">
+            <div className={cn("h-full px-4 sm:px-8 md:px-12 py-8 max-w-[1200px] mx-auto w-full relative", currentTheme.text)}>
               
               <h1 className={cn(
                 "text-3xl sm:text-4xl font-bold mb-12 text-center leading-tight font-serif pt-8 transition-colors",
@@ -286,8 +280,7 @@ export default function ReaderPage() {
               ) : (
                 <div 
                   className={cn(
-                    "leading-relaxed font-serif mx-auto w-full transition-all text-justify md:text-left selection:bg-accent/30 tracking-wide",
-                    readerTheme === 'auto' ? "text-text-primary/90" : "",
+                    "leading-relaxed font-serif mx-auto w-full transition-all text-justify md:text-left selection:bg-accent/30 tracking-wide opacity-90",
                     isTwoColumn && "md:columns-2 md:gap-16 [column-rule:1px_solid_var(--border-color)]"
                   )}
                   style={{
