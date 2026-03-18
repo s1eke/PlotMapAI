@@ -32,8 +32,8 @@ export default function BookDetailPage() {
     try {
       const data = await novelsApi.get(novelId);
       setNovel(data);
-    } catch (err: any) {
-      setError(err.message || t('bookDetail.loadError'));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('bookDetail.loadError'));
     } finally {
       setIsLoading(false);
     }
@@ -45,8 +45,8 @@ export default function BookDetailPage() {
     try {
       const data = await analysisApi.getStatus(novelId);
       setAnalysisStatus(data);
-    } catch (err: any) {
-      setAnalysisMessage(err.message || t('bookDetail.analysisLoadError'));
+    } catch (err) {
+      setAnalysisMessage(err instanceof Error ? err.message : t('bookDetail.analysisLoadError'));
       setAnalysisStatus(null);
     } finally {
       if (!silent) setIsAnalysisLoading(false);
@@ -100,8 +100,8 @@ export default function BookDetailPage() {
     try {
       await novelsApi.delete(novel.id);
       navigate('/', { replace: true });
-    } catch (err: any) {
-      alert(err.message || t('bookDetail.deleteFailed'));
+    } catch (err) {
+      alert(err instanceof Error ? err.message : t('bookDetail.deleteFailed'));
       setIsDeleting(false);
       setIsDeleteModalOpen(false);
     }
@@ -129,8 +129,8 @@ export default function BookDetailPage() {
               ? t('bookDetail.analysisActionRestarted')
               : t('bookDetail.analysisActionStarted')
       );
-    } catch (err: any) {
-      setAnalysisMessage(err.message || t('bookDetail.analysisActionFailed'));
+    } catch (err) {
+      setAnalysisMessage(err instanceof Error ? err.message : t('bookDetail.analysisActionFailed'));
     } finally {
       setAnalysisAction(null);
     }

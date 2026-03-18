@@ -1,5 +1,4 @@
 """Flask application factory."""
-import os
 from pathlib import Path
 
 from flask import Flask

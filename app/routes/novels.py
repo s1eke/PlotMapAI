@@ -3,7 +3,7 @@ import os
 import json
 from pathlib import Path
 
-from flask import Blueprint, request, jsonify, send_file, current_app
+from flask import Blueprint, request, jsonify, send_file
 from sqlalchemy.orm import Session
 
 from config import Config
@@ -96,18 +96,12 @@ def delete_novel(novel_id: int):
         if not novel:
             return jsonify({"error": "Novel not found"}), 404
 
-        # Remove cover file if exists
-        if novel.cover_path and os.path.exists(novel.cover_path):
-            os.remove(novel.cover_path)
-
-        # Remove EPUB file if exists
-        if novel.raw_content and novel.raw_content.epub_path:
-            epub_path = novel.raw_content.epub_path
-            if os.path.exists(epub_path):
-                os.remove(epub_path)
+        cover_path_to_delete, epub_path_to_delete = _plan_novel_file_cleanup(session, novel)
 
         session.delete(novel)
         session.commit()
+        _remove_file_if_exists(cover_path_to_delete)
+        _remove_file_if_exists(epub_path_to_delete)
         return jsonify({"message": "Novel deleted"})
     except Exception as e:
         session.rollback()
@@ -138,6 +132,48 @@ def get_cover(novel_id: int):
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
+
+def _plan_novel_file_cleanup(session: Session, novel: Novel) -> tuple[str | None, str | None]:
+    """Return the cover/EPUB paths that are safe to delete after the DB row is removed."""
+    cover_path_to_delete = None
+    epub_path_to_delete = None
+
+    if novel.cover_path and not _has_other_cover_reference(session, novel.cover_path, novel.id):
+        cover_path_to_delete = novel.cover_path
+
+    epub_path = novel.raw_content.epub_path if novel.raw_content else ""
+    if epub_path and not _has_other_epub_reference(session, epub_path, novel.id):
+        epub_path_to_delete = epub_path
+
+    return cover_path_to_delete, epub_path_to_delete
+
+
+def _has_other_cover_reference(session: Session, cover_path: str, exclude_novel_id: int) -> bool:
+    if not cover_path:
+        return False
+    return (
+        session.query(Novel.id)
+        .filter(Novel.cover_path == cover_path, Novel.id != exclude_novel_id)
+        .first()
+        is not None
+    )
+
+
+def _has_other_epub_reference(session: Session, epub_path: str, exclude_novel_id: int) -> bool:
+    if not epub_path:
+        return False
+    return (
+        session.query(NovelRawContent.novel_id)
+        .filter(NovelRawContent.epub_path == epub_path, NovelRawContent.novel_id != exclude_novel_id)
+        .first()
+        is not None
+    )
+
+
+def _remove_file_if_exists(file_path: str | None) -> None:
+    if file_path and os.path.exists(file_path):
+        os.remove(file_path)
+
 
 def _handle_txt_upload(session: Session, raw_bytes: bytes, filename: str) -> dict:
     """Process a TXT file upload."""

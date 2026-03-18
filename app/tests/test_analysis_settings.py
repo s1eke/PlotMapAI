@@ -74,11 +74,10 @@ class AnalysisSettingsTests(unittest.TestCase):
                 patch.object(database, "_apply_schema_updates", side_effect=lambda: calls.append("schema")), \
                 patch.object(database, "_seed_default_user", side_effect=lambda _session: calls.append("user")), \
                 patch.object(database, "_seed_default_toc_rules", side_effect=lambda _session: calls.append("toc")), \
-                patch.object(database, "_remove_legacy_default_purification_rules", side_effect=lambda _session: calls.append("purifier_cleanup")), \
                 patch.object(database, "db_session", side_effect=lambda: DummySession()):
                 database.init_db()
 
-        self.assertEqual(calls, ["create_all", "schema", "user", "toc", "purifier_cleanup"])
+        self.assertEqual(calls, ["create_all", "schema", "user", "toc"])
 
     def test_handle_analysis_error_maps_missing_novel_to_404(self):
         app = Flask(__name__)

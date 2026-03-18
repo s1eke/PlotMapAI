@@ -94,6 +94,7 @@ export default function SettingsPage() {
     fetchTocRules();
     fetchPurificationRules();
     fetchAiSettings();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleSaveTocRule = async (data: Partial<TocRule>) => {
@@ -136,8 +137,8 @@ export default function SettingsPage() {
     try {
       await settingsApi.uploadTocRulesJson(file);
       await fetchTocRules();
-    } catch (err: any) {
-      alert(`${t('settings.common.uploadFailed')}: ${err.message}`);
+    } catch (err) {
+      alert(`${t('settings.common.uploadFailed')}: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setIsTocLoading(false);
       if (tocInputRef.current) tocInputRef.current.value = '';
@@ -184,8 +185,8 @@ export default function SettingsPage() {
     try {
       await settingsApi.uploadPurificationRulesJson(file);
       await fetchPurificationRules();
-    } catch (err: any) {
-      alert(`${t('settings.common.uploadFailed')}: ${err.message}`);
+    } catch (err) {
+      alert(`${t('settings.common.uploadFailed')}: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setIsPurificationLoading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -217,8 +218,8 @@ export default function SettingsPage() {
       setAiSettings(data);
       syncAiForm(data);
       setAiMessage(t('settings.ai.saveSuccess'));
-    } catch (err: any) {
-      setAiMessage(err.message || t('settings.ai.saveFailed'));
+    } catch (err) {
+      setAiMessage(err instanceof Error ? err.message : t('settings.ai.saveFailed'));
     } finally {
       setIsAiSaving(false);
     }
@@ -230,8 +231,8 @@ export default function SettingsPage() {
     try {
       const result = await settingsApi.testAiProviderSettings(buildAiPayload());
       setAiMessage(`${result.message} ${result.preview ? t('settings.ai.testPreviewPrefix', { preview: result.preview }) : ''}`.trim());
-    } catch (err: any) {
-      setAiMessage(err.message || t('settings.ai.testFailed'));
+    } catch (err) {
+      setAiMessage(err instanceof Error ? err.message : t('settings.ai.testFailed'));
     } finally {
       setIsAiTesting(false);
     }

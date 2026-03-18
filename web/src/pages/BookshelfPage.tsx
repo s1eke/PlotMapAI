@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { novelsApi } from '../api/novels';
@@ -13,22 +13,22 @@ export default function BookshelfPage() {
   const [error, setError] = useState<string | null>(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
-  const fetchNovels = async () => {
+  const fetchNovels = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
       const data = await novelsApi.list();
       setNovels(data);
-    } catch (err: any) {
-      setError(err.message || t('bookshelf.loadError'));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('bookshelf.loadError'));
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [t]);
 
   useEffect(() => {
     fetchNovels();
-  }, []);
+  }, [fetchNovels]);
 
   return (
     <div className="flex-1 flex flex-col p-6 max-w-7xl mx-auto w-full">

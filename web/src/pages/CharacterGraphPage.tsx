@@ -96,8 +96,8 @@ export default function CharacterGraphPage() {
       setSelectedNodeId((current) => (
         current && graphData.nodes.some((node) => node.id === current) ? current : null
       ));
-    } catch (err: any) {
-      setError(err.message || t('characterGraph.loadError'));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('characterGraph.loadError'));
     } finally {
       setIsLoading(false);
     }
@@ -292,7 +292,7 @@ export default function CharacterGraphPage() {
     };
   }, [getSvgPoint, getViewportPoint]);
 
-  const handleNodePointerDown = useCallback((event: any, node: LayoutNode) => {
+  const handleNodePointerDown = useCallback((event: React.PointerEvent<SVGGElement>, node: LayoutNode) => {
     const point = getSvgPoint(event.clientX, event.clientY);
     if (!point) return;
     dragStateRef.current = {
@@ -335,7 +335,7 @@ export default function CharacterGraphPage() {
     });
   }, [getViewportPoint]);
 
-  const handleCanvasPointerDown = useCallback((event: any) => {
+  const handleCanvasPointerDown = useCallback((event: React.PointerEvent<SVGSVGElement>) => {
     dragStateRef.current = null;
     if (!canPanCanvas) {
       setSelectedNodeId(null);
@@ -379,8 +379,8 @@ export default function CharacterGraphPage() {
     try {
       await analysisApi.refreshOverview(novelId);
       setActionMessage(t('characterGraph.refreshStarted'));
-    } catch (err: any) {
-      setActionMessage(err.message || t('characterGraph.refreshFailed'));
+    } catch (err) {
+      setActionMessage(err instanceof Error ? err.message : t('characterGraph.refreshFailed'));
     } finally {
       setIsRefreshingOverview(false);
     }
@@ -1008,6 +1008,7 @@ function estimateCharacterUnits(char: string) {
   if (/[a-z0-9]/.test(char)) {
     return 0.58;
   }
+  // eslint-disable-next-line no-control-regex
   if (/[^\u0000-\u00ff]/.test(char)) {
     return 1;
   }

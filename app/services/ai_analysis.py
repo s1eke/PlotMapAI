@@ -1,5 +1,6 @@
 """AI analysis helpers: config handling, chunking, LLM calling, result normalization, and aggregation."""
 import json
+import logging
 import re
 from collections import Counter
 from dataclasses import dataclass
@@ -14,6 +15,8 @@ MIN_CONTEXT_SIZE = 12000
 LLM_TIMEOUT_SECONDS = 120
 LLM_MAX_OUTPUT_TOKENS = 4000
 ANALYSIS_RETRY_LIMIT = 3
+
+logger = logging.getLogger(__name__)
 
 _RELATION_TAG_CANONICAL_PATTERNS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("父女", ("父女",)),
@@ -519,6 +522,14 @@ def _build_overview_relationship_map(raw_relationship_graph: Any) -> dict[tuple[
 
 
 
+def _find_missing_overview_relationship_names(
+    pair: tuple[str, str],
+    local_character_map: dict[str, dict[str, Any]],
+) -> list[str]:
+    return [name for name in pair if name not in local_character_map]
+
+
+
 def _build_character_graph_node_description(
     name: str,
     role: str,
@@ -990,8 +1001,15 @@ def _normalize_overview_result(raw: dict[str, Any], aggregates: dict[str, Any], 
         if not pair or pair in seen_pairs:
             continue
         source, target = pair
-        if source not in local_character_map or target not in local_character_map:
-            raise AnalysisExecutionError(f"AI 返回了未在章节分析中出现的关系人物：{source} / {target}。")
+        missing_names = _find_missing_overview_relationship_names(pair, local_character_map)
+        if missing_names:
+            logger.warning(
+                "Skipping overview relationship because names were not found in chapter analyses: "
+                "missing=%s pair=%s",
+                ", ".join(missing_names),
+                f"{source} / {target}",
+            )
+            continue
         local_edge = local_relationship_map.get(pair, {})
         relation_tags = _normalize_relation_tags(item.get("relationTags"), item.get("type"))
         if not relation_tags:

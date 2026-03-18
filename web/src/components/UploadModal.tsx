@@ -48,8 +48,8 @@ export default function UploadModal({ isOpen, onClose, onSuccess }: UploadModalP
       await novelsApi.upload(file);
       onSuccess();
       onClose();
-    } catch (err: any) {
-      setError(err.message || t('bookshelf.uploadFailed'));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err) || t('bookshelf.uploadFailed'));
     } finally {
       setIsUploading(false);
     }

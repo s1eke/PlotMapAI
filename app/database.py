@@ -7,7 +7,7 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker, scoped_session
 
 from config import Config
-from models import Base, TocRule, PurificationRuleSet, PurificationRule, User
+from models import Base, TocRule, User
 
 engine = create_engine(
     Config.DATABASE_URL,
@@ -42,7 +42,6 @@ def init_db():
     with db_session() as session:
         _seed_default_user(session)
         _seed_default_toc_rules(session)
-        _remove_legacy_default_purification_rules(session)
 
 
 def _seed_default_user(session):
@@ -87,38 +86,6 @@ def _seed_default_toc_rules(session):
         print(f"Error seeding default TOC rules: {e}")
         session.rollback()
 
-
-def _remove_legacy_default_purification_rules(session):
-    """Remove legacy auto-seeded purification rules that are no longer desired."""
-    legacy_signatures = {
-        ("去除空白行", "格式", "^\\s*$", "", True, 1, False, True),
-        ("去除行首尾空格", "格式", "^\\s+|\\s+$", "", True, 2, True, True),
-    }
-
-    try:
-        rules = session.query(PurificationRule).filter_by(user_id=Config.DEFAULT_USER_ID).all()
-        stale_rules = [
-            rule for rule in rules
-            if (
-                rule.name,
-                rule.group,
-                rule.pattern,
-                rule.replacement,
-                rule.is_regex,
-                rule.order,
-                rule.scope_title,
-                rule.scope_content,
-            ) in legacy_signatures
-        ]
-        if not stale_rules:
-            return
-
-        for rule in stale_rules:
-            session.delete(rule)
-        session.commit()
-    except Exception as e:
-        print(f"Error removing legacy purification rules: {e}")
-        session.rollback()
 
 
 def _apply_schema_updates():
