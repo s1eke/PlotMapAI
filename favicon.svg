@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <title>PlotMapAI Logo</title>
+  <desc>Minimal warm-toned open book with a rising three-node story arc.</desc>
+
+  <g stroke="#7A4B2B" stroke-width="24" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M92 150c62 0 118 22 164 68v172c-43-36-98-54-164-54V150Z" />
+    <path d="M420 150c-62 0-118 22-164 68v172c43-36 98-54 164-54V150Z" />
+    <path d="M256 218v172" />
+    <path d="M122 348c50 0 94 14 134 42" opacity=".88" />
+    <path d="M390 348c-50 0-94 14-134 42" opacity=".88" />
+  </g>
+
+  <g stroke="#E7A04B" stroke-width="18" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M176 194 256 126 336 194" />
+    <path d="M256 126v56" opacity=".9" />
+    <path d="M256 182v54" opacity=".82" />
+  </g>
+
+  <g fill="#E7A04B">
+    <circle cx="176" cy="194" r="19" />
+    <circle cx="256" cy="126" r="22" />
+    <circle cx="336" cy="194" r="19" />
+    <circle cx="256" cy="236" r="18" fill="#C97837" />
+  </g>
+</svg>
