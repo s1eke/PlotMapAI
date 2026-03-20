@@ -16,10 +16,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "24"
           cache: npm
@@ -43,35 +43,34 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@v4
         with:
           languages: javascript-typescript
           build-mode: none
           queries: security-extended,security-and-quality
 
       - name: Perform CodeQL analysis
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@v4
 
-  build-pages:
-    name: Build Pages
+  deploy-gh-pages:
+    name: Build and Publish gh-pages
     if: ${{ github.ref == 'refs/heads/dev' }}
     needs:
       - frontend-checks
       - codeql
     runs-on: ubuntu-latest
     permissions:
-      contents: read
-      pages: write
+      contents: write
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "24"
           cache: npm
@@ -79,45 +78,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Configure GitHub Pages
-        id: pages
-        uses: actions/configure-pages@v5
-
-      - name: Normalize Pages base path
-        id: pages-base
-        run: |
-          base_path="${{ steps.pages.outputs.base_path }}"
-          normalized_base="${base_path%/}"
-
-          if [ -z "$normalized_base" ]; then
-            echo "vite_base=/" >> "$GITHUB_OUTPUT"
-          else
-            echo "vite_base=${normalized_base}/" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Build
         run: npm run build
         env:
-          VITE_BASE: ${{ steps.pages-base.outputs.vite_base }}
+          VITE_BASE: /${{ github.event.repository.name }}/
 
-      - name: Upload GitHub Pages artifact
-        uses: actions/upload-pages-artifact@v4
+      - name: Publish to gh-pages branch
+        uses: peaceiris/actions-gh-pages@v4
         with:
-          path: ./dist
-
-  deploy-pages:
-    name: Deploy Pages
-    if: ${{ github.ref == 'refs/heads/dev' }}
-    needs: build-pages
-    runs-on: ubuntu-latest
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: ./dist
