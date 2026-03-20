@@ -19,6 +19,7 @@ coverage/
 *.swp
 *.swo
 AGENTS.md
+.kilo
 
 # OS
 .DS_Store
