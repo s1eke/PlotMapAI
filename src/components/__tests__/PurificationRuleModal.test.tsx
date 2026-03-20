@@ -19,15 +19,15 @@ describe('PurificationRuleModal', () => {
     const user = userEvent.setup();
     render(<PurificationRuleModal isOpen={true} onClose={onClose} onSave={onSave} rule={null} />);
 
-    await user.type(screen.getByPlaceholderText('#广告 替换#JS'), 'Rule A');
-    await user.clear(screen.getByPlaceholderText('净化'));
-    await user.type(screen.getByPlaceholderText('净化'), 'Custom');
-    await user.type(screen.getByPlaceholderText('正则表达式...'), 'foo');
-    await user.type(screen.getByPlaceholderText('替换内容 (支持 @js: 预设函数)...'), 'bar');
+    await user.type(screen.getByPlaceholderText('settings.purification.namePlaceholder'), 'Rule A');
+    await user.clear(screen.getByPlaceholderText('settings.purification.groupPlaceholder'));
+    await user.type(screen.getByPlaceholderText('settings.purification.groupPlaceholder'), 'Custom');
+    await user.type(screen.getByPlaceholderText('settings.purification.patternPlaceholder'), 'foo');
+    await user.type(screen.getByPlaceholderText('settings.purification.replacementPlaceholder'), 'bar');
     await user.click(screen.getAllByRole('switch')[0]);
     await user.click(screen.getByRole('checkbox', { name: 'settings.purification.scopeTitle' }));
 
-    await user.click(screen.getByRole('button', { name: 'common.add' }));
+    await user.click(screen.getByRole('button', { name: 'common.actions.add' }));
 
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
       name: 'Rule A',
@@ -47,9 +47,9 @@ describe('PurificationRuleModal', () => {
     const user = userEvent.setup();
     render(<PurificationRuleModal isOpen={true} onClose={onClose} onSave={onSave} rule={null} />);
 
-    await user.type(screen.getByPlaceholderText('#广告 替换#JS'), 'Rule');
-    await user.type(screen.getByPlaceholderText('正则表达式...'), 'foo');
-    await user.click(screen.getByRole('button', { name: 'common.add' }));
+    await user.type(screen.getByPlaceholderText('settings.purification.namePlaceholder'), 'Rule');
+    await user.type(screen.getByPlaceholderText('settings.purification.patternPlaceholder'), 'foo');
+    await user.click(screen.getByRole('button', { name: 'common.actions.add' }));
 
     expect(onSave).toHaveBeenCalledTimes(1);
     expect(onClose).not.toHaveBeenCalled();
@@ -59,8 +59,8 @@ describe('PurificationRuleModal', () => {
     render(<PurificationRuleModal isOpen={true} onClose={() => {}} onSave={() => Promise.resolve()} rule={null} />);
     const user = userEvent.setup();
 
-    await user.type(screen.getByPlaceholderText('替换内容 (支持 @js: 预设函数)...'), '@js:fullwidth');
+    await user.type(screen.getByPlaceholderText('settings.purification.replacementPlaceholder'), '@js:fullwidth');
 
-    expect(screen.getByText(/SECURITY: WHITELIST ONLY/)).toBeInTheDocument();
+    expect(screen.getByText('settings.purification.jsSecurityBadge')).toBeInTheDocument();
   });
 });

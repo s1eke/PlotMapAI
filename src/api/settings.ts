@@ -216,7 +216,7 @@ export const settingsApi = {
       id: undefined as unknown as number,
       externalId: null,
       name: data.name,
-      group: data.group || '默认',
+      group: data.group || 'Purification',
       pattern: data.pattern,
       replacement: unescapeReplacement(data.replacement || ''),
       isRegex: data.isRegex ?? true,
@@ -293,7 +293,7 @@ export const settingsApi = {
         id: undefined as unknown as number,
         externalId: null,
         name,
-        group: (obj.group as string) || '默认',
+        group: (obj.group as string) || 'Purification',
         pattern,
         replacement: unescapeReplacement((obj.replacement as string) || ''),
         isRegex,
@@ -317,7 +317,7 @@ export const settingsApi = {
     const rules = await db.purificationRules.orderBy('order').toArray();
     const exportData = rules.map(r => ({
       name: r.name,
-      group: r.group || '默认',
+      group: r.group || 'Purification',
       pattern: r.pattern,
       replacement: r.replacement,
       is_regex: r.isRegex,
