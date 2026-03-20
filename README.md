@@ -1,8 +1,7 @@
 <h1 align="center">PlotMapAI</h1>
 
 <p align="center">
-  <a href="https://github.com/s1eke/PlotMapAI/actions/workflows/ci.yml"><img src="https://github.com/s1eke/PlotMapAI/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://github.com/s1eke/PlotMapAI/actions/workflows/codeql.yml"><img src="https://github.com/s1eke/PlotMapAI/actions/workflows/codeql.yml/badge.svg" alt="Code Scanning"></a>
+  <a href="https://github.com/s1eke-labs/PlotMapAI/actions/workflows/ci.yml"><img src="https://github.com/s1eke-labs/PlotMapAI/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white" alt="React">
   <img src="https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white" alt="TypeScript">
   <img src="https://img.shields.io/badge/Vite-8-646CFF?logo=vite&logoColor=white" alt="Vite">

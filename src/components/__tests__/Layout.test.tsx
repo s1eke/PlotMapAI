@@ -4,15 +4,20 @@ import Layout from '../Layout';
 import { MemoryRouter } from 'react-router-dom';
 import { ThemeProvider } from '../../context/ThemeContext';
 
-const changeLanguage = vi.fn();
-const t = (key: string) => key;
-
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t, i18n: { language: 'zh-CN', changeLanguage } }),
+  useTranslation: () => ({ t: (key: string) => key }),
+}));
+
+vi.mock('../ThemeToggle', () => ({
+  default: () => <div data-testid="theme-toggle">theme-toggle</div>,
+}));
+
+vi.mock('../LanguageSwitcher', () => ({
+  default: () => <div data-testid="language-switcher">language-switcher</div>,
 }));
 
 describe('Layout component', () => {
-  it('renders header when not in reader mode', () => {
+  it('shows global navigation outside reader mode', () => {
     render(
       <MemoryRouter initialEntries={['/']}>
         <ThemeProvider>
@@ -22,11 +27,14 @@ describe('Layout component', () => {
         </ThemeProvider>
       </MemoryRouter>
     );
-    expect(screen.getByText('common.appName')).toBeInTheDocument();
-    expect(screen.getByText('Page Content')).toBeInTheDocument();
+
+    expect(screen.getByRole('link', { name: 'common.appName' })).toHaveAttribute('href', '/');
+    expect(screen.getByTitle('common.nav.settings')).toHaveAttribute('href', '/settings');
+    expect(screen.getByTestId('theme-toggle')).toBeInTheDocument();
+    expect(screen.getByTestId('language-switcher')).toBeInTheDocument();
   });
 
-  it('hides header in reader mode', () => {
+  it('hides the global navigation in reader mode', () => {
     render(
       <MemoryRouter initialEntries={['/novel/1/read']}>
         <ThemeProvider>
@@ -36,7 +44,11 @@ describe('Layout component', () => {
         </ThemeProvider>
       </MemoryRouter>
     );
-    expect(screen.queryByText('common.appName')).toBeNull();
+
+    expect(screen.queryByRole('link', { name: 'common.appName' })).not.toBeInTheDocument();
+    expect(screen.queryByTitle('common.nav.settings')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('theme-toggle')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('language-switcher')).not.toBeInTheDocument();
     expect(screen.getByText('Reader Content')).toBeInTheDocument();
   });
 });
