@@ -170,6 +170,7 @@
     "aiSummaryPlaceholder": "AI 摘要",
     "aiSummaryHint": "AI 正在分析此章节，摘要生成后将在此显示。",
     "background": "背景",
+    "moreSettings": "更多设置",
     "bgPresets": {
       "auto": "默认",
       "paper": "白纸",

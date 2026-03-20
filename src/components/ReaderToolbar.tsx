@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { AlignJustify, AlignVerticalSpaceAround, Columns2, Type, ArrowLeft, ArrowRight } from 'lucide-react';
+import { AlignJustify, AlignVerticalSpaceAround, Columns2, MoreVertical, Type, ArrowLeft, ArrowRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '../utils/cn';
 
@@ -42,25 +42,31 @@ export default function ReaderToolbar({
 }: ReaderToolbarProps) {
   const { t } = useTranslation();
   const [activeSlider, setActiveSlider] = useState<SliderKey>(null);
+  const [overflowOpen, setOverflowOpen] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
+  const overflowRef = useRef<HTMLDivElement>(null);
   const buttonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const overflowBtnRef = useRef<HTMLButtonElement>(null);
 
   const toggleSlider = useCallback((key: SliderKey) => {
     setActiveSlider(prev => prev === key ? null : key);
   }, []);
 
   useEffect(() => {
-    if (!activeSlider) return;
+    if (!activeSlider && !overflowOpen) return;
     const handleClick = (e: MouseEvent) => {
       const target = e.target as Node;
       if (popoverRef.current?.contains(target)) return;
-      const btn = buttonRefs.current[activeSlider];
+      if (overflowRef.current?.contains(target)) return;
+      if (overflowBtnRef.current?.contains(target)) return;
+      const btn = activeSlider ? buttonRefs.current[activeSlider] : null;
       if (btn?.contains(target)) return;
       setActiveSlider(null);
+      setOverflowOpen(false);
     };
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
-  }, [activeSlider]);
+  }, [activeSlider, overflowOpen]);
 
   const themes = [
     { id: 'auto', color: 'transparent', label: t('reader.bgPresets.auto') },
@@ -70,7 +76,7 @@ export default function ReaderToolbar({
     { id: 'night', color: '#1a1a1a', label: t('reader.bgPresets.night') },
   ];
 
-  const sliders: Array<{
+  const desktopSliders: Array<{
     key: Exclude<SliderKey, null>;
     icon: typeof Type;
     label: string;
@@ -86,10 +92,74 @@ export default function ReaderToolbar({
       { key: 'paragraphSpacing', icon: AlignVerticalSpaceAround, label: t('reader.paragraphSpacing'), value: paragraphSpacing, display: `${paragraphSpacing}px`, min: 0, max: 32, step: 2, onChange: setParagraphSpacing },
     ];
 
-  return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-bg-secondary/90 dark:bg-brand-800/90 backdrop-blur-xl rounded-full px-6 py-3 flex items-center gap-4 shadow-2xl border border-border-color z-40 transition-all hover:bg-bg-secondary dark:hover:bg-brand-800">
+  const mobileSliders = desktopSliders.filter(s => s.key === 'fontSize');
 
-      <div className="flex items-center gap-2 border-r border-border-color/50 pr-5">
+  function renderSliderButton(s: typeof desktopSliders[number]) {
+    return (
+      <div key={s.key} className="relative">
+        <button
+          ref={el => { buttonRefs.current[s.key] = el; }}
+          onClick={() => toggleSlider(s.key)}
+          className={cn(
+            "px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 text-sm transition-colors",
+            activeSlider === s.key ? "bg-accent text-white" : "hover:bg-muted-bg text-text-primary"
+          )}
+          title={s.label}
+        >
+          <s.icon className="w-4 h-4" />
+          <span className="font-medium text-xs">{s.display}</span>
+        </button>
+        {activeSlider === s.key && (
+          <div
+            ref={popoverRef}
+            className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 bg-bg-secondary dark:bg-brand-800 border border-border-color rounded-xl px-5 py-4 shadow-xl min-w-[200px]"
+          >
+            <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 rotate-45 w-2.5 h-2.5 bg-bg-secondary dark:bg-brand-800 border-r border-b border-border-color" />
+            <div className="text-xs text-text-secondary mb-2 text-center">{s.label}</div>
+            <div className="flex items-center gap-3">
+              <input
+                type="range"
+                min={s.min}
+                max={s.max}
+                step={s.step}
+                value={s.value}
+                onChange={e => s.onChange(Number(e.target.value))}
+                className="flex-1 accent-accent h-1.5 cursor-pointer"
+              />
+              <span className="text-sm font-mono text-text-primary min-w-[3.5ch] text-right">{s.display}</span>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  function renderSliderRow(s: typeof desktopSliders[number]) {
+    return (
+      <div key={s.key} className="space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-text-secondary">{s.label}</span>
+          <span className="text-xs font-mono text-text-primary">{s.display}</span>
+        </div>
+        <input
+          type="range"
+          min={s.min}
+          max={s.max}
+          step={s.step}
+          value={s.value}
+          onChange={e => s.onChange(Number(e.target.value))}
+          className="w-full accent-accent h-1.5 cursor-pointer"
+        />
+      </div>
+    );
+  }
+
+  const spacingSliders = desktopSliders.filter(s => s.key === 'lineSpacing' || s.key === 'paragraphSpacing');
+
+  return (
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-bg-secondary/90 dark:bg-brand-800/90 backdrop-blur-xl rounded-full px-3 sm:px-6 py-3 flex items-center gap-2 sm:gap-4 shadow-2xl border border-border-color z-40 transition-all hover:bg-bg-secondary dark:hover:bg-brand-800">
+
+      <div className="flex items-center gap-2 border-r border-border-color/50 pr-3 sm:pr-5">
         <button
           onClick={onPrev}
           disabled={!hasPrev}
@@ -108,47 +178,17 @@ export default function ReaderToolbar({
         </button>
       </div>
 
-      <div className="flex items-center gap-1 border-r border-border-color/50 pr-5 relative">
-        {sliders.map(({ key, icon: Icon, label, display, min, max, step, onChange, value }) => (
-          <div key={key} className="relative">
-            <button
-              ref={el => { buttonRefs.current[key] = el; }}
-              onClick={() => toggleSlider(key)}
-              className={cn(
-                "px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 text-sm transition-colors",
-                activeSlider === key ? "bg-accent text-white" : "hover:bg-muted-bg text-text-primary"
-              )}
-              title={label}
-            >
-              <Icon className="w-4 h-4" />
-              <span className="font-medium text-xs">{display}</span>
-            </button>
-            {activeSlider === key && (
-              <div
-                ref={popoverRef}
-                className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 bg-bg-secondary dark:bg-brand-800 border border-border-color rounded-xl px-5 py-4 shadow-xl min-w-[200px]"
-              >
-                <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 rotate-45 w-2.5 h-2.5 bg-bg-secondary dark:bg-brand-800 border-r border-b border-border-color" />
-                <div className="text-xs text-text-secondary mb-2 text-center">{label}</div>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="range"
-                    min={min}
-                    max={max}
-                    step={step}
-                    value={value}
-                    onChange={e => onChange(Number(e.target.value))}
-                    className="flex-1 accent-accent h-1.5 cursor-pointer"
-                  />
-                  <span className="text-sm font-mono text-text-primary min-w-[3.5ch] text-right">{display}</span>
-                </div>
-              </div>
-            )}
-          </div>
-        ))}
+      {/* Desktop: all 3 sliders inline */}
+      <div className="hidden sm:flex items-center gap-1 border-r border-border-color/50 pr-5 relative">
+        {desktopSliders.map(renderSliderButton)}
       </div>
 
-      <div className="flex items-center gap-2 border-r border-border-color/50 pr-5">
+      {/* Mobile: only font size */}
+      <div className="flex sm:hidden items-center gap-1 border-r border-border-color/50 pr-3 relative">
+        {mobileSliders.map(renderSliderButton)}
+      </div>
+
+      <div className="flex items-center gap-2 border-r border-border-color/50 pr-3 sm:pr-5">
         <button
           onClick={() => setIsTwoColumn(false)}
           className={cn(
@@ -171,7 +211,8 @@ export default function ReaderToolbar({
         </button>
       </div>
 
-      <div className="flex items-center gap-2">
+      {/* Desktop: themes inline */}
+      <div className="hidden sm:flex items-center gap-2">
         {themes.map(theme => (
           <button
             key={theme.id}
@@ -187,6 +228,52 @@ export default function ReaderToolbar({
             {theme.id === 'auto' && <div className="sr-only">Auto</div>}
           </button>
         ))}
+      </div>
+
+      {/* Mobile: overflow menu for spacing + themes */}
+      <div className="relative sm:hidden">
+        <button
+          ref={overflowBtnRef}
+          onClick={() => { setOverflowOpen(prev => !prev); setActiveSlider(null); }}
+          className={cn(
+            "p-2 rounded-full transition-colors",
+            overflowOpen ? "bg-accent text-white" : "text-text-primary hover:bg-muted-bg"
+          )}
+          title={t('reader.moreSettings')}
+        >
+          <MoreVertical className="w-5 h-5" />
+        </button>
+        {overflowOpen && (
+          <div
+            ref={overflowRef}
+            className="absolute bottom-full mb-3 right-0 bg-bg-secondary dark:bg-brand-800 border border-border-color rounded-xl px-5 py-4 shadow-xl min-w-[220px] space-y-4"
+          >
+            <div className="absolute bottom-0 right-5 translate-y-1/2 rotate-45 w-2.5 h-2.5 bg-bg-secondary dark:bg-brand-800 border-r border-b border-border-color" />
+
+            {spacingSliders.map(renderSliderRow)}
+
+            <div className="space-y-2 pt-2 border-t border-border-color/50">
+              <span className="text-xs text-text-secondary">{t('reader.background')}</span>
+              <div className="flex items-center gap-3">
+                {themes.map(theme => (
+                  <button
+                    key={theme.id}
+                    onClick={() => setReaderTheme(theme.id)}
+                    className={cn(
+                      "w-7 h-7 rounded-full border transition-all flex items-center justify-center overflow-hidden",
+                      readerTheme === theme.id ? "ring-2 ring-accent ring-offset-2 ring-offset-bg-secondary scale-110" : "border-border-color hover:scale-105",
+                      theme.id === 'auto' && "bg-gradient-to-tr from-white to-brand-900"
+                    )}
+                    style={{ backgroundColor: theme.id === 'auto' ? undefined : theme.color }}
+                    title={theme.label}
+                  >
+                    {theme.id === 'auto' && <div className="sr-only">Auto</div>}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

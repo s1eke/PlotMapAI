@@ -170,6 +170,7 @@
     "aiSummaryPlaceholder": "AI Summary",
     "aiSummaryHint": "AI is analyzing this chapter. Summary will appear here once ready.",
     "background": "Background",
+    "moreSettings": "More settings",
     "bgPresets": {
       "auto": "Auto",
       "paper": "Paper",

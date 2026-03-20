@@ -695,7 +695,7 @@ export default function ReaderPage() {
 
       <aside
         className={cn(
-          'flex flex-col transition-all duration-300 ease-in-out overflow-hidden z-20 text-text-primary',
+          'flex flex-col transition-all duration-300 ease-in-out overflow-hidden z-50 text-text-primary',
           currentTheme.sidebarBg,
           'fixed inset-y-0 left-0 md:relative md:translate-x-0 h-full',
           isSidebarOpen
