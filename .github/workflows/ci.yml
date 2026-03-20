@@ -2,9 +2,8 @@ name: CI
 
 on:
   push:
-  pull_request:
-  schedule:
-    - cron: "0 3 * * 1"
+    branches:
+      - '**'
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -22,7 +21,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
           cache: npm
 
       - name: Install dependencies
@@ -33,9 +32,6 @@ jobs:
 
       - name: Test
         run: npm test
-
-      - name: Build
-        run: npm run build
 
   codeql:
     name: Code Scanning
@@ -58,3 +54,70 @@ jobs:
 
       - name: Perform CodeQL analysis
         uses: github/codeql-action/analyze@v3
+
+  build-pages:
+    name: Build Pages
+    if: ${{ github.ref == 'refs/heads/dev' }}
+    needs:
+      - frontend-checks
+      - codeql
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Configure GitHub Pages
+        id: pages
+        uses: actions/configure-pages@v5
+
+      - name: Normalize Pages base path
+        id: pages-base
+        run: |
+          base_path="${{ steps.pages.outputs.base_path }}"
+          normalized_base="${base_path%/}"
+
+          if [ -z "$normalized_base" ]; then
+            echo "vite_base=/" >> "$GITHUB_OUTPUT"
+          else
+            echo "vite_base=${normalized_base}/" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build
+        run: npm run build
+        env:
+          VITE_BASE: ${{ steps.pages-base.outputs.vite_base }}
+
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: ./dist
+
+  deploy-pages:
+    name: Deploy Pages
+    if: ${{ github.ref == 'refs/heads/dev' }}
+    needs: build-pages
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
