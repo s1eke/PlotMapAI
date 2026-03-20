@@ -295,7 +295,20 @@
       "apiTokenPlaceholderEmpty": "Enter your API token",
       "savedTokenLabel": "Saved token: {{maskedApiKey}}",
       "saveButton": "Save Settings",
-      "testButton": "Test Connection"
+      "testButton": "Test Connection",
+      "exportButton": "Export Config",
+      "importButton": "Import Config",
+      "exportTitle": "Export AI Config",
+      "exportHint": "Set a password to encrypt your config. The same password is required to import.",
+      "importTitle": "Import AI Config",
+      "importHint": "Enter the password that was used when exporting.",
+      "passwordLabel": "Password",
+      "passwordPlaceholder": "At least 4 characters",
+      "passwordRequired": "Password is required",
+      "passwordTooShort": "Password must be at least 4 characters",
+      "exportSuccess": "Config exported successfully. Keep the file and password safe.",
+      "importSuccess": "Config imported successfully.",
+      "importFailed": "Import failed. Please check your password and file."
     },
     "common": {
       "import": "Import",

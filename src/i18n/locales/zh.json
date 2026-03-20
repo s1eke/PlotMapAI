@@ -295,7 +295,20 @@
       "apiTokenPlaceholderEmpty": "请输入你的 API Token",
       "savedTokenLabel": "当前已保存 Token：{{maskedApiKey}}",
       "saveButton": "保存配置",
-      "testButton": "测试连接"
+      "testButton": "测试连接",
+      "exportButton": "导出配置",
+      "importButton": "导入配置",
+      "exportTitle": "导出 AI 配置",
+      "exportHint": "请设置一个密码来加密配置文件。导入时需要输入相同密码。",
+      "importTitle": "导入 AI 配置",
+      "importHint": "请输入导出时设置的密码。",
+      "passwordLabel": "密码",
+      "passwordPlaceholder": "至少 4 个字符",
+      "passwordRequired": "请输入密码",
+      "passwordTooShort": "密码至少需要 4 个字符",
+      "exportSuccess": "配置导出成功，请妥善保管文件和密码。",
+      "importSuccess": "配置导入成功。",
+      "importFailed": "导入失败，请检查密码和文件是否正确。"
     },
     "common": {
       "import": "导入",

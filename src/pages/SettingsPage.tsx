@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Download, Loader2, Plus, Save, Shield, Trash2, Upload, Wifi } from 'lucide-react';
+import { Download, Loader2, Lock, Plus, Save, Shield, Trash2, Upload, Wifi } from 'lucide-react';
 import { settingsApi } from '../api/settings';
 import type {
   AiProviderSettings,
@@ -51,9 +51,16 @@ export default function SettingsPage() {
   const [isAiSaving, setIsAiSaving] = useState(false);
   const [isAiTesting, setIsAiTesting] = useState(false);
   const [aiMessage, setAiMessage] = useState<string | null>(null);
+  const [isExportAiOpen, setIsExportAiOpen] = useState(false);
+  const [isImportAiOpen, setIsImportAiOpen] = useState(false);
+  const [exportPassword, setExportPassword] = useState('');
+  const [importPassword, setImportPassword] = useState('');
+  const [isExportingAi, setIsExportingAi] = useState(false);
+  const [isImportingAi, setIsImportingAi] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const tocInputRef = useRef<HTMLInputElement>(null);
+  const aiImportRef = useRef<HTMLInputElement>(null);
 
   const fetchTocRules = async () => {
     setIsTocLoading(true);
@@ -282,6 +289,41 @@ export default function SettingsPage() {
     }
   };
 
+  const handleExportAiConfig = async () => {
+    if (exportPassword.length < 4) return;
+    setIsExportingAi(true);
+    try {
+      const content = await settingsApi.exportAiConfig(exportPassword);
+      downloadFile(content, 'plotmapai-ai-config.enc', 'application/octet-stream');
+      setAiMessage(t('settings.ai.exportSuccess'));
+      setIsExportAiOpen(false);
+      setExportPassword('');
+    } catch (err) {
+      setAiMessage(err instanceof Error ? err.message : 'Export failed');
+    } finally {
+      setIsExportingAi(false);
+    }
+  };
+
+  const handleImportAiFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!event.target.files?.length) return;
+    if (importPassword.length < 4) return;
+    const file = event.target.files[0];
+    setIsImportingAi(true);
+    try {
+      await settingsApi.importAiConfig(file, importPassword);
+      setAiMessage(t('settings.ai.importSuccess'));
+      setIsImportAiOpen(false);
+      setImportPassword('');
+      await fetchAiSettings();
+    } catch (err) {
+      setAiMessage(err instanceof Error ? err.message : t('settings.ai.importFailed'));
+    } finally {
+      setIsImportingAi(false);
+      if (aiImportRef.current) aiImportRef.current.value = '';
+    }
+  };
+
   const groupedPurificationRules = purificationRules.reduce((acc: Record<string, PurificationRule[]>, rule) => {
     const groupName = rule.group || t('settings.purification.ungrouped');
     if (!acc[groupName]) acc[groupName] = [];
@@ -489,9 +531,27 @@ export default function SettingsPage() {
 
         {activeTab === 'ai' && (
           <div className="space-y-6">
-            <div className="flex flex-col gap-2">
-              <h2 className="text-xl font-semibold text-text-primary">{t('settings.ai.title')}</h2>
-              <p className="text-sm text-text-secondary">{t('settings.ai.subtitle')}</p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-semibold text-text-primary">{t('settings.ai.title')}</h2>
+                <p className="text-sm text-text-secondary mt-1">{t('settings.ai.subtitle')}</p>
+              </div>
+              <div className="shrink-0 flex items-center gap-3">
+                <button
+                  onClick={() => { setImportPassword(''); setIsImportAiOpen(true); }}
+                  className="px-4 py-2 border border-white/10 rounded-lg hover:bg-white/5 text-text-primary transition-colors flex items-center gap-2 text-sm"
+                >
+                  <Upload className="w-4 h-4" /> {t('settings.common.import')}
+                </button>
+                <button
+                  onClick={() => { setExportPassword(''); setIsExportAiOpen(true); }}
+                  disabled={!aiSettings?.hasApiKey}
+                  className="px-4 py-2 border border-white/10 rounded-lg hover:bg-white/5 text-text-primary transition-colors flex items-center gap-2 text-sm disabled:opacity-40"
+                  title={!aiSettings?.hasApiKey ? t('settings.ai.apiTokenPlaceholderEmpty') : ''}
+                >
+                  <Download className="w-4 h-4" /> {t('settings.common.export')}
+                </button>
+              </div>
             </div>
 
             {isAiLoading ? (
@@ -628,6 +688,92 @@ export default function SettingsPage() {
             >
               {isClearingPurification && <Loader2 className="w-4 h-4 animate-spin" />}
               {t('settings.purification.clearAll')}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={isExportAiOpen}
+        onClose={() => { setIsExportAiOpen(false); setExportPassword(''); }}
+        title={t('settings.ai.exportTitle')}
+      >
+        <div className="flex flex-col gap-5">
+          <div className="flex items-start gap-3 rounded-xl bg-muted-bg/40 border border-border-color/20 p-4">
+            <Lock className="w-5 h-5 text-accent mt-0.5 shrink-0" />
+            <p className="text-sm text-text-secondary leading-6">{t('settings.ai.exportHint')}</p>
+          </div>
+          <label className="space-y-2">
+            <span className="text-sm font-medium text-text-primary">{t('settings.ai.passwordLabel')}</span>
+            <input
+              type="password"
+              value={exportPassword}
+              onChange={(e) => setExportPassword(e.target.value)}
+              placeholder={t('settings.ai.passwordPlaceholder')}
+              className="w-full rounded-xl border border-border-color/20 bg-muted-bg/50 px-4 py-3 text-text-primary outline-none focus:border-accent"
+              onKeyDown={(e) => e.key === 'Enter' && exportPassword.length >= 4 && handleExportAiConfig()}
+            />
+          </label>
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={() => { setIsExportAiOpen(false); setExportPassword(''); }}
+              className="px-4 py-2 rounded-lg font-medium hover:bg-white/10 transition-colors"
+            >
+              {t('common.actions.cancel')}
+            </button>
+            <button
+              onClick={handleExportAiConfig}
+              disabled={exportPassword.length < 4 || isExportingAi}
+              className="px-4 py-2 rounded-lg font-medium bg-accent hover:bg-accent-hover text-white transition-colors disabled:opacity-50 flex items-center gap-2"
+            >
+              {isExportingAi ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+              {t('settings.ai.exportButton')}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={isImportAiOpen}
+        onClose={() => { setIsImportAiOpen(false); setImportPassword(''); }}
+        title={t('settings.ai.importTitle')}
+      >
+        <div className="flex flex-col gap-5">
+          <div className="flex items-start gap-3 rounded-xl bg-muted-bg/40 border border-border-color/20 p-4">
+            <Lock className="w-5 h-5 text-accent mt-0.5 shrink-0" />
+            <p className="text-sm text-text-secondary leading-6">{t('settings.ai.importHint')}</p>
+          </div>
+          <label className="space-y-2">
+            <span className="text-sm font-medium text-text-primary">{t('settings.ai.passwordLabel')}</span>
+            <input
+              type="password"
+              value={importPassword}
+              onChange={(e) => setImportPassword(e.target.value)}
+              placeholder={t('settings.ai.passwordPlaceholder')}
+              className="w-full rounded-xl border border-border-color/20 bg-muted-bg/50 px-4 py-3 text-text-primary outline-none focus:border-accent"
+            />
+          </label>
+          <input
+            type="file"
+            ref={aiImportRef}
+            onChange={handleImportAiFile}
+            accept=".enc,.json"
+            className="hidden"
+          />
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={() => { setIsImportAiOpen(false); setImportPassword(''); }}
+              className="px-4 py-2 rounded-lg font-medium hover:bg-white/10 transition-colors"
+            >
+              {t('common.actions.cancel')}
+            </button>
+            <button
+              onClick={() => aiImportRef.current?.click()}
+              disabled={importPassword.length < 4 || isImportingAi}
+              className="px-4 py-2 rounded-lg font-medium bg-accent hover:bg-accent-hover text-white transition-colors disabled:opacity-50 flex items-center gap-2"
+            >
+              {isImportingAi ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+              {t('settings.ai.importButton')}
             </button>
           </div>
         </div>

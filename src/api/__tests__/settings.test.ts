@@ -171,4 +171,76 @@ describe('settingsApi', () => {
       })).rejects.toThrow();
     });
   });
+
+  describe('AI config export/import', () => {
+    beforeEach(() => {
+      localStorage.setItem('plotmapai_ai_config', JSON.stringify({
+        apiBaseUrl: 'http://localhost:5000',
+        apiKey: 'sk-test-secret-key-12345',
+        modelName: 'gpt-4',
+        contextSize: 32000,
+      }));
+    });
+
+    it('exportAiConfig throws without config', async () => {
+      localStorage.removeItem('plotmapai_ai_config');
+      await expect(settingsApi.exportAiConfig('password')).rejects.toThrow('No AI config');
+    });
+
+    it('exportAiConfig throws with short password', async () => {
+      await expect(settingsApi.exportAiConfig('ab')).rejects.toThrow('at least 4 characters');
+    });
+
+    it('exportAiConfig returns encrypted JSON string', async () => {
+      const result = await settingsApi.exportAiConfig('testpassword');
+      const parsed = JSON.parse(result);
+      expect(parsed.v).toBe(1);
+      expect(parsed.salt).toBeDefined();
+      expect(parsed.iv).toBeDefined();
+      expect(parsed.data).toBeDefined();
+    });
+
+    it('export and import round-trip works', async () => {
+      const exported = await settingsApi.exportAiConfig('mypassword123');
+      localStorage.removeItem('plotmapai_ai_config');
+
+      const file = new File([exported], 'config.enc', { type: 'application/octet-stream' });
+      await settingsApi.importAiConfig(file, 'mypassword123');
+
+      const raw = localStorage.getItem('plotmapai_ai_config');
+      expect(raw).not.toBeNull();
+      const config = JSON.parse(raw!);
+      expect(config.apiBaseUrl).toBe('http://localhost:5000');
+      expect(config.apiKey).toBe('sk-test-secret-key-12345');
+      expect(config.modelName).toBe('gpt-4');
+      expect(config.contextSize).toBe(32000);
+    });
+
+    it('import fails with wrong password', async () => {
+      const exported = await settingsApi.exportAiConfig('correctpassword');
+      const file = new File([exported], 'config.enc', { type: 'application/octet-stream' });
+      await expect(settingsApi.importAiConfig(file, 'wrongpassword')).rejects.toThrow('Decryption failed');
+    });
+
+    it('import fails with invalid file', async () => {
+      const file = new File(['not json'], 'bad.enc', { type: 'application/octet-stream' });
+      await expect(settingsApi.importAiConfig(file, 'password')).rejects.toThrow('Invalid config file');
+    });
+
+    it('import fails with invalid envelope structure', async () => {
+      const file = new File([JSON.stringify({ v: 2, salt: 'x', iv: 'y', data: 'z' })], 'bad.enc', { type: 'application/octet-stream' });
+      await expect(settingsApi.importAiConfig(file, 'password')).rejects.toThrow('Invalid config file structure');
+    });
+
+    it('import fails without password', async () => {
+      const file = new File(['{}'], 'config.enc', { type: 'application/octet-stream' });
+      await expect(settingsApi.importAiConfig(file, '')).rejects.toThrow('Password is required');
+    });
+
+    it('export produces different ciphertext each time', async () => {
+      const a = await settingsApi.exportAiConfig('samepassword');
+      const b = await settingsApi.exportAiConfig('samepassword');
+      expect(a).not.toBe(b); // Different salt and IV each time
+    });
+  });
 });
