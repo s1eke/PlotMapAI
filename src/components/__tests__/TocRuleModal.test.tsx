@@ -26,7 +26,7 @@ describe('TocRuleModal', () => {
       />
     );
 
-    const nameInput = screen.getByPlaceholderText('e.g. Chapter Number + Title');
+    const nameInput = screen.getByPlaceholderText('settings.toc.namePlaceholder');
     const regexInput = screen.getByDisplayValue('^old');
     const exampleInput = screen.getByDisplayValue('old');
     const priorityInput = screen.getByRole('spinbutton');
@@ -57,8 +57,8 @@ describe('TocRuleModal', () => {
     const user = userEvent.setup();
     render(<TocRuleModal isOpen={true} onClose={onClose} onSave={onSave} rule={null} />);
 
-    await user.type(screen.getByPlaceholderText('e.g. Chapter Number + Title'), 'Rule');
-    await user.type(screen.getByPlaceholderText('^第?\\s*[〇零一二三四五六七八九十百千万\\d]+\\s*[章节回]\\s*.*$'), '^chapter');
+    await user.type(screen.getByPlaceholderText('settings.toc.namePlaceholder'), 'Rule');
+    await user.type(screen.getByPlaceholderText('settings.toc.regexPlaceholder'), '^chapter');
     await user.click(screen.getByRole('button', { name: 'common.actions.add' }));
 
     expect(onSave).toHaveBeenCalledTimes(1);
@@ -75,12 +75,12 @@ describe('TocRuleModal', () => {
       />
     );
 
-    expect(screen.getByPlaceholderText('e.g. Chapter Number + Title')).toHaveValue('Existing');
-    expect(screen.getByPlaceholderText('e.g. 第一章 启程')).toHaveValue('Existing');
+    expect(screen.getByPlaceholderText('settings.toc.namePlaceholder')).toHaveValue('Existing');
+    expect(screen.getByPlaceholderText('settings.toc.examplePlaceholder')).toHaveValue('Existing');
 
     rerender(<TocRuleModal isOpen={true} onClose={() => {}} onSave={() => Promise.resolve()} rule={null} />);
 
-    expect(screen.getByPlaceholderText('e.g. Chapter Number + Title')).toHaveValue('');
+    expect(screen.getByPlaceholderText('settings.toc.namePlaceholder')).toHaveValue('');
     expect(screen.getByRole('spinbutton')).toHaveValue(10);
   });
 });

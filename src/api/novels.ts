@@ -17,14 +17,12 @@ export interface Novel {
 }
 
 function novelToApi(novel: import('../services/db').Novel, chapterCount: number): Novel {
-  let tags: string[] = [];
-  try { tags = JSON.parse(novel.tags); } catch { /* ignore */ }
   return {
     id: novel.id,
     title: novel.title,
     author: novel.author,
     description: novel.description,
-    tags,
+    tags: novel.tags,
     fileType: novel.fileType,
     hasCover: !!novel.coverPath,
     originalFilename: novel.originalFilename,
@@ -98,7 +96,7 @@ export const novelsApi = {
         title: parsed.title,
         author: parsed.author,
         description: parsed.description,
-        tags: JSON.stringify(parsed.tags),
+        tags: parsed.tags,
         fileType,
         fileHash: parsed.fileHash,
         coverPath: parsed.coverBlob ? 'has_cover' : '',

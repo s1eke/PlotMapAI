@@ -225,7 +225,7 @@ export async function runOverviewAnalysis(
 export function isChapterAnalysisComplete(row: ChapterAnalysis | undefined): boolean {
   if (!row) return false;
   if (!cleanText(row.summary, 400)) return false;
-  return [row.keyPoints, row.characters, row.relationships, row.tags].every(isJsonListString);
+  return [row.keyPoints, row.characters, row.relationships, row.tags].every(isList);
 }
 
 export function isOverviewComplete(overview: AnalysisOverview | undefined, totalChapters: number): boolean {
@@ -234,7 +234,7 @@ export function isOverviewComplete(overview: AnalysisOverview | undefined, total
   if (!cleanText(overview.bookIntro, 400)) return false;
   if (!cleanText(overview.globalSummary, 2000)) return false;
   if (overview.analyzedChapters < totalChapters || overview.totalChapters < totalChapters) return false;
-  return [overview.themes, overview.characterStats, overview.relationshipGraph].every(isJsonListString);
+  return [overview.themes, overview.characterStats, overview.relationshipGraph].every(isList);
 }
 
 export function serializeOverview(overview: AnalysisOverview | undefined): Record<string, unknown> | null {
@@ -242,9 +242,9 @@ export function serializeOverview(overview: AnalysisOverview | undefined): Recor
   return {
     bookIntro: overview.bookIntro,
     globalSummary: overview.globalSummary,
-    themes: loadsJsonList(overview.themes),
-    characterStats: loadsJsonList(overview.characterStats),
-    relationshipGraph: loadsJsonList(overview.relationshipGraph),
+    themes: overview.themes,
+    characterStats: overview.characterStats,
+    relationshipGraph: overview.relationshipGraph,
     totalChapters: overview.totalChapters,
     analyzedChapters: overview.analyzedChapters,
     updatedAt: overview.updatedAt,
@@ -257,10 +257,10 @@ export function serializeChapterAnalysis(row: ChapterAnalysis | undefined): Reco
     chapterIndex: row.chapterIndex,
     chapterTitle: row.chapterTitle,
     summary: row.summary,
-    keyPoints: loadsJsonList(row.keyPoints),
-    characters: loadsJsonList(row.characters),
-    relationships: loadsJsonList(row.relationships),
-    tags: loadsJsonList(row.tags),
+    keyPoints: row.keyPoints,
+    characters: row.characters,
+    relationships: row.relationships,
+    tags: row.tags,
     chunkIndex: row.chunkIndex,
     updatedAt: row.updatedAt,
   };
@@ -636,10 +636,10 @@ function collectAnalysisAggregates(chapterRows: ChapterAnalysis[]): Record<strin
   const chaptersPayload: Array<Record<string, unknown>> = [];
 
   for (const row of chapterRows) {
-    const tags = loadsJsonList(row.tags);
-    const characters = loadsJsonList(row.characters);
-    const relationships = loadsJsonList(row.relationships);
-    const keyPoints = loadsJsonList(row.keyPoints);
+    const tags = row.tags;
+    const characters = row.characters;
+    const relationships = row.relationships;
+    const keyPoints = row.keyPoints;
     chaptersPayload.push({
       chapterIndex: row.chapterIndex,
       chapterTitle: row.chapterTitle,
@@ -1211,20 +1211,8 @@ function extractErrorMessage(detail: string): string {
   return detail.slice(0, 300) || '未知错误';
 }
 
-function loadsJsonList(raw: string): unknown[] {
-  if (!raw) return [];
-  try {
-    const value = JSON.parse(raw);
-    return Array.isArray(value) ? value : [];
-  } catch { return []; }
-}
-
-function isJsonListString(raw: string): boolean {
-  if (!raw) return false;
-  try {
-    const value = JSON.parse(raw);
-    return Array.isArray(value);
-  } catch { return false; }
+function isList(raw: unknown): boolean {
+  return Array.isArray(raw);
 }
 
 export function normalizeBaseUrl(value: unknown): string {

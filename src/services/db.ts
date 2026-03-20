@@ -13,7 +13,7 @@ export interface Novel {
   title: string;
   author: string;
   description: string;
-  tags: string;
+  tags: string[];
   fileType: string;
   fileHash: string;
   coverPath: string;
@@ -106,10 +106,10 @@ export interface ChapterAnalysis {
   chapterIndex: number;
   chapterTitle: string;
   summary: string;
-  keyPoints: string;
-  characters: string;
-  relationships: string;
-  tags: string;
+  keyPoints: string[];
+  characters: Array<Record<string, unknown>>;
+  relationships: Array<Record<string, unknown>>;
+  tags: string[];
   chunkIndex: number;
   updatedAt: string;
 }
@@ -119,9 +119,9 @@ export interface AnalysisOverview {
   novelId: number;
   bookIntro: string;
   globalSummary: string;
-  themes: string;
-  characterStats: string;
-  relationshipGraph: string;
+  themes: string[];
+  characterStats: Array<Record<string, unknown>>;
+  relationshipGraph: Array<Record<string, unknown>>;
   totalChapters: number;
   analyzedChapters: number;
   updatedAt: string;
@@ -140,6 +140,22 @@ export interface ChapterImage {
   blob: Blob;
 }
 
+const CURRENT_DB_VERSION = 5;
+
+const CURRENT_SCHEMA = {
+  novels: '++id, createdAt',
+  chapters: '++id, novelId, [novelId+chapterIndex]',
+  tocRules: '++id, serialNumber, enable',
+  purificationRules: '++id, order, isEnabled',
+  readingProgress: '++id, novelId',
+  analysisJobs: '++id, novelId',
+  analysisChunks: '++id, novelId, [novelId+chunkIndex]',
+  chapterAnalyses: '++id, novelId, [novelId+chapterIndex]',
+  analysisOverviews: '++id, novelId',
+  coverImages: '++id, novelId',
+  chapterImages: '++id, novelId, [novelId+imageKey]',
+} as const;
+
 const db = new Dexie('PlotMapAI') as Dexie & {
   novels: EntityTable<Novel, 'id'>;
   chapters: EntityTable<Chapter, 'id'>;
@@ -154,30 +170,10 @@ const db = new Dexie('PlotMapAI') as Dexie & {
   chapterImages: EntityTable<ChapterImage, 'id'>;
 };
 
-db.version(1).stores({
-  novels: '++id, createdAt',
-  chapters: '++id, novelId, [novelId+chapterIndex]',
-  tocRules: '++id, serialNumber',
-  purificationRules: '++id, order, isEnabled',
-  readingProgress: '++id, novelId',
-  analysisJobs: '++id, novelId',
-  analysisChunks: '++id, novelId, [novelId+chunkIndex]',
-  chapterAnalyses: '++id, novelId, [novelId+chapterIndex]',
-  analysisOverviews: '++id, novelId',
-  coverImages: '++id, novelId',
-});
-
-db.version(2).stores({
-  tocRules: '++id, serialNumber, enable',
-});
-
-db.version(3).stores({
-  novelRawContent: null,
-});
-
-db.version(4).stores({
-  chapterImages: '++id, novelId, [novelId+imageKey]',
-});
+// Development phase: keep a single declaration for the latest schema instead of
+// preserving every intermediate migration step. If we later need production-grade
+// upgrade compatibility, reintroduce explicit version history and upgrades here.
+db.version(CURRENT_DB_VERSION).stores(CURRENT_SCHEMA);
 
 async function loadDefaultTocRules(): Promise<DefaultTocRule[]> {
   const [{ default: yaml }, { default: defaultTocRulesRaw }] = await Promise.all([

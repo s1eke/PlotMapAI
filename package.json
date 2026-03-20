@@ -1,7 +1,7 @@
 {
   "name": "plotmapai",
   "private": true,
-  "version": "0.2.0",
+  "version": "1.0.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -17,7 +17,7 @@
     "@tailwindcss/vite": "^4.2.1",
     "axios": "^1.13.6",
     "clsx": "^2.1.1",
-    "dexie": "^4.3.0",
+    "dexie": "^4.4.0",
     "i18next": "^24.2.2",
     "i18next-browser-languagedetector": "^8.1.8",
     "js-yaml": "^4.1.1",
@@ -28,11 +28,6 @@
     "react-i18next": "^15.4.0",
     "react-router-dom": "^7.13.1",
     "tailwind-merge": "^3.5.0"
-  },
-  "overrides": {
-    "@tailwindcss/vite": {
-      "vite": "^8.0.0"
-    }
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
@@ -53,7 +48,7 @@
     "jsdom": "^29.0.0",
     "msw": "^2.12.13",
     "postcss": "^8.5.8",
-    "tailwindcss": "^4.2.1",
+    "tailwindcss": "^4.2.2",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.56.1",
     "vite": "^8.0.0",

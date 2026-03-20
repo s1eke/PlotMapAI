@@ -12,7 +12,7 @@ describe('readerApi', () => {
       title: 'Reader Novel',
       author: 'Author',
       description: '',
-      tags: '[]',
+      tags: [],
       fileType: 'txt',
       fileHash: 'rh',
       coverPath: '',
@@ -112,7 +112,7 @@ describe('loadAndPurifyChapters', () => {
     await db.novels.add({
       id: undefined as unknown as number,
       title: 'Purify Novel',
-      author: '', description: '', tags: '[]',
+      author: '', description: '', tags: [],
       fileType: 'txt', fileHash: 'ph', coverPath: '', originalFilename: 'p.txt',
       originalEncoding: 'utf-8', totalWords: 100, createdAt: new Date().toISOString(),
     });

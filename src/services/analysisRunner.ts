@@ -134,23 +134,13 @@ function serializeOverviewRow(overview: AnalysisOverview | undefined): ApiAnalys
   return {
     bookIntro: overview.bookIntro,
     globalSummary: overview.globalSummary,
-    themes: parseJsonArray(overview.themes) as string[],
-    characterStats: parseJsonArray(overview.characterStats) as ApiAnalysisOverview['characterStats'],
-    relationshipGraph: parseJsonArray(overview.relationshipGraph) as ApiAnalysisOverview['relationshipGraph'],
+    themes: overview.themes,
+    characterStats: overview.characterStats as unknown as ApiAnalysisOverview['characterStats'],
+    relationshipGraph: overview.relationshipGraph as unknown as ApiAnalysisOverview['relationshipGraph'],
     totalChapters: overview.totalChapters,
     analyzedChapters: overview.analyzedChapters,
     updatedAt: overview.updatedAt,
   };
-}
-
-function parseJsonArray(raw: string): unknown[] {
-  if (!raw) return [];
-  try {
-    const value = JSON.parse(raw);
-    return Array.isArray(value) ? value : [];
-  } catch {
-    return [];
-  }
 }
 
 function serializeChapterAnalysisRow(row: ChapterAnalysis | undefined): ChapterAnalysisResult | null {
@@ -159,26 +149,13 @@ function serializeChapterAnalysisRow(row: ChapterAnalysis | undefined): ChapterA
     chapterIndex: row.chapterIndex,
     chapterTitle: row.chapterTitle,
     summary: row.summary,
-    keyPoints: parseJsonArray(row.keyPoints) as string[],
-    characters: parseJsonArray(row.characters) as ChapterAnalysisResult['characters'],
-    relationships: parseJsonArray(row.relationships) as ChapterAnalysisResult['relationships'],
-    tags: parseJsonArray(row.tags) as string[],
+    keyPoints: row.keyPoints,
+    characters: row.characters as unknown as ChapterAnalysisResult['characters'],
+    relationships: row.relationships as unknown as ChapterAnalysisResult['relationships'],
+    tags: row.tags,
     chunkIndex: row.chunkIndex,
     updatedAt: row.updatedAt,
   };
-}
-
-// ── Index helpers ─────────────────────────────────────────────────────────
-
-function loadChapterIndices(raw: string): number[] {
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.map(Number).filter(Number.isInteger);
-  } catch {
-    return [];
-  }
 }
 
 // ── Incomplete chunk detection ────────────────────────────────────────────
@@ -190,7 +167,7 @@ async function findIncompleteChunkIndices(novelId: number, chunks: AnalysisChunk
   for (const row of chapterRows) chapterMap.set(row.chapterIndex, row);
   const incomplete = new Set<number>();
   for (const chunk of chunks) {
-    const indices = loadChapterIndices(JSON.stringify(chunk.chapterIndices));
+    const indices = chunk.chapterIndices;
     if (chunk.status !== 'completed' || !indices.length) {
       incomplete.add(chunk.chunkIndex);
       continue;
@@ -538,10 +515,10 @@ async function saveChunkAnalysisResult(
       chapterIndex: item.chapterIndex as number,
       chapterTitle: cleanText(item.title as string, 256) || '',
       summary: cleanText(item.summary as string, 400),
-      keyPoints: JSON.stringify(item.keyPoints ?? []),
-      characters: JSON.stringify(item.characters ?? []),
-      relationships: JSON.stringify(item.relationships ?? []),
-      tags: JSON.stringify(item.tags ?? []),
+      keyPoints: (item.keyPoints ?? []) as string[],
+      characters: (item.characters ?? []) as ChapterAnalysis['characters'],
+      relationships: (item.relationships ?? []) as ChapterAnalysis['relationships'],
+      tags: (item.tags ?? []) as string[],
       chunkIndex,
       updatedAt: nowISO(),
     };
@@ -564,9 +541,9 @@ async function saveOverviewAnalysisResult(
     novelId,
     bookIntro: cleanText(result.bookIntro as string, 400),
     globalSummary: cleanText(result.globalSummary as string, 2400),
-    themes: JSON.stringify(result.themes ?? []),
-    characterStats: JSON.stringify(result.characterStats ?? []),
-    relationshipGraph: JSON.stringify(result.relationshipGraph ?? []),
+    themes: (result.themes ?? []) as string[],
+    characterStats: (result.characterStats ?? []) as AnalysisOverview['characterStats'],
+    relationshipGraph: (result.relationshipGraph ?? []) as AnalysisOverview['relationshipGraph'],
     totalChapters: result.totalChapters as number,
     analyzedChapters: result.analyzedChapters as number,
     updatedAt: nowISO(),
@@ -1024,10 +1001,10 @@ export async function analyzeSingleChapter(
     chapterIndex,
     chapterTitle: cleanText(item.title as string, 256) || chapter.title || '',
     summary: cleanText(item.summary as string, 400),
-    keyPoints: JSON.stringify(item.keyPoints ?? []),
-    characters: JSON.stringify(item.characters ?? []),
-    relationships: JSON.stringify(item.relationships ?? []),
-    tags: JSON.stringify(item.tags ?? []),
+    keyPoints: (item.keyPoints ?? []) as string[],
+    characters: (item.characters ?? []) as ChapterAnalysis['characters'],
+    relationships: (item.relationships ?? []) as ChapterAnalysis['relationships'],
+    tags: (item.tags ?? []) as string[],
     chunkIndex: -1,
     updatedAt: nowISO(),
   };

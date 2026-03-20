@@ -216,7 +216,7 @@ export const settingsApi = {
       id: undefined as unknown as number,
       externalId: null,
       name: data.name,
-      group: data.group || '默认',
+      group: data.group || 'Purification',
       pattern: data.pattern,
       replacement: unescapeReplacement(data.replacement || ''),
       isRegex: data.isRegex ?? true,
@@ -293,7 +293,7 @@ export const settingsApi = {
         id: undefined as unknown as number,
         externalId: null,
         name,
-        group: (obj.group as string) || '默认',
+        group: (obj.group as string) || 'Purification',
         pattern,
         replacement: unescapeReplacement((obj.replacement as string) || ''),
         isRegex,
@@ -317,7 +317,7 @@ export const settingsApi = {
     const rules = await db.purificationRules.orderBy('order').toArray();
     const exportData = rules.map(r => ({
       name: r.name,
-      group: r.group || '默认',
+      group: r.group || 'Purification',
       pattern: r.pattern,
       replacement: r.replacement,
       is_regex: r.isRegex,
@@ -381,5 +381,98 @@ export const settingsApi = {
     };
     validateAnalysisConfig(config);
     return testAiProviderConnection(config);
+  },
+
+  exportAiConfig: async (password: string): Promise<string> => {
+    const config = getAiConfig();
+    if (!config) throw new Error('No AI config to export');
+    if (!password || password.length < 4) throw new Error('Password must be at least 4 characters');
+
+    const encoder = new TextEncoder();
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+
+    const keyMaterial = await crypto.subtle.importKey(
+      'raw', encoder.encode(password), 'PBKDF2', false, ['deriveKey'],
+    );
+    const key = await crypto.subtle.deriveKey(
+      { name: 'PBKDF2', salt, iterations: 600000, hash: 'SHA-256' },
+      keyMaterial,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['encrypt'],
+    );
+
+    const plaintext = encoder.encode(JSON.stringify(config));
+    const ciphertext = await crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv },
+      key,
+      plaintext,
+    );
+
+    const payload = {
+      v: 1,
+      salt: btoa(String.fromCharCode(...salt)),
+      iv: btoa(String.fromCharCode(...iv)),
+      data: btoa(String.fromCharCode(...new Uint8Array(ciphertext))),
+    };
+    return JSON.stringify(payload);
+  },
+
+  importAiConfig: async (file: File, password: string): Promise<void> => {
+    if (!password) throw new Error('Password is required');
+
+    const text = await file.text();
+    let envelope: { v: number; salt: string; iv: string; data: string };
+    try {
+      envelope = JSON.parse(text);
+    } catch {
+      throw new Error('Invalid config file format');
+    }
+    if (envelope.v !== 1 || !envelope.salt || !envelope.iv || !envelope.data) {
+      throw new Error('Invalid config file structure');
+    }
+
+    const decode64 = (s: string) => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+    const salt = decode64(envelope.salt);
+    const iv = decode64(envelope.iv);
+    const ciphertext = decode64(envelope.data);
+
+    const encoder = new TextEncoder();
+    const keyMaterial = await crypto.subtle.importKey(
+      'raw', encoder.encode(password), 'PBKDF2', false, ['deriveKey'],
+    );
+    const key = await crypto.subtle.deriveKey(
+      { name: 'PBKDF2', salt, iterations: 600000, hash: 'SHA-256' },
+      keyMaterial,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['decrypt'],
+    );
+
+    let plaintext: ArrayBuffer;
+    try {
+      plaintext = await crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv },
+        key,
+        ciphertext,
+      );
+    } catch {
+      throw new Error('Decryption failed. Please check your password.');
+    }
+
+    const decoder = new TextDecoder();
+    let config: { apiBaseUrl: string; apiKey: string; modelName: string; contextSize: number };
+    try {
+      config = JSON.parse(decoder.decode(plaintext));
+    } catch {
+      throw new Error('Decrypted data is not valid JSON');
+    }
+
+    if (!config.apiBaseUrl || !config.apiKey || !config.modelName || !config.contextSize) {
+      throw new Error('Config file is missing required fields');
+    }
+
+    setAiConfig(config);
   },
 };

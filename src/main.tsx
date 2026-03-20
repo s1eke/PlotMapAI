@@ -7,6 +7,8 @@ import { ensureDefaultTocRules } from './services/db'
 
 ensureDefaultTocRules()
 
+console.log(`PlotMapAI v${__APP_VERSION__}`)
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App />

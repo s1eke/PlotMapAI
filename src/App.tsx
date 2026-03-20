@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { Loader2 } from 'lucide-react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route } from 'react-router-dom';
 import Layout from './components/Layout';
 import { ThemeProvider } from './context/ThemeContext';
 import DebugPanel from './components/DebugPanel';
@@ -23,7 +23,7 @@ function RouteFallback() {
 function App() {
   return (
     <ThemeProvider>
-      <Router basename={import.meta.env.BASE_URL}>
+      <Router>
         <Layout>
           <Suspense fallback={<RouteFallback />}>
             <Routes>

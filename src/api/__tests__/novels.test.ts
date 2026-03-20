@@ -34,13 +34,13 @@ describe('novelsApi', () => {
   it('list returns novels sorted by createdAt descending', async () => {
     await db.novels.add({
       id: undefined as unknown as number,
-      title: 'First', author: '', description: '', tags: '[]',
+      title: 'First', author: '', description: '', tags: [],
       fileType: 'txt', fileHash: 'h1', coverPath: '', originalFilename: 'f.txt',
       originalEncoding: 'utf-8', totalWords: 100, createdAt: '2024-01-01T00:00:00Z',
     });
     await db.novels.add({
       id: undefined as unknown as number,
-      title: 'Second', author: '', description: '', tags: '[]',
+      title: 'Second', author: '', description: '', tags: [],
       fileType: 'txt', fileHash: 'h2', coverPath: '', originalFilename: 's.txt',
       originalEncoding: 'utf-8', totalWords: 200, createdAt: '2024-02-01T00:00:00Z',
     });
@@ -52,7 +52,7 @@ describe('novelsApi', () => {
   it('get returns a novel by id', async () => {
     const id = await db.novels.add({
       id: undefined as unknown as number,
-      title: 'Get Test', author: 'Auth', description: 'Desc', tags: '["tag1"]',
+      title: 'Get Test', author: 'Auth', description: 'Desc', tags: ['tag1'],
       fileType: 'txt', fileHash: 'h', coverPath: '', originalFilename: 'g.txt',
       originalEncoding: 'utf-8', totalWords: 500, createdAt: new Date().toISOString(),
     });
@@ -68,7 +68,7 @@ describe('novelsApi', () => {
   it('delete removes novel and related data', async () => {
     const id = await db.novels.add({
       id: undefined as unknown as number,
-      title: 'Delete Me', author: '', description: '', tags: '[]',
+      title: 'Delete Me', author: '', description: '', tags: [],
       fileType: 'txt', fileHash: 'dh', coverPath: '', originalFilename: 'd.txt',
       originalEncoding: 'utf-8', totalWords: 100, createdAt: new Date().toISOString(),
     });
@@ -103,7 +103,7 @@ describe('novelsApi', () => {
   it('novelToApi converts tags from JSON string to array', async () => {
     await db.novels.add({
       id: undefined as unknown as number,
-      title: 'Tagged', author: '', description: '', tags: '["a","b","c"]',
+      title: 'Tagged', author: '', description: '', tags: ['a','b','c'],
       fileType: 'txt', fileHash: 'th', coverPath: '', originalFilename: 't.txt',
       originalEncoding: 'utf-8', totalWords: 100, createdAt: new Date().toISOString(),
     });

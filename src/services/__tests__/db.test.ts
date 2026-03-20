@@ -11,13 +11,29 @@ describe('db', () => {
     expect(db.name).toBe('PlotMapAI');
   });
 
+  it('registers all current tables in the schema', () => {
+    expect(db.tables.map((table) => table.name).sort()).toEqual([
+      'analysisChunks',
+      'analysisJobs',
+      'analysisOverviews',
+      'chapterAnalyses',
+      'chapterImages',
+      'chapters',
+      'coverImages',
+      'novels',
+      'purificationRules',
+      'readingProgress',
+      'tocRules',
+    ]);
+  });
+
   it('can add and retrieve a novel', async () => {
     const id = await db.novels.add({
       id: undefined as unknown as number,
       title: 'Test Novel',
       author: 'Author',
       description: 'Desc',
-      tags: '[]',
+      tags: [],
       fileType: 'txt',
       fileHash: 'abc123',
       coverPath: '',
@@ -37,7 +53,7 @@ describe('db', () => {
       title: 'Novel',
       author: '',
       description: '',
-      tags: '[]',
+      tags: [],
       fileType: 'txt',
       fileHash: 'hash',
       coverPath: '',
