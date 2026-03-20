@@ -71,4 +71,18 @@ describe('debug', () => {
     const mod = await import('../debug');
     expect(mod.MAX_LOGS).toBeGreaterThan(0);
   });
+
+  it('registerDebugHelpers exposes window debug methods in debug mode', async () => {
+    vi.stubEnv('VITE_DEBUG', 'true');
+    const mod = await import('../debug');
+    const cleanup = mod.registerDebugHelpers();
+
+    expect(window.PlotMapAIDebug).toBeDefined();
+    expect(typeof window.PlotMapAIDebug?.showInstallPrompt).toBe('function');
+    expect(typeof window.PlotMapAIDebug?.showUpdateToast).toBe('function');
+
+    cleanup();
+
+    expect(window.PlotMapAIDebug).toBeUndefined();
+  });
 });

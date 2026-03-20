@@ -9,3 +9,14 @@ interface ImportMeta {
 }
 
 declare const __APP_VERSION__: string;
+
+interface DebugPwaTools {
+  showInstallPrompt: () => void;
+  showIosInstallHint: () => void;
+  showUpdateToast: () => void;
+  resetPwaPrompts: () => void;
+}
+
+interface Window {
+  PlotMapAIDebug?: DebugPwaTools;
+}

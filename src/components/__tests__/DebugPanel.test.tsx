@@ -11,6 +11,10 @@ const debugTest = vi.hoisted(() => {
     clearMock: vi.fn(() => {
       logs = [];
     }),
+    triggerDebugInstallPrompt: vi.fn(),
+    triggerDebugIosInstallHint: vi.fn(),
+    triggerDebugUpdateToast: vi.fn(),
+    triggerDebugResetPwaPrompts: vi.fn(),
     getLogs: () => [...logs],
     setLogs(nextLogs: Array<{ time: number; category: string; message: string }>) {
       logs = [...nextLogs];
@@ -34,6 +38,10 @@ vi.mock('../../services/debug', () => {
     getRecentLogs: debugTest.getLogs,
     clearLogs: debugTest.clearMock,
     MAX_LOGS: 500,
+    triggerDebugInstallPrompt: debugTest.triggerDebugInstallPrompt,
+    triggerDebugIosInstallHint: debugTest.triggerDebugIosInstallHint,
+    triggerDebugUpdateToast: debugTest.triggerDebugUpdateToast,
+    triggerDebugResetPwaPrompts: debugTest.triggerDebugResetPwaPrompts,
   };
 });
 
@@ -67,5 +75,22 @@ describe('DebugPanel', () => {
     await user.click(screen.getByTitle('Clear logs'));
 
     expect(screen.getByText('No logs yet')).toBeInTheDocument();
+  });
+
+  it('exposes manual PWA trigger buttons', async () => {
+    const user = userEvent.setup();
+
+    render(<DebugPanel />);
+    await user.click(screen.getByTitle('Debug Panel'));
+
+    await user.click(screen.getByRole('button', { name: /Install Prompt/i }));
+    await user.click(screen.getByRole('button', { name: /iOS Hint/i }));
+    await user.click(screen.getByRole('button', { name: /Update Toast/i }));
+    await user.click(screen.getByRole('button', { name: /Reset PWA/i }));
+
+    expect(debugTest.triggerDebugInstallPrompt).toHaveBeenCalledTimes(1);
+    expect(debugTest.triggerDebugIosInstallHint).toHaveBeenCalledTimes(1);
+    expect(debugTest.triggerDebugUpdateToast).toHaveBeenCalledTimes(1);
+    expect(debugTest.triggerDebugResetPwaPrompts).toHaveBeenCalledTimes(1);
   });
 });

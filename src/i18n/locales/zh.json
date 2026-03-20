@@ -343,5 +343,16 @@
       "enabled": "已启用",
       "disabled": "已禁用"
     }
+  },
+  "pwa": {
+    "installTitle": "安装 PlotMapAI",
+    "installDescription": "将 PlotMapAI 添加到设备主屏幕后，可以更快打开，并获得更接近原生应用的全屏阅读体验。",
+    "installIosHint": "如果你使用的是 iPhone 或 iPad，请在 Safari 的分享菜单中选择“添加到主屏幕”。",
+    "install": "安装应用",
+    "updateAvailable": "发现新版本",
+    "updateDescription": "立即刷新即可应用最新修复和改进，你的本地阅读进度不会丢失。",
+    "reload": "立即刷新",
+    "updating": "正在刷新...",
+    "later": "稍后再说"
   }
 }

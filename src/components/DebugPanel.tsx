@@ -1,6 +1,16 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Bug, Trash2, ChevronDown } from 'lucide-react';
-import { debugSubscribe, getRecentLogs, clearLogs, MAX_LOGS, type LogEntry } from '../services/debug';
+import { Bug, ChevronDown, Download, RefreshCw, RotateCcw, Smartphone, Trash2 } from 'lucide-react';
+import {
+  debugSubscribe,
+  getRecentLogs,
+  clearLogs,
+  MAX_LOGS,
+  triggerDebugInstallPrompt,
+  triggerDebugIosInstallHint,
+  triggerDebugUpdateToast,
+  triggerDebugResetPwaPrompts,
+  type LogEntry,
+} from '../services/debug';
 import { cn } from '../utils/cn';
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -12,6 +22,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   Settings: 'text-orange-400',
   AI: 'text-pink-400',
   Analysis: 'text-red-400',
+  PWA: 'text-sky-400',
 };
 
 export default function DebugPanel() {
@@ -87,6 +98,36 @@ export default function DebugPanel() {
             <ChevronDown className="w-4 h-4" />
           </button>
         </div>
+      </div>
+      <div className="grid grid-cols-2 gap-2 border-b border-border-color/50 p-2">
+        <button
+          onClick={triggerDebugInstallPrompt}
+          className="flex items-center justify-center gap-2 rounded-lg border border-border-color/50 px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-white/10"
+        >
+          <Download className="h-3.5 w-3.5" />
+          Install Prompt
+        </button>
+        <button
+          onClick={triggerDebugIosInstallHint}
+          className="flex items-center justify-center gap-2 rounded-lg border border-border-color/50 px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-white/10"
+        >
+          <Smartphone className="h-3.5 w-3.5" />
+          iOS Hint
+        </button>
+        <button
+          onClick={triggerDebugUpdateToast}
+          className="flex items-center justify-center gap-2 rounded-lg border border-border-color/50 px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-white/10"
+        >
+          <RefreshCw className="h-3.5 w-3.5" />
+          Update Toast
+        </button>
+        <button
+          onClick={triggerDebugResetPwaPrompts}
+          className="flex items-center justify-center gap-2 rounded-lg border border-border-color/50 px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-white/10"
+        >
+          <RotateCcw className="h-3.5 w-3.5" />
+          Reset PWA
+        </button>
       </div>
       <div ref={listRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-2 space-y-0.5 text-[11px] font-mono leading-relaxed custom-scrollbar">
         {logs.length === 0 && (
