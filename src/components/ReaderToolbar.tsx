@@ -61,7 +61,9 @@ export default function ReaderToolbar({
       if (popoverRef.current?.contains(target)) return;
       if (overflowRef.current?.contains(target)) return;
       if (overflowBtnRef.current?.contains(target)) return;
-      const btn = activeSlider ? buttonRefs.current[activeSlider] : null;
+      const isDesktop = window.matchMedia('(min-width: 640px)').matches;
+      const mode = isDesktop ? 'desktop' : 'mobile';
+      const btn = activeSlider ? buttonRefs.current[mode + '-' + activeSlider] : null;
       if (btn?.contains(target)) return;
       setActiveSlider(null);
       setOverflowOpen(false);
@@ -96,11 +98,11 @@ export default function ReaderToolbar({
 
   const mobileSliders = desktopSliders.filter(s => s.key === 'fontSize');
 
-  function renderSliderButton(s: typeof desktopSliders[number]) {
+  function renderSliderButton(s: typeof desktopSliders[number], mode: 'desktop' | 'mobile') {
     return (
-      <div key={s.key} className="relative">
+      <div key={`${mode}-${s.key}`} className="relative">
         <button
-          ref={el => { buttonRefs.current[s.key] = el; }}
+          ref={el => { buttonRefs.current[mode + '-' + s.key] = el; }}
           onClick={() => toggleSlider(s.key)}
           className={cn(
             "px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 text-sm transition-colors",
@@ -185,12 +187,12 @@ export default function ReaderToolbar({
 
       {/* Desktop: all 3 sliders inline */}
       <div className="hidden sm:flex items-center gap-1 border-r border-border-color/50 pr-5 relative">
-        {desktopSliders.map(renderSliderButton)}
+        {desktopSliders.map(s => renderSliderButton(s, 'desktop'))}
       </div>
 
       {/* Mobile: only font size */}
       <div className="flex sm:hidden items-center gap-1 border-r border-border-color/50 pr-3 relative">
-        {mobileSliders.map(renderSliderButton)}
+        {mobileSliders.map(s => renderSliderButton(s, 'mobile'))}
       </div>
 
       <div className="flex items-center gap-2 border-r border-border-color/50 pr-3 sm:pr-5">
