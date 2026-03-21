@@ -173,6 +173,7 @@ export default function ReaderPage() {
   });
   const [pageIndex, setPageIndex] = useState(0);
   const [pageCount, setPageCount] = useState(1);
+  const [isChromeVisible, setIsChromeVisible] = useState(false);
   const [pagedViewportSize, setPagedViewportSize] = useState({ width: 0, height: 0 });
   const [hasHydratedReaderState, setHasHydratedReaderState] = useState(false);
 
@@ -409,6 +410,7 @@ export default function ReaderPage() {
         setCurrentChapter(data);
         setPageIndex(0);
         setPageCount(1);
+        setIsChromeVisible(false);
         wheelDeltaRef.current = 0;
         pageTurnLockedRef.current = false;
 
@@ -689,6 +691,22 @@ export default function ReaderPage() {
     return () => el.removeEventListener('wheel', handlePagedWheel);
   }, [handlePagedWheel]);
 
+  const handleContentClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isPagedMode) return;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const ratio = x / rect.width;
+
+    if (ratio < 0.25) {
+      handlePrev();
+    } else if (ratio > 0.75) {
+      handleNext();
+    } else {
+      setIsChromeVisible(prev => !prev);
+    }
+  }, [isPagedMode, handlePrev, handleNext]);
+
   return (
     <div className={cn('flex h-screen w-full overflow-hidden transition-colors duration-300', currentTheme.bg)}>
       <div
@@ -734,7 +752,10 @@ export default function ReaderPage() {
       </aside>
 
       <main className="flex-1 flex flex-col min-w-0 relative text-text-primary">
-        <header className="h-14 flex items-center justify-between px-4 sm:px-6 shrink-0 border-b border-border-color/20 glass z-10 sticky top-0">
+        <header className={cn(
+          'h-14 flex items-center justify-between px-4 sm:px-6 shrink-0 border-b border-border-color/20 glass z-10 sticky top-0 transition-all duration-300',
+          isPagedMode && !isChromeVisible && '-translate-y-full opacity-0 pointer-events-none',
+        )}>
           <div className="flex items-center gap-3">
             <button
               onClick={toggleSidebar}
@@ -772,7 +793,8 @@ export default function ReaderPage() {
 
         <div
           ref={contentRef}
-          className={cn('flex-1 w-full relative', isPagedMode ? 'overflow-hidden' : 'overflow-y-auto pb-32')}
+          className={cn('flex-1 w-full relative', isPagedMode ? 'overflow-hidden cursor-pointer' : 'overflow-y-auto pb-32')}
+          onClick={handleContentClick}
           onScroll={() => {
             if (isPagedMode || !contentRef.current) return;
           }}
@@ -933,6 +955,7 @@ export default function ReaderPage() {
             navigationMode={isPagedMode ? 'page' : 'chapter'}
             readerTheme={readerTheme}
             setReaderTheme={setReaderTheme}
+            hidden={isPagedMode && !isChromeVisible}
           />
         )}
       </main>

@@ -19,6 +19,7 @@ interface ReaderToolbarProps {
   navigationMode: 'chapter' | 'page';
   readerTheme: string;
   setReaderTheme: (theme: string) => void;
+  hidden?: boolean;
 }
 
 type SliderKey = 'fontSize' | 'lineSpacing' | 'paragraphSpacing' | null;
@@ -38,7 +39,8 @@ export default function ReaderToolbar({
   hasNext,
   navigationMode,
   readerTheme,
-  setReaderTheme
+  setReaderTheme,
+  hidden,
 }: ReaderToolbarProps) {
   const { t } = useTranslation();
   const [activeSlider, setActiveSlider] = useState<SliderKey>(null);
@@ -157,7 +159,10 @@ export default function ReaderToolbar({
   const spacingSliders = desktopSliders.filter(s => s.key === 'lineSpacing' || s.key === 'paragraphSpacing');
 
   return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-bg-secondary/90 dark:bg-brand-800/90 backdrop-blur-xl rounded-full px-3 sm:px-6 py-3 flex items-center gap-2 sm:gap-4 shadow-2xl border border-border-color z-40 transition-all hover:bg-bg-secondary dark:hover:bg-brand-800">
+    <div className={cn(
+      'fixed bottom-6 left-1/2 -translate-x-1/2 bg-bg-secondary/90 dark:bg-brand-800/90 backdrop-blur-xl rounded-full px-3 sm:px-6 py-3 flex items-center gap-2 sm:gap-4 shadow-2xl border border-border-color z-40 transition-all hover:bg-bg-secondary dark:hover:bg-brand-800',
+      hidden && 'translate-y-[calc(100%+24px)] opacity-0 pointer-events-none',
+    )}>
 
       <div className="flex items-center gap-2 border-r border-border-color/50 pr-3 sm:pr-5">
         <button
