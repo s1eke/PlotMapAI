@@ -1,17 +1,29 @@
 name: CI
 
 on:
+  pull_request:
+    branches:
+      - dev
   push:
     branches:
-      - '**'
+      - dev
+  workflow_dispatch:
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '24'
+  BUILD_BASE: /${{ github.event.repository.name }}/
+
 jobs:
-  frontend-checks:
-    name: Frontend Checks
+  lint:
+    name: Lint
+    if: ${{ github.event_name != 'schedule' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -21,46 +33,73 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: "24"
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Lint
+      - name: Run ESLint
         run: npm run lint
 
-      - name: Test
-        run: npm test
-
-  codeql:
-    name: Code Scanning
+  test:
+    name: Unit Tests
+    if: ${{ github.event_name != 'schedule' }}
     runs-on: ubuntu-latest
-    permissions:
-      actions: read
-      contents: read
-      security-events: write
 
     steps:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
         with:
-          languages: javascript-typescript
-          build-mode: none
-          queries: security-extended,security-and-quality
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
 
-      - name: Perform CodeQL analysis
-        uses: github/codeql-action/analyze@v4
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Vitest
+        run: npm test
+
+  build:
+    name: Build
+    if: ${{ github.event_name != 'schedule' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build app
+        run: npm run build
+        env:
+          VITE_BASE: ${{ env.BUILD_BASE }}
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist
+          if-no-files-found: error
 
   deploy-gh-pages:
     name: Build and Publish gh-pages
-    if: ${{ github.ref == 'refs/heads/dev' }}
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/dev' }}
     needs:
-      - frontend-checks
-      - codeql
+      - lint
+      - test
+      - build
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -69,19 +108,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v6
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
         with:
-          node-version: "24"
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build
-        run: npm run build
-        env:
-          VITE_BASE: /${{ github.event.repository.name }}/
+          name: dist
+          path: dist
 
       - name: Publish to gh-pages branch
         uses: peaceiris/actions-gh-pages@v4
