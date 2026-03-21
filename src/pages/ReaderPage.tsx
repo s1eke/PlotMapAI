@@ -635,7 +635,7 @@ export default function ReaderPage() {
     setIsSidebarOpen(false);
   };
 
-  const handleNext = () => {
+  const handleNext = useCallback(() => {
     if (isPagedMode) {
       goToNextPage();
       return;
@@ -644,9 +644,9 @@ export default function ReaderPage() {
     if (currentChapter?.hasNext) {
       goToChapter(chapterIndex + 1, 'start');
     }
-  };
+  }, [isPagedMode, goToNextPage, currentChapter, goToChapter, chapterIndex]);
 
-  const handlePrev = () => {
+  const handlePrev = useCallback(() => {
     if (isPagedMode) {
       goToPrevPage();
       return;
@@ -655,7 +655,7 @@ export default function ReaderPage() {
     if (currentChapter?.hasPrev) {
       goToChapter(chapterIndex - 1, 'start');
     }
-  };
+  }, [isPagedMode, goToPrevPage, currentChapter, goToChapter, chapterIndex]);
 
   const isPagedModeRef = useRef(isPagedMode);
   isPagedModeRef.current = isPagedMode;
