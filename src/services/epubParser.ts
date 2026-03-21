@@ -76,13 +76,54 @@ function isNonContentPage(title: string, href: string): boolean {
 }
 
 function htmlToText(html: string): string {
-  const doc = new DOMParser().parseFromString(html, 'text/xml');
-  doc.querySelectorAll('script, style, nav, header, footer, [class*="nav"], [class*="Nav"], [id*="nav"], [id*="Nav"]').forEach(el => el.remove());
-  doc.querySelectorAll('script, style, nav, header, footer, [class*="nav"], [class*="Nav"], [id*="nav"], [id*="Nav"]').forEach(el => el.remove());
-  doc.querySelectorAll('p, div, br, li, h1, h2, h3, h4, h5, h6, tr').forEach(el => {
-    el.insertAdjacentText('afterend', '\n');
-  });
-  const text = doc.body.textContent || '';
+  const removeBlockWithContent = (input: string, pattern: RegExp): string => input.replace(pattern, '');
+  const decodeHtmlEntities = (input: string): string => {
+    const namedEntities: Record<string, string> = {
+      amp: '&',
+      apos: '\'',
+      gt: '>',
+      lt: '<',
+      nbsp: ' ',
+      quot: '"',
+    };
+
+    return input
+      .replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/giu, (match, entity: string) => {
+        if (entity.startsWith('#x')) {
+          const codePoint = Number.parseInt(entity.slice(2), 16);
+          return Number.isNaN(codePoint) ? match : String.fromCodePoint(codePoint);
+        }
+
+        if (entity.startsWith('#')) {
+          const codePoint = Number.parseInt(entity.slice(1), 10);
+          return Number.isNaN(codePoint) ? match : String.fromCodePoint(codePoint);
+        }
+
+        return namedEntities[entity.toLowerCase()] ?? match;
+      })
+      .replace(/\u00a0/gu, ' ');
+  };
+
+  const structuralTagPattern = /<\s*\/?\s*(?:p|div|br|li|h[1-6]|tr|td|th|ul|ol|table|section|article)\b[^>]*\/?\s*>/giu;
+  const stripped = decodeHtmlEntities(
+    removeBlockWithContent(
+      removeBlockWithContent(
+        removeBlockWithContent(
+          html,
+          /<\s*(?:script|style|nav|header|footer)\b[^>]*>[\s\S]*?<\s*\/\s*(?:script|style|nav|header|footer)\s*>/giu,
+        ),
+        /<([a-z0-9:_-]+)\b[^>]*\b(?:class|id)\s*=\s*(['"])[^'"]*nav[^'"]*\2[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/giu,
+      ),
+      /<!--[\s\S]*?-->/gu,
+    )
+      .replace(structuralTagPattern, '\n')
+      .replace(/<[^>]+>/gu, ''),
+  );
+
+  const text = stripped
+    .replace(/\r\n?/gu, '\n')
+    .replace(/[^\S\n]+/gu, ' ')
+    .replace(/ *\n */gu, '\n');
   const lines = text.split('\n');
   const filtered = lines.filter(line => {
     const trimmed = line.trim();
@@ -90,7 +131,7 @@ function htmlToText(html: string): string {
     if (NAV_LINE_PATTERN.test(trimmed)) return false;
     return true;
   });
-  return filtered.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  return filtered.join('\n').replace(/\n{3,}/gu, '\n\n').trim();
 }
 
 async function fileHash(file: File): Promise<string> {
