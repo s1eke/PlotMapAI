@@ -632,6 +632,30 @@ export default function ReaderPage() {
 
   const toggleSidebar = () => setIsSidebarOpen((prev) => !prev);
 
+  const dragRef = useRef({ startY: 0, dragging: false });
+  const [dragOffset, setDragOffset] = useState(0);
+
+  const handleDragStart = useCallback((e: React.TouchEvent) => {
+    if (window.matchMedia('(min-width: 768px)').matches) return;
+    dragRef.current = { startY: e.touches[0].clientY, dragging: true };
+    setDragOffset(0);
+  }, []);
+
+  const handleDragMove = useCallback((e: React.TouchEvent) => {
+    if (!dragRef.current.dragging) return;
+    const delta = e.touches[0].clientY - dragRef.current.startY;
+    setDragOffset(Math.max(0, delta));
+  }, []);
+
+  const handleDragEnd = useCallback(() => {
+    if (!dragRef.current.dragging) return;
+    dragRef.current.dragging = false;
+    if (dragOffset > window.innerHeight * 0.2) {
+      setIsSidebarOpen(false);
+    }
+    setDragOffset(0);
+  }, [dragOffset]);
+
   const handleSelectChapter = (idx: number) => {
     goToChapter(idx, 'start');
     setIsSidebarOpen(false);
@@ -723,22 +747,27 @@ export default function ReaderPage() {
         className={cn(
           'flex flex-col transition-all duration-300 ease-in-out overflow-hidden z-50 text-text-primary',
           currentTheme.sidebarBg,
-          'fixed inset-y-0 left-0 md:relative md:translate-x-0 h-full',
+          // Mobile: full-screen bottom sheet
+          'fixed inset-0 md:inset-y-0 md:left-0 md:bottom-auto md:inset-x-auto md:relative',
           isSidebarOpen
-            ? 'w-72 translate-x-0 shadow-2xl md:shadow-none border-r border-border-color/30'
-            : 'w-0 -translate-x-full md:translate-x-0 border-r-0',
+            ? 'translate-y-0 md:translate-x-0 w-full md:w-72 md:border-r md:border-border-color/30'
+            : 'translate-y-full md:translate-y-0 md:-translate-x-full w-full md:w-0 md:border-r-0',
+          dragOffset > 0 && 'transition-none',
         )}
+        style={dragOffset > 0 ? { transform: `translateY(${dragOffset}px)` } : undefined}
       >
-        <div className="w-72 flex flex-col h-full shrink-0">
-          <header className="h-14 flex items-center justify-between px-4 border-b border-border-color/20 shrink-0 glass z-10">
-            <button
-              onClick={() => setIsSidebarOpen(false)}
-              className="font-semibold text-lg text-text-primary flex items-center gap-2 hover:opacity-70 transition-opacity cursor-pointer text-left"
-              title={t('reader.contents')}
-            >
+        <div className="w-full md:w-72 flex flex-col h-full shrink-0">
+          <header
+            className="h-14 flex items-center justify-between px-4 border-b border-border-color/20 shrink-0 glass z-10 touch-none"
+            onTouchStart={handleDragStart}
+            onTouchMove={handleDragMove}
+            onTouchEnd={handleDragEnd}
+            onTouchCancel={handleDragEnd}
+          >
+            <span className="font-semibold text-lg text-text-primary flex items-center gap-2">
               <Menu className="w-5 h-5 text-accent" /> {t('reader.contents')}
-            </button>
-            <button onClick={() => setIsSidebarOpen(false)} className="md:hidden p-1 rounded-full hover:bg-white/10 text-text-secondary transition-colors">
+            </span>
+            <button onClick={() => setIsSidebarOpen(false)} className="p-1 rounded-full hover:bg-white/10 text-text-secondary transition-colors">
               <X className="w-5 h-5" />
             </button>
           </header>
