@@ -68,6 +68,7 @@ export default function ReaderPage() {
   const [chapterIndex, setChapterIndex] = useState<number>(() => initialStoredState?.chapterIndex ?? 0);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageCount, setPageCount] = useState(1);
+  const [scrollModeChapters, setScrollModeChapters] = useState<number[]>([]);
   const [pagedViewportSize, setPagedViewportSize] = useState({ width: 0, height: 0 });
   const [hasHydratedReaderState, setHasHydratedReaderState] = useState(false);
 
@@ -124,6 +125,8 @@ export default function ReaderPage() {
         }
       }
     },
+    scrollModeChapters,
+    setScrollModeChapters,
   );
 
   const isPagedMode = isTwoColumn && viewMode === 'original';
@@ -257,7 +260,7 @@ export default function ReaderPage() {
         setPageCount(1);
         wheelDeltaRef.current = 0;
         pageTurnLockedRef.current = false;
-        if (!isPagedMode) scrollMode.setScrollModeChapters([chapterIndex]);
+        if (!isPagedMode) setScrollModeChapters([chapterIndex]);
         if (contentRef.current) { contentRef.current.scrollTop = 0; contentRef.current.scrollLeft = 0; }
         if (pagedViewportRef.current) pagedViewportRef.current.scrollLeft = 0;
         preloadAdjacent(chapterIndex);
@@ -274,7 +277,7 @@ export default function ReaderPage() {
         setPageCount(1);
         wheelDeltaRef.current = 0;
         pageTurnLockedRef.current = false;
-        if (!isPagedMode) scrollMode.setScrollModeChapters([chapterIndex]);
+        if (!isPagedMode) setScrollModeChapters([chapterIndex]);
         if (contentRef.current) { contentRef.current.scrollTop = 0; contentRef.current.scrollLeft = 0; }
         if (pagedViewportRef.current) pagedViewportRef.current.scrollLeft = 0;
         preloadAdjacent(chapterIndex);
@@ -307,7 +310,7 @@ export default function ReaderPage() {
   const navigation = useReaderNavigation(
     chapterIndex, setChapterIndex, currentChapter, isPagedMode,
     pageIndex, setPageIndex, pageCount, persistReaderState, pageTargetRef,
-    chapters, scrollMode.scrollModeChapters, hasUserInteractedRef,
+    chapters, scrollModeChapters, hasUserInteractedRef,
   );
 
   // Input
@@ -321,10 +324,10 @@ export default function ReaderPage() {
   // Toolbar state
   const toolbarHasPrev = isPagedMode
     ? pageIndex > 0 || Boolean(currentChapter?.hasPrev)
-    : scrollMode.scrollModeChapters.length > 0 ? scrollMode.scrollModeChapters[0] > 0 : Boolean(currentChapter?.hasPrev);
+    : scrollModeChapters.length > 0 ? scrollModeChapters[0] > 0 : Boolean(currentChapter?.hasPrev);
   const toolbarHasNext = isPagedMode
     ? pageIndex < pageCount - 1 || Boolean(currentChapter?.hasNext)
-    : scrollMode.scrollModeChapters.length > 0 ? scrollMode.scrollModeChapters[scrollMode.scrollModeChapters.length - 1] < chapters.length - 1 : Boolean(currentChapter?.hasNext);
+    : scrollModeChapters.length > 0 ? scrollModeChapters[scrollModeChapters.length - 1] < chapters.length - 1 : Boolean(currentChapter?.hasNext);
 
   const handleSelectChapter = (idx: number) => { navigation.goToChapter(idx, 'start'); sidebar.setIsSidebarOpen(false); };
 
@@ -530,7 +533,7 @@ export default function ReaderPage() {
                   </>
                 ) : (
                   <div className="pt-6">
-                    {scrollMode.scrollModeChapters.map((chIdx) => {
+                    {scrollModeChapters.map((chIdx) => {
                       const chData = chapterCacheRef.current.get(chIdx);
                       if (!chData) return null;
                       const chParagraphs = chData.content.split('\n');

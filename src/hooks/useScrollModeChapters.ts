@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useRef, useCallback } from 'react';
 import type { Chapter, ChapterContent } from '../api/reader';
 
 export function useScrollModeChapters(
@@ -9,8 +9,9 @@ export function useScrollModeChapters(
   chapterCacheRef: React.MutableRefObject<Map<number, ChapterContent>>,
   fetchChapterContent: (idx: number) => Promise<ChapterContent>,
   preloadAdjacent: (idx: number, prune?: boolean) => void,
+  scrollModeChapters: number[],
+  setScrollModeChapters: React.Dispatch<React.SetStateAction<number[]>>,
 ) {
-  const [scrollModeChapters, setScrollModeChapters] = useState<number[]>([]);
   const scrollChapterElementsRef = useRef<Map<number, HTMLDivElement>>(new Map());
   const scrollThrottleRef = useRef(0);
   const pendingScrollFetchesRef = useRef<Set<number>>(new Set());
@@ -85,11 +86,9 @@ export function useScrollModeChapters(
         });
       }
     }
-  }, [isPagedMode, viewMode, scrollModeChapters, chapters, contentRef, chapterCacheRef, fetchChapterContent, preloadAdjacent]);
+  }, [isPagedMode, viewMode, scrollModeChapters, chapters, contentRef, chapterCacheRef, fetchChapterContent, preloadAdjacent, setScrollModeChapters]);
 
   return {
-    scrollModeChapters,
-    setScrollModeChapters,
     scrollChapterElementsRef,
     handleScroll,
   };
