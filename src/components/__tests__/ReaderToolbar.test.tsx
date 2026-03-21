@@ -8,12 +8,14 @@ vi.mock('react-i18next', () => ({
 
 describe('ReaderToolbar', () => {
   const defaultProps = {
-    fontSize: 16,
-    setFontSize: vi.fn(),
-    lineSpacing: 1.8,
-    setLineSpacing: vi.fn(),
-    paragraphSpacing: 16,
-    setParagraphSpacing: vi.fn(),
+    sliders: {
+      fontSize: 16,
+      setFontSize: vi.fn(),
+      lineSpacing: 1.8,
+      setLineSpacing: vi.fn(),
+      paragraphSpacing: 16,
+      setParagraphSpacing: vi.fn(),
+    },
     isTwoColumn: false,
     setIsTwoColumn: vi.fn(),
     onPrev: vi.fn(),
@@ -49,5 +51,20 @@ describe('ReaderToolbar', () => {
     
     expect(screen.getByTitle('reader.prev')).toBeDisabled();
     expect(screen.getByTitle('reader.next')).toBeDisabled();
+  });
+
+  it('renders mobile TOC button when onToggleSidebar is provided', () => {
+    const onToggleSidebar = vi.fn();
+    render(<ReaderToolbar {...defaultProps} onToggleSidebar={onToggleSidebar} isSidebarOpen={false} />);
+
+    const tocButton = screen.getByTitle('reader.contents');
+    fireEvent.click(tocButton);
+    expect(onToggleSidebar).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not render mobile TOC button when onToggleSidebar is omitted', () => {
+    render(<ReaderToolbar {...defaultProps} />);
+
+    expect(screen.queryByTitle('reader.contents')).not.toBeInTheDocument();
   });
 });

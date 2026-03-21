@@ -1,15 +1,21 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
-import { AlignJustify, AlignVerticalSpaceAround, Columns2, MoreVertical, Type, ArrowLeft, ArrowRight } from 'lucide-react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { AlignJustify, Columns2, List, MoreVertical, ArrowLeft, ArrowRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '../utils/cn';
+import { READER_SLIDER_CONFIG, MOBILE_SLIDER_KEYS, OVERFLOW_SLIDER_KEYS } from '../constants/readerSliderConfig';
+import { READER_THEME_DISPLAY } from '../constants/readerThemeConfig';
 
-interface ReaderToolbarProps {
+interface SliderValues {
   fontSize: number;
   setFontSize: (size: number) => void;
   lineSpacing: number;
   setLineSpacing: (spacing: number) => void;
   paragraphSpacing: number;
   setParagraphSpacing: (spacing: number) => void;
+}
+
+interface ReaderToolbarProps {
+  sliders: SliderValues;
   isTwoColumn: boolean;
   setIsTwoColumn: (two: boolean) => void;
   onPrev: () => void;
@@ -20,17 +26,32 @@ interface ReaderToolbarProps {
   readerTheme: string;
   setReaderTheme: (theme: string) => void;
   hidden?: boolean;
+  isSidebarOpen?: boolean;
+  onToggleSidebar?: () => void;
 }
 
 type SliderKey = 'fontSize' | 'lineSpacing' | 'paragraphSpacing' | null;
 
+interface ResolvedSlider {
+  key: Exclude<SliderKey, null>;
+  icon: typeof AlignJustify;
+  label: string;
+  value: number;
+  display: string;
+  min: number;
+  max: number;
+  step: number;
+  onChange: (v: number) => void;
+}
+
+const SETTERS: Record<string, keyof SliderValues> = {
+  fontSize: 'setFontSize',
+  lineSpacing: 'setLineSpacing',
+  paragraphSpacing: 'setParagraphSpacing',
+};
+
 export default function ReaderToolbar({
-  fontSize,
-  setFontSize,
-  lineSpacing,
-  setLineSpacing,
-  paragraphSpacing,
-  setParagraphSpacing,
+  sliders,
   isTwoColumn,
   setIsTwoColumn,
   onPrev,
@@ -41,6 +62,8 @@ export default function ReaderToolbar({
   readerTheme,
   setReaderTheme,
   hidden,
+  isSidebarOpen,
+  onToggleSidebar,
 }: ReaderToolbarProps) {
   const { t } = useTranslation();
   const [activeSlider, setActiveSlider] = useState<SliderKey>(null);
@@ -72,33 +95,31 @@ export default function ReaderToolbar({
     return () => document.removeEventListener('mousedown', handleClick);
   }, [activeSlider, overflowOpen]);
 
-  const themes = [
-    { id: 'auto', color: 'transparent', label: t('reader.bgPresets.auto') },
-    { id: 'paper', color: '#ffffff', label: t('reader.bgPresets.paper') },
-    { id: 'parchment', color: '#f4ecd8', label: t('reader.bgPresets.parchment') },
-    { id: 'green', color: '#c7edcc', label: t('reader.bgPresets.green') },
-    { id: 'night', color: '#1a1a1a', label: t('reader.bgPresets.night') },
-  ];
+  const resolvedSliders: ResolvedSlider[] = useMemo(() =>
+    READER_SLIDER_CONFIG.map(cfg => ({
+      key: cfg.key,
+      icon: cfg.icon,
+      label: t(cfg.labelKey),
+      value: sliders[cfg.key],
+      display: cfg.format(sliders[cfg.key]),
+      min: cfg.min,
+      max: cfg.max,
+      step: cfg.step,
+      onChange: sliders[SETTERS[cfg.key]] as (v: number) => void,
+    })),
+    [sliders, t],
+  );
 
-  const desktopSliders: Array<{
-    key: Exclude<SliderKey, null>;
-    icon: typeof Type;
-    label: string;
-    value: number;
-    display: string;
-    min: number;
-    max: number;
-    step: number;
-    onChange: (v: number) => void;
-  }> = [
-      { key: 'fontSize', icon: Type, label: t('reader.fontSize'), value: fontSize, display: `${fontSize}px`, min: 14, max: 32, step: 1, onChange: setFontSize },
-      { key: 'lineSpacing', icon: AlignJustify, label: t('reader.lineSpacing'), value: lineSpacing, display: lineSpacing.toFixed(1), min: 1.0, max: 3.0, step: 0.1, onChange: setLineSpacing },
-      { key: 'paragraphSpacing', icon: AlignVerticalSpaceAround, label: t('reader.paragraphSpacing'), value: paragraphSpacing, display: `${paragraphSpacing}px`, min: 0, max: 32, step: 2, onChange: setParagraphSpacing },
-    ];
+  const desktopSliders = resolvedSliders;
+  const mobileSliders = resolvedSliders.filter(s => MOBILE_SLIDER_KEYS.includes(s.key));
+  const overflowSliders = resolvedSliders.filter(s => OVERFLOW_SLIDER_KEYS.includes(s.key));
 
-  const mobileSliders = desktopSliders.filter(s => s.key === 'fontSize');
+  const themes = useMemo(() =>
+    READER_THEME_DISPLAY.map(td => ({ ...td, label: t(td.labelKey) })),
+    [t],
+  );
 
-  function renderSliderButton(s: typeof desktopSliders[number], mode: 'desktop' | 'mobile') {
+  function renderSliderButton(s: ResolvedSlider, mode: 'desktop' | 'mobile') {
     return (
       <div key={`${mode}-${s.key}`} className="relative">
         <button
@@ -138,7 +159,7 @@ export default function ReaderToolbar({
     );
   }
 
-  function renderSliderRow(s: typeof desktopSliders[number]) {
+  function renderSliderRow(s: ResolvedSlider) {
     return (
       <div key={s.key} className="space-y-2">
         <div className="flex items-center justify-between">
@@ -158,15 +179,27 @@ export default function ReaderToolbar({
     );
   }
 
-  const spacingSliders = desktopSliders.filter(s => s.key === 'lineSpacing' || s.key === 'paragraphSpacing');
-
   return (
     <div className={cn(
       'fixed bottom-6 left-1/2 -translate-x-1/2 bg-bg-secondary/90 dark:bg-brand-800/90 backdrop-blur-xl rounded-full px-3 sm:px-6 py-3 flex items-center gap-2 sm:gap-4 shadow-2xl border border-border-color z-40 transition-all hover:bg-bg-secondary dark:hover:bg-brand-800',
       hidden && 'translate-y-[calc(100%+24px)] opacity-0 pointer-events-none',
     )}>
 
-      <div className="flex items-center gap-2 border-r border-border-color/50 pr-3 sm:pr-5">
+      {/* Mobile: TOC button (first position, replaces prev/next) */}
+      {onToggleSidebar && (
+        <button
+          onClick={onToggleSidebar}
+          className={cn(
+            "p-2 rounded-full transition-colors sm:hidden border-r border-border-color/50 pr-3",
+            isSidebarOpen ? "bg-accent text-white shadow-sm" : "text-text-secondary hover:text-text-primary hover:bg-muted-bg"
+          )}
+          title={t('reader.contents')}
+        >
+          <List className="w-5 h-5" />
+        </button>
+      )}
+
+      <div className="hidden sm:flex items-center gap-2 border-r border-border-color/50 pr-3 sm:pr-5">
         <button
           onClick={onPrev}
           disabled={!hasPrev}
@@ -185,7 +218,7 @@ export default function ReaderToolbar({
         </button>
       </div>
 
-      {/* Desktop: all 3 sliders inline */}
+      {/* Desktop: all sliders inline */}
       <div className="hidden sm:flex items-center gap-1 border-r border-border-color/50 pr-5 relative">
         {desktopSliders.map(s => renderSliderButton(s, 'desktop'))}
       </div>
@@ -269,7 +302,7 @@ export default function ReaderToolbar({
           >
             <div className="absolute bottom-0 right-5 translate-y-1/2 rotate-45 w-2.5 h-2.5 bg-bg-secondary dark:bg-brand-800 border-r border-b border-border-color" />
 
-            {spacingSliders.map(renderSliderRow)}
+            {overflowSliders.map(renderSliderRow)}
 
             <div className="space-y-2 pt-2 border-t border-border-color/50">
               <span className="text-xs text-text-secondary">{t('reader.background')}</span>

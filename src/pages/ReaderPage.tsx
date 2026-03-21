@@ -757,14 +757,21 @@ export default function ReaderPage() {
           isPagedMode && !isChromeVisible && '-translate-y-full opacity-0 pointer-events-none',
         )}>
           <div className="flex items-center gap-3">
+            <Link
+              to="/"
+              className="md:hidden p-2 rounded-full hover:bg-white/10 transition-colors text-text-primary"
+              title={t('reader.exit')}
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </Link>
             <button
               onClick={toggleSidebar}
-              className="p-2 rounded-full hover:bg-white/10 transition-colors text-text-primary"
+              className="hidden md:flex p-2 rounded-full hover:bg-white/10 transition-colors text-text-primary"
               title={t('reader.contents')}
             >
               {isSidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
-            <Link to={`/novel/${novelId}`} className="text-sm font-medium hover:text-accent transition-colors hidden sm:block text-text-primary">
+            <Link to={`/novel/${novelId}`} className="text-sm font-medium hover:text-accent transition-colors hidden md:block text-text-primary">
               {t('reader.exit')}
             </Link>
           </div>
@@ -940,12 +947,14 @@ export default function ReaderPage() {
 
         {currentChapter && (
           <ReaderToolbar
-            fontSize={fontSize}
-            setFontSize={setFontSize}
-            lineSpacing={lineSpacing}
-            setLineSpacing={setLineSpacing}
-            paragraphSpacing={paragraphSpacing}
-            setParagraphSpacing={setParagraphSpacing}
+            sliders={{
+              fontSize,
+              setFontSize,
+              lineSpacing,
+              setLineSpacing,
+              paragraphSpacing,
+              setParagraphSpacing,
+            }}
             isTwoColumn={isTwoColumn}
             setIsTwoColumn={handleSetIsTwoColumn}
             hasPrev={toolbarHasPrev}
@@ -956,6 +965,8 @@ export default function ReaderPage() {
             readerTheme={readerTheme}
             setReaderTheme={setReaderTheme}
             hidden={isPagedMode && !isChromeVisible}
+            isSidebarOpen={isSidebarOpen}
+            onToggleSidebar={toggleSidebar}
           />
         )}
       </main>
