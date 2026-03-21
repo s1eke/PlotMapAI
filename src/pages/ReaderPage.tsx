@@ -195,10 +195,12 @@ export default function ReaderPage() {
 
   const currentTheme = READER_THEMES[readerTheme] || READER_THEMES.auto;
   const chapterParagraphs = currentChapter?.content.split('\n') ?? [];
-  const firstHeadingIndex = chapterParagraphs.findIndex(p => p.trim().length > 0);
-  const hasBodyHeading = firstHeadingIndex !== -1
+  const firstNonEmptyIndex = chapterParagraphs.findIndex(p => p.trim().length > 0);
+  const skipLineIndex = firstNonEmptyIndex !== -1
     && currentChapter
-    && chapterParagraphs[firstHeadingIndex].trim() === currentChapter.title.trim();
+    && chapterParagraphs[firstNonEmptyIndex].trim() === currentChapter.title.trim()
+    ? firstNonEmptyIndex
+    : -1;
   const isPagedMode = isTwoColumn && viewMode === 'original';
   const HEADER_BG_MAP: Record<string, string> = {
     auto: 'bg-bg-primary',
@@ -845,20 +847,16 @@ export default function ReaderPage() {
                       columnRule: fitsTwoColumns ? '1px solid var(--border-color)' : undefined,
                     }}
                   >
+                    <h2
+                      className="text-xl sm:text-2xl font-bold text-center mb-8 mt-2 break-inside-avoid"
+                      style={{ lineHeight: '1.4' }}
+                    >
+                      {currentChapter.title}
+                    </h2>
                     {chapterParagraphs.map((paragraph, i) => {
+                      if (i === skipLineIndex) return null;
                       if (!paragraph.trim()) {
                         return <div key={i} className="break-inside-avoid" style={{ height: paragraphSpacing }} aria-hidden="true" />;
-                      }
-                      if (hasBodyHeading && i === firstHeadingIndex) {
-                        return (
-                          <h2
-                            key={i}
-                            className="text-xl sm:text-2xl font-bold text-center mb-8 mt-2 break-inside-avoid"
-                            style={{ lineHeight: '1.4' }}
-                          >
-                            {paragraph.trim()}
-                          </h2>
-                        );
                       }
                       return (
                         <ChapterParagraph
@@ -905,20 +903,16 @@ export default function ReaderPage() {
                       lineHeight: String(lineSpacing),
                     }}
                   >
+                    <h2
+                      className="text-xl sm:text-2xl font-bold text-center mb-8 mt-2"
+                      style={{ lineHeight: '1.4' }}
+                    >
+                      {currentChapter.title}
+                    </h2>
                     {chapterParagraphs.map((paragraph, i) => {
+                      if (i === skipLineIndex) return null;
                       if (!paragraph.trim()) {
                         return <div key={i} style={{ height: paragraphSpacing }} aria-hidden="true" />;
-                      }
-                      if (hasBodyHeading && i === firstHeadingIndex) {
-                        return (
-                          <h2
-                            key={i}
-                            className="text-xl sm:text-2xl font-bold text-center mb-8 mt-2"
-                            style={{ lineHeight: '1.4' }}
-                          >
-                            {paragraph.trim()}
-                          </h2>
-                        );
                       }
                       return (
                         <ChapterParagraph
