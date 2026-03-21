@@ -29,6 +29,7 @@ interface OverflowAction {
   icon: ReactNode;
   onClick: () => void;
   variant?: 'default' | 'danger';
+  disabled?: boolean;
 }
 
 interface ActionOverflowMenuProps {
@@ -46,11 +47,12 @@ function ActionOverflowMenu({ primary, overflow }: ActionOverflowMenuProps) {
           <button
             key={action.label}
             onClick={action.onClick}
+            disabled={action.disabled}
             className={`px-3 sm:px-4 py-2 rounded-lg transition-colors flex items-center gap-2 text-sm ${
               action.variant === 'danger'
                 ? 'border border-red-500/30 hover:bg-red-500/10 text-red-400'
                 : 'bg-accent hover:bg-accent-hover text-white font-medium'
-            }`}
+            } disabled:opacity-40`}
           >
             {action.icon} {action.label}
           </button>
@@ -65,11 +67,12 @@ function ActionOverflowMenu({ primary, overflow }: ActionOverflowMenuProps) {
         <button
           key={action.label}
           onClick={action.onClick}
+          disabled={action.disabled}
           className={`px-3 sm:px-4 py-2 rounded-lg transition-colors flex items-center gap-2 text-sm ${
             action.variant === 'danger'
               ? 'border border-red-500/30 hover:bg-red-500/10 text-red-400'
               : 'bg-accent hover:bg-accent-hover text-white font-medium'
-          }`}
+          } disabled:opacity-40`}
         >
           {action.icon} <span className="hidden sm:inline">{action.label}</span>
         </button>
@@ -81,11 +84,12 @@ function ActionOverflowMenu({ primary, overflow }: ActionOverflowMenuProps) {
           <button
             key={action.label}
             onClick={action.onClick}
+            disabled={action.disabled}
             className={`px-3 sm:px-4 py-2 rounded-lg transition-colors flex items-center gap-2 text-sm ${
               action.variant === 'danger'
                 ? 'border border-red-500/30 hover:bg-red-500/10 text-red-400'
                 : 'border border-white/10 hover:bg-white/5 text-text-primary'
-            }`}
+            } disabled:opacity-40`}
           >
             {action.icon} {action.label}
           </button>
@@ -114,12 +118,13 @@ function ActionOverflowMenu({ primary, overflow }: ActionOverflowMenuProps) {
                 <button
                   key={action.label}
                   role="menuitem"
+                  disabled={action.disabled}
                   onClick={() => { action.onClick(); setIsOpen(false); }}
                   className={`w-full text-left px-4 py-2.5 text-sm flex items-center gap-2.5 transition-colors ${
                     action.variant === 'danger'
                       ? 'text-red-400 hover:bg-red-500/10'
                       : 'text-text-primary hover:bg-white/5'
-                  }`}
+                  } disabled:opacity-40`}
                 >
                   {action.icon} {action.label}
                 </button>
@@ -682,6 +687,7 @@ export default function SettingsPage() {
                       label: t('settings.common.export'),
                       icon: <Download className="w-4 h-4" />,
                       onClick: () => { setExportPassword(''); setExportAiMsg(null); setIsExportAiOpen(true); },
+                      disabled: !aiSettings?.hasApiKey,
                     },
                   ]}
                 />
