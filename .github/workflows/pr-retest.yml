@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   retest:
-    name: Re-run CI and CodeQL
+    name: Re-run CI
     if: >-
       github.event.issue.pull_request &&
       startsWith(github.event.comment.body, '/retest') &&
@@ -35,7 +35,7 @@ jobs:
               pull_number,
             });
 
-            const workflowIds = ['ci.yml', 'codeql.yml'];
+            const workflowIds = ['ci.yml'];
             const rerunIds = [];
 
             for (const workflow_id of workflowIds) {
