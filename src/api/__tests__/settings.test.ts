@@ -1,13 +1,13 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { db } from '../../services/db';
-import { settingsApi, clearApiKeyMemory } from '../settings';
+import { settingsApi, resetDeviceKeyForTesting } from '../settings';
 
 describe('settingsApi', () => {
   beforeEach(async () => {
     await db.delete();
     await db.open();
     localStorage.clear();
-    clearApiKeyMemory();
+    resetDeviceKeyForTesting();
   });
 
   describe('TOC rules', () => {
@@ -204,7 +204,7 @@ describe('settingsApi', () => {
     it('export and import round-trip works', async () => {
       const exported = await settingsApi.exportAiConfig('mypassword123');
       localStorage.clear();
-      clearApiKeyMemory();
+      resetDeviceKeyForTesting();
 
       const file = new File([exported], 'config.enc', { type: 'application/octet-stream' });
       await settingsApi.importAiConfig(file, 'mypassword123');

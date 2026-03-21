@@ -66,16 +66,89 @@ export interface AiProviderSettingsPayload {
 }
 
 const AI_CONFIG_KEY = 'plotmapai_ai_config';
-let apiKeyMemory: string | null = null;
+const ENCRYPTED_API_KEY_STORAGE_KEY = 'plotmapai_encrypted_api_key';
+const DEVICE_KEY_STORAGE_KEY = 'plotmapai_device_key';
 
-export function getAiConfig(): { apiBaseUrl: string; apiKey: string; modelName: string; contextSize: number } | null {
+// ── Device AES key for localStorage apiKey encryption ──────────────────
+
+let deviceCryptoKey: CryptoKey | null = null;
+let deviceKeyPromise: Promise<CryptoKey> | null = null;
+
+function toB64(bytes: Uint8Array): string {
+  return btoa(String.fromCharCode(...bytes));
+}
+
+function fromB64(s: string): Uint8Array<ArrayBuffer> {
+  const decoded = atob(s);
+  const arr = new Uint8Array(decoded.length);
+  for (let i = 0; i < decoded.length; i++) arr[i] = decoded.charCodeAt(i);
+  return arr as Uint8Array<ArrayBuffer>;
+}
+
+function getDeviceCryptoKey(): Promise<CryptoKey> {
+  if (deviceCryptoKey) return Promise.resolve(deviceCryptoKey);
+  if (deviceKeyPromise) return deviceKeyPromise;
+
+  deviceKeyPromise = (async (): Promise<CryptoKey> => {
+    const existing = localStorage.getItem(DEVICE_KEY_STORAGE_KEY);
+    if (existing) {
+      deviceCryptoKey = await crypto.subtle.importKey(
+        'raw', fromB64(existing), { name: 'AES-GCM' }, false, ['encrypt', 'decrypt'],
+      );
+    } else {
+      const key = await crypto.subtle.generateKey(
+        { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt'],
+      );
+      const exported = await crypto.subtle.exportKey('raw', key);
+      localStorage.setItem(DEVICE_KEY_STORAGE_KEY, toB64(new Uint8Array(exported)));
+      deviceCryptoKey = key;
+    }
+    return deviceCryptoKey;
+  })().catch((err: unknown) => {
+    deviceKeyPromise = null;
+    throw err;
+  });
+
+  return deviceKeyPromise;
+}
+
+async function encryptApiKey(apiKey: string): Promise<string> {
+  const key = await getDeviceCryptoKey();
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const encoded = new TextEncoder().encode(apiKey);
+  const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, encoded);
+  return `${toB64(iv)}.${toB64(new Uint8Array(ciphertext))}`;
+}
+
+async function decryptApiKey(payload: string): Promise<string> {
+  const key = await getDeviceCryptoKey();
+  const dot = payload.indexOf('.');
+  if (dot < 0) throw new Error('Invalid encrypted payload');
+  const iv = fromB64(payload.slice(0, dot));
+  const ciphertext = fromB64(payload.slice(dot + 1));
+  const plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ciphertext);
+  return new TextDecoder().decode(plaintext);
+}
+
+// ── Config read/write ──────────────────────────────────────────────────
+
+export async function getAiConfig(): Promise<{ apiBaseUrl: string; apiKey: string; modelName: string; contextSize: number } | null> {
   const raw = localStorage.getItem(AI_CONFIG_KEY);
   if (!raw) return null;
   try {
     const stored = JSON.parse(raw);
+    let apiKey = '';
+    const enc = localStorage.getItem(ENCRYPTED_API_KEY_STORAGE_KEY);
+    if (enc) {
+      try {
+        apiKey = await decryptApiKey(enc);
+      } catch {
+        // Corrupt or un-decryptable — treat as missing
+      }
+    }
     return {
       apiBaseUrl: stored.apiBaseUrl ?? '',
-      apiKey: apiKeyMemory ?? stored.apiKey ?? '',
+      apiKey,
       modelName: stored.modelName ?? '',
       contextSize: stored.contextSize ?? 32000,
     };
@@ -84,15 +157,21 @@ export function getAiConfig(): { apiBaseUrl: string; apiKey: string; modelName: 
   }
 }
 
-function setAiConfig(config: { apiBaseUrl: string; apiKey: string; modelName: string; contextSize: number }): void {
-  apiKeyMemory = config.apiKey || null;
+async function setAiConfig(config: { apiBaseUrl: string; apiKey: string; modelName: string; contextSize: number }): Promise<void> {
+  if (config.apiKey) {
+    const encrypted = await encryptApiKey(config.apiKey);
+    localStorage.setItem(ENCRYPTED_API_KEY_STORAGE_KEY, encrypted);
+  } else {
+    localStorage.removeItem(ENCRYPTED_API_KEY_STORAGE_KEY);
+  }
   const { apiKey: _ignored, ...rest } = config;
   void _ignored;
   localStorage.setItem(AI_CONFIG_KEY, JSON.stringify(rest));
 }
 
-export function clearApiKeyMemory(): void {
-  apiKeyMemory = null;
+export function resetDeviceKeyForTesting(): void {
+  deviceCryptoKey = null;
+  deviceKeyPromise = null;
 }
 
 function tocRuleToApi(rule: import('../services/db').TocRule): TocRule {
@@ -350,7 +429,7 @@ export const settingsApi = {
   },
 
   getAiProviderSettings: async (): Promise<AiProviderSettings> => {
-    const config = getAiConfig();
+    const config = await getAiConfig();
     if (!config) {
       return {
         apiBaseUrl: '',
@@ -372,7 +451,7 @@ export const settingsApi = {
   },
 
   updateAiProviderSettings: async (payload: AiProviderSettingsPayload): Promise<AiProviderSettings> => {
-    const existing = getAiConfig();
+    const existing = await getAiConfig();
     const keepExisting = payload.keepExistingApiKey !== false;
     let apiKey = payload.apiKey || '';
     if (!apiKey && keepExisting && existing) {
@@ -385,12 +464,12 @@ export const settingsApi = {
       contextSize: payload.contextSize || existing?.contextSize || 32000,
     };
     validateAnalysisConfig(config);
-    setAiConfig(config);
+    await setAiConfig(config);
     return settingsApi.getAiProviderSettings();
   },
 
   testAiProviderSettings: async (payload: Partial<AiProviderSettingsPayload>): Promise<{ message: string; preview: string }> => {
-    const existing = getAiConfig();
+    const existing = await getAiConfig();
     const config: RuntimeAnalysisConfig = {
       apiBaseUrl: normalizeBaseUrl(payload.apiBaseUrl || existing?.apiBaseUrl || ''),
       apiKey: payload.apiKey || existing?.apiKey || '',
@@ -402,7 +481,7 @@ export const settingsApi = {
   },
 
   exportAiConfig: async (password: string): Promise<string> => {
-    const config = getAiConfig();
+    const config = await getAiConfig();
     if (!config) throw new Error('No AI config to export');
     if (!password || password.length < 4) throw new Error('Password must be at least 4 characters');
 
@@ -491,6 +570,6 @@ export const settingsApi = {
       throw new Error('Config file is missing required fields');
     }
 
-    setAiConfig(config);
+    await setAiConfig(config);
   },
 };
