@@ -192,6 +192,11 @@ export default function ReaderPage() {
     isTwoColumn: initialStoredState?.isTwoColumn ?? false,
   });
   const hasUserInteractedRef = useRef(false);
+  const chapterCacheRef = useRef<Map<number, ChapterContent>>(new Map());
+  const scrollChapterElementsRef = useRef<Map<number, HTMLDivElement>>(new Map());
+  const [scrollModeChapters, setScrollModeChapters] = useState<number[]>([]);
+  const scrollThrottleRef = useRef(0);
+  const pendingScrollFetchesRef = useRef<Set<number>>(new Set());
 
   const currentTheme = READER_THEMES[readerTheme] || READER_THEMES.auto;
   const chapterParagraphs = currentChapter?.content.split('\n') ?? [];
@@ -210,8 +215,16 @@ export default function ReaderPage() {
     night: 'bg-[#1a1a1a]',
   };
   const headerBg = HEADER_BG_MAP[readerTheme] || HEADER_BG_MAP.auto;
-  const toolbarHasPrev = isPagedMode ? pageIndex > 0 || Boolean(currentChapter?.hasPrev) : Boolean(currentChapter?.hasPrev);
-  const toolbarHasNext = isPagedMode ? pageIndex < pageCount - 1 || Boolean(currentChapter?.hasNext) : Boolean(currentChapter?.hasNext);
+  const toolbarHasPrev = isPagedMode
+    ? pageIndex > 0 || Boolean(currentChapter?.hasPrev)
+    : scrollModeChapters.length > 0
+      ? scrollModeChapters[0] > 0
+      : Boolean(currentChapter?.hasPrev);
+  const toolbarHasNext = isPagedMode
+    ? pageIndex < pageCount - 1 || Boolean(currentChapter?.hasNext)
+    : scrollModeChapters.length > 0
+      ? scrollModeChapters[scrollModeChapters.length - 1] < chapters.length - 1
+      : Boolean(currentChapter?.hasNext);
   const twoColumnWidth = pagedViewportSize.width
     ? (pagedViewportSize.width >= 2 * MIN_COLUMN_WIDTH + TWO_COLUMN_GAP
       ? Math.max((pagedViewportSize.width - TWO_COLUMN_GAP) / 2, MIN_COLUMN_WIDTH)
@@ -234,6 +247,44 @@ export default function ReaderPage() {
     latestReaderStateRef.current = mergedState;
     writeStoredReaderState(novelId, mergedState);
   }, [novelId]);
+
+  const fetchChapterContent = useCallback(async (idx: number): Promise<ChapterContent> => {
+    const cached = chapterCacheRef.current.get(idx);
+    if (cached) return cached;
+    const data = await readerApi.getChapterContent(novelId, idx);
+    chapterCacheRef.current.set(idx, data);
+    return data;
+  }, [novelId]);
+
+  const preloadAdjacent = useCallback((idx: number, prune = true) => {
+    const toPreload: number[] = [];
+    for (let offset = -3; offset <= 3; offset++) {
+      if (offset === 0) continue;
+      const adjacentIdx = idx + offset;
+      if (adjacentIdx < 0 || adjacentIdx >= chapters.length) continue;
+      if (chapterCacheRef.current.has(adjacentIdx)) continue;
+      toPreload.push(adjacentIdx);
+    }
+
+    let delay = 50;
+    for (const adjIdx of toPreload) {
+      window.setTimeout(() => {
+        if (chapterCacheRef.current.has(adjIdx)) return;
+        readerApi.getChapterContent(novelId, adjIdx).then(data => {
+          chapterCacheRef.current.set(adjIdx, data);
+        }).catch(() => { /* preload failure is non-critical */ });
+      }, delay);
+      delay += 80;
+    }
+
+    if (prune) {
+      for (const key of chapterCacheRef.current.keys()) {
+        if (Math.abs(key - idx) > 3) {
+          chapterCacheRef.current.delete(key);
+        }
+      }
+    }
+  }, [novelId, chapters.length]);
 
   const handleSetIsTwoColumn = useCallback((twoColumn: boolean) => {
     hasUserInteractedRef.current = true;
@@ -404,17 +455,42 @@ export default function ReaderPage() {
     let cancelled = false;
 
     const fetchContent = async () => {
+      const cached = chapterCacheRef.current.get(chapterIndex);
+
+      if (cached) {
+        if (cancelled) return;
+        setCurrentChapter(cached);
+        setPageIndex(0);
+        setPageCount(1);
+        setIsChromeVisible(false);
+        wheelDeltaRef.current = 0;
+        pageTurnLockedRef.current = false;
+        if (!isPagedMode) setScrollModeChapters([chapterIndex]);
+        if (contentRef.current) {
+          contentRef.current.scrollTop = 0;
+          contentRef.current.scrollLeft = 0;
+        }
+        if (pagedViewportRef.current) {
+          pagedViewportRef.current.scrollLeft = 0;
+        }
+        preloadAdjacent(chapterIndex);
+        readerApi.saveProgress(novelId, { chapterIndex, viewMode }).catch(console.error);
+        return;
+      }
+
       setIsLoading(true);
       try {
         const data = await readerApi.getChapterContent(novelId, chapterIndex);
         if (cancelled) return;
 
+        chapterCacheRef.current.set(chapterIndex, data);
         setCurrentChapter(data);
         setPageIndex(0);
         setPageCount(1);
         setIsChromeVisible(false);
         wheelDeltaRef.current = 0;
         pageTurnLockedRef.current = false;
+        if (!isPagedMode) setScrollModeChapters([chapterIndex]);
 
         if (contentRef.current) {
           contentRef.current.scrollTop = 0;
@@ -425,6 +501,7 @@ export default function ReaderPage() {
           pagedViewportRef.current.scrollLeft = 0;
         }
 
+        preloadAdjacent(chapterIndex);
         readerApi.saveProgress(novelId, { chapterIndex, viewMode }).catch(console.error);
       } catch (err) {
         if (!cancelled) {
@@ -442,7 +519,7 @@ export default function ReaderPage() {
     return () => {
       cancelled = true;
     };
-  }, [novelId, chapterIndex, viewMode]);
+  }, [novelId, chapterIndex, viewMode, isPagedMode, preloadAdjacent]);
 
   useEffect(() => {
     if (!novelId) return;
@@ -834,10 +911,78 @@ export default function ReaderPage() {
 
         <div
           ref={contentRef}
-          className={cn('h-full w-full relative cursor-pointer', isPagedMode ? 'overflow-hidden' : 'overflow-y-auto')}
+          className={cn('h-full w-full relative cursor-pointer', isPagedMode ? 'overflow-hidden' : 'overflow-y-auto hide-scrollbar')}
           onClick={handleContentClick}
           onScroll={() => {
-            if (isPagedMode || !contentRef.current) return;
+            if (isPagedMode || !contentRef.current || viewMode !== 'original') return;
+
+            const now = Date.now();
+            if (now - scrollThrottleRef.current < 150) return;
+            scrollThrottleRef.current = now;
+
+            const el = contentRef.current;
+            const scrollTop = el.scrollTop;
+
+            if (scrollModeChapters.length > 0) {
+              const lastIdx = scrollModeChapters[scrollModeChapters.length - 1];
+              const nextIdx = lastIdx + 1;
+              if (nextIdx < chapters.length && !scrollModeChapters.includes(nextIdx) && !pendingScrollFetchesRef.current.has(nextIdx)) {
+                let currentReadIdx = scrollModeChapters[0];
+                for (const idx of scrollModeChapters) {
+                  const chEl = scrollChapterElementsRef.current.get(idx);
+                  if (chEl && chEl.offsetTop <= scrollTop + el.clientHeight * 0.3) {
+                    currentReadIdx = idx;
+                  }
+                }
+
+                const chEl = scrollChapterElementsRef.current.get(currentReadIdx);
+                if (chEl) {
+                  const chTop = chEl.offsetTop;
+                  const chHeight = chEl.offsetHeight;
+                  if (chHeight > 0) {
+                    const progress = (scrollTop - chTop) / chHeight;
+                    if (progress >= 0.5) {
+                      pendingScrollFetchesRef.current.add(nextIdx);
+                      fetchChapterContent(nextIdx).then(data => {
+                        chapterCacheRef.current.set(nextIdx, data);
+                        setScrollModeChapters(prev => {
+                          if (prev.includes(nextIdx)) return prev;
+                          return [...prev, nextIdx];
+                        });
+                        preloadAdjacent(nextIdx, false);
+                      }).finally(() => {
+                        pendingScrollFetchesRef.current.delete(nextIdx);
+                      });
+                    }
+                  }
+                }
+              }
+            }
+
+            if (scrollTop < 50 && scrollModeChapters.length > 0) {
+              const firstIdx = scrollModeChapters[0];
+              const prevIdx = firstIdx - 1;
+              if (prevIdx >= 0 && !scrollModeChapters.includes(prevIdx) && !pendingScrollFetchesRef.current.has(prevIdx)) {
+                pendingScrollFetchesRef.current.add(prevIdx);
+                fetchChapterContent(prevIdx).then(data => {
+                  chapterCacheRef.current.set(prevIdx, data);
+                  const container = contentRef.current;
+                  const prevHeight = container?.scrollHeight ?? 0;
+                  setScrollModeChapters(prev => {
+                    if (prev.includes(prevIdx)) return prev;
+                    return [prevIdx, ...prev];
+                  });
+                  requestAnimationFrame(() => {
+                    if (container) {
+                      container.scrollTop += container.scrollHeight - prevHeight;
+                    }
+                    preloadAdjacent(prevIdx, false);
+                  });
+                }).finally(() => {
+                  pendingScrollFetchesRef.current.delete(prevIdx);
+                });
+              }
+            }
           }}
         >
           {isLoading ? (
@@ -905,60 +1050,95 @@ export default function ReaderPage() {
               </div>
             ) : (
               <div className={cn('px-4 sm:px-8 md:px-12 max-w-[1200px] mx-auto w-full relative', currentTheme.text)}>
-                <div className={cn('sticky top-0 z-10 -mx-4 sm:-mx-8 md:-mx-12 px-4 sm:px-8 md:px-12 py-3 border-b border-border-color/20 backdrop-blur-sm', headerBg)}>
-                  <h1
-                    className={cn(
-                      'text-sm font-medium truncate transition-colors',
-                      readerTheme === 'auto' ? 'text-text-secondary' : 'opacity-60',
-                    )}
-                  >
-                    {currentChapter.title}
-                  </h1>
-                </div>
-                <div className="pt-6">
-
                 {viewMode === 'summary' ? (
-                  <ChapterAnalysisPanel
-                    novelId={novelId}
-                    analysis={chapterAnalysis}
-                    job={analysisStatus?.job ?? null}
-                    isLoading={isChapterAnalysisLoading}
-                    onAnalyzeChapter={handleAnalyzeChapter}
-                    isAnalyzingChapter={isAnalyzingChapter}
-                  />
+                  <>
+                    <div className={cn('sticky top-0 z-10 -mx-4 sm:-mx-8 md:-mx-12 px-4 sm:px-8 md:px-12 py-3 border-b border-border-color/20 backdrop-blur-sm', headerBg)}>
+                      <h1
+                        className={cn(
+                          'text-sm font-medium truncate transition-colors',
+                          readerTheme === 'auto' ? 'text-text-secondary' : 'opacity-60',
+                        )}
+                      >
+                        {currentChapter.title}
+                      </h1>
+                    </div>
+                    <div className="pt-6">
+                      <ChapterAnalysisPanel
+                        novelId={novelId}
+                        analysis={chapterAnalysis}
+                        job={analysisStatus?.job ?? null}
+                        isLoading={isChapterAnalysisLoading}
+                        onAnalyzeChapter={handleAnalyzeChapter}
+                        isAnalyzingChapter={isAnalyzingChapter}
+                      />
+                    </div>
+                  </>
                 ) : (
-                  <div
-                    className="leading-relaxed font-serif mx-auto w-full transition-all text-justify md:text-left selection:bg-accent/30 tracking-wide opacity-90"
-                    style={{
-                      fontSize: `${fontSize}px`,
-                      maxWidth: '800px',
-                      lineHeight: String(lineSpacing),
-                    }}
-                  >
-                    <h2
-                      className="text-xl sm:text-2xl font-bold text-center mb-8 mt-2"
-                      style={{ lineHeight: '1.4' }}
-                    >
-                      {currentChapter.title}
-                    </h2>
-                    {chapterParagraphs.map((paragraph, i) => {
-                      if (i === skipLineIndex) return null;
-                      if (!paragraph.trim()) {
-                        return <div key={i} style={{ height: paragraphSpacing }} aria-hidden="true" />;
-                      }
+                  <div className="pt-6">
+                    {scrollModeChapters.map((chIdx) => {
+                      const chData = chapterCacheRef.current.get(chIdx);
+                      if (!chData) return null;
+                      const chParagraphs = chData.content.split('\n');
+                      const chFirstNonEmpty = chParagraphs.findIndex(p => p.trim().length > 0);
+                      const chSkipLine = chFirstNonEmpty !== -1
+                        && chParagraphs[chFirstNonEmpty].trim() === chData.title.trim()
+                        ? chFirstNonEmpty
+                        : -1;
+
                       return (
-                        <ChapterParagraph
-                          key={i}
-                          text={paragraph}
-                          novelId={novelId}
-                          marginBottom={paragraphSpacing}
-                          className="indent-8"
-                        />
+                        <div
+                          key={chIdx}
+                          ref={el => {
+                            if (el) scrollChapterElementsRef.current.set(chIdx, el);
+                            else scrollChapterElementsRef.current.delete(chIdx);
+                          }}
+                          className="mb-12"
+                        >
+                          <div className={cn('sticky top-0 z-10 -mx-4 sm:-mx-8 md:-mx-12 px-4 sm:px-8 md:px-12 py-3 border-b border-border-color/20 backdrop-blur-sm', headerBg)}>
+                            <h1
+                              className={cn(
+                                'text-sm font-medium truncate transition-colors',
+                                readerTheme === 'auto' ? 'text-text-secondary' : 'opacity-60',
+                              )}
+                            >
+                              {chData.title}
+                            </h1>
+                          </div>
+                          <div
+                            className="leading-relaxed font-serif mx-auto w-full transition-all text-justify md:text-left selection:bg-accent/30 tracking-wide opacity-90"
+                            style={{
+                              fontSize: `${fontSize}px`,
+                              maxWidth: '800px',
+                              lineHeight: String(lineSpacing),
+                            }}
+                          >
+                            <h2
+                              className="text-xl sm:text-2xl font-bold text-center mb-8 mt-2"
+                              style={{ lineHeight: '1.4' }}
+                            >
+                              {chData.title}
+                            </h2>
+                            {chParagraphs.map((paragraph, i) => {
+                              if (i === chSkipLine) return null;
+                              if (!paragraph.trim()) {
+                                return <div key={i} style={{ height: paragraphSpacing }} aria-hidden="true" />;
+                              }
+                              return (
+                                <ChapterParagraph
+                                  key={i}
+                                  text={paragraph}
+                                  novelId={novelId}
+                                  marginBottom={paragraphSpacing}
+                                  className="indent-8"
+                                />
+                              );
+                            })}
+                          </div>
+                        </div>
                       );
                     })}
                   </div>
                 )}
-                </div>
               </div>
             )
           ) : (
