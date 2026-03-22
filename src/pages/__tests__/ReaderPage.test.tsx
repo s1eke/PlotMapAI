@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -414,6 +414,53 @@ describe('ReaderPage', () => {
 
     expect(await screen.findByRole('heading', { name: 'Chapter 1', level: 2 })).toBeInTheDocument();
     expect(await screen.findByText('2 / 3')).toBeInTheDocument();
+  });
+
+  it('keeps the loading overlay visible until paged restore reaches the stored page', async () => {
+    const frameCallbacks: FrameRequestCallback[] = [];
+    const flushAnimationFrames = async () => {
+      while (frameCallbacks.length > 0) {
+        const queuedCallbacks = frameCallbacks.splice(0, frameCallbacks.length);
+        await act(async () => {
+          queuedCallbacks.forEach((callback) => callback(0));
+          await Promise.resolve();
+        });
+      }
+    };
+
+    setPrototypeNumberGetter('clientWidth', 600);
+    setPrototypeNumberGetter('clientHeight', 800);
+    setPrototypeNumberGetter('scrollWidth', 1500);
+    localStorage.setItem('reader-state:1', JSON.stringify({
+      chapterIndex: 0,
+      viewMode: 'original',
+      isTwoColumn: true,
+      chapterProgress: 0.5,
+    }));
+
+    const requestAnimationFrameSpy = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback: FrameRequestCallback) => {
+      frameCallbacks.push(callback);
+      return frameCallbacks.length;
+    });
+    const cancelAnimationFrameSpy = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => undefined);
+
+    try {
+      const { container } = renderPage();
+
+      expect(await screen.findByRole('heading', { name: 'Chapter 1', level: 2 })).toBeInTheDocument();
+      expect(container.querySelector('.animate-spin')).toBeInTheDocument();
+      expect(screen.queryByText('2 / 3')).not.toBeInTheDocument();
+
+      await flushAnimationFrames();
+
+      expect(await screen.findByText('2 / 3')).toBeInTheDocument();
+      await waitFor(() => {
+        expect(container.querySelector('.animate-spin')).not.toBeInTheDocument();
+      });
+    } finally {
+      requestAnimationFrameSpy.mockRestore();
+      cancelAnimationFrameSpy.mockRestore();
+    }
   });
 
   it('shows the unified loading state while chapter content is loading in scroll mode', async () => {

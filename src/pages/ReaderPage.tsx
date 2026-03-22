@@ -43,6 +43,16 @@ function getPageIndexFromProgress(progress: number | undefined, totalPages: numb
   return Math.max(0, Math.min(totalPages - 1, Math.round(clampProgress(progress) * (totalPages - 1))));
 }
 
+function shouldMaskReaderPositionRestore(state: StoredReaderState | null | undefined): boolean {
+  if (!state) return false;
+
+  return (state.chapterIndex ?? 0) > 0
+    || state.viewMode === 'summary'
+    || state.isTwoColumn === true
+    || (typeof state.chapterProgress === 'number' && state.chapterProgress > 0)
+    || (typeof state.scrollPosition === 'number' && state.scrollPosition > 0);
+}
+
 export default function ReaderPage() {
   const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
@@ -70,6 +80,7 @@ export default function ReaderPage() {
   const [scrollModeChapters, setScrollModeChapters] = useState<number[]>([]);
   const [pagedViewportSize, setPagedViewportSize] = useState({ width: 0, height: 0 });
   const [sidebarOpenSignal, setSidebarOpenSignal] = useState(0);
+  const [isRestoringPosition, setIsRestoringPosition] = useState(false);
 
   const contentRef = useRef<HTMLDivElement>(null);
   const pagedViewportRef = useRef<HTMLDivElement>(null);
@@ -269,6 +280,7 @@ export default function ReaderPage() {
 
     const init = async () => {
       setIsLoading(true);
+      setIsRestoringPosition(false);
       setHasHydratedReaderState(false);
       hasUserInteractedRef.current = false;
       chapterChangeSourceRef.current = null;
@@ -321,9 +333,15 @@ export default function ReaderPage() {
           setViewMode(nextViewMode);
           setChapterIndex(resolvedChapterIndex);
           setPendingRestoreState(resolvedState, { force: true });
+          setIsRestoringPosition(shouldMaskReaderPositionRestore(resolvedState));
+        }
+
+        if (toc.length === 0) {
+          setIsRestoringPosition(false);
         }
       } catch (err) {
         if (!cancelled) console.error('Failed to load reader init data:', err);
+        if (!cancelled) setIsRestoringPosition(false);
       } finally {
         if (!cancelled) setHasHydratedReaderState(true);
       }
@@ -433,6 +451,7 @@ export default function ReaderPage() {
         chapterChangeSourceRef.current = null;
       } catch (err) {
         if (!cancelled) console.error('Failed to load chapter content', err);
+        if (!cancelled) setIsRestoringPosition(false);
       } finally {
         if (!cancelled) setIsLoading(false);
       }
@@ -475,6 +494,7 @@ export default function ReaderPage() {
       }
       chapterChangeSourceRef.current = null;
       clearPendingRestoreState();
+      setIsRestoringPosition(false);
     });
 
     return () => cancelAnimationFrame(frameId);
@@ -513,6 +533,7 @@ export default function ReaderPage() {
       }
       chapterChangeSourceRef.current = null;
       clearPendingRestoreState();
+      setIsRestoringPosition(false);
     });
 
     return () => cancelAnimationFrame(frameId);
@@ -580,6 +601,7 @@ export default function ReaderPage() {
 
   const handleBeforeChapterChange = useCallback(() => {
     clearPendingRestoreState();
+    setIsRestoringPosition(false);
     suppressScrollSyncTemporarily();
   }, [clearPendingRestoreState, suppressScrollSyncTemporarily]);
 
@@ -670,6 +692,7 @@ export default function ReaderPage() {
       if (hasRestorablePage || pendingRestoreState) {
         clearPendingRestoreState();
       }
+      setIsRestoringPosition(false);
     });
     return () => cancelAnimationFrame(frameId);
   }, [
@@ -697,6 +720,8 @@ export default function ReaderPage() {
   const handleDragStart = sidebar.handleDragStart;
   const handleDragMove = sidebar.handleDragMove;
   const handleDragEnd = sidebar.handleDragEnd;
+  const showLoadingOverlay = isLoading || isRestoringPosition;
+  const renderableChapter = !isLoading ? currentChapter : null;
 
   return (
     <div className={cn('flex h-screen w-full overflow-hidden transition-colors duration-300', preferences.currentTheme.bg)}>
@@ -770,80 +795,83 @@ export default function ReaderPage() {
           onClick={contentClick.handleContentClick}
           onScroll={handleContentScroll}
         >
-          {isLoading ? (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <Loader2 className="w-8 h-8 animate-spin text-accent" />
-            </div>
-          ) : currentChapter ? (
-            isPagedMode ? (
-              <div className={cn('h-full max-w-[1400px] mx-auto w-full px-4 sm:px-8 md:px-12 flex flex-col', preferences.currentTheme.text)}>
-                <div className={cn('flex items-center justify-between gap-4 py-3 mb-4 shrink-0 border-b border-border-color/20', preferences.headerBg)}>
-                  <h1 className={cn('text-sm font-medium truncate transition-colors', preferences.readerTheme === 'auto' ? 'text-text-secondary' : 'opacity-60')}>
-                    {currentChapter.title}
-                  </h1>
-                  {pageCount > 1 && <div className="text-xs font-medium text-text-secondary whitespace-nowrap">{pageIndex + 1} / {pageCount}</div>}
-                </div>
-                <div ref={pagedViewportRef} className="flex-1 min-h-0 overflow-hidden">
-                  <div ref={pagedContentRef} className="h-full font-serif text-justify md:text-left selection:bg-accent/30 tracking-wide opacity-90" style={{ fontSize: `${preferences.fontSize}px`, lineHeight: String(preferences.lineSpacing), columnGap: fitsTwoColumns ? `${TWO_COLUMN_GAP}px` : '0px', columnWidth: twoColumnWidth ? `${twoColumnWidth}px` : undefined, columnFill: 'auto', columnRule: fitsTwoColumns ? '1px solid var(--border-color)' : undefined }}>
-                    <h2 className="text-xl sm:text-2xl font-bold text-center mb-8 mt-2 break-inside-avoid" style={{ lineHeight: '1.4' }}>{currentChapter.title}</h2>
-                    {chapterParagraphs.map((paragraph, i) => {
-                      if (i === skipLineIndex) return null;
-                      if (!paragraph.trim()) return <div key={i} className="break-inside-avoid" style={{ height: preferences.paragraphSpacing }} aria-hidden="true" />;
-                      return <ChapterParagraph key={i} text={paragraph} novelId={novelId} marginBottom={preferences.paragraphSpacing} className="indent-8 break-inside-avoid" />;
-                    })}
+          {renderableChapter ? (
+            <div className={cn('h-full transition-opacity duration-150', isRestoringPosition && 'opacity-0 pointer-events-none select-none')}>
+              {isPagedMode ? (
+                <div className={cn('h-full max-w-[1400px] mx-auto w-full px-4 sm:px-8 md:px-12 flex flex-col', preferences.currentTheme.text)}>
+                  <div className={cn('flex items-center justify-between gap-4 py-3 mb-4 shrink-0 border-b border-border-color/20', preferences.headerBg)}>
+                    <h1 className={cn('text-sm font-medium truncate transition-colors', preferences.readerTheme === 'auto' ? 'text-text-secondary' : 'opacity-60')}>
+                      {renderableChapter.title}
+                    </h1>
+                    {pageCount > 1 && <div className="text-xs font-medium text-text-secondary whitespace-nowrap">{pageIndex + 1} / {pageCount}</div>}
+                  </div>
+                  <div ref={pagedViewportRef} className="flex-1 min-h-0 overflow-hidden">
+                    <div ref={pagedContentRef} className="h-full font-serif text-justify md:text-left selection:bg-accent/30 tracking-wide opacity-90" style={{ fontSize: `${preferences.fontSize}px`, lineHeight: String(preferences.lineSpacing), columnGap: fitsTwoColumns ? `${TWO_COLUMN_GAP}px` : '0px', columnWidth: twoColumnWidth ? `${twoColumnWidth}px` : undefined, columnFill: 'auto', columnRule: fitsTwoColumns ? '1px solid var(--border-color)' : undefined }}>
+                      <h2 className="text-xl sm:text-2xl font-bold text-center mb-8 mt-2 break-inside-avoid" style={{ lineHeight: '1.4' }}>{renderableChapter.title}</h2>
+                      {chapterParagraphs.map((paragraph, i) => {
+                        if (i === skipLineIndex) return null;
+                        if (!paragraph.trim()) return <div key={i} className="break-inside-avoid" style={{ height: preferences.paragraphSpacing }} aria-hidden="true" />;
+                        return <ChapterParagraph key={i} text={paragraph} novelId={novelId} marginBottom={preferences.paragraphSpacing} className="indent-8 break-inside-avoid" />;
+                      })}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ) : (
-              <div className={cn('px-4 sm:px-8 md:px-12 max-w-[1200px] mx-auto w-full relative', preferences.currentTheme.text)}>
-                {viewMode === 'summary' ? (
-                  <>
-                    <div className={cn('sticky top-0 z-10 -mx-4 sm:-mx-8 md:-mx-12 px-4 sm:px-8 md:px-12 py-3 border-b border-border-color/20 backdrop-blur-sm', preferences.headerBg)}>
-                      <h1 className={cn('text-sm font-medium truncate transition-colors', preferences.readerTheme === 'auto' ? 'text-text-secondary' : 'opacity-60')}>{currentChapter.title}</h1>
-                    </div>
+              ) : (
+                <div className={cn('px-4 sm:px-8 md:px-12 max-w-[1200px] mx-auto w-full relative', preferences.currentTheme.text)}>
+                  {viewMode === 'summary' ? (
+                    <>
+                      <div className={cn('sticky top-0 z-10 -mx-4 sm:-mx-8 md:-mx-12 px-4 sm:px-8 md:px-12 py-3 border-b border-border-color/20 backdrop-blur-sm', preferences.headerBg)}>
+                        <h1 className={cn('text-sm font-medium truncate transition-colors', preferences.readerTheme === 'auto' ? 'text-text-secondary' : 'opacity-60')}>{renderableChapter.title}</h1>
+                      </div>
+                      <div className="pt-6">
+                        <ChapterAnalysisPanel novelId={novelId} analysis={analysis.chapterAnalysis} job={analysis.analysisStatus?.job ?? null} isLoading={analysis.isChapterAnalysisLoading} onAnalyzeChapter={analysis.handleAnalyzeChapter} isAnalyzingChapter={analysis.isAnalyzingChapter} />
+                      </div>
+                    </>
+                  ) : (
                     <div className="pt-6">
-                      <ChapterAnalysisPanel novelId={novelId} analysis={analysis.chapterAnalysis} job={analysis.analysisStatus?.job ?? null} isLoading={analysis.isChapterAnalysisLoading} onAnalyzeChapter={analysis.handleAnalyzeChapter} isAnalyzingChapter={analysis.isAnalyzingChapter} />
+                      {scrollModeChapters.map((chIdx) => {
+                        const chData = chapterCacheRef.current.get(chIdx);
+                        if (!chData) return null;
+                        const chParagraphs = chData.content.split('\n');
+                        const chFirstNonEmpty = chParagraphs.findIndex(p => p.trim().length > 0);
+                        const chSkipLine = chFirstNonEmpty !== -1 && chParagraphs[chFirstNonEmpty].trim() === chData.title.trim() ? chFirstNonEmpty : -1;
+                        return (
+                          <div key={chIdx} ref={el => { if (el) scrollMode.scrollChapterElementsRef.current.set(chIdx, el); else scrollMode.scrollChapterElementsRef.current.delete(chIdx); }} className="mb-12">
+                            <div className={cn('sticky top-0 z-10 -mx-4 sm:-mx-8 md:-mx-12 px-4 sm:px-8 md:px-12 py-3 border-b border-border-color/20 backdrop-blur-sm', preferences.headerBg)}>
+                              <h1 className={cn('text-sm font-medium truncate transition-colors', preferences.readerTheme === 'auto' ? 'text-text-secondary' : 'opacity-60')}>{chData.title}</h1>
+                            </div>
+                            <div className="leading-relaxed font-serif mx-auto w-full transition-all text-justify md:text-left selection:bg-accent/30 tracking-wide opacity-90" style={{ fontSize: `${preferences.fontSize}px`, maxWidth: '800px', lineHeight: String(preferences.lineSpacing) }}>
+                              <h2 className="text-xl sm:text-2xl font-bold text-center mb-8 mt-2" style={{ lineHeight: '1.4' }}>{chData.title}</h2>
+                              {chParagraphs.map((paragraph, i) => {
+                                if (i === chSkipLine) return null;
+                                if (!paragraph.trim()) return <div key={i} style={{ height: preferences.paragraphSpacing }} aria-hidden="true" />;
+                                return <ChapterParagraph key={i} text={paragraph} novelId={novelId} marginBottom={preferences.paragraphSpacing} className="indent-8" />;
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                  </>
-                ) : (
-                  <div className="pt-6">
-                    {scrollModeChapters.map((chIdx) => {
-                      const chData = chapterCacheRef.current.get(chIdx);
-                      if (!chData) return null;
-                      const chParagraphs = chData.content.split('\n');
-                      const chFirstNonEmpty = chParagraphs.findIndex(p => p.trim().length > 0);
-                      const chSkipLine = chFirstNonEmpty !== -1 && chParagraphs[chFirstNonEmpty].trim() === chData.title.trim() ? chFirstNonEmpty : -1;
-                      return (
-                        <div key={chIdx} ref={el => { if (el) scrollMode.scrollChapterElementsRef.current.set(chIdx, el); else scrollMode.scrollChapterElementsRef.current.delete(chIdx); }} className="mb-12">
-                          <div className={cn('sticky top-0 z-10 -mx-4 sm:-mx-8 md:-mx-12 px-4 sm:px-8 md:px-12 py-3 border-b border-border-color/20 backdrop-blur-sm', preferences.headerBg)}>
-                            <h1 className={cn('text-sm font-medium truncate transition-colors', preferences.readerTheme === 'auto' ? 'text-text-secondary' : 'opacity-60')}>{chData.title}</h1>
-                          </div>
-                          <div className="leading-relaxed font-serif mx-auto w-full transition-all text-justify md:text-left selection:bg-accent/30 tracking-wide opacity-90" style={{ fontSize: `${preferences.fontSize}px`, maxWidth: '800px', lineHeight: String(preferences.lineSpacing) }}>
-                            <h2 className="text-xl sm:text-2xl font-bold text-center mb-8 mt-2" style={{ lineHeight: '1.4' }}>{chData.title}</h2>
-                            {chParagraphs.map((paragraph, i) => {
-                              if (i === chSkipLine) return null;
-                              if (!paragraph.trim()) return <div key={i} style={{ height: preferences.paragraphSpacing }} aria-hidden="true" />;
-                              return <ChapterParagraph key={i} text={paragraph} novelId={novelId} marginBottom={preferences.paragraphSpacing} className="indent-8" />;
-                            })}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )
-          ) : (
+                  )}
+                </div>
+              )}
+            </div>
+          ) : !showLoadingOverlay ? (
             <div className="absolute inset-0 flex flex-col items-center justify-center text-text-secondary">
               <p>{t('reader.noChapters')}</p>
               <Link to={`/novel/${novelId}`} className="text-accent underline mt-4 flex items-center gap-2">
                 <ArrowLeft className="w-4 h-4" /> {t('reader.goBack')}
               </Link>
             </div>
+          ) : null}
+          {showLoadingOverlay && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Loader2 className="w-8 h-8 animate-spin text-accent" />
+            </div>
           )}
         </div>
 
-        {currentChapter && (
+        {currentChapter && !showLoadingOverlay && (
           <ReaderToolbar
             sliders={{ fontSize: preferences.fontSize, setFontSize: preferences.setFontSize, lineSpacing: preferences.lineSpacing, setLineSpacing: preferences.setLineSpacing, paragraphSpacing: preferences.paragraphSpacing, setParagraphSpacing: preferences.setParagraphSpacing }}
             isTwoColumn={isTwoColumn} setIsTwoColumn={handleSetIsTwoColumn}
