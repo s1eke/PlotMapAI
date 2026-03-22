@@ -1,5 +1,4 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import ReaderPage from '../ReaderPage';
@@ -221,11 +220,10 @@ describe('ReaderPage', () => {
   });
 
   it('loads the selected chapter and persists progress when a chapter is chosen', async () => {
-    const user = userEvent.setup();
     renderPage();
 
     expect(await screen.findByRole('heading', { name: 'Chapter 1', level: 1 })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /Chapter 2/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Chapter 2/ }));
 
     await waitFor(() => {
       expect(readerApi.getChapterContent).toHaveBeenLastCalledWith(1, 1);
@@ -240,7 +238,6 @@ describe('ReaderPage', () => {
   });
 
   it('does not let stale scroll anchor override chapter selection from the table of contents', async () => {
-    const user = userEvent.setup();
     const longChapters = Array.from({ length: 6 }, (_, index) => ({
       index,
       title: `Chapter ${index + 1}`,
@@ -274,7 +271,7 @@ describe('ReaderPage', () => {
       expect(readerApi.getChapterContent).toHaveBeenCalledWith(1, 2);
     });
 
-    await user.click(screen.getByRole('button', { name: /Chapter 6/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Chapter 6/i }));
 
     const readerContainer = container.querySelector('main .overflow-y-auto.hide-scrollbar') as HTMLDivElement | null;
     expect(readerContainer).not.toBeNull();
@@ -294,7 +291,6 @@ describe('ReaderPage', () => {
   });
 
   it('scrolls to the selected chapter itself in scroll mode navigation', async () => {
-    const user = userEvent.setup();
     const longChapters = Array.from({ length: 12 }, (_, index) => ({
       index,
       title: `Chapter ${index + 1}`,
@@ -322,7 +318,7 @@ describe('ReaderPage', () => {
     const { container } = renderPage();
 
     expect(await screen.findByRole('heading', { name: 'Chapter 1', level: 1 })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /Chapter 10/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Chapter 10/i }));
 
     const readerContainer = container.querySelector('main .overflow-y-auto.hide-scrollbar') as HTMLDivElement | null;
     expect(readerContainer).not.toBeNull();
@@ -364,11 +360,10 @@ describe('ReaderPage', () => {
       overview: null,
       chunks: [],
     });
-    const user = userEvent.setup();
     renderPage();
 
     expect(await screen.findByRole('heading', { name: 'Chapter 1', level: 1 })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'reader.summary' }));
+    fireEvent.click(screen.getByRole('button', { name: 'reader.summary' }));
 
     expect(await screen.findByText('reader.analysisPanel.statusQueued')).toBeInTheDocument();
     expect(screen.getByText('reader.analysisPanel.progressTitle')).toBeInTheDocument();
@@ -481,11 +476,10 @@ describe('ReaderPage', () => {
   });
 
   it('flushes the latest reading state on pagehide', async () => {
-    const user = userEvent.setup();
     renderPage();
 
     expect(await screen.findByRole('heading', { name: 'Chapter 1', level: 1 })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /Chapter 2/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Chapter 2/ }));
 
     window.dispatchEvent(new Event('pagehide'));
 

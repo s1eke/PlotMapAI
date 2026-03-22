@@ -28,11 +28,11 @@ describe('ChapterList', () => {
     expect(screen.getByRole('button', { name: /Chapter 3: The End/ })).toHaveAttribute('data-active', 'true');
   });
 
-  it('jumps directly to the active chapter when the sidebar open signal changes', () => {
-    const { rerender } = render(<ChapterList chapters={chapters} currentIndex={2} onSelect={() => {}} scrollSignal={0} />);
+  it('jumps directly to the active chapter when the sidebar opens', () => {
+    const { rerender } = render(<ChapterList chapters={chapters} currentIndex={2} onSelect={() => {}} isSidebarOpen={false} />);
 
     scrollIntoViewMock.mockClear();
-    rerender(<ChapterList chapters={chapters} currentIndex={2} onSelect={() => {}} scrollSignal={1} />);
+    rerender(<ChapterList chapters={chapters} currentIndex={2} onSelect={() => {}} isSidebarOpen />);
 
     expect(scrollIntoViewMock).toHaveBeenCalledWith({ block: 'center', behavior: 'auto' });
   });
