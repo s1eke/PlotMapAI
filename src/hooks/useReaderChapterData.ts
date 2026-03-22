@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { readerApi } from '../api/reader';
 import type { Chapter, ChapterContent } from '../api/reader';
 import type { PageTarget, StoredReaderState } from './useReaderStatePersistence';
@@ -77,6 +77,15 @@ export function useReaderChapterData({
   startRestoreMaskForState,
   stopRestoreMask,
 }: UseReaderChapterDataParams): UseReaderChapterDataResult {
+  const preloadTimeoutIdsRef = useRef<number[]>([]);
+
+  const clearScheduledPreloads = useCallback(() => {
+    preloadTimeoutIdsRef.current.forEach((timeoutId) => {
+      window.clearTimeout(timeoutId);
+    });
+    preloadTimeoutIdsRef.current = [];
+  }, []);
+
   const fetchChapterContent = useCallback(async (index: number) => {
     const cached = chapterCacheRef.current.get(index);
     if (cached) return cached;
@@ -86,6 +95,8 @@ export function useReaderChapterData({
   }, [chapterCacheRef, novelId]);
 
   const preloadAdjacent = useCallback((index: number, prune = true) => {
+    clearScheduledPreloads();
+
     const toPreload: number[] = [];
     for (let offset = -3; offset <= 3; offset += 1) {
       if (offset === 0) continue;
@@ -97,12 +108,14 @@ export function useReaderChapterData({
 
     let delay = 50;
     for (const adjacentIndex of toPreload) {
-      window.setTimeout(() => {
+      const timeoutId = window.setTimeout(() => {
+        preloadTimeoutIdsRef.current = preloadTimeoutIdsRef.current.filter((id) => id !== timeoutId);
         if (chapterCacheRef.current.has(adjacentIndex)) return;
         readerApi.getChapterContent(novelId, adjacentIndex)
           .then((data) => chapterCacheRef.current.set(adjacentIndex, data))
           .catch(() => {});
       }, delay);
+      preloadTimeoutIdsRef.current.push(timeoutId);
       delay += 80;
     }
 
@@ -113,7 +126,7 @@ export function useReaderChapterData({
         }
       }
     }
-  }, [chapterCacheRef, chapters.length, novelId]);
+  }, [chapterCacheRef, chapters.length, clearScheduledPreloads, novelId]);
 
   const updateChapterWindow = useCallback((nextWindow: number[]) => {
     setCurrentChapterWindow((previousWindow) => {
@@ -133,6 +146,7 @@ export function useReaderChapterData({
     let cancelled = false;
 
     const init = async () => {
+      clearScheduledPreloads();
       setIsLoading(true);
       stopRestoreMask();
       setHasHydratedReaderState(false);
@@ -210,10 +224,12 @@ export function useReaderChapterData({
     void init();
     return () => {
       cancelled = true;
+      clearScheduledPreloads();
     };
   }, [
     chapterCacheRef,
     chapterChangeSourceRef,
+    clearScheduledPreloads,
     clearPendingRestoreState,
     hasUserInteractedRef,
     latestReaderStateRef,
@@ -354,12 +370,14 @@ export function useReaderChapterData({
     void fetchContent();
     return () => {
       cancelled = true;
+      clearScheduledPreloads();
     };
   }, [
     chapterCacheRef,
     chapterChangeSourceRef,
     chapterIndex,
     chapters.length,
+    clearScheduledPreloads,
     contentRef,
     fetchChapterContent,
     isPagedMode,
