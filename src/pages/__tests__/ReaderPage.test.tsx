@@ -77,8 +77,15 @@ const originalClientWidthDescriptor = Object.getOwnPropertyDescriptor(HTMLElemen
 const originalClientHeightDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientHeight');
 const originalScrollWidthDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollWidth');
 
+type HTMLElementPrototypeNumberProperty =
+  | 'offsetHeight'
+  | 'offsetTop'
+  | 'clientWidth'
+  | 'clientHeight'
+  | 'scrollWidth';
+
 function setPrototypeNumberGetter(
-  property: 'offsetHeight' | 'clientWidth' | 'clientHeight' | 'scrollWidth',
+  property: Exclude<HTMLElementPrototypeNumberProperty, 'offsetTop'>,
   value: number,
 ) {
   Object.defineProperty(HTMLElement.prototype, property, {
@@ -88,7 +95,7 @@ function setPrototypeNumberGetter(
 }
 
 function restorePrototypeDescriptor(
-  property: 'offsetHeight' | 'clientWidth' | 'clientHeight' | 'scrollWidth',
+  property: HTMLElementPrototypeNumberProperty,
   descriptor: PropertyDescriptor | undefined,
 ) {
   if (descriptor) {
@@ -407,6 +414,23 @@ describe('ReaderPage', () => {
 
     expect(await screen.findByRole('heading', { name: 'Chapter 1', level: 2 })).toBeInTheDocument();
     expect(await screen.findByText('2 / 3')).toBeInTheDocument();
+  });
+
+  it('shows the unified loading state while chapter content is loading in scroll mode', async () => {
+    const deferredChapter = createDeferred<(typeof chapterContent)[number]>();
+    vi.mocked(readerApi.getChapterContent).mockImplementationOnce(async () => deferredChapter.promise);
+
+    const { container } = renderPage();
+
+    await waitFor(() => {
+      expect(readerApi.getChapterContent).toHaveBeenCalledWith(1, 0);
+    });
+    expect(screen.queryByText('reader.noChapters')).not.toBeInTheDocument();
+    expect(container.querySelector('.animate-spin')).toBeInTheDocument();
+
+    deferredChapter.resolve(chapterContent[0]);
+
+    expect(await screen.findByRole('heading', { name: 'Chapter 1', level: 1 })).toBeInTheDocument();
   });
 
   it('flushes the latest reading state on pagehide', async () => {
