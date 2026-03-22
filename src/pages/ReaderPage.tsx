@@ -336,7 +336,7 @@ export default function ReaderPage() {
       pageTargetRef.current = 'start';
     });
     return () => cancelAnimationFrame(frameId);
-  }, [currentChapter, fitsTwoColumns, preferences.fontSize, isLoading, isPagedMode, pageIndex, pageTurnStep, pagedViewportSize.height, pagedViewportSize.width]);
+  }, [currentChapter, fitsTwoColumns, preferences.fontSize, preferences.lineSpacing, isLoading, isPagedMode, pageIndex, pageTurnStep, pagedViewportSize.height, pagedViewportSize.width]);
 
   // Scroll left sync
   useLayoutEffect(() => {
