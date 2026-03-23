@@ -11,11 +11,9 @@ function unescapeReplacement(raw: string): string {
 }
 
 import {
+  buildRuntimeAnalysisConfig,
   maskApiKey,
-  normalizeBaseUrl,
-  validateAnalysisConfig,
   testAiProviderConnection,
-  type RuntimeAnalysisConfig,
 } from '../services/aiAnalysis';
 import { debugLog } from '../services/debug';
 
@@ -457,26 +455,24 @@ export const settingsApi = {
     if (!apiKey && keepExisting && existing) {
       apiKey = existing.apiKey;
     }
-    const config: RuntimeAnalysisConfig = {
-      apiBaseUrl: normalizeBaseUrl(payload.apiBaseUrl || existing?.apiBaseUrl || ''),
+    const config = buildRuntimeAnalysisConfig({
+      apiBaseUrl: payload.apiBaseUrl || existing?.apiBaseUrl || '',
       apiKey,
       modelName: payload.modelName || existing?.modelName || '',
       contextSize: payload.contextSize || existing?.contextSize || 32000,
-    };
-    validateAnalysisConfig(config);
+    });
     await setAiConfig(config);
     return settingsApi.getAiProviderSettings();
   },
 
   testAiProviderSettings: async (payload: Partial<AiProviderSettingsPayload>): Promise<{ message: string; preview: string }> => {
     const existing = await getAiConfig();
-    const config: RuntimeAnalysisConfig = {
-      apiBaseUrl: normalizeBaseUrl(payload.apiBaseUrl || existing?.apiBaseUrl || ''),
+    const config = buildRuntimeAnalysisConfig({
+      apiBaseUrl: payload.apiBaseUrl || existing?.apiBaseUrl || '',
       apiKey: payload.apiKey || existing?.apiKey || '',
       modelName: payload.modelName || existing?.modelName || '',
       contextSize: payload.contextSize || existing?.contextSize || 32000,
-    };
-    validateAnalysisConfig(config);
+    });
     return testAiProviderConnection(config);
   },
 

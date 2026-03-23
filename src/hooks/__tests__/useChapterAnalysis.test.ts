@@ -213,4 +213,28 @@ describe('useChapterAnalysis', () => {
       expect(mockedApi.getChapterAnalysis).toHaveBeenCalledWith(1, 1);
     });
   });
+
+  it('reuses cached chapter analysis when toggling away from and back to the same chapter', async () => {
+    mockedApi.getChapterAnalysis.mockResolvedValue({ analysis: chapterAnalysisResult });
+
+    const { rerender, result } = renderHook(
+      ({ idx }) => useChapterAnalysis(1, idx),
+      { initialProps: { idx: -1 } },
+    );
+
+    rerender({ idx: 0 });
+
+    await waitFor(() => {
+      expect(result.current.chapterAnalysis).toEqual(chapterAnalysisResult);
+    });
+    expect(mockedApi.getChapterAnalysis).toHaveBeenCalledTimes(1);
+
+    rerender({ idx: -1 });
+    rerender({ idx: 0 });
+
+    await waitFor(() => {
+      expect(result.current.chapterAnalysis).toEqual(chapterAnalysisResult);
+    });
+    expect(mockedApi.getChapterAnalysis).toHaveBeenCalledTimes(1);
+  });
 });

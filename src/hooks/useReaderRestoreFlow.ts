@@ -81,6 +81,8 @@ export function useReaderRestoreFlow({
 }: UseReaderRestoreFlowParams): UseReaderRestoreFlowResult {
   const chapterChangeSourceRef = useRef<ChapterChangeSource>(null);
   const pendingRestoreStateRef = useRef<StoredReaderState | null>(null);
+  const originalViewStateRef = useRef<StoredReaderState | null>(null);
+  const summaryViewStateRef = useRef<StoredReaderState | null>(null);
   const summaryProgressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const suppressScrollSyncRef = useRef(false);
   const scrollSyncReleaseFrameRef = useRef<number | null>(null);
@@ -137,6 +139,27 @@ export function useReaderRestoreFlow({
     scrollSyncReleaseFrameRef.current = requestAnimationFrame(releaseAfterLayout);
   }, []);
 
+  const rememberViewState = useCallback((state: StoredReaderState) => {
+    const normalizedState: StoredReaderState = {
+      chapterIndex: state.chapterIndex,
+      viewMode: state.viewMode,
+      isTwoColumn: state.isTwoColumn,
+      chapterProgress: typeof state.chapterProgress === 'number'
+        ? clampProgress(state.chapterProgress)
+        : undefined,
+      scrollPosition: typeof state.scrollPosition === 'number' && Number.isFinite(state.scrollPosition)
+        ? state.scrollPosition
+        : undefined,
+    };
+
+    if (normalizedState.viewMode === 'summary') {
+      summaryViewStateRef.current = normalizedState;
+      return;
+    }
+
+    originalViewStateRef.current = normalizedState;
+  }, []);
+
   const handleReadingAnchorChange = useCallback((anchor: ScrollModeAnchor) => {
     if (isPagedMode || viewMode !== 'original') return;
     if (pendingRestoreStateRef.current) return;
@@ -184,6 +207,7 @@ export function useReaderRestoreFlow({
       }
     }
 
+    rememberViewState(nextState);
     persistReaderState(nextState, { flush: options?.flush });
     return {
       ...latestReaderStateRef.current,
@@ -198,6 +222,7 @@ export function useReaderRestoreFlow({
     isTwoColumn,
     latestReaderStateRef,
     persistReaderState,
+    rememberViewState,
     viewMode,
   ]);
 
@@ -224,20 +249,34 @@ export function useReaderRestoreFlow({
     if (nextViewMode === viewMode) return;
 
     const currentReaderState = captureCurrentReaderPosition();
+    const matchingSnapshot = nextViewMode === 'original'
+      ? originalViewStateRef.current
+      : summaryViewStateRef.current;
+    const canReuseSnapshot = matchingSnapshot
+      && matchingSnapshot.chapterIndex === currentReaderState.chapterIndex;
+    const targetRestoreState: StoredReaderState = canReuseSnapshot
+      ? {
+          ...currentReaderState,
+          ...matchingSnapshot,
+          viewMode: nextViewMode,
+          isTwoColumn: currentReaderState.isTwoColumn,
+        }
+      : {
+          ...currentReaderState,
+          viewMode: nextViewMode,
+          chapterProgress: 0,
+          scrollPosition: undefined,
+        };
+
     markUserInteracted();
-    if (typeof currentReaderState.chapterIndex === 'number') {
-      setChapterIndex(currentReaderState.chapterIndex);
+    if (typeof targetRestoreState.chapterIndex === 'number') {
+      setChapterIndex(targetRestoreState.chapterIndex);
     }
-    setPendingRestoreState({
-      ...currentReaderState,
-      viewMode: nextViewMode,
-    }, { force: true });
+    rememberViewState(targetRestoreState);
+    setPendingRestoreState(targetRestoreState, { force: true });
     setViewMode(nextViewMode);
-    persistReaderState({
-      ...currentReaderState,
-      viewMode: nextViewMode,
-    });
-  }, [captureCurrentReaderPosition, markUserInteracted, persistReaderState, setChapterIndex, setPendingRestoreState, setViewMode, viewMode]);
+    persistReaderState(targetRestoreState);
+  }, [captureCurrentReaderPosition, markUserInteracted, persistReaderState, rememberViewState, setChapterIndex, setPendingRestoreState, setViewMode, viewMode]);
 
   useEffect(() => {
     if (isLoading || viewMode !== 'original' || isPagedMode) return;

@@ -4,20 +4,29 @@ import { loadAndPurifyChapters } from '../api/reader';
 import { getAiConfig } from '../api/settings';
 import { debugLog } from './debug';
 import {
-  buildAnalysisChunks,
-  runChunkAnalysis,
-  runSingleChapterAnalysis,
-  runOverviewAnalysis,
-  isChapterAnalysisComplete,
-  isOverviewComplete,
-  buildCharacterGraphPayload,
   AnalysisConfigError,
   AnalysisExecutionError,
   ChunkingError,
-  type RuntimeAnalysisConfig,
-  normalizeBaseUrl,
-  cleanText,
-} from './aiAnalysis';
+  buildRuntimeAnalysisConfig,
+} from './analysis';
+import {
+  buildCharacterGraphPayload,
+  isChapterAnalysisComplete,
+  isOverviewComplete,
+} from './analysis/aggregates';
+import { buildChunkFromChapters } from './analysis/chunking';
+import {
+  buildAnalysisChunks,
+  runChunkAnalysis,
+  runOverviewAnalysis,
+  runSingleChapterAnalysis,
+} from './analysis/service';
+import type {
+  AnalysisChunkPayload,
+  ChunkAnalysisResult,
+  OverviewAnalysisResult,
+  RuntimeAnalysisConfig,
+} from './analysis/types';
 
 import type {
   AnalysisStatusResponse,
@@ -50,18 +59,7 @@ class AnalysisJobStateError extends Error {
 
 async function loadRuntimeConfig(): Promise<RuntimeAnalysisConfig> {
   const stored = await getAiConfig();
-  if (!stored) throw new AnalysisConfigError('请先在设置中完成 AI 接口配置。');
-  const config: RuntimeAnalysisConfig = {
-    apiBaseUrl: normalizeBaseUrl(stored.apiBaseUrl),
-    apiKey: cleanText(stored.apiKey),
-    modelName: cleanText(stored.modelName),
-    contextSize: Number(stored.contextSize) || 0,
-  };
-  if (!config.apiBaseUrl) throw new AnalysisConfigError('AI 接口地址不能为空。');
-  if (!config.apiKey) throw new AnalysisConfigError('AI Token 未配置，请先在设置中保存。');
-  if (!config.modelName) throw new AnalysisConfigError('AI 模型名称不能为空。');
-  if (config.contextSize < 12000) throw new AnalysisConfigError('上下文大小不能小于 12000。');
-  return config;
+  return buildRuntimeAnalysisConfig(stored);
 }
 
 // ── IndexedDB helpers ─────────────────────────────────────────────────────
@@ -296,7 +294,7 @@ function nowISO(): string {
 async function resetJobPlan(
   novelId: number,
   totalChapters: number,
-  chunks: Array<Record<string, unknown>>,
+  chunks: AnalysisChunkPayload[],
 ): Promise<void> {
   if (!chunks.length) throw new AnalysisJobStateError('当前小说没有可分析的章节。');
 
@@ -341,10 +339,10 @@ async function resetJobPlan(
   for (const chunk of chunks) {
     await db.analysisChunks.add({
       novelId,
-      chunkIndex: chunk.chunkIndex as number,
-      startChapterIndex: chunk.startChapterIndex as number,
-      endChapterIndex: chunk.endChapterIndex as number,
-      chapterIndices: chunk.chapterIndices as number[],
+      chunkIndex: chunk.chunkIndex,
+      startChapterIndex: chunk.startChapterIndex,
+      endChapterIndex: chunk.endChapterIndex,
+      chapterIndices: chunk.chapterIndices,
       status: 'pending',
       chunkSummary: '',
       errorMessage: '',
@@ -386,37 +384,15 @@ async function failJob(novelId: number, message: string): Promise<void> {
 async function hydrateChunkPayload(
   chunkRow: AnalysisChunk,
   chapterMap: Map<number, Chapter>,
-): Promise<Record<string, unknown>> {
+): Promise<AnalysisChunkPayload> {
   const chapterIndices = chunkRow.chapterIndices;
-  const chapters: Array<Record<string, unknown>> = [];
-  let totalLength = 0;
+  const chapters: Chapter[] = [];
   for (const chapterIndex of chapterIndices) {
     const chapter = chapterMap.get(chapterIndex);
     if (!chapter) throw new AnalysisJobStateError(`找不到第 ${chapterIndex + 1} 章，无法继续分析。`);
-    const chapterText = renderChapterForPrompt(chapter);
-    const chapterLength = new TextEncoder().encode(chapterText).length;
-    chapters.push({
-      chapterIndex: chapter.chapterIndex,
-      title: chapter.title,
-      content: chapter.content,
-      text: chapterText,
-      length: chapterLength,
-    });
-    totalLength += chapterLength;
+    chapters.push(chapter);
   }
-  return {
-    chunkIndex: chunkRow.chunkIndex,
-    chapterIndices,
-    startChapterIndex: chunkRow.startChapterIndex,
-    endChapterIndex: chunkRow.endChapterIndex,
-    contentLength: totalLength,
-    chapters,
-    text: chapters.map(c => c.text as string).join('\n\n'),
-  };
-}
-
-function renderChapterForPrompt(chapter: Chapter): string {
-  return `[章节索引]${chapter.chapterIndex}\n[章节标题]${chapter.title || '未命名章节'}\n[章节正文]\n${chapter.content || ''}`;
+  return buildChunkFromChapters(chunkRow.chunkIndex, chapters);
 }
 
 // ── Error formatting ──────────────────────────────────────────────────────
@@ -437,9 +413,9 @@ function formatExceptionMessage(exc: unknown): string {
 
 async function markChunkRunning(
   novelId: number,
-  chunkPayload: Record<string, unknown>,
+  chunkPayload: AnalysisChunkPayload,
 ): Promise<void> {
-  const chunkIndex = chunkPayload.chunkIndex as number;
+  const chunkIndex = chunkPayload.chunkIndex;
   const chunk = await db.analysisChunks
     .where('[novelId+chunkIndex]')
     .equals([novelId, chunkIndex])
@@ -454,10 +430,10 @@ async function markChunkRunning(
 
 async function markChunkFailed(
   novelId: number,
-  chunkPayload: Record<string, unknown>,
+  chunkPayload: AnalysisChunkPayload,
   errorMessage: string,
 ): Promise<void> {
-  const chunkIndex = chunkPayload.chunkIndex as number;
+  const chunkIndex = chunkPayload.chunkIndex;
   const chunk = await db.analysisChunks
     .where('[novelId+chunkIndex]')
     .equals([novelId, chunkIndex])
@@ -472,39 +448,37 @@ async function markChunkFailed(
 
 async function saveChunkAnalysisResult(
   novelId: number,
-  chunkPayload: Record<string, unknown>,
-  result: Record<string, unknown>,
+  chunkPayload: AnalysisChunkPayload,
+  result: ChunkAnalysisResult,
 ): Promise<void> {
-  const chunkIndex = chunkPayload.chunkIndex as number;
+  const chunkIndex = chunkPayload.chunkIndex;
   const chunk = await db.analysisChunks
     .where('[novelId+chunkIndex]')
     .equals([novelId, chunkIndex])
     .first();
   if (chunk) {
     chunk.status = 'completed';
-    chunk.chunkSummary = cleanText(result.chunkSummary as string, 500) || '该章节块分析已完成。';
+    chunk.chunkSummary = result.chunkSummary || '该章节块分析已完成。';
     chunk.errorMessage = '';
     chunk.updatedAt = nowISO();
     await db.analysisChunks.put(chunk);
   }
 
-  const analyses = result.chapterAnalyses as Array<Record<string, unknown>> | undefined;
-  if (!analyses) return;
-  for (const item of analyses) {
+  for (const item of result.chapterAnalyses) {
     const existing = await db.chapterAnalyses
       .where('[novelId+chapterIndex]')
-      .equals([novelId, item.chapterIndex as number])
+      .equals([novelId, item.chapterIndex])
       .first();
     const record: ChapterAnalysis = {
       id: existing?.id ?? (undefined as unknown as number),
       novelId,
-      chapterIndex: item.chapterIndex as number,
-      chapterTitle: cleanText(item.title as string, 256) || '',
-      summary: cleanText(item.summary as string, 400),
-      keyPoints: (item.keyPoints ?? []) as string[],
-      characters: (item.characters ?? []) as ChapterAnalysis['characters'],
-      relationships: (item.relationships ?? []) as ChapterAnalysis['relationships'],
-      tags: (item.tags ?? []) as string[],
+      chapterIndex: item.chapterIndex,
+      chapterTitle: item.title || '',
+      summary: item.summary,
+      keyPoints: item.keyPoints,
+      characters: item.characters as unknown as ChapterAnalysis['characters'],
+      relationships: item.relationships as unknown as ChapterAnalysis['relationships'],
+      tags: item.tags,
       chunkIndex,
       updatedAt: nowISO(),
     };
@@ -519,19 +493,19 @@ async function saveChunkAnalysisResult(
 
 async function saveOverviewAnalysisResult(
   novelId: number,
-  result: Record<string, unknown>,
+  result: OverviewAnalysisResult,
 ): Promise<void> {
   const existing = await loadOverview(novelId);
   const record: AnalysisOverview = {
     id: existing?.id ?? (undefined as unknown as number),
     novelId,
-    bookIntro: cleanText(result.bookIntro as string, 400),
-    globalSummary: cleanText(result.globalSummary as string, 2400),
-    themes: (result.themes ?? []) as string[],
-    characterStats: (result.characterStats ?? []) as AnalysisOverview['characterStats'],
-    relationshipGraph: (result.relationshipGraph ?? []) as AnalysisOverview['relationshipGraph'],
-    totalChapters: result.totalChapters as number,
-    analyzedChapters: result.analyzedChapters as number,
+    bookIntro: result.bookIntro,
+    globalSummary: result.globalSummary,
+    themes: result.themes,
+    characterStats: result.characterStats as unknown as AnalysisOverview['characterStats'],
+    relationshipGraph: result.relationshipGraph as unknown as AnalysisOverview['relationshipGraph'],
+    totalChapters: result.totalChapters,
+    analyzedChapters: result.analyzedChapters,
     updatedAt: nowISO(),
   };
   if (existing) {
@@ -973,10 +947,9 @@ export async function analyzeSingleChapter(
   if (!chapter) throw new AnalysisJobStateError(`第 ${chapterIndex + 1} 章不存在。`);
 
   const result = await runSingleChapterAnalysis(runtimeConfig, novel.title, chapter);
-  const analyses = result.chapterAnalyses as Array<Record<string, unknown>> | undefined;
-  if (!analyses || analyses.length === 0) return null;
+  if (result.chapterAnalyses.length === 0) return null;
 
-  const item = analyses[0];
+  const item = result.chapterAnalyses[0];
   const existing = await db.chapterAnalyses
     .where('[novelId+chapterIndex]')
     .equals([novelId, chapterIndex])
@@ -985,12 +958,12 @@ export async function analyzeSingleChapter(
     id: existing?.id ?? (undefined as unknown as number),
     novelId,
     chapterIndex,
-    chapterTitle: cleanText(item.title as string, 256) || chapter.title || '',
-    summary: cleanText(item.summary as string, 400),
-    keyPoints: (item.keyPoints ?? []) as string[],
-    characters: (item.characters ?? []) as ChapterAnalysis['characters'],
-    relationships: (item.relationships ?? []) as ChapterAnalysis['relationships'],
-    tags: (item.tags ?? []) as string[],
+    chapterTitle: item.title || chapter.title || '',
+    summary: item.summary,
+    keyPoints: item.keyPoints,
+    characters: item.characters as unknown as ChapterAnalysis['characters'],
+    relationships: item.relationships as unknown as ChapterAnalysis['relationships'],
+    tags: item.tags,
     chunkIndex: -1,
     updatedAt: nowISO(),
   };
@@ -1008,7 +981,7 @@ export async function getCharacterGraph(novelId: number): Promise<CharacterGraph
   const chapters = await loadPurifiedChaptersForAnalysis(novelId);
   const chapterRows = await loadChapterAnalyses(novelId);
   const overview = await loadOverview(novelId);
-  return buildCharacterGraphPayload(chapters, chapterRows, overview) as unknown as CharacterGraphResponse;
+  return buildCharacterGraphPayload(chapters, chapterRows, overview);
 }
 
 export async function getChapterAnalysis(
