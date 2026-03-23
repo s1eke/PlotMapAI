@@ -120,6 +120,9 @@
   border-radius: 4px;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: var(--text-secondary);
+/* PWA standalone: prevent pull-to-refresh and overscroll bounce */
+@media (display-mode: standalone) {
+  html, body {
+    overscroll-behavior: none;
+  }
 }

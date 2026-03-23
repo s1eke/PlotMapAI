@@ -220,6 +220,7 @@
   },
   "settings": {
     "title": "Settings",
+    "subtitle": "Manage chapter parsing, text purification, and AI analysis settings from one place.",
     "tocRules": "Book Parsing Rules",
     "purificationRules": "Purification Rules",
     "language": "Language",
@@ -235,6 +236,7 @@
       "importJson": "Import JSON",
       "resetTitle": "Reset to Default Rules",
       "resetConfirm": "Are you sure you want to reset all TOC rules? This will delete your custom rules.",
+      "deleteTitle": "Delete Chapter Rule",
       "deleteConfirm": "Are you sure you want to delete this Directory Rule?",
       "addRule": "Add Rule",
       "editRule": "Edit Directory Rule",
@@ -243,7 +245,9 @@
       "priorityTemplate": "Priority: {{priority}}",
       "namePlaceholder": "e.g. Chapter Number + Title",
       "regexPlaceholder": "Enter regex pattern...",
-      "examplePlaceholder": "e.g. Chapter 1 The Beginning"
+      "examplePlaceholder": "e.g. Chapter 1 The Beginning",
+      "emptyTitle": "No chapter rules yet",
+      "emptyDescription": "Add a detection rule or import a YAML rule pack to make TXT chapter parsing more reliable."
     },
     "purification": {
       "title": "Text Purification",
@@ -285,12 +289,24 @@
       "jsSecurityNote": "Only whitelisted functions (fullwidth, halfwidth, strip, etc.) are allowed.",
       "bookScopePlaceholder": "Book names...",
       "excludeBookScopePlaceholder": "Exclude book names...",
-      "defaultGroup": "Purification"
+      "defaultGroup": "Purification",
+      "emptyTitle": "No purification rules yet",
+      "emptyDescription": "Import a YAML rule pack or create rules manually to clean ads, typos, and formatting noise."
     },
     "ai": {
       "tab": "AI Analysis Settings",
       "title": "AI Analysis Settings",
       "subtitle": "AI connection settings are stored in your browser. Tokens are only shown masked.",
+      "connectionTitle": "Connection Settings",
+      "connectionDescription": "Set the service URL, model name, and context size, then save the configuration locally.",
+      "statusTitle": "Current Status",
+      "statusDescription": "Review the currently saved connection details and token state at a glance.",
+      "backupTitle": "Security & Backup",
+      "backupDescription": "Before importing or exporting, make sure the device is trusted and keep the encrypted file and password safe.",
+      "savedTokenStatusLabel": "Token Status",
+      "tokenSaved": "Saved",
+      "tokenMissing": "Not Saved",
+      "updatedAtLabel": "Last Updated",
       "loadFailed": "Failed to load AI settings. Please try again later.",
       "saveSuccess": "AI settings saved. ",
       "saveFailed": "Failed to save AI settings.",
@@ -337,6 +353,14 @@
     "common": {
       "import": "Import",
       "export": "Export",
+      "moreActions": "More actions",
+      "loadFailed": "Failed to load",
+      "saveSuccess": "Saved successfully",
+      "importSuccess": "Imported successfully",
+      "exportSuccess": "Exported successfully",
+      "exportFailed": "Export failed",
+      "deleteSuccess": "Deleted successfully",
+      "clearSuccess": "Cleared successfully",
       "updateFailed": "Failed to update rule",
       "resetFailed": "Failed to reset TOC rules",
       "uploadFailed": "Upload failed",

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import type { Chapter } from '../api/reader';
 import { cn } from '../utils/cn';
 
@@ -7,20 +7,35 @@ interface ChapterListProps {
   currentIndex: number;
   onSelect: (index: number) => void;
   contentTextColor?: string;
+  isSidebarOpen?: boolean;
 }
 
-export default function ChapterList({ chapters, currentIndex, onSelect, contentTextColor }: ChapterListProps) {
+export default function ChapterList({ chapters, currentIndex, onSelect, contentTextColor, isSidebarOpen }: ChapterListProps) {
   const listRef = useRef<HTMLDivElement>(null);
+  const hasMountedRef = useRef(false);
+  const previousCurrentIndexRef = useRef(currentIndex);
+  const previousSidebarOpenRef = useRef(isSidebarOpen);
 
-  // Auto-scroll to active chapter
-  useEffect(() => {
+  // When the directory opens or first renders, jump directly to the active chapter
+  // so the user doesn't see a long animated scroll from the top.
+  useLayoutEffect(() => {
     if (listRef.current) {
       const activeEl = listRef.current.querySelector('[data-active="true"]');
       if (activeEl) {
-        activeEl.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        const didOpenSidebar = Boolean(isSidebarOpen) && !previousSidebarOpenRef.current;
+        const didChangeChapter = currentIndex !== previousCurrentIndexRef.current;
+        const behavior: ScrollBehavior = !hasMountedRef.current || didOpenSidebar || !didChangeChapter
+          ? 'auto'
+          : 'smooth';
+
+        activeEl.scrollIntoView({ block: 'center', behavior });
       }
     }
-  }, [currentIndex]);
+
+    hasMountedRef.current = true;
+    previousCurrentIndexRef.current = currentIndex;
+    previousSidebarOpenRef.current = isSidebarOpen;
+  }, [currentIndex, isSidebarOpen]);
 
   return (
     <div 

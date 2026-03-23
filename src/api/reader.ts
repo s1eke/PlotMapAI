@@ -19,6 +19,8 @@ export interface ReadingProgress {
   chapterIndex: number;
   scrollPosition: number;
   viewMode: 'summary' | 'original';
+  chapterProgress?: number;
+  isTwoColumn?: boolean;
 }
 
 async function getPurifyRules(): Promise<Array<Record<string, unknown>>> {
@@ -98,12 +100,20 @@ export const readerApi = {
   getProgress: async (novelId: number): Promise<ReadingProgress> => {
     const progress = await db.readingProgress.where('novelId').equals(novelId).first();
     if (!progress) {
-      return { chapterIndex: 0, scrollPosition: 0, viewMode: 'original' };
+      return {
+        chapterIndex: 0,
+        scrollPosition: 0,
+        viewMode: 'original',
+        chapterProgress: 0,
+        isTwoColumn: false,
+      };
     }
     return {
       chapterIndex: progress.chapterIndex,
       scrollPosition: progress.scrollPosition,
       viewMode: (progress.viewMode || 'original') as 'summary' | 'original',
+      chapterProgress: typeof progress.chapterProgress === 'number' ? progress.chapterProgress : undefined,
+      isTwoColumn: typeof progress.isTwoColumn === 'boolean' ? progress.isTwoColumn : undefined,
     };
   },
 
@@ -115,6 +125,8 @@ export const readerApi = {
         chapterIndex: data.chapterIndex ?? existing.chapterIndex,
         scrollPosition: data.scrollPosition ?? existing.scrollPosition,
         viewMode: data.viewMode ?? existing.viewMode,
+        chapterProgress: data.chapterProgress ?? existing.chapterProgress,
+        isTwoColumn: data.isTwoColumn ?? existing.isTwoColumn,
         updatedAt: now,
       });
     } else {
@@ -124,6 +136,8 @@ export const readerApi = {
         chapterIndex: data.chapterIndex ?? 0,
         scrollPosition: data.scrollPosition ?? 0,
         viewMode: data.viewMode ?? 'original',
+        chapterProgress: data.chapterProgress,
+        isTwoColumn: data.isTwoColumn,
         updatedAt: now,
       });
     }

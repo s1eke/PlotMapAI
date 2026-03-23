@@ -1,10 +1,24 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
+import { useState } from 'react';
 import ReaderToolbar from '../ReaderToolbar';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
+
+function mockMatchMedia(matches: boolean) {
+  window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+    matches,
+    media: query,
+    onchange: null,
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  }));
+}
 
 describe('ReaderToolbar', () => {
   const defaultProps = {
@@ -26,6 +40,41 @@ describe('ReaderToolbar', () => {
     readerTheme: 'paper',
     setReaderTheme: vi.fn()
   };
+
+  it('keeps the desktop slider popover open while adjusting font size', () => {
+    mockMatchMedia(true);
+    const setFontSizeSpy = vi.fn();
+
+    function TestToolbar() {
+      const [fontSize, setFontSize] = useState(16);
+
+      return (
+        <ReaderToolbar
+          {...defaultProps}
+          sliders={{
+            ...defaultProps.sliders,
+            fontSize,
+            setFontSize: (value) => {
+              setFontSizeSpy(value);
+              setFontSize(value);
+            },
+          }}
+        />
+      );
+    }
+
+    render(<TestToolbar />);
+
+    fireEvent.click(screen.getAllByTitle('reader.fontSize')[0]);
+
+    expect(screen.getAllByRole('slider')).toHaveLength(1);
+
+    fireEvent.change(screen.getByRole('slider'), { target: { value: '20' } });
+
+    expect(setFontSizeSpy).toHaveBeenCalledWith(20);
+    expect(screen.getByRole('slider')).toBeInTheDocument();
+    expect(screen.getAllByText('20px').length).toBeGreaterThanOrEqual(2);
+  });
 
   it('renders correctly with default props', () => {
     render(<ReaderToolbar {...defaultProps} />);

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo, useSyncExternalStore } from 'react';
 import { AlignJustify, Columns2, List, MoreVertical, ArrowLeft, ArrowRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '../utils/cn';
@@ -50,6 +50,31 @@ const SETTERS: Record<string, keyof SliderValues> = {
   paragraphSpacing: 'setParagraphSpacing',
 };
 
+function getIsDesktopViewport(): boolean {
+  if (typeof window === 'undefined') {
+    return true;
+  }
+
+  return window.matchMedia('(min-width: 640px)').matches;
+}
+
+function subscribeToDesktopViewport(onStoreChange: () => void): () => void {
+  if (typeof window === 'undefined') {
+    return () => {};
+  }
+
+  const mediaQuery = window.matchMedia('(min-width: 640px)');
+  const handleChange = () => onStoreChange();
+
+  if (typeof mediaQuery.addEventListener === 'function') {
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }
+
+  mediaQuery.addListener(handleChange);
+  return () => mediaQuery.removeListener(handleChange);
+}
+
 export default function ReaderToolbar({
   sliders,
   isTwoColumn,
@@ -72,6 +97,11 @@ export default function ReaderToolbar({
   const overflowRef = useRef<HTMLDivElement>(null);
   const buttonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const overflowBtnRef = useRef<HTMLButtonElement>(null);
+  const isDesktopViewport = useSyncExternalStore(
+    subscribeToDesktopViewport,
+    getIsDesktopViewport,
+    () => true,
+  );
 
   const toggleSlider = useCallback((key: SliderKey) => {
     setActiveSlider(prev => prev === key ? null : key);
@@ -84,8 +114,7 @@ export default function ReaderToolbar({
       if (popoverRef.current?.contains(target)) return;
       if (overflowRef.current?.contains(target)) return;
       if (overflowBtnRef.current?.contains(target)) return;
-      const isDesktop = window.matchMedia('(min-width: 640px)').matches;
-      const mode = isDesktop ? 'desktop' : 'mobile';
+      const mode = isDesktopViewport ? 'desktop' : 'mobile';
       const btn = activeSlider ? buttonRefs.current[mode + '-' + activeSlider] : null;
       if (btn?.contains(target)) return;
       setActiveSlider(null);
@@ -93,7 +122,7 @@ export default function ReaderToolbar({
     };
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
-  }, [activeSlider, overflowOpen]);
+  }, [activeSlider, isDesktopViewport, overflowOpen]);
 
   const resolvedSliders: ResolvedSlider[] = useMemo(() =>
     READER_SLIDER_CONFIG.map(cfg => ({
@@ -120,6 +149,8 @@ export default function ReaderToolbar({
   );
 
   function renderSliderButton(s: ResolvedSlider, mode: 'desktop' | 'mobile') {
+    const isActiveMode = (mode === 'desktop') === isDesktopViewport;
+
     return (
       <div key={`${mode}-${s.key}`} className="relative">
         <button
@@ -134,7 +165,7 @@ export default function ReaderToolbar({
           <s.icon className="w-4 h-4" />
           <span className="font-medium text-xs">{s.display}</span>
         </button>
-        {activeSlider === s.key && (
+        {activeSlider === s.key && isActiveMode && (
           <div
             ref={popoverRef}
             className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 bg-bg-secondary dark:bg-brand-800 border border-border-color rounded-xl px-5 py-4 shadow-xl min-w-[200px]"

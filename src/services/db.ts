@@ -67,6 +67,8 @@ export interface ReadingProgress {
   chapterIndex: number;
   scrollPosition: number;
   viewMode: string;
+  chapterProgress?: number;
+  isTwoColumn?: boolean;
   updatedAt: string;
 }
 

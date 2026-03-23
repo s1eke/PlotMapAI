@@ -24,7 +24,17 @@ describe('ChapterList', () => {
     rerender(<ChapterList chapters={chapters} currentIndex={2} onSelect={() => {}} />);
 
     expect(scrollIntoViewMock).toHaveBeenCalled();
+    expect(scrollIntoViewMock).toHaveBeenCalledWith({ block: 'center', behavior: 'smooth' });
     expect(screen.getByRole('button', { name: /Chapter 3: The End/ })).toHaveAttribute('data-active', 'true');
+  });
+
+  it('jumps directly to the active chapter when the sidebar opens', () => {
+    const { rerender } = render(<ChapterList chapters={chapters} currentIndex={2} onSelect={() => {}} isSidebarOpen={false} />);
+
+    scrollIntoViewMock.mockClear();
+    rerender(<ChapterList chapters={chapters} currentIndex={2} onSelect={() => {}} isSidebarOpen />);
+
+    expect(scrollIntoViewMock).toHaveBeenCalledWith({ block: 'center', behavior: 'auto' });
   });
 
   it('calls onSelect when a chapter is clicked', async () => {

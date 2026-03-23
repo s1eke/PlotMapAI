@@ -220,6 +220,7 @@
   },
   "settings": {
     "title": "设置",
+    "subtitle": "集中管理章节识别、文本净化和 AI 分析配置，让解析与阅读体验保持一致。",
     "tocRules": "目录规则",
     "purificationRules": "净化规则",
     "language": "语言设置",
@@ -235,6 +236,7 @@
       "importJson": "导入 JSON",
       "resetTitle": "重置为默认规则",
       "resetConfirm": "确定要重置所有目录规则吗？这将会删除您自定义的规则。",
+      "deleteTitle": "删除目录规则",
       "deleteConfirm": "确定要删除此目录规则吗？",
       "addRule": "新增规则",
       "editRule": "编辑目录规则",
@@ -243,7 +245,9 @@
       "priorityTemplate": "优先级：{{priority}}",
       "namePlaceholder": "如：第X章 + 标题",
       "regexPlaceholder": "输入正则表达式…",
-      "examplePlaceholder": "如：第一章 启程"
+      "examplePlaceholder": "如：第一章 启程",
+      "emptyTitle": "还没有目录规则",
+      "emptyDescription": "新增一条章节识别规则，或导入现成 YAML 规则集，让 TXT 章节识别更稳定。"
     },
     "purification": {
       "title": "文本净化",
@@ -285,12 +289,24 @@
       "jsSecurityNote": "仅允许白名单函数（fullwidth、halfwidth、strip 等）。",
       "bookScopePlaceholder": "限定书名…",
       "excludeBookScopePlaceholder": "排除书名…",
-      "defaultGroup": "净化"
+      "defaultGroup": "净化",
+      "emptyTitle": "还没有净化规则",
+      "emptyDescription": "导入常用 YAML 规则集，或手动创建规则来清理广告、错别字和排版问题。"
     },
     "ai": {
       "tab": "AI 分析配置",
       "title": "AI 分析配置",
       "subtitle": "AI 分析所需的连接信息保存在浏览器本地，Token 仅以脱敏形式展示。",
+      "connectionTitle": "连接配置",
+      "connectionDescription": "填写模型服务地址、模型名称与上下文大小，再保存到本地浏览器。",
+      "statusTitle": "当前状态",
+      "statusDescription": "快速查看当前已保存的连接信息和 Token 状态。",
+      "backupTitle": "安全与备份",
+      "backupDescription": "导入导出配置前，请确认设备环境可信，并妥善保管加密文件和密码。",
+      "savedTokenStatusLabel": "Token 状态",
+      "tokenSaved": "已保存",
+      "tokenMissing": "未保存",
+      "updatedAtLabel": "最近更新",
       "loadFailed": "加载 AI 配置失败，请稍后重试。",
       "saveSuccess": "AI 配置已保存。",
       "saveFailed": "保存 AI 配置失败。",
@@ -337,6 +353,14 @@
     "common": {
       "import": "导入",
       "export": "导出",
+      "moreActions": "更多操作",
+      "loadFailed": "加载失败",
+      "saveSuccess": "保存成功",
+      "importSuccess": "导入成功",
+      "exportSuccess": "导出成功",
+      "exportFailed": "导出失败",
+      "deleteSuccess": "删除成功",
+      "clearSuccess": "清空成功",
       "updateFailed": "更新失败",
       "resetFailed": "重置失败",
       "uploadFailed": "上传失败",

@@ -78,24 +78,35 @@ describe('readerApi', () => {
     expect(progress.chapterIndex).toBe(0);
     expect(progress.scrollPosition).toBe(0);
     expect(progress.viewMode).toBe('original');
+    expect(progress.chapterProgress).toBe(0);
+    expect(progress.isTwoColumn).toBe(false);
   });
 
   it('saveProgress creates and updates progress', async () => {
     const novelId = await getNovelId();
-    await readerApi.saveProgress(novelId, { chapterIndex: 2, scrollPosition: 500, viewMode: 'summary' });
+    await readerApi.saveProgress(novelId, {
+      chapterIndex: 2,
+      scrollPosition: 500,
+      viewMode: 'summary',
+      chapterProgress: 0.6,
+      isTwoColumn: true,
+    });
     const progress = await readerApi.getProgress(novelId);
     expect(progress.chapterIndex).toBe(2);
     expect(progress.scrollPosition).toBe(500);
     expect(progress.viewMode).toBe('summary');
+    expect(progress.chapterProgress).toBe(0.6);
+    expect(progress.isTwoColumn).toBe(true);
   });
 
   it('saveProgress updates existing progress', async () => {
     const novelId = await getNovelId();
     await readerApi.saveProgress(novelId, { chapterIndex: 1 });
-    await readerApi.saveProgress(novelId, { chapterIndex: 2, scrollPosition: 100 });
+    await readerApi.saveProgress(novelId, { chapterIndex: 2, scrollPosition: 100, chapterProgress: 0.25 });
     const progress = await readerApi.getProgress(novelId);
     expect(progress.chapterIndex).toBe(2);
     expect(progress.scrollPosition).toBe(100);
+    expect(progress.chapterProgress).toBe(0.25);
   });
 
   it('getImageUrl returns null for non-existent image', async () => {

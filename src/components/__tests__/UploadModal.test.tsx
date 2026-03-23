@@ -20,12 +20,15 @@ describe('UploadModal', () => {
     vi.mocked(novelsApi.upload).mockResolvedValue({ id: 1, title: 'Test' } as never);
   });
 
+  function getFileInput(): HTMLInputElement {
+    return document.body.querySelector('input[type="file"]') as HTMLInputElement;
+  }
+
   it('rejects unsupported file types before calling upload', async () => {
     const user = userEvent.setup({ applyAccept: false });
-    const { container } = render(<UploadModal isOpen={true} onClose={() => {}} onSuccess={() => {}} />);
-    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+    render(<UploadModal isOpen={true} onClose={() => {}} onSuccess={() => {}} />);
 
-    await user.upload(input, new File(['data'], 'novel.pdf', { type: 'application/pdf' }));
+    await user.upload(getFileInput(), new File(['data'], 'novel.pdf', { type: 'application/pdf' }));
 
     expect(await screen.findByText('bookshelf.invalidType')).toBeInTheDocument();
     expect(novelsApi.upload).not.toHaveBeenCalled();
@@ -33,12 +36,11 @@ describe('UploadModal', () => {
 
   it('rejects files larger than the configured size limit', async () => {
     const user = userEvent.setup();
-    const { container } = render(<UploadModal isOpen={true} onClose={() => {}} onSuccess={() => {}} />);
-    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+    render(<UploadModal isOpen={true} onClose={() => {}} onSuccess={() => {}} />);
     const file = new File(['small'], 'novel.txt', { type: 'text/plain' });
 
     Object.defineProperty(file, 'size', { value: 101 * 1024 * 1024 });
-    await user.upload(input, file);
+    await user.upload(getFileInput(), file);
 
     expect(await screen.findByText('bookshelf.sizeLimit')).toBeInTheDocument();
     expect(novelsApi.upload).not.toHaveBeenCalled();
@@ -48,11 +50,10 @@ describe('UploadModal', () => {
     const onClose = vi.fn();
     const onSuccess = vi.fn();
     const user = userEvent.setup();
-    const { container } = render(<UploadModal isOpen={true} onClose={onClose} onSuccess={onSuccess} />);
-    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+    render(<UploadModal isOpen={true} onClose={onClose} onSuccess={onSuccess} />);
     const file = new File(['chapter 1'], 'novel.txt', { type: 'text/plain' });
 
-    await user.upload(input, file);
+    await user.upload(getFileInput(), file);
 
     await waitFor(() => {
       expect(novelsApi.upload).toHaveBeenCalledWith(file);
@@ -66,10 +67,9 @@ describe('UploadModal', () => {
     const onClose = vi.fn();
     const onSuccess = vi.fn();
     const user = userEvent.setup();
-    const { container } = render(<UploadModal isOpen={true} onClose={onClose} onSuccess={onSuccess} />);
-    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+    render(<UploadModal isOpen={true} onClose={onClose} onSuccess={onSuccess} />);
 
-    await user.upload(input, new File(['chapter 1'], 'novel.txt', { type: 'text/plain' }));
+    await user.upload(getFileInput(), new File(['chapter 1'], 'novel.txt', { type: 'text/plain' }));
 
     expect(await screen.findByText('upload failed')).toBeInTheDocument();
     expect(onSuccess).not.toHaveBeenCalled();
