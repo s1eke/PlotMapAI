@@ -9,6 +9,7 @@ import {
   clamp,
   clampZoomOffset,
   DEFAULT_ZOOM_STATE,
+  getFitZoomState,
   MAX_ZOOM_SCALE,
   MIN_ZOOM_SCALE,
   STAGE_HEIGHT,
@@ -34,8 +35,20 @@ interface PanState {
   moved: boolean;
 }
 
+interface NodePositionState {
+  graph: CharacterGraphResponse | null;
+  positions: Record<string, { x: number; y: number }>;
+}
+
+interface ViewportState {
+  graph: CharacterGraphResponse | null;
+  isMobile: boolean;
+  zoom: ZoomState | null;
+}
+
 interface UseCharacterGraphCanvasParams {
   graph: CharacterGraphResponse | null;
+  isMobile: boolean;
   isLoading: boolean;
   t: TFunction;
 }
@@ -64,6 +77,7 @@ interface UseCharacterGraphCanvasResult {
 
 export function useCharacterGraphCanvas({
   graph,
+  isMobile,
   isLoading,
   t,
 }: UseCharacterGraphCanvasParams): UseCharacterGraphCanvasResult {
@@ -73,14 +87,34 @@ export function useCharacterGraphCanvas({
 
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
-  const [nodePositions, setNodePositions] = useState<Record<string, { x: number; y: number }>>({});
-  const [zoomState, setZoomState] = useState<ZoomState>(DEFAULT_ZOOM_STATE);
+  const [nodePositionState, setNodePositionState] = useState<NodePositionState>({ graph: null, positions: {} });
+  const [viewportState, setViewportState] = useState<ViewportState>({ graph: null, isMobile: false, zoom: null });
   const [isPanning, setIsPanning] = useState(false);
 
   const baseNodes = useMemo(
     () => buildSpaciousLayout(graph?.nodes ?? [], graph?.edges ?? []),
     [graph?.edges, graph?.nodes],
   );
+
+  const mobileFitZoomState = useMemo(
+    () => getFitZoomState(baseNodes, {
+      paddingX: 128,
+      paddingTop: 122,
+      paddingBottom: 236,
+      targetCenterYRatio: 0.38,
+      minScale: 1.08,
+      maxScale: 2,
+    }),
+    [baseNodes],
+  );
+  const defaultZoomState = isMobile ? mobileFitZoomState : DEFAULT_ZOOM_STATE;
+  const nodePositions = useMemo(
+    () => (nodePositionState.graph === graph ? nodePositionState.positions : {}),
+    [graph, nodePositionState.graph, nodePositionState.positions],
+  );
+  const zoomState = viewportState.graph === graph && viewportState.isMobile === isMobile && viewportState.zoom
+    ? viewportState.zoom
+    : defaultZoomState;
 
   const resolvedSelectedNodeId = selectedNodeId && graph?.nodes.some((node) => node.id === selectedNodeId)
     ? selectedNodeId
@@ -165,9 +199,9 @@ export function useCharacterGraphCanvas({
     || zoomState.offsetY !== DEFAULT_ZOOM_STATE.offsetY;
 
   const resetLayout = useCallback(() => {
-    setNodePositions({});
-    setZoomState(DEFAULT_ZOOM_STATE);
-  }, []);
+    setNodePositionState({ graph, positions: {} });
+    setViewportState({ graph, isMobile, zoom: null });
+  }, [graph, isMobile]);
 
   const getViewportPoint = useCallback((clientX: number, clientY: number) => {
     const svg = svgRef.current;
@@ -192,13 +226,19 @@ export function useCharacterGraphCanvas({
       if (drag) {
         const point = getSvgPoint(event.clientX, event.clientY);
         if (!point) return;
-        setNodePositions((current) => ({
-          ...current,
-          [drag.nodeId]: {
-            x: clamp(point.x - drag.offsetX, CANVAS_PADDING + drag.radius, STAGE_WIDTH - CANVAS_PADDING - drag.radius),
-            y: clamp(point.y - drag.offsetY, CANVAS_PADDING + drag.radius, STAGE_HEIGHT - CANVAS_PADDING - drag.radius),
-          },
-        }));
+        setNodePositionState((current) => {
+          const currentPositions = current.graph === graph ? current.positions : {};
+          return {
+            graph,
+            positions: {
+              ...currentPositions,
+              [drag.nodeId]: {
+                x: clamp(point.x - drag.offsetX, CANVAS_PADDING + drag.radius, STAGE_WIDTH - CANVAS_PADDING - drag.radius),
+                y: clamp(point.y - drag.offsetY, CANVAS_PADDING + drag.radius, STAGE_HEIGHT - CANVAS_PADDING - drag.radius),
+              },
+            },
+          };
+        });
         return;
       }
 
@@ -211,18 +251,25 @@ export function useCharacterGraphCanvas({
       if (!pan.moved && (Math.abs(deltaX) > 2 || Math.abs(deltaY) > 2)) {
         pan.moved = true;
       }
-      setZoomState((current) => {
+      setViewportState((current) => {
+        const currentZoom = current.graph === graph && current.isMobile === isMobile && current.zoom
+          ? current.zoom
+          : defaultZoomState;
         const nextOffset = clampZoomOffset(
-          current.scale,
+          currentZoom.scale,
           pan.originOffsetX + deltaX,
           pan.originOffsetY + deltaY,
         );
-        if (nextOffset.offsetX === current.offsetX && nextOffset.offsetY === current.offsetY) {
+        if (nextOffset.offsetX === currentZoom.offsetX && nextOffset.offsetY === currentZoom.offsetY) {
           return current;
         }
         return {
-          ...current,
-          ...nextOffset,
+          graph,
+          isMobile,
+          zoom: {
+            ...currentZoom,
+            ...nextOffset,
+          },
         };
       });
     };
@@ -243,7 +290,7 @@ export function useCharacterGraphCanvas({
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
     };
-  }, [getSvgPoint, getViewportPoint]);
+  }, [defaultZoomState, getSvgPoint, getViewportPoint, graph, isMobile]);
 
   const handleNodePointerDown = useCallback((event: ReactPointerEvent<SVGGElement>, node: LayoutNode) => {
     const point = getSvgPoint(event.clientX, event.clientY);
@@ -265,28 +312,35 @@ export function useCharacterGraphCanvas({
     if (!viewportPoint) return;
 
     event.preventDefault();
-    setZoomState((current) => {
+    setViewportState((current) => {
+      const currentZoom = current.graph === graph && current.isMobile === isMobile && current.zoom
+        ? current.zoom
+        : defaultZoomState;
       const nextScale = clamp(
-        Number((current.scale * Math.exp(-event.deltaY * 0.0015)).toFixed(4)),
+        Number((currentZoom.scale * Math.exp(-event.deltaY * 0.0015)).toFixed(4)),
         MIN_ZOOM_SCALE,
         MAX_ZOOM_SCALE,
       );
-      if (nextScale === current.scale) {
+      if (nextScale === currentZoom.scale) {
         return current;
       }
 
-      const graphPoint = viewportPointToGraphPoint(viewportPoint, current);
+      const graphPoint = viewportPointToGraphPoint(viewportPoint, currentZoom);
       const nextOffset = clampZoomOffset(
         nextScale,
         viewportPoint.x - graphPoint.x * nextScale,
         viewportPoint.y - graphPoint.y * nextScale,
       );
       return {
-        scale: nextScale,
-        ...nextOffset,
+        graph,
+        isMobile,
+        zoom: {
+          scale: nextScale,
+          ...nextOffset,
+        },
       };
     });
-  }, [getViewportPoint]);
+  }, [defaultZoomState, getViewportPoint, graph, isMobile]);
 
   useEffect(() => {
     const element = svgRef.current;

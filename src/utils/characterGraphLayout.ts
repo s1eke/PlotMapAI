@@ -29,6 +29,26 @@ export interface NodeLabelLayout {
   maxTextWidth: number;
 }
 
+export interface GraphViewportBounds {
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+  width: number;
+  height: number;
+  centerX: number;
+  centerY: number;
+}
+
+export interface FitZoomStateOptions {
+  paddingX?: number;
+  paddingTop?: number;
+  paddingBottom?: number;
+  targetCenterYRatio?: number;
+  minScale?: number;
+  maxScale?: number;
+}
+
 export const STAGE_WIDTH = 1440;
 export const STAGE_HEIGHT = 960;
 export const CANVAS_PADDING = 96;
@@ -201,6 +221,65 @@ export function buildEdgeCurve(source: LayoutNode, target: LayoutNode, seed: num
     path: `M ${source.x} ${source.y} Q ${controlX} ${controlY} ${target.x} ${target.y}`,
     labelX: Number(((midX + controlX) / 2).toFixed(2)),
     labelY: Number(((midY + controlY) / 2).toFixed(2)),
+  };
+}
+
+export function getLayoutBounds(nodes: Array<Pick<LayoutNode, 'x' | 'y' | 'radius'>>): GraphViewportBounds | null {
+  if (nodes.length === 0) {
+    return null;
+  }
+
+  const minX = Math.min(...nodes.map((node) => node.x - node.radius));
+  const maxX = Math.max(...nodes.map((node) => node.x + node.radius));
+  const minY = Math.min(...nodes.map((node) => node.y - node.radius));
+  const maxY = Math.max(...nodes.map((node) => node.y + node.radius));
+  const width = Math.max(1, maxX - minX);
+  const height = Math.max(1, maxY - minY);
+
+  return {
+    minX,
+    maxX,
+    minY,
+    maxY,
+    width,
+    height,
+    centerX: (minX + maxX) / 2,
+    centerY: (minY + maxY) / 2,
+  };
+}
+
+export function getFitZoomState(
+  nodes: Array<Pick<LayoutNode, 'x' | 'y' | 'radius'>>,
+  options: FitZoomStateOptions = {},
+): ZoomState {
+  const bounds = getLayoutBounds(nodes);
+  if (!bounds) {
+    return DEFAULT_ZOOM_STATE;
+  }
+
+  const paddingX = options.paddingX ?? 132;
+  const paddingTop = options.paddingTop ?? 120;
+  const paddingBottom = options.paddingBottom ?? 216;
+  const availableWidth = Math.max(1, STAGE_WIDTH - paddingX * 2);
+  const availableHeight = Math.max(1, STAGE_HEIGHT - paddingTop - paddingBottom);
+  const rawScale = Math.min(availableWidth / bounds.width, availableHeight / bounds.height);
+  const scale = clamp(
+    Number(rawScale.toFixed(4)),
+    options.minScale ?? MIN_ZOOM_SCALE,
+    options.maxScale ?? MAX_ZOOM_SCALE,
+  );
+  const targetCenterYRatio = options.targetCenterYRatio ?? 0.42;
+  const targetCenterX = STAGE_WIDTH / 2;
+  const targetCenterY = paddingTop + availableHeight * targetCenterYRatio;
+  const nextOffset = clampZoomOffset(
+    scale,
+    targetCenterX - bounds.centerX * scale,
+    targetCenterY - bounds.centerY * scale,
+  );
+
+  return {
+    scale,
+    ...nextOffset,
   };
 }
 

@@ -9,6 +9,10 @@ import type { Novel } from '../api/novels';
 import CharacterGraphStage from '../components/characterGraph/CharacterGraphStage';
 import { useCharacterGraphCanvas } from '../hooks/useCharacterGraphCanvas';
 
+function getIsMobileViewport(): boolean {
+  return window.matchMedia('(max-width: 767px)').matches;
+}
+
 export default function CharacterGraphPage() {
   const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
@@ -22,8 +26,9 @@ export default function CharacterGraphPage() {
   const [error, setError] = useState<string | null>(null);
   const [isRefreshingOverview, setIsRefreshingOverview] = useState(false);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState<boolean>(getIsMobileViewport);
 
-  const canvas = useCharacterGraphCanvas({ graph, isLoading, t });
+  const canvas = useCharacterGraphCanvas({ graph, isLoading, isMobile, t });
 
   const loadData = useCallback(async () => {
     if (!Number.isFinite(novelId) || novelId <= 0) {
@@ -65,6 +70,17 @@ export default function CharacterGraphPage() {
   useEffect(() => {
     setIsFullscreen(Boolean(fullscreenRef.current && document.fullscreenElement === fullscreenRef.current));
   }, [isLoading]);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 767px)');
+    const handleChange = (event: MediaQueryListEvent) => {
+      setIsMobile(event.matches);
+    };
+
+    setIsMobile(mediaQuery.matches);
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
 
   const toggleFullscreen = useCallback(async () => {
     if (!fullscreenRef.current) return;
@@ -154,6 +170,7 @@ export default function CharacterGraphPage() {
       highlightedNodeIds={canvas.highlightedNodeIds}
       isComplete={graph.meta.isComplete}
       isFullscreen={isFullscreen}
+      isMobile={isMobile}
       isPanning={canvas.isPanning}
       isRefreshingOverview={isRefreshingOverview}
       layoutEdges={canvas.layoutEdges}
