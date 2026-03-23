@@ -197,6 +197,7 @@ describe('CharacterGraphPage', () => {
 
     expect(await screen.findByText('Mock Novel')).toBeInTheDocument();
     fireEvent.pointerDown(screen.getByText('Hero'), { clientX: 50, clientY: 50 });
+    window.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
 
     expect(await screen.findByText('characterGraph.profileTitle')).toBeInTheDocument();
 
@@ -271,6 +272,7 @@ describe('CharacterGraphPage', () => {
 
     expect(await screen.findByText('Mock Novel')).toBeInTheDocument();
     fireEvent.pointerDown(screen.getByText('Hero'), { clientX: 50, clientY: 50 });
+    window.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
 
     expect(await screen.findByText('characterGraph.profileTitle')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'characterGraph.closePanel' })).toBeInTheDocument();
