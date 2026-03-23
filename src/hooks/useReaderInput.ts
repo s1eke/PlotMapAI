@@ -33,7 +33,10 @@ export function useReaderInput(
 
   useEffect(() => {
     isPagedModeRef.current = isPagedMode;
-  }, [isPagedMode]);
+    if (isPagedMode) {
+      stopContinuousScroll();
+    }
+  }, [isPagedMode, stopContinuousScroll]);
 
   useEffect(() => {
     scrollLoopRef.current = () => {
