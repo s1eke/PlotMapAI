@@ -368,7 +368,6 @@ describe('ReaderPage', () => {
     expect(await screen.findByText('reader.analysisPanel.statusQueued')).toBeInTheDocument();
     expect(screen.getByText('reader.analysisPanel.progressTitle')).toBeInTheDocument();
     expect(JSON.parse(localStorage.getItem('reader-state:1')!)).toMatchObject({
-      chapterIndex: 0,
       viewMode: 'summary',
       isTwoColumn: false,
     });

@@ -206,6 +206,9 @@ export function useReaderRestoreFlow({
 
     const currentReaderState = captureCurrentReaderPosition();
     markUserInteracted();
+    if (typeof currentReaderState.chapterIndex === 'number') {
+      setChapterIndex(currentReaderState.chapterIndex);
+    }
     setPendingRestoreState({
       ...currentReaderState,
       isTwoColumn: twoColumn,
@@ -215,13 +218,16 @@ export function useReaderRestoreFlow({
       ...currentReaderState,
       isTwoColumn: twoColumn,
     });
-  }, [captureCurrentReaderPosition, isTwoColumn, markUserInteracted, persistReaderState, setIsTwoColumn, setPendingRestoreState]);
+  }, [captureCurrentReaderPosition, isTwoColumn, markUserInteracted, persistReaderState, setChapterIndex, setIsTwoColumn, setPendingRestoreState]);
 
   const handleSetViewMode = useCallback((nextViewMode: 'original' | 'summary') => {
     if (nextViewMode === viewMode) return;
 
     const currentReaderState = captureCurrentReaderPosition();
     markUserInteracted();
+    if (typeof currentReaderState.chapterIndex === 'number') {
+      setChapterIndex(currentReaderState.chapterIndex);
+    }
     setPendingRestoreState({
       ...currentReaderState,
       viewMode: nextViewMode,
@@ -231,7 +237,7 @@ export function useReaderRestoreFlow({
       ...currentReaderState,
       viewMode: nextViewMode,
     });
-  }, [captureCurrentReaderPosition, markUserInteracted, persistReaderState, setPendingRestoreState, setViewMode, viewMode]);
+  }, [captureCurrentReaderPosition, markUserInteracted, persistReaderState, setChapterIndex, setPendingRestoreState, setViewMode, viewMode]);
 
   useEffect(() => {
     if (isLoading || viewMode !== 'original' || isPagedMode) return;
