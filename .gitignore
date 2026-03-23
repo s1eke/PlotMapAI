@@ -19,6 +19,7 @@ coverage/
 *.swp
 *.swo
 AGENTS.md
+GEMINI.md
 .kilo
 
 # OS

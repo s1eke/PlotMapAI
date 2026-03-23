@@ -48,7 +48,10 @@ export default function CharacterGraphCanvas({
       ref={svgRef}
       viewBox={`0 0 ${STAGE_WIDTH} ${STAGE_HEIGHT}`}
       className="relative h-full w-full"
-      style={{ cursor: isPanning ? 'grabbing' : (canPanCanvas ? 'grab' : 'default') }}
+      style={{
+        cursor: isPanning ? 'grabbing' : (canPanCanvas ? 'grab' : 'default'),
+        touchAction: 'none',
+      }}
       onPointerDown={onCanvasPointerDown}
     >
       <defs>

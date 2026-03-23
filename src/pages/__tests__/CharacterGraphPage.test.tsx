@@ -130,12 +130,29 @@ function mockSvgBoundingRect() {
   } as DOMRect);
 }
 
+function mockViewport(isMobile: boolean) {
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: vi.fn().mockImplementation((query: string) => ({
+      matches: query === '(max-width: 767px)' ? isMobile : false,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  });
+}
+
 describe('CharacterGraphPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(novelsApi.get).mockResolvedValue(novel);
     vi.mocked(analysisApi.getCharacterGraph).mockResolvedValue(graphResponse);
     vi.mocked(analysisApi.refreshOverview).mockResolvedValue({ job: { status: 'running' }, overview: null, chunks: [] } as never);
+    mockViewport(false);
   });
 
   afterEach(() => {
@@ -173,19 +190,18 @@ describe('CharacterGraphPage', () => {
     expect(await screen.findByText('characterGraph.refreshStarted')).toBeInTheDocument();
   });
 
-  it('opens and closes the character inspector when a node is selected', async () => {
+  it('opens and closes the desktop character inspector when a node is selected', async () => {
     const rectSpy = mockSvgBoundingRect();
     vi.mocked(analysisApi.getCharacterGraph).mockResolvedValueOnce(interactiveGraphResponse);
-    const { container } = renderPage('/novel/1/graph');
+    renderPage('/novel/1/graph');
 
     expect(await screen.findByText('Mock Novel')).toBeInTheDocument();
     fireEvent.pointerDown(screen.getByText('Hero'), { clientX: 50, clientY: 50 });
+    window.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
 
     expect(await screen.findByText('characterGraph.profileTitle')).toBeInTheDocument();
 
-    const closeButton = Array.from(container.querySelectorAll('button')).find((button) => button.className.includes('h-10 w-10'));
-    expect(closeButton).toBeTruthy();
-    fireEvent.click(closeButton!);
+    await userEvent.setup().click(screen.getByRole('button', { name: 'characterGraph.closePanel' }));
 
     await waitFor(() => {
       expect(screen.queryByText('characterGraph.profileTitle')).not.toBeInTheDocument();
@@ -194,7 +210,7 @@ describe('CharacterGraphPage', () => {
     rectSpy.mockRestore();
   });
 
-  it('resets the canvas zoom transform when layout reset is triggered', async () => {
+  it('resets the desktop canvas zoom transform back to the default matrix', async () => {
     const user = userEvent.setup();
     const rectSpy = mockSvgBoundingRect();
     const { container } = renderPage('/novel/1/graph');
@@ -236,5 +252,78 @@ describe('CharacterGraphPage', () => {
 
     expect(await screen.findByText('characterGraph.partialHint')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'characterGraph.refreshGraph' })).toBeInTheDocument();
+  });
+
+  it('renders the compact mobile layout without the desktop help card', async () => {
+    mockViewport(true);
+    renderPage('/novel/1/graph');
+
+    expect(await screen.findByText('Mock Novel')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'characterGraph.helpSheetTrigger' })).toBeInTheDocument();
+    expect(screen.queryByText('characterGraph.canvasHint')).not.toBeInTheDocument();
+    expect(screen.queryByText('characterGraph.legendCore')).not.toBeInTheDocument();
+  });
+
+  it('opens the mobile bottom sheet with character details when a node is selected', async () => {
+    const rectSpy = mockSvgBoundingRect();
+    mockViewport(true);
+    vi.mocked(analysisApi.getCharacterGraph).mockResolvedValueOnce(interactiveGraphResponse);
+    renderPage('/novel/1/graph');
+
+    expect(await screen.findByText('Mock Novel')).toBeInTheDocument();
+    fireEvent.pointerDown(screen.getByText('Hero'), { clientX: 50, clientY: 50 });
+    window.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
+
+    expect(await screen.findByText('characterGraph.profileTitle')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'characterGraph.closePanel' })).toBeInTheDocument();
+
+    rectSpy.mockRestore();
+  });
+
+  it('opens the mobile guide sheet and shows legend guidance', async () => {
+    const user = userEvent.setup();
+    mockViewport(true);
+    renderPage('/novel/1/graph');
+
+    expect(await screen.findByText('Mock Novel')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'characterGraph.helpSheetTrigger' }));
+
+    expect(await screen.findByText('characterGraph.graphStatusTitle')).toBeInTheDocument();
+    expect(screen.getByText('characterGraph.legendCore')).toBeInTheDocument();
+    expect(screen.getByText('characterGraph.dragHint')).toBeInTheDocument();
+  });
+
+  it('resets the mobile canvas back to its fitted viewport instead of the desktop default', async () => {
+    const user = userEvent.setup();
+    const rectSpy = mockSvgBoundingRect();
+    mockViewport(true);
+    const { container } = renderPage('/novel/1/graph');
+
+    expect(await screen.findByText('Mock Novel')).toBeInTheDocument();
+
+    const svg = container.querySelector('svg[viewBox="0 0 1440 960"]');
+    const matrixGroup = svg?.querySelector('g[transform^="matrix("]');
+
+    expect(svg).not.toBeNull();
+    expect(matrixGroup).not.toBeNull();
+
+    const initialTransform = matrixGroup?.getAttribute('transform');
+    expect(initialTransform).not.toBeNull();
+    expect(initialTransform).not.toBe('matrix(1 0 0 1 0 0)');
+
+    fireEvent.wheel(svg!, { clientX: 50, clientY: 50, deltaY: -300 });
+
+    await waitFor(() => {
+      expect(matrixGroup?.getAttribute('transform')).not.toBe(initialTransform);
+    });
+
+    await user.click(screen.getByRole('button', { name: 'characterGraph.resetLayout' }));
+
+    await waitFor(() => {
+      expect(matrixGroup?.getAttribute('transform')).toBe(initialTransform);
+    });
+
+    rectSpy.mockRestore();
   });
 });

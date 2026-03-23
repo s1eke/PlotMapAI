@@ -2,7 +2,7 @@ import { X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { CharacterGraphEdge } from '../../api/analysis';
 import type { LayoutNode } from '../../utils/characterGraphLayout';
-import MetricCard from './MetricCard';
+import CharacterGraphProfileContent from './CharacterGraphProfileContent';
 
 interface CharacterGraphInspectorProps {
   selectedNode: LayoutNode;
@@ -30,6 +30,7 @@ export default function CharacterGraphInspector({
         <button
           type="button"
           onClick={onClose}
+          aria-label={t('characterGraph.closePanel')}
           className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#ddd7cc] bg-[#f8f7f3] text-[#697384] transition hover:border-[#cfc7b9] hover:text-[#18202a]"
         >
           <X className="h-4 w-4" />
@@ -37,52 +38,11 @@ export default function CharacterGraphInspector({
       </div>
 
       <div className="mt-4 min-h-0 flex-1 overflow-y-auto pr-1">
-        <p className="text-xs leading-6 text-[#3d4856]">
-          {selectedNode.description || t('characterGraph.descriptionEmpty')}
-        </p>
-
-        <div className="mt-5 grid grid-cols-2 gap-3">
-          <MetricCard label={t('characterGraph.sharePercentLabel')} value={selectedNode.sharePercent > 0 ? `${selectedNode.sharePercent.toFixed(2)}%` : '--'} />
-          <MetricCard label={t('characterGraph.connectionCountLabel')} value={String(relatedEdges.length)} />
-        </div>
-
-        <div className="mt-5">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#34527a]">{t('characterGraph.relatedRelationships')}</p>
-          {relatedEdges.length > 0 ? (
-            <div className="mt-3 space-y-3">
-              {relatedEdges.map((edge) => {
-                const counterpart = edge.source === selectedNode.id ? edge.target : edge.source;
-                const relationTags = edge.relationTags.length > 0 ? edge.relationTags : [edge.type || t('characterGraph.relationTypeFallback')];
-                return (
-                  <button
-                    key={edge.id}
-                    type="button"
-                    onClick={() => onSelectNode(counterpart)}
-                    className="w-full rounded-[18px] border border-[#e2ddd3] bg-[#f7f5f0] p-4 text-left transition hover:border-[#cfc7b9] hover:bg-[#fffdfa]"
-                  >
-                    <div>
-                      <p className="text-sm font-medium text-[#18202a]">{counterpart}</p>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {relationTags.map((tag) => (
-                          <span key={`${edge.id}-${tag}`} className="rounded-full bg-[#eef1f4] px-2.5 py-1 text-[10px] font-semibold text-[#34527a]">
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                    <p className="mt-3 text-xs leading-6 text-[#3d4856]">
-                      {edge.description || t('characterGraph.relationshipDescriptionEmpty')}
-                    </p>
-                  </button>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="mt-3 rounded-[20px] border border-dashed border-[#d7deea] bg-[#f8fafc] px-4 py-6 text-sm text-[#7b8796]">
-              {t('characterGraph.relationshipsEmpty')}
-            </div>
-          )}
-        </div>
+        <CharacterGraphProfileContent
+          selectedNode={selectedNode}
+          relatedEdges={relatedEdges}
+          onSelectNode={onSelectNode}
+        />
       </div>
     </div>
   );
