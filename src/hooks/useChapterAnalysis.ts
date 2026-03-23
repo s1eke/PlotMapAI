@@ -27,17 +27,18 @@ export function useChapterAnalysis(novelId: number, chapterIndex: number) {
     const cacheKey = `${novelId}:${chapterIndex}`;
     const hasCachedAnalysis = chapterAnalysisCacheRef.current.has(cacheKey);
     const cachedAnalysis = chapterAnalysisCacheRef.current.get(cacheKey) ?? null;
+    const hasUsableCache = hasCachedAnalysis && cachedAnalysis !== null;
     const shouldRefreshCachedAnalysis = analysisStatus?.job.status === 'running' || analysisStatus?.job.status === 'pausing';
 
     if (hasCachedAnalysis) {
       setChapterAnalysis(cachedAnalysis);
-      if (!shouldRefreshCachedAnalysis) {
+      if (hasUsableCache && !shouldRefreshCachedAnalysis) {
         setIsChapterAnalysisLoading(false);
         return;
       }
     }
 
-    if (!silent && !hasCachedAnalysis) setIsChapterAnalysisLoading(true);
+    if (!silent && !hasUsableCache) setIsChapterAnalysisLoading(true);
     try {
       const data = await analysisApi.getChapterAnalysis(novelId, chapterIndex);
       chapterAnalysisCacheRef.current.set(cacheKey, data.analysis);
@@ -48,7 +49,7 @@ export function useChapterAnalysis(novelId: number, chapterIndex: number) {
         setChapterAnalysis(null);
       }
     } finally {
-      if (!silent && !hasCachedAnalysis) setIsChapterAnalysisLoading(false);
+      if (!silent && !hasUsableCache) setIsChapterAnalysisLoading(false);
     }
   }, [analysisStatus?.job.status, chapterIndex, novelId]);
 
