@@ -25,6 +25,9 @@ interface DragState {
   offsetX: number;
   offsetY: number;
   radius: number;
+  moved: boolean;
+  startX: number;
+  startY: number;
 }
 
 interface PanState {
@@ -226,6 +229,11 @@ export function useCharacterGraphCanvas({
       if (drag) {
         const point = getSvgPoint(event.clientX, event.clientY);
         if (!point) return;
+        const deltaX = event.clientX - drag.startX;
+        const deltaY = event.clientY - drag.startY;
+        if (!drag.moved && (Math.abs(deltaX) > 2 || Math.abs(deltaY) > 2)) {
+          drag.moved = true;
+        }
         setNodePositionState((current) => {
           const currentPositions = current.graph === graph ? current.positions : {};
           return {
@@ -275,6 +283,10 @@ export function useCharacterGraphCanvas({
     };
 
     const handlePointerUp = () => {
+      const drag = dragStateRef.current;
+      if (drag && !drag.moved) {
+        setSelectedNodeId(drag.nodeId);
+      }
       dragStateRef.current = null;
       const pan = panStateRef.current;
       if (pan && !pan.moved) {
@@ -300,8 +312,10 @@ export function useCharacterGraphCanvas({
       offsetX: point.x - node.x,
       offsetY: point.y - node.y,
       radius: node.radius,
+      moved: false,
+      startX: event.clientX,
+      startY: event.clientY,
     };
-    setSelectedNodeId(node.id);
     setHoveredNodeId(node.id);
     event.stopPropagation();
     event.preventDefault();
