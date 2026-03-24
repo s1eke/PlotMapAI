@@ -1,6 +1,7 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ThemeProvider, useTheme } from '../ThemeContext';
+import { resetReaderSessionStoreForTests } from '../../hooks/sessionStore';
 
 const TestComponent = () => {
   const { theme, toggleTheme } = useTheme();
@@ -16,6 +17,7 @@ describe('ThemeContext', () => {
   beforeEach(() => {
     localStorage.clear();
     document.documentElement.classList.remove('dark');
+    resetReaderSessionStoreForTests();
   });
 
   it('provides default light theme if no preference', () => {

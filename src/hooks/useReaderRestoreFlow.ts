@@ -1,7 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import type { ChapterContent } from '../api/reader';
 import type { ScrollModeAnchor } from './useScrollModeChapters';
 import type { StoredReaderState } from './useReaderStatePersistence';
+import {
+  beginRestore,
+  completeRestore,
+  setPendingRestoreState as setStorePendingRestoreState,
+  useReaderSessionSelector,
+} from './sessionStore';
 import {
   clampProgress,
   getContainerProgress,
@@ -80,13 +86,18 @@ export function useReaderRestoreFlow({
   isChapterAnalysisLoading,
 }: UseReaderRestoreFlowParams): UseReaderRestoreFlowResult {
   const chapterChangeSourceRef = useRef<ChapterChangeSource>(null);
-  const pendingRestoreStateRef = useRef<StoredReaderState | null>(null);
+  const pendingRestoreState = useReaderSessionSelector(state => state.pendingRestoreState);
+  const restoreStatus = useReaderSessionSelector(state => state.restoreStatus);
+  const pendingRestoreStateRef = useRef<StoredReaderState | null>(pendingRestoreState);
   const originalViewStateRef = useRef<StoredReaderState | null>(null);
   const summaryViewStateRef = useRef<StoredReaderState | null>(null);
   const summaryProgressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const suppressScrollSyncRef = useRef(false);
   const scrollSyncReleaseFrameRef = useRef<number | null>(null);
-  const [isRestoringPosition, setIsRestoringPosition] = useState(false);
+
+  useEffect(() => {
+    pendingRestoreStateRef.current = pendingRestoreState;
+  }, [pendingRestoreState]);
 
   const getPagedProgress = useCallback(() => {
     if (pageCount <= 1) return 0;
@@ -95,30 +106,34 @@ export function useReaderRestoreFlow({
 
   const setPendingRestoreState = useCallback((nextState: StoredReaderState | null, options?: { force?: boolean }) => {
     if (!nextState) {
-      pendingRestoreStateRef.current = null;
+      setStorePendingRestoreState(null);
       return;
     }
 
     if (options?.force) {
-      pendingRestoreStateRef.current = nextState;
+      setStorePendingRestoreState(nextState);
       return;
     }
 
     const hasChapterProgress = typeof nextState.chapterProgress === 'number' && nextState.chapterProgress > 0;
     const hasLegacyScrollPosition = typeof nextState.scrollPosition === 'number' && nextState.scrollPosition > 0;
-    pendingRestoreStateRef.current = hasChapterProgress || hasLegacyScrollPosition ? nextState : null;
+    setStorePendingRestoreState(hasChapterProgress || hasLegacyScrollPosition ? nextState : null);
   }, []);
 
   const clearPendingRestoreState = useCallback(() => {
-    pendingRestoreStateRef.current = null;
+    setStorePendingRestoreState(null);
   }, []);
 
   const startRestoreMaskForState = useCallback((state: StoredReaderState | null | undefined) => {
-    setIsRestoringPosition(shouldMaskReaderPositionRestore(state));
+    if (shouldMaskReaderPositionRestore(state)) {
+      beginRestore(state);
+      return;
+    }
+    completeRestore();
   }, []);
 
   const stopRestoreMask = useCallback(() => {
-    setIsRestoringPosition(false);
+    completeRestore();
   }, []);
 
   const suppressScrollSyncTemporarily = useCallback(() => {
@@ -294,9 +309,9 @@ export function useReaderRestoreFlow({
       const targetIndex = pendingRestoreState.chapterIndex ?? chapterIndex;
       const targetElement = scrollChapterElementsRef.current.get(targetIndex);
 
-      if (!container || !targetElement) {
-        frameId = requestAnimationFrame(restoreScrollPosition);
-        return;
+        if (!container || !targetElement) {
+          frameId = requestAnimationFrame(restoreScrollPosition);
+          return;
       }
 
       chapterChangeSourceRef.current = 'restore';
@@ -451,7 +466,7 @@ export function useReaderRestoreFlow({
   return {
     chapterChangeSourceRef,
     pendingRestoreStateRef,
-    isRestoringPosition,
+    isRestoringPosition: restoreStatus === 'restoring',
     captureCurrentReaderPosition,
     clearPendingRestoreState,
     handleBeforeChapterChange,

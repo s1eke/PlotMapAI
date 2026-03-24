@@ -20,6 +20,12 @@ import { useContentClick } from '../hooks/useContentClick';
 import { useReaderRestoreFlow } from '../hooks/useReaderRestoreFlow';
 import { useReaderChapterData } from '../hooks/useReaderChapterData';
 import { usePagedReaderLayout } from '../hooks/usePagedReaderLayout';
+import {
+  getReaderSessionSnapshot,
+  setChapterIndex as setSessionChapterIndex,
+  setMode as setSessionMode,
+  useReaderSessionSelector,
+} from '../hooks/sessionStore';
 
 export default function ReaderPage() {
   const { t } = useTranslation();
@@ -33,15 +39,11 @@ export default function ReaderPage() {
     markUserInteracted,
     persistReaderState,
     loadPersistedReaderState,
-    initialStoredState,
   } = useReaderStatePersistence(novelId);
 
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [currentChapter, setCurrentChapter] = useState<ChapterContent | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isTwoColumn, setIsTwoColumn] = useState<boolean>(() => initialStoredState?.isTwoColumn ?? false);
-  const [viewMode, setViewMode] = useState<'original' | 'summary'>(() => initialStoredState?.viewMode ?? 'original');
-  const [chapterIndex, setChapterIndex] = useState<number>(() => initialStoredState?.chapterIndex ?? 0);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageCount, setPageCount] = useState(1);
   const [scrollModeChapters, setScrollModeChapters] = useState<number[]>([]);
@@ -61,8 +63,46 @@ export default function ReaderPage() {
 
   const preferences = useReaderPreferences();
   const sidebar = useSidebarDrag();
+  const { chapterIndex, isTwoColumn, restoreStatus, viewMode } = useReaderSessionSelector(state => ({
+    chapterIndex: state.chapterIndex,
+    isTwoColumn: state.isTwoColumn,
+    restoreStatus: state.restoreStatus,
+    viewMode: state.viewMode,
+  }));
   const analysis = useChapterAnalysis(novelId, viewMode === 'summary' ? chapterIndex : -1);
   const isPagedMode = isTwoColumn && viewMode === 'original';
+
+  const setChapterIndex = useCallback((nextState: React.SetStateAction<number>) => {
+    const current = getReaderSessionSnapshot().chapterIndex;
+    const nextValue = typeof nextState === 'function'
+      ? nextState(current)
+      : nextState;
+    setSessionChapterIndex(nextValue, { persistRemote: false });
+  }, []);
+
+  const setViewMode = useCallback((nextState: React.SetStateAction<'original' | 'summary'>) => {
+    const currentSnapshot = getReaderSessionSnapshot();
+    const currentViewMode = currentSnapshot.viewMode;
+    const nextValue = typeof nextState === 'function'
+      ? nextState(currentViewMode)
+      : nextState;
+    const nextMode = nextValue === 'summary'
+      ? 'summary'
+      : currentSnapshot.lastContentMode;
+    setSessionMode(nextMode, { persistRemote: false });
+  }, []);
+
+  const setIsTwoColumn = useCallback((nextState: React.SetStateAction<boolean>) => {
+    const currentSnapshot = getReaderSessionSnapshot();
+    const currentValue = currentSnapshot.isTwoColumn;
+    const nextValue = typeof nextState === 'function'
+      ? nextState(currentValue)
+      : nextState;
+    if (currentSnapshot.viewMode === 'summary') {
+      return;
+    }
+    setSessionMode(nextValue ? 'paged' : 'scroll', { persistRemote: false });
+  }, []);
 
   const restoreFlow = useReaderRestoreFlow({
     novelId,
@@ -231,7 +271,7 @@ export default function ReaderPage() {
   }, [scrollMode.scrollChapterElementsRef]);
 
   const renderableChapter = !isLoading ? currentChapter : null;
-  const showLoadingOverlay = isLoading || restoreFlow.isRestoringPosition;
+  const showLoadingOverlay = isLoading || restoreStatus === 'restoring';
 
   return (
     <div className={cn('flex h-screen w-full overflow-hidden transition-colors duration-300', preferences.currentTheme.bg)}>

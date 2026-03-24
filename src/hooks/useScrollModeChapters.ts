@@ -34,11 +34,17 @@ export function useScrollModeChapters(
     const container = contentRef.current;
     const visibleMarker = container.scrollTop + container.clientHeight * 0.3;
     let currentReadIdx = scrollModeChapters[0];
+    let currentReadOffsetTop = Number.NEGATIVE_INFINITY;
 
     for (const idx of scrollModeChapters) {
       const chapterElement = scrollChapterElementsRef.current.get(idx);
-      if (chapterElement && chapterElement.offsetTop <= visibleMarker) {
+      if (
+        chapterElement
+        && chapterElement.offsetTop <= visibleMarker
+        && chapterElement.offsetTop > currentReadOffsetTop
+      ) {
         currentReadIdx = idx;
+        currentReadOffsetTop = chapterElement.offsetTop;
       }
     }
 

@@ -2,10 +2,12 @@ import { renderHook, act } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { useReaderPreferences } from '../useReaderPreferences';
 import { READER_THEMES } from '../../constants/readerThemes';
+import { resetReaderSessionStoreForTests } from '../sessionStore';
 
 describe('useReaderPreferences', () => {
   beforeEach(() => {
     localStorage.clear();
+    resetReaderSessionStoreForTests();
   });
 
   it('returns default values when localStorage is empty', () => {
@@ -21,12 +23,14 @@ describe('useReaderPreferences', () => {
 
   it('reads saved fontSize from localStorage', () => {
     localStorage.setItem('readerFontSize', '24');
+    resetReaderSessionStoreForTests();
     const { result } = renderHook(() => useReaderPreferences());
     expect(result.current.fontSize).toBe(24);
   });
 
   it('reads saved readerTheme from localStorage', () => {
     localStorage.setItem('readerTheme', 'night');
+    resetReaderSessionStoreForTests();
     const { result } = renderHook(() => useReaderPreferences());
     expect(result.current.readerTheme).toBe('night');
     expect(result.current.currentTheme).toEqual(READER_THEMES.night);
@@ -34,12 +38,14 @@ describe('useReaderPreferences', () => {
 
   it('reads saved lineSpacing from localStorage', () => {
     localStorage.setItem('readerLineSpacing', '2.0');
+    resetReaderSessionStoreForTests();
     const { result } = renderHook(() => useReaderPreferences());
     expect(result.current.lineSpacing).toBe(2.0);
   });
 
   it('reads saved paragraphSpacing from localStorage', () => {
     localStorage.setItem('readerParagraphSpacing', '20');
+    resetReaderSessionStoreForTests();
     const { result } = renderHook(() => useReaderPreferences());
     expect(result.current.paragraphSpacing).toBe(20);
   });
@@ -82,6 +88,7 @@ describe('useReaderPreferences', () => {
 
   it('falls back to auto theme for unknown theme key', () => {
     localStorage.setItem('readerTheme', 'nonexistent');
+    resetReaderSessionStoreForTests();
     const { result } = renderHook(() => useReaderPreferences());
     expect(result.current.currentTheme).toEqual(READER_THEMES.auto);
   });
@@ -107,6 +114,7 @@ describe('useReaderPreferences', () => {
 
   it('falls back headerBg to auto for unknown theme', () => {
     localStorage.setItem('readerTheme', 'unknown');
+    resetReaderSessionStoreForTests();
     const { result } = renderHook(() => useReaderPreferences());
     expect(result.current.headerBg).toBe('bg-bg-primary');
   });

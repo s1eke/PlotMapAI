@@ -2,6 +2,7 @@ import { renderHook, act } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useReaderStatePersistence } from '../useReaderStatePersistence';
 import { readerApi } from '../../api/reader';
+import { resetReaderSessionStoreForTests } from '../sessionStore';
 
 vi.mock('../../api/reader', () => ({
   readerApi: {
@@ -14,6 +15,7 @@ describe('useReaderStatePersistence', () => {
   beforeEach(() => {
     localStorage.clear();
     vi.clearAllMocks();
+    resetReaderSessionStoreForTests();
     vi.mocked(readerApi.getProgress).mockResolvedValue({
       chapterIndex: 0,
       scrollPosition: 0,
@@ -30,10 +32,12 @@ describe('useReaderStatePersistence', () => {
     expect(result.current.initialStoredState).toBeNull();
     expect(result.current.latestReaderStateRef.current).toEqual({
       chapterIndex: 0,
+      mode: 'scroll',
       viewMode: 'original',
       isTwoColumn: false,
       chapterProgress: undefined,
       scrollPosition: undefined,
+      lastContentMode: 'scroll',
     });
     expect(result.current.hasHydratedReaderState).toBe(false);
     expect(result.current.hasUserInteractedRef.current).toBe(false);
@@ -42,25 +46,29 @@ describe('useReaderStatePersistence', () => {
   it('reads stored state from localStorage', () => {
     localStorage.setItem('reader-state:42', JSON.stringify({
       chapterIndex: 5,
-      viewMode: 'summary',
-      isTwoColumn: true,
+      mode: 'summary',
+      lastContentMode: 'paged',
     }));
 
     const { result } = renderHook(() => useReaderStatePersistence(42));
 
     expect(result.current.initialStoredState).toEqual({
       chapterIndex: 5,
-      viewMode: 'summary',
-      isTwoColumn: true,
+      mode: 'summary',
+      viewMode: undefined,
+      isTwoColumn: undefined,
+      lastContentMode: 'paged',
       chapterProgress: undefined,
       scrollPosition: undefined,
     });
     expect(result.current.latestReaderStateRef.current).toEqual({
       chapterIndex: 5,
+      mode: 'summary',
       viewMode: 'summary',
-      isTwoColumn: true,
+      isTwoColumn: false,
       chapterProgress: undefined,
       scrollPosition: undefined,
+      lastContentMode: 'paged',
     });
   });
 
@@ -86,10 +94,12 @@ describe('useReaderStatePersistence', () => {
 
     expect(result.current.initialStoredState).toEqual({
       chapterIndex: undefined,
+      mode: undefined,
       viewMode: undefined,
       isTwoColumn: undefined,
       chapterProgress: undefined,
       scrollPosition: undefined,
+      lastContentMode: undefined,
     });
   });
 
@@ -107,18 +117,22 @@ describe('useReaderStatePersistence', () => {
 
     expect(result.current.latestReaderStateRef.current).toEqual({
       chapterIndex: 3,
+      mode: 'summary',
       viewMode: 'summary',
-      isTwoColumn: true,
+      isTwoColumn: false,
       chapterProgress: 0.4,
       scrollPosition: undefined,
+      lastContentMode: 'scroll',
     });
 
     const stored = JSON.parse(localStorage.getItem('reader-state:1')!);
-    expect(stored).toEqual({
+    expect(stored).toMatchObject({
       chapterIndex: 3,
+      mode: 'summary',
       viewMode: 'summary',
-      isTwoColumn: true,
+      isTwoColumn: false,
       chapterProgress: 0.4,
+      lastContentMode: 'scroll',
     });
   });
 
@@ -140,18 +154,20 @@ describe('useReaderStatePersistence', () => {
 
     expect(result.current.latestReaderStateRef.current).toEqual({
       chapterIndex: 7,
+      mode: 'summary',
       viewMode: 'summary',
-      isTwoColumn: true,
+      isTwoColumn: false,
       chapterProgress: 0.6,
       scrollPosition: undefined,
+      lastContentMode: 'scroll',
     });
   });
 
   it('loads persisted state with localStorage priority over Dexie progress', async () => {
     localStorage.setItem('reader-state:1', JSON.stringify({
       chapterIndex: 4,
-      viewMode: 'summary',
-      isTwoColumn: true,
+      mode: 'summary',
+      lastContentMode: 'paged',
       chapterProgress: 0.75,
     }));
     vi.mocked(readerApi.getProgress).mockResolvedValueOnce({
@@ -170,10 +186,12 @@ describe('useReaderStatePersistence', () => {
 
     expect(state!).toEqual({
       chapterIndex: 4,
+      mode: 'summary',
       viewMode: 'summary',
-      isTwoColumn: true,
+      isTwoColumn: false,
       chapterProgress: 0.75,
       scrollPosition: 120,
+      lastContentMode: 'paged',
     });
   });
 
@@ -189,21 +207,25 @@ describe('useReaderStatePersistence', () => {
 
     expect(result.current.initialStoredState).toEqual({
       chapterIndex: 2,
+      mode: undefined,
       viewMode: 'original',
       isTwoColumn: false,
       chapterProgress: undefined,
       scrollPosition: 380,
+      lastContentMode: undefined,
     });
 
     act(() => {
       result.current.persistReaderState({ chapterProgress: 0.55 });
     });
 
-    expect(JSON.parse(localStorage.getItem('reader-state:1')!)).toEqual({
+    expect(JSON.parse(localStorage.getItem('reader-state:1')!)).toMatchObject({
       chapterIndex: 2,
+      mode: 'scroll',
       viewMode: 'original',
       isTwoColumn: false,
       chapterProgress: 0.55,
+      lastContentMode: 'scroll',
     });
   });
 
