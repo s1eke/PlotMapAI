@@ -1,6 +1,11 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { READER_THEMES } from '../constants/readerThemes';
-import { setReaderTheme, setTypography, useReaderSessionSelector } from './sessionStore';
+import {
+  ensureSessionPreferencesHydrated,
+  setReaderTheme,
+  setTypography,
+  useReaderSessionSelector,
+} from './sessionStore';
 
 const HEADER_BG_MAP: Record<string, string> = {
   auto: 'bg-bg-primary',
@@ -11,6 +16,10 @@ const HEADER_BG_MAP: Record<string, string> = {
 };
 
 export function useReaderPreferences() {
+  useEffect(() => {
+    void ensureSessionPreferencesHydrated();
+  }, []);
+
   const preferences = useReaderSessionSelector(state => ({
     fontSize: state.fontSize,
     readerTheme: state.readerTheme,

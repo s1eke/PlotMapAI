@@ -1,7 +1,9 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { APP_SETTING_KEYS, storage } from '../../infra/storage';
 import { ThemeProvider, useTheme } from '../ThemeContext';
 import { resetReaderSessionStoreForTests } from '../../hooks/sessionStore';
+import { db } from '../../services/db';
 
 const TestComponent = () => {
   const { theme, toggleTheme } = useTheme();
@@ -14,7 +16,9 @@ const TestComponent = () => {
 };
 
 describe('ThemeContext', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    await db.delete();
+    await db.open();
     localStorage.clear();
     document.documentElement.classList.remove('dark');
     resetReaderSessionStoreForTests();
@@ -51,6 +55,25 @@ describe('ThemeContext', () => {
     
     expect(screen.getByTestId('theme-value').textContent).toBe('dark');
     expect(localStorage.getItem('theme')).toBe('dark');
+    expect(document.documentElement.classList.contains('dark')).toBe(true);
+  });
+
+  it('hydrates theme from primary storage', async () => {
+    window.matchMedia = vi.fn().mockImplementation(query => ({
+      matches: false,
+      media: query,
+    }));
+    await storage.primary.settings.set(APP_SETTING_KEYS.appTheme, 'dark');
+
+    render(
+      <ThemeProvider>
+        <TestComponent />
+      </ThemeProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('theme-value').textContent).toBe('dark');
+    });
     expect(document.documentElement.classList.contains('dark')).toBe(true);
   });
 });

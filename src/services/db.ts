@@ -73,6 +73,12 @@ export interface ReadingProgress {
   updatedAt: string;
 }
 
+export interface AppSettingRecord {
+  key: string;
+  value: unknown;
+  updatedAt: string;
+}
+
 export interface AnalysisJob {
   id: number;
   novelId: number;
@@ -143,7 +149,7 @@ export interface ChapterImage {
   blob: Blob;
 }
 
-const CURRENT_DB_VERSION = 5;
+const CURRENT_DB_VERSION = 6;
 
 const CURRENT_SCHEMA = {
   novels: '++id, createdAt',
@@ -151,6 +157,7 @@ const CURRENT_SCHEMA = {
   tocRules: '++id, serialNumber, enable',
   purificationRules: '++id, order, isEnabled',
   readingProgress: '++id, novelId',
+  appSettings: 'key, updatedAt',
   analysisJobs: '++id, novelId',
   analysisChunks: '++id, novelId, [novelId+chunkIndex]',
   chapterAnalyses: '++id, novelId, [novelId+chapterIndex]',
@@ -165,6 +172,7 @@ const db = new Dexie('PlotMapAI') as Dexie & {
   tocRules: EntityTable<TocRule, 'id'>;
   purificationRules: EntityTable<PurificationRule, 'id'>;
   readingProgress: EntityTable<ReadingProgress, 'id'>;
+  appSettings: EntityTable<AppSettingRecord, 'key'>;
   analysisJobs: EntityTable<AnalysisJob, 'id'>;
   analysisChunks: EntityTable<AnalysisChunk, 'id'>;
   chapterAnalyses: EntityTable<ChapterAnalysis, 'id'>;

@@ -317,7 +317,7 @@
       "testFailed": "AI connection test failed.",
       "testPreviewPrefix": "Response: {{preview}}",
       "securityTitle": "Security notes:",
-      "securityItem1": "Settings and tokens are stored in browser localStorage only, never uploaded to any server.",
+      "securityItem1": "Settings and tokens are stored locally in your browser, never uploaded to any server.",
       "securityItem2": "Only a masked token summary is shown on read; the raw value is never exposed.",
       "securityItem3": "Analysis is strictly chunked by chapters, and each chunk will stay within your configured context budget.",
       "apiBaseUrlLabel": "API Base URL",

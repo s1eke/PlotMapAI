@@ -317,7 +317,7 @@
       "testFailed": "AI 接口测试失败。",
       "testPreviewPrefix": "返回：{{preview}}",
       "securityTitle": "安全说明：",
-      "securityItem1": "配置和 Token 仅保存在浏览器 localStorage 中，不会上传到任何服务器。",
+      "securityItem1": "配置和 Token 仅保存在浏览器本地，不会上传到任何服务器。",
       "securityItem2": "读取配置时只展示脱敏后的 Token 摘要，不暴露原始值。",
       "securityItem3": "分析时会严格按章节切块，且每个块绝不超过你设置的上下文预算。",
       "apiBaseUrlLabel": "API Base URL",

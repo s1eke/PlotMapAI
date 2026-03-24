@@ -5,6 +5,7 @@ import type { StoredReaderState } from './useReaderStatePersistence';
 import {
   beginRestore,
   completeRestore,
+  getStoredReaderStateSnapshot,
   setPendingRestoreState as setStorePendingRestoreState,
   useReaderSessionSelector,
 } from './sessionStore';
@@ -199,8 +200,16 @@ export function useReaderRestoreFlow({
   }, [handleReadingAnchorChange, readingAnchorHandlerRef]);
 
   const captureCurrentReaderPosition = useCallback((options?: { flush?: boolean }): StoredReaderState => {
+    const storedReaderState = getStoredReaderStateSnapshot();
+    const shouldPreferLatestReaderState = chapterChangeSourceRef.current === 'navigation'
+      || latestReaderStateRef.current.chapterIndex !== chapterIndex
+      || latestReaderStateRef.current.viewMode !== viewMode
+      || latestReaderStateRef.current.isTwoColumn !== isTwoColumn;
+    const preferredReaderState = shouldPreferLatestReaderState
+      ? latestReaderStateRef.current
+      : storedReaderState;
     let nextState: StoredReaderState = {
-      chapterIndex,
+      chapterIndex: preferredReaderState.chapterIndex ?? storedReaderState.chapterIndex ?? chapterIndex,
       viewMode,
       isTwoColumn,
     };
@@ -210,12 +219,23 @@ export function useReaderRestoreFlow({
     } else if (viewMode === 'summary') {
       nextState.chapterProgress = getContainerProgress(contentRef.current);
     } else {
-      const anchor = getCurrentAnchorRef.current();
+      const anchor = shouldPreferLatestReaderState ? null : getCurrentAnchorRef.current();
       if (anchor) {
         nextState = {
           ...nextState,
           chapterIndex: anchor.chapterIndex,
           chapterProgress: clampProgress(anchor.chapterProgress),
+        };
+      } else if (shouldPreferLatestReaderState) {
+        nextState = {
+          ...nextState,
+          chapterIndex: preferredReaderState.chapterIndex ?? nextState.chapterIndex,
+          chapterProgress: typeof preferredReaderState.chapterProgress === 'number'
+            ? clampProgress(preferredReaderState.chapterProgress)
+            : undefined,
+          scrollPosition: typeof preferredReaderState.scrollPosition === 'number' && Number.isFinite(preferredReaderState.scrollPosition)
+            ? preferredReaderState.scrollPosition
+            : undefined,
         };
       } else if (typeof latestReaderStateRef.current.chapterProgress === 'number') {
         nextState.chapterProgress = latestReaderStateRef.current.chapterProgress;

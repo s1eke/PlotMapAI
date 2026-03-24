@@ -1,11 +1,15 @@
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { APP_SETTING_KEYS, storage } from '../../infra/storage';
 import { useReaderPreferences } from '../useReaderPreferences';
 import { READER_THEMES } from '../../constants/readerThemes';
 import { resetReaderSessionStoreForTests } from '../sessionStore';
+import { db } from '../../services/db';
 
 describe('useReaderPreferences', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    await db.delete();
+    await db.open();
     localStorage.clear();
     resetReaderSessionStoreForTests();
   });
@@ -117,5 +121,21 @@ describe('useReaderPreferences', () => {
     resetReaderSessionStoreForTests();
     const { result } = renderHook(() => useReaderPreferences());
     expect(result.current.headerBg).toBe('bg-bg-primary');
+  });
+
+  it('hydrates reader preferences from primary storage when cache is empty', async () => {
+    await storage.primary.settings.set(APP_SETTING_KEYS.readerTheme, 'paper');
+    await storage.primary.settings.set(APP_SETTING_KEYS.readerFontSize, 23);
+    await storage.primary.settings.set(APP_SETTING_KEYS.readerLineSpacing, 2.2);
+    await storage.primary.settings.set(APP_SETTING_KEYS.readerParagraphSpacing, 20);
+
+    const { result } = renderHook(() => useReaderPreferences());
+
+    await waitFor(() => {
+      expect(result.current.readerTheme).toBe('paper');
+      expect(result.current.fontSize).toBe(23);
+      expect(result.current.lineSpacing).toBe(2.2);
+      expect(result.current.paragraphSpacing).toBe(20);
+    });
   });
 });

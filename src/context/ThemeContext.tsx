@@ -1,6 +1,11 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useMemo, type ReactNode } from 'react';
-import { setAppTheme, useReaderSessionSelector, type AppTheme } from '../hooks/sessionStore';
+import { createContext, useContext, useEffect, useMemo, type ReactNode } from 'react';
+import {
+  ensureSessionPreferencesHydrated,
+  setAppTheme,
+  useReaderSessionSelector,
+  type AppTheme,
+} from '../hooks/sessionStore';
 
 interface ThemeContextType {
   theme: AppTheme;
@@ -11,6 +16,10 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const theme = useReaderSessionSelector(state => state.appTheme);
+
+  useEffect(() => {
+    void ensureSessionPreferencesHydrated();
+  }, []);
 
   const value = useMemo<ThemeContextType>(() => ({
     theme,

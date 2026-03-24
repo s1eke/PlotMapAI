@@ -20,4 +20,30 @@ export default defineConfig([
       globals: globals.browser,
     },
   },
+  {
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: [
+      'src/infra/storage/**',
+      'src/i18n/config.ts',
+      'src/**/__tests__/**',
+      'src/test/**',
+    ],
+    rules: {
+      'no-restricted-globals': [
+        'error',
+        {
+          name: 'localStorage',
+          message: 'Use infra/storage instead of direct localStorage access.',
+        },
+      ],
+      'no-restricted-properties': [
+        'error',
+        {
+          object: 'window',
+          property: 'localStorage',
+          message: 'Use infra/storage instead of direct localStorage access.',
+        },
+      ],
+    },
+  },
 ])

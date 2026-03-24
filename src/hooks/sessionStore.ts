@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import { APP_SETTING_KEYS, CACHE_KEYS, storage } from '../infra/storage';
 import { readerApi, type ReadingProgress } from '../api/reader';
 
 export type PageTarget = 'start' | 'end';
@@ -7,7 +8,6 @@ export type AppTheme = 'light' | 'dark';
 export type RestoreStatus = 'hydrating' | 'restoring' | 'ready' | 'error';
 
 const READER_STATE_SYNC_DELAY_MS = 400;
-const SESSION_STORAGE_PREFIX = 'reader-state:';
 const DEFAULT_FONT_SIZE = 18;
 const DEFAULT_LINE_SPACING = 1.8;
 const DEFAULT_PARAGRAPH_SPACING = 16;
@@ -80,30 +80,46 @@ interface SessionUpdateOptions {
   markUserInteracted?: boolean;
 }
 
+interface SessionPreferenceSnapshot {
+  readerTheme: string;
+  appTheme: AppTheme;
+  fontSize: number;
+  lineSpacing: number;
+  paragraphSpacing: number;
+}
+
 const listeners = new Set<() => void>();
 let syncTimerId: number | null = null;
 let syncQueue: Promise<void> = Promise.resolve();
 let lastSyncedRemoteSnapshot = '';
+let settingsHydrationPromise: Promise<void> | null = null;
+let settingsHydrated = false;
+let settingsPersistTimerId: number | null = null;
+let settingsPersistQueue: Promise<void> = Promise.resolve();
+let preferenceRevision = 0;
+let storeEpoch = 0;
 
 function isBrowser(): boolean {
   return typeof window !== 'undefined';
 }
 
-function readNumberStorage(key: string, fallback: number): number {
-  if (!isBrowser()) return fallback;
-  const saved = localStorage.getItem(key);
+function readStringCache(key: string): string | null {
+  return storage.cache.getString(key);
+}
+
+function readNumberCache(key: string, fallback: number): number {
+  const saved = readStringCache(key);
   const numeric = saved ? Number(saved) : Number.NaN;
   return Number.isFinite(numeric) ? numeric : fallback;
 }
 
 function readReaderTheme(): string {
-  if (!isBrowser()) return 'auto';
-  return localStorage.getItem('readerTheme') || 'auto';
+  return readStringCache(CACHE_KEYS.readerTheme) || 'auto';
 }
 
 function readAppTheme(): AppTheme {
   if (!isBrowser()) return 'light';
-  const saved = localStorage.getItem('theme');
+  const saved = readStringCache(CACHE_KEYS.theme);
   if (saved === 'dark' || saved === 'light') return saved;
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
@@ -116,7 +132,6 @@ function applyAppTheme(theme: AppTheme): void {
   } else {
     root.classList.remove('dark');
   }
-  localStorage.setItem('theme', theme);
 }
 
 function clampChapterProgress(value: number | undefined): number | undefined {
@@ -231,21 +246,16 @@ function mergeStoredReaderState(
 
 function readLocalSessionState(novelId: number): LocalReaderSessionSnapshot | null {
   if (!isBrowser() || !novelId) return null;
-  try {
-    const raw = localStorage.getItem(`${SESSION_STORAGE_PREFIX}${novelId}`);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as Record<string, unknown>;
-    return {
-      ...sanitizeStoredReaderState(parsed),
-      readerTheme: typeof parsed.readerTheme === 'string' ? parsed.readerTheme : undefined,
-      appTheme: parsed.appTheme === 'light' || parsed.appTheme === 'dark' ? parsed.appTheme : undefined,
-      fontSize: typeof parsed.fontSize === 'number' && Number.isFinite(parsed.fontSize) ? parsed.fontSize : undefined,
-      lineSpacing: typeof parsed.lineSpacing === 'number' && Number.isFinite(parsed.lineSpacing) ? parsed.lineSpacing : undefined,
-      paragraphSpacing: typeof parsed.paragraphSpacing === 'number' && Number.isFinite(parsed.paragraphSpacing) ? parsed.paragraphSpacing : undefined,
-    };
-  } catch {
-    return null;
-  }
+  const parsed = storage.cache.getJson<Record<string, unknown>>(CACHE_KEYS.readerState(novelId));
+  if (!parsed) return null;
+  return {
+    ...sanitizeStoredReaderState(parsed),
+    readerTheme: typeof parsed.readerTheme === 'string' ? parsed.readerTheme : undefined,
+    appTheme: parsed.appTheme === 'light' || parsed.appTheme === 'dark' ? parsed.appTheme : undefined,
+    fontSize: typeof parsed.fontSize === 'number' && Number.isFinite(parsed.fontSize) ? parsed.fontSize : undefined,
+    lineSpacing: typeof parsed.lineSpacing === 'number' && Number.isFinite(parsed.lineSpacing) ? parsed.lineSpacing : undefined,
+    paragraphSpacing: typeof parsed.paragraphSpacing === 'number' && Number.isFinite(parsed.paragraphSpacing) ? parsed.paragraphSpacing : undefined,
+  };
 }
 
 function getRemoteProgressSnapshot(progress: ReadingProgress): string {
@@ -258,23 +268,154 @@ function getRemoteProgressSnapshot(progress: ReadingProgress): string {
   });
 }
 
-function writeLocalPersistence(state: ReaderSessionInternalState): void {
-  if (!isBrowser()) return;
-  localStorage.setItem('readerTheme', state.readerTheme);
-  localStorage.setItem('readerFontSize', String(state.fontSize));
-  localStorage.setItem('readerLineSpacing', String(state.lineSpacing));
-  localStorage.setItem('readerParagraphSpacing', String(state.paragraphSpacing));
-  applyAppTheme(state.appTheme);
-  if (!state.novelId) return;
-  const snapshot: LocalReaderSessionSnapshot = {
-    ...toStoredReaderState(state),
-    readerTheme: state.readerTheme,
-    appTheme: state.appTheme,
-    fontSize: state.fontSize,
-    lineSpacing: state.lineSpacing,
-    paragraphSpacing: state.paragraphSpacing,
+function getSessionPreferences(currentState: ReaderSessionInternalState): SessionPreferenceSnapshot {
+  return {
+    readerTheme: currentState.readerTheme,
+    appTheme: currentState.appTheme,
+    fontSize: currentState.fontSize,
+    lineSpacing: currentState.lineSpacing,
+    paragraphSpacing: currentState.paragraphSpacing,
   };
-  localStorage.setItem(`${SESSION_STORAGE_PREFIX}${state.novelId}`, JSON.stringify(snapshot));
+}
+
+function readCachedPreferenceState(): SessionPreferenceSnapshot {
+  return {
+    readerTheme: readReaderTheme(),
+    appTheme: readAppTheme(),
+    fontSize: readNumberCache(CACHE_KEYS.readerFontSize, DEFAULT_FONT_SIZE),
+    lineSpacing: readNumberCache(CACHE_KEYS.readerLineSpacing, DEFAULT_LINE_SPACING),
+    paragraphSpacing: readNumberCache(CACHE_KEYS.readerParagraphSpacing, DEFAULT_PARAGRAPH_SPACING),
+  };
+}
+
+function writeCachePersistence(currentState: ReaderSessionInternalState): void {
+  if (!isBrowser()) return;
+
+  storage.cache.set(CACHE_KEYS.theme, currentState.appTheme);
+  storage.cache.set(CACHE_KEYS.readerTheme, currentState.readerTheme);
+  storage.cache.set(CACHE_KEYS.readerFontSize, String(currentState.fontSize));
+  storage.cache.set(CACHE_KEYS.readerLineSpacing, String(currentState.lineSpacing));
+  storage.cache.set(CACHE_KEYS.readerParagraphSpacing, String(currentState.paragraphSpacing));
+
+  if (!currentState.novelId) return;
+
+  const snapshot: LocalReaderSessionSnapshot = {
+    ...toStoredReaderState(currentState),
+    readerTheme: currentState.readerTheme,
+    appTheme: currentState.appTheme,
+    fontSize: currentState.fontSize,
+    lineSpacing: currentState.lineSpacing,
+    paragraphSpacing: currentState.paragraphSpacing,
+  };
+  storage.cache.set(CACHE_KEYS.readerState(currentState.novelId), snapshot);
+}
+
+async function persistPreferenceSettings(preferences: SessionPreferenceSnapshot): Promise<void> {
+  await Promise.all([
+    storage.primary.settings.set(APP_SETTING_KEYS.appTheme, preferences.appTheme),
+    storage.primary.settings.set(APP_SETTING_KEYS.readerTheme, preferences.readerTheme),
+    storage.primary.settings.set(APP_SETTING_KEYS.readerFontSize, preferences.fontSize),
+    storage.primary.settings.set(APP_SETTING_KEYS.readerLineSpacing, preferences.lineSpacing),
+    storage.primary.settings.set(APP_SETTING_KEYS.readerParagraphSpacing, preferences.paragraphSpacing),
+  ]);
+}
+
+async function loadPrimaryPreferenceState(): Promise<SessionPreferenceSnapshot> {
+  const cached = readCachedPreferenceState();
+  try {
+    const [appTheme, readerTheme, fontSize, lineSpacing, paragraphSpacing] = await Promise.all([
+      storage.primary.settings.get<AppTheme>(APP_SETTING_KEYS.appTheme),
+      storage.primary.settings.get<string>(APP_SETTING_KEYS.readerTheme),
+      storage.primary.settings.get<number>(APP_SETTING_KEYS.readerFontSize),
+      storage.primary.settings.get<number>(APP_SETTING_KEYS.readerLineSpacing),
+      storage.primary.settings.get<number>(APP_SETTING_KEYS.readerParagraphSpacing),
+    ]);
+
+    const resolved: SessionPreferenceSnapshot = {
+      appTheme: appTheme === 'light' || appTheme === 'dark' ? appTheme : cached.appTheme,
+      readerTheme: typeof readerTheme === 'string' ? readerTheme : cached.readerTheme,
+      fontSize: typeof fontSize === 'number' && Number.isFinite(fontSize) ? fontSize : cached.fontSize,
+      lineSpacing: typeof lineSpacing === 'number' && Number.isFinite(lineSpacing) ? lineSpacing : cached.lineSpacing,
+      paragraphSpacing: typeof paragraphSpacing === 'number' && Number.isFinite(paragraphSpacing) ? paragraphSpacing : cached.paragraphSpacing,
+    };
+
+    if (
+      appTheme === null
+      || readerTheme === null
+      || fontSize === null
+      || lineSpacing === null
+      || paragraphSpacing === null
+    ) {
+      await persistPreferenceSettings(resolved).catch(() => undefined);
+    }
+
+    return resolved;
+  } catch {
+    return cached;
+  }
+}
+
+function schedulePreferencePersistence(): void {
+  if (!isBrowser()) return;
+  if (settingsPersistTimerId !== null) {
+    window.clearTimeout(settingsPersistTimerId);
+  }
+
+  settingsPersistTimerId = window.setTimeout(() => {
+    settingsPersistTimerId = null;
+    const snapshot = getSessionPreferences(state);
+    const epochAtSchedule = storeEpoch;
+    settingsPersistQueue = settingsPersistQueue
+      .then(async () => {
+        if (epochAtSchedule !== storeEpoch) return;
+        await persistPreferenceSettings(snapshot);
+      })
+      .catch(() => undefined);
+  }, 80);
+}
+
+async function flushPreferencePersistence(): Promise<void> {
+  if (settingsPersistTimerId !== null && isBrowser()) {
+    window.clearTimeout(settingsPersistTimerId);
+    settingsPersistTimerId = null;
+    const epochAtFlush = storeEpoch;
+    settingsPersistQueue = settingsPersistQueue
+      .then(async () => {
+        if (epochAtFlush !== storeEpoch) return;
+        await persistPreferenceSettings(getSessionPreferences(state));
+      })
+      .catch(() => undefined);
+  }
+  await settingsPersistQueue;
+}
+
+export async function ensureSessionPreferencesHydrated(): Promise<void> {
+  if (!isBrowser() || settingsHydrated) return;
+  if (settingsHydrationPromise) return settingsHydrationPromise;
+
+  const epochAtStart = storeEpoch;
+  const revisionAtStart = preferenceRevision;
+  const hydrationPromise = (async () => {
+    const preferences = await loadPrimaryPreferenceState();
+    if (epochAtStart !== storeEpoch) return;
+    if (revisionAtStart === preferenceRevision) {
+      setState(preferences);
+    }
+    settingsHydrated = true;
+  })().catch(() => {
+    if (epochAtStart === storeEpoch) {
+      settingsHydrated = true;
+    }
+  });
+
+  const trackedPromise = hydrationPromise.finally(() => {
+    if (settingsHydrationPromise === trackedPromise) {
+      settingsHydrationPromise = null;
+    }
+  });
+  settingsHydrationPromise = trackedPromise;
+
+  return trackedPromise;
 }
 
 function toRemoteProgress(state: ReaderSessionInternalState): ReadingProgress {
@@ -291,17 +432,14 @@ function toRemoteProgress(state: ReaderSessionInternalState): ReadingProgress {
 
 function createInitialState(): ReaderSessionInternalState {
   const mode: ReaderMode = 'scroll';
+  const preferences = readCachedPreferenceState();
   return {
     novelId: 0,
     ...deriveViewState(mode),
     chapterIndex: 0,
     chapterProgress: undefined,
     scrollPosition: undefined,
-    readerTheme: readReaderTheme(),
-    appTheme: readAppTheme(),
-    fontSize: readNumberStorage('readerFontSize', DEFAULT_FONT_SIZE),
-    lineSpacing: readNumberStorage('readerLineSpacing', DEFAULT_LINE_SPACING),
-    paragraphSpacing: readNumberStorage('readerParagraphSpacing', DEFAULT_PARAGRAPH_SPACING),
+    ...preferences,
     restoreStatus: 'hydrating',
     lastContentMode: 'scroll',
     pendingRestoreState: null,
@@ -327,18 +465,19 @@ export function getReaderSessionSnapshot(): ReaderSessionSnapshot {
 
 function setState(partial: Partial<ReaderSessionInternalState>): void {
   state = { ...state, ...partial };
-  writeLocalPersistence(state);
+  applyAppTheme(state.appTheme);
+  writeCachePersistence(state);
   emit();
 }
 
-function enqueueRemotePersistence(progress: ReadingProgress): Promise<void> {
-  if (!state.novelId) return Promise.resolve();
+function enqueueRemotePersistence(progress: ReadingProgress, novelId = state.novelId): Promise<void> {
+  if (!novelId) return Promise.resolve();
   const snapshot = getRemoteProgressSnapshot(progress);
   if (snapshot === lastSyncedRemoteSnapshot) return syncQueue;
   syncQueue = syncQueue
     .then(async () => {
       if (snapshot === lastSyncedRemoteSnapshot) return;
-      await readerApi.saveProgress(state.novelId, progress);
+      await readerApi.saveProgress(novelId, progress);
       lastSyncedRemoteSnapshot = snapshot;
     })
     .catch(() => undefined);
@@ -387,17 +526,21 @@ function updateStoredReaderState(
 
 export async function hydrateSession(novelId: number): Promise<StoredReaderState> {
   const localState = readLocalSessionState(novelId);
+  const cachedPreferences = readCachedPreferenceState();
   setState({
     novelId,
     restoreStatus: 'hydrating',
     pendingRestoreState: null,
     hasUserInteracted: false,
-    readerTheme: localState?.readerTheme ?? readReaderTheme(),
-    appTheme: localState?.appTheme ?? readAppTheme(),
-    fontSize: localState?.fontSize ?? readNumberStorage('readerFontSize', DEFAULT_FONT_SIZE),
-    lineSpacing: localState?.lineSpacing ?? readNumberStorage('readerLineSpacing', DEFAULT_LINE_SPACING),
-    paragraphSpacing: localState?.paragraphSpacing ?? readNumberStorage('readerParagraphSpacing', DEFAULT_PARAGRAPH_SPACING),
+    readerTheme: localState?.readerTheme ?? cachedPreferences.readerTheme,
+    appTheme: localState?.appTheme ?? cachedPreferences.appTheme,
+    fontSize: localState?.fontSize ?? cachedPreferences.fontSize,
+    lineSpacing: localState?.lineSpacing ?? cachedPreferences.lineSpacing,
+    paragraphSpacing: localState?.paragraphSpacing ?? cachedPreferences.paragraphSpacing,
   });
+
+  await ensureSessionPreferencesHydrated();
+  const preferences = getSessionPreferences(state);
 
   let remoteState: StoredReaderState | null = null;
   try {
@@ -420,6 +563,7 @@ export async function hydrateSession(novelId: number): Promise<StoredReaderState
   const mode = resolveModeFromStoredState(mergedState);
   setState({
     novelId,
+    ...preferences,
     ...deriveViewState(mode),
     chapterIndex: mergedState.chapterIndex ?? 0,
     chapterProgress: clampChapterProgress(mergedState.chapterProgress),
@@ -471,19 +615,25 @@ export function setReadingPosition(nextState: StoredReaderState, options: Sessio
 }
 
 export function setReaderTheme(theme: string): void {
+  preferenceRevision += 1;
   setState({ readerTheme: theme });
+  schedulePreferencePersistence();
 }
 
 export function setAppTheme(theme: AppTheme): void {
+  preferenceRevision += 1;
   setState({ appTheme: theme });
+  schedulePreferencePersistence();
 }
 
 export function setTypography(nextState: TypographyState): void {
+  preferenceRevision += 1;
   setState({
     fontSize: nextState.fontSize ?? state.fontSize,
     lineSpacing: nextState.lineSpacing ?? state.lineSpacing,
     paragraphSpacing: nextState.paragraphSpacing ?? state.paragraphSpacing,
   });
+  schedulePreferencePersistence();
 }
 
 export function setPendingRestoreState(nextState: StoredReaderState | null): void {
@@ -550,11 +700,14 @@ export function persistStoredReaderState(nextState: StoredReaderState, options?:
 }
 
 export async function flushPersistence(): Promise<void> {
+  const novelId = state.novelId;
+  const progress = toRemoteProgress(state);
+  await flushPreferencePersistence();
   if (syncTimerId !== null && isBrowser()) {
     window.clearTimeout(syncTimerId);
     syncTimerId = null;
   }
-  await enqueueRemotePersistence(toRemoteProgress(state));
+  await enqueueRemotePersistence(progress, novelId);
 }
 
 export function useReaderSessionSelector<T>(selector: (state: ReaderSessionSnapshot) => T): T {
@@ -583,12 +736,21 @@ export function useReaderSessionActions(): ReaderSessionActions {
 }
 
 export function resetReaderSessionStoreForTests(): void {
+  storeEpoch += 1;
   if (syncTimerId !== null && isBrowser()) {
     window.clearTimeout(syncTimerId);
     syncTimerId = null;
   }
+  if (settingsPersistTimerId !== null && isBrowser()) {
+    window.clearTimeout(settingsPersistTimerId);
+    settingsPersistTimerId = null;
+  }
   lastSyncedRemoteSnapshot = '';
   syncQueue = Promise.resolve();
+  settingsHydrationPromise = null;
+  settingsHydrated = false;
+  settingsPersistQueue = Promise.resolve();
+  preferenceRevision = 0;
   state = createInitialState();
   applyAppTheme(state.appTheme);
   emit();

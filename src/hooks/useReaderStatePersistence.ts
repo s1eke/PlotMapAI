@@ -88,12 +88,14 @@ export function useReaderStatePersistence(novelId: number): {
           ? 'scroll'
           : undefined;
     const shouldRecomputeMode = inferredMode !== undefined && nextState.mode !== inferredMode;
+    const mergedState: StoredReaderState = {
+      ...latestReaderStateRef.current,
+      ...nextState,
+      ...(shouldRecomputeMode ? { mode: undefined } : {}),
+    };
+    latestReaderStateRef.current = mergedState;
     persistStoredReaderState(
-      {
-        ...latestReaderStateRef.current,
-        ...nextState,
-        ...(shouldRecomputeMode ? { mode: undefined } : {}),
-      },
+      mergedState,
       { flush: options?.flush },
     );
   }, [novelId]);

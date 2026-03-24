@@ -16,6 +16,7 @@ describe('db', () => {
       'analysisChunks',
       'analysisJobs',
       'analysisOverviews',
+      'appSettings',
       'chapterAnalyses',
       'chapterImages',
       'chapters',

@@ -1,4 +1,11 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import {
+  APP_SETTING_KEYS,
+  LEGACY_CACHE_KEYS,
+  LEGACY_SECURE_KEYS,
+  SECURE_KEYS,
+  storage,
+} from '../../infra/storage';
 import { db } from '../../services/db';
 import { settingsApi, resetDeviceKeyForTesting } from '../settings';
 
@@ -163,6 +170,30 @@ describe('settingsApi', () => {
       expect(settings.hasApiKey).toBe(true);
     });
 
+    it('migrates legacy AI config from localStorage to primary and secure storage', async () => {
+      localStorage.setItem(LEGACY_CACHE_KEYS.aiConfig, JSON.stringify({
+        apiBaseUrl: 'http://legacy-host:5000',
+        modelName: 'legacy-model',
+        contextSize: 64000,
+      }));
+      await storage.secure.set(LEGACY_SECURE_KEYS.aiApiKey, 'sk-legacy-secret');
+
+      const settings = await settingsApi.getAiProviderSettings();
+
+      expect(settings.apiBaseUrl).toBe('http://legacy-host:5000');
+      expect(settings.modelName).toBe('legacy-model');
+      expect(settings.contextSize).toBe(64000);
+      expect(settings.hasApiKey).toBe(true);
+      expect(await storage.primary.settings.get(APP_SETTING_KEYS.aiConfig)).toEqual({
+        apiBaseUrl: 'http://legacy-host:5000',
+        modelName: 'legacy-model',
+        contextSize: 64000,
+      });
+      expect(await storage.secure.get(SECURE_KEYS.aiApiKey)).toBe('sk-legacy-secret');
+      expect(localStorage.getItem(LEGACY_CACHE_KEYS.aiConfig)).toBeNull();
+      expect(localStorage.getItem(LEGACY_SECURE_KEYS.aiApiKey)).toBeNull();
+    });
+
     it('updateAiProviderSettings throws for invalid config', async () => {
       await expect(settingsApi.updateAiProviderSettings({
         apiBaseUrl: '',
@@ -184,7 +215,8 @@ describe('settingsApi', () => {
     });
 
     it('exportAiConfig throws without config', async () => {
-      localStorage.removeItem('plotmapai_ai_config');
+      await storage.primary.settings.remove(APP_SETTING_KEYS.aiConfig);
+      await storage.secure.remove(SECURE_KEYS.aiApiKey);
       await expect(settingsApi.exportAiConfig('password')).rejects.toThrow('No AI config');
     });
 
@@ -204,6 +236,8 @@ describe('settingsApi', () => {
     it('export and import round-trip works', async () => {
       const exported = await settingsApi.exportAiConfig('mypassword123');
       localStorage.clear();
+      await storage.primary.settings.remove(APP_SETTING_KEYS.aiConfig);
+      await storage.secure.remove(SECURE_KEYS.aiApiKey);
       resetDeviceKeyForTesting();
 
       const file = new File([exported], 'config.enc', { type: 'application/octet-stream' });

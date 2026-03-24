@@ -1,4 +1,11 @@
 import yaml from 'js-yaml';
+import {
+  APP_SETTING_KEYS,
+  LEGACY_CACHE_KEYS,
+  LEGACY_SECURE_KEYS,
+  SECURE_KEYS,
+  storage,
+} from '../infra/storage';
 import { db } from '../services/db';
 
 function unescapeReplacement(raw: string): string {
@@ -63,113 +70,96 @@ export interface AiProviderSettingsPayload {
   keepExistingApiKey?: boolean;
 }
 
-const AI_CONFIG_KEY = 'plotmapai_ai_config';
-const ENCRYPTED_API_KEY_STORAGE_KEY = 'plotmapai_encrypted_api_key';
-const DEVICE_KEY_STORAGE_KEY = 'plotmapai_device_key';
-
-// ── Device AES key for localStorage apiKey encryption ──────────────────
-
-let deviceCryptoKey: CryptoKey | null = null;
-let deviceKeyPromise: Promise<CryptoKey> | null = null;
-
-function toB64(bytes: Uint8Array): string {
-  return btoa(String.fromCharCode(...bytes));
+interface StoredAiConfigRecord {
+  apiBaseUrl: string;
+  modelName: string;
+  contextSize: number;
 }
 
-function fromB64(s: string): Uint8Array<ArrayBuffer> {
-  const decoded = atob(s);
-  const arr = new Uint8Array(decoded.length);
-  for (let i = 0; i < decoded.length; i++) arr[i] = decoded.charCodeAt(i);
-  return arr as Uint8Array<ArrayBuffer>;
+function sanitizeAiConfigRecord(raw: unknown): StoredAiConfigRecord | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const parsed = raw as Record<string, unknown>;
+  return {
+    apiBaseUrl: typeof parsed.apiBaseUrl === 'string' ? parsed.apiBaseUrl : '',
+    modelName: typeof parsed.modelName === 'string' ? parsed.modelName : '',
+    contextSize: typeof parsed.contextSize === 'number' ? parsed.contextSize : 32000,
+  };
 }
 
-function getDeviceCryptoKey(): Promise<CryptoKey> {
-  if (deviceCryptoKey) return Promise.resolve(deviceCryptoKey);
-  if (deviceKeyPromise) return deviceKeyPromise;
+async function migrateLegacyAiConfig(): Promise<StoredAiConfigRecord | null> {
+  const raw = storage.cache.getString(LEGACY_CACHE_KEYS.aiConfig);
+  if (!raw) return null;
 
-  deviceKeyPromise = (async (): Promise<CryptoKey> => {
-    const existing = localStorage.getItem(DEVICE_KEY_STORAGE_KEY);
-    if (existing) {
-      deviceCryptoKey = await crypto.subtle.importKey(
-        'raw', fromB64(existing), { name: 'AES-GCM' }, false, ['encrypt', 'decrypt'],
-      );
-    } else {
-      const key = await crypto.subtle.generateKey(
-        { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt'],
-      );
-      const exported = await crypto.subtle.exportKey('raw', key);
-      localStorage.setItem(DEVICE_KEY_STORAGE_KEY, toB64(new Uint8Array(exported)));
-      deviceCryptoKey = key;
-    }
-    return deviceCryptoKey;
-  })().catch((err: unknown) => {
-    deviceKeyPromise = null;
-    throw err;
-  });
-
-  return deviceKeyPromise;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    const config = sanitizeAiConfigRecord(parsed);
+    storage.cache.remove(LEGACY_CACHE_KEYS.aiConfig);
+    if (!config) return null;
+    await storage.primary.settings.set(APP_SETTING_KEYS.aiConfig, config);
+    return config;
+  } catch {
+    storage.cache.remove(LEGACY_CACHE_KEYS.aiConfig);
+    return null;
+  }
 }
 
-async function encryptApiKey(apiKey: string): Promise<string> {
-  const key = await getDeviceCryptoKey();
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const encoded = new TextEncoder().encode(apiKey);
-  const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, encoded);
-  return `${toB64(iv)}.${toB64(new Uint8Array(ciphertext))}`;
+async function getStoredAiConfigRecord(): Promise<StoredAiConfigRecord | null> {
+  const stored = sanitizeAiConfigRecord(
+    await storage.primary.settings.get<StoredAiConfigRecord>(APP_SETTING_KEYS.aiConfig),
+  );
+  if (stored) {
+    storage.cache.remove(LEGACY_CACHE_KEYS.aiConfig);
+    return stored;
+  }
+  return migrateLegacyAiConfig();
 }
 
-async function decryptApiKey(payload: string): Promise<string> {
-  const key = await getDeviceCryptoKey();
-  const dot = payload.indexOf('.');
-  if (dot < 0) throw new Error('Invalid encrypted payload');
-  const iv = fromB64(payload.slice(0, dot));
-  const ciphertext = fromB64(payload.slice(dot + 1));
-  const plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ciphertext);
-  return new TextDecoder().decode(plaintext);
+async function getStoredAiApiKey(): Promise<string> {
+  const current = await storage.secure.get(SECURE_KEYS.aiApiKey);
+  if (current !== null) {
+    await storage.secure.remove(LEGACY_SECURE_KEYS.aiApiKey);
+    return current;
+  }
+
+  const legacy = await storage.secure.get(LEGACY_SECURE_KEYS.aiApiKey);
+  if (legacy === null) return '';
+
+  await storage.secure.set(SECURE_KEYS.aiApiKey, legacy);
+  await storage.secure.remove(LEGACY_SECURE_KEYS.aiApiKey);
+  return legacy;
 }
 
 // ── Config read/write ──────────────────────────────────────────────────
 
 export async function getAiConfig(): Promise<{ apiBaseUrl: string; apiKey: string; modelName: string; contextSize: number } | null> {
-  const raw = localStorage.getItem(AI_CONFIG_KEY);
-  if (!raw) return null;
-  try {
-    const stored = JSON.parse(raw);
-    let apiKey = '';
-    const enc = localStorage.getItem(ENCRYPTED_API_KEY_STORAGE_KEY);
-    if (enc) {
-      try {
-        apiKey = await decryptApiKey(enc);
-      } catch {
-        // Corrupt or un-decryptable — treat as missing
-      }
-    }
-    return {
-      apiBaseUrl: stored.apiBaseUrl ?? '',
-      apiKey,
-      modelName: stored.modelName ?? '',
-      contextSize: stored.contextSize ?? 32000,
-    };
-  } catch {
-    return null;
-  }
+  const stored = await getStoredAiConfigRecord();
+  if (!stored) return null;
+
+  return {
+    apiBaseUrl: stored.apiBaseUrl,
+    apiKey: await getStoredAiApiKey(),
+    modelName: stored.modelName,
+    contextSize: stored.contextSize,
+  };
 }
 
 async function setAiConfig(config: { apiBaseUrl: string; apiKey: string; modelName: string; contextSize: number }): Promise<void> {
+  await storage.primary.settings.set(APP_SETTING_KEYS.aiConfig, {
+    apiBaseUrl: config.apiBaseUrl,
+    modelName: config.modelName,
+    contextSize: config.contextSize,
+  } satisfies StoredAiConfigRecord);
   if (config.apiKey) {
-    const encrypted = await encryptApiKey(config.apiKey);
-    localStorage.setItem(ENCRYPTED_API_KEY_STORAGE_KEY, encrypted);
+    await storage.secure.set(SECURE_KEYS.aiApiKey, config.apiKey);
   } else {
-    localStorage.removeItem(ENCRYPTED_API_KEY_STORAGE_KEY);
+    await storage.secure.remove(SECURE_KEYS.aiApiKey);
   }
-  const { apiKey: _ignored, ...rest } = config;
-  void _ignored;
-  localStorage.setItem(AI_CONFIG_KEY, JSON.stringify(rest));
+  storage.cache.remove(LEGACY_CACHE_KEYS.aiConfig);
+  await storage.secure.remove(LEGACY_SECURE_KEYS.aiApiKey);
 }
 
 export function resetDeviceKeyForTesting(): void {
-  deviceCryptoKey = null;
-  deviceKeyPromise = null;
+  storage.secure.resetForTesting();
 }
 
 function tocRuleToApi(rule: import('../services/db').TocRule): TocRule {
