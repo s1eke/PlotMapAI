@@ -525,6 +525,8 @@ function updateStoredReaderState(
 }
 
 export async function hydrateSession(novelId: number): Promise<StoredReaderState> {
+  storeEpoch += 1;
+  const epochAtStart = storeEpoch;
   const localState = readLocalSessionState(novelId);
   const cachedPreferences = readCachedPreferenceState();
   setState({
@@ -540,6 +542,7 @@ export async function hydrateSession(novelId: number): Promise<StoredReaderState
   });
 
   await ensureSessionPreferencesHydrated();
+  if (epochAtStart !== storeEpoch) return buildStoredReaderState(localState);
   const preferences = getSessionPreferences(state);
 
   let remoteState: StoredReaderState | null = null;
@@ -559,6 +562,7 @@ export async function hydrateSession(novelId: number): Promise<StoredReaderState
     remoteState = null;
   }
 
+  if (epochAtStart !== storeEpoch) return buildStoredReaderState(localState);
   const mergedState = mergeStoredReaderState(remoteState, localState);
   const mode = resolveModeFromStoredState(mergedState);
   setState({
