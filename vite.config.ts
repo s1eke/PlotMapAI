@@ -1,5 +1,6 @@
 import { execSync } from 'child_process'
 import { readFileSync } from 'fs'
+import { resolve } from 'path'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
@@ -19,6 +20,15 @@ const base = process.env.VITE_BASE || '/'
 export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(`${pkg.version}-${shortHash}`),
+  },
+  resolve: {
+    alias: {
+      '@app': resolve(__dirname, './src/app'),
+      '@domains': resolve(__dirname, './src/domains'),
+      '@shared': resolve(__dirname, './src/shared'),
+      '@infra': resolve(__dirname, './src/infra'),
+      '@test': resolve(__dirname, './src/test'),
+    },
   },
   base,
   plugins: [

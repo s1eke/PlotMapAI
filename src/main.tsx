@@ -2,8 +2,8 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import './i18n/config'
-import App from './App.tsx'
-import { ensureDefaultTocRules } from './services/db'
+import App from '@app/App'
+import { initializeApp } from '@app/bootstrap/initializeApp'
 
 // PWA standalone: prevent iOS Safari rubber-band overscroll
 // CSS overscroll-behavior is unsupported on iOS, so we intercept touchmove
@@ -46,7 +46,7 @@ if (window.matchMedia('(display-mode: standalone)').matches) {
   }, { passive: false });
 }
 
-ensureDefaultTocRules()
+void initializeApp()
 
 console.log(`PlotMapAI v${__APP_VERSION__}`)
 

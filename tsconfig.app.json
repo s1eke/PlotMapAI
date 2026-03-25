@@ -5,8 +5,16 @@
     "useDefineForClassFields": true,
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "module": "ESNext",
+    "baseUrl": ".",
     "types": ["vite/client"],
     "skipLibCheck": true,
+    "paths": {
+      "@app/*": ["src/app/*"],
+      "@domains/*": ["src/domains/*"],
+      "@shared/*": ["src/shared/*"],
+      "@infra/*": ["src/infra/*"],
+      "@test/*": ["src/test/*"]
+    },
 
     /* Bundler mode */
     "moduleResolution": "bundler",
@@ -25,5 +33,9 @@
     "noUncheckedSideEffectImports": true,
     "resolveJsonModule": true
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": [
+    "src/**/__tests__/**",
+    "src/test/**"
+  ]
 }

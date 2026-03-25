@@ -1,4 +1,4 @@
-import { db } from '../../services/db';
+import { db } from '@infra/db';
 
 const settings = {
   async get<T>(key: string): Promise<T | null> {

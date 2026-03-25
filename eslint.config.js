@@ -46,4 +46,45 @@ export default defineConfig([
       ],
     },
   },
+  {
+    files: ['src/app/**/*.{ts,tsx}', 'src/domains/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['@domains/*/*'],
+              message: 'Import other domains only via @domains/<domain>.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['src/shared/**/*.{ts,tsx}', 'src/infra/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                '@domains/*',
+                '@domains/*/*',
+                '../domains/*',
+                '../domains/*/*',
+                '../../domains/*',
+                '../../domains/*/*',
+                '../../../domains/*',
+                '../../../domains/*/*',
+              ],
+              message: 'shared and infra must not depend on domain code.',
+            },
+          ],
+        },
+      ],
+    },
+  },
 ])
