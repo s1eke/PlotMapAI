@@ -1,3 +1,8 @@
+import {
+  AppErrorCode,
+  serializeAppError,
+  toAppError,
+} from '@shared/errors';
 import type { WorkerTaskMessage, WorkerTaskResponse } from './protocol';
 
 export type WorkerTaskHandler<Payload, Result, Progress> = (
@@ -31,10 +36,12 @@ export function registerWorkerTaskHandlers(handlers: WorkerTaskHandlers): void {
       workerContext.postMessage({
         kind: 'error',
         requestId: message.requestId,
-        error: {
-          message: `Unknown worker task: ${message.task}`,
-          name: 'WorkerTaskError',
-        },
+        error: serializeAppError(toAppError(`Unknown worker task: ${message.task}`, {
+          code: AppErrorCode.WORKER_EXECUTION_FAILED,
+          kind: 'execution',
+          source: 'worker',
+          userMessageKey: 'errors.WORKER_EXECUTION_FAILED',
+        })),
       } satisfies WorkerTaskResponse<unknown, unknown>);
       return;
     }
@@ -78,14 +85,16 @@ export function registerWorkerTaskHandlers(handlers: WorkerTaskHandlers): void {
           } satisfies WorkerTaskResponse<unknown, unknown>);
           return;
         }
-        const normalized = error instanceof Error ? error : new Error(String(error));
+        const normalized = toAppError(error, {
+          code: AppErrorCode.WORKER_EXECUTION_FAILED,
+          kind: 'execution',
+          source: 'worker',
+          userMessageKey: 'errors.WORKER_EXECUTION_FAILED',
+        });
         workerContext.postMessage({
           kind: 'error',
           requestId: message.requestId,
-          error: {
-            message: normalized.message,
-            name: normalized.name,
-          },
+          error: serializeAppError(normalized),
         } satisfies WorkerTaskResponse<unknown, unknown>);
       });
   };

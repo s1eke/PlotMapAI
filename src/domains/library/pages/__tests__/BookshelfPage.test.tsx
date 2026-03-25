@@ -84,7 +84,7 @@ describe('BookshelfPage', () => {
       </MemoryRouter>
     );
 
-    expect(await screen.findByText('load failed')).toBeInTheDocument();
+    expect(await screen.findByText('bookshelf.loadError')).toBeInTheDocument();
     vi.mocked(libraryApi.list).mockResolvedValueOnce([]);
     await user.click(screen.getByRole('button', { name: 'bookshelf.tryAgain' }));
 

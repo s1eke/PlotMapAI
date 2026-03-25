@@ -6,6 +6,10 @@ import {
   storage,
 } from '@infra/storage';
 import {
+  AppErrorCode,
+  createAppError,
+} from '@shared/errors';
+import {
   DEFAULT_ANALYSIS_PROVIDER_ID,
   type AnalysisProviderId,
   buildRuntimeAnalysisConfig,
@@ -174,8 +178,24 @@ export const aiConfigApi = {
 
   exportAiConfig: async (password: string): Promise<string> => {
     const config = await getAiConfig();
-    if (!config) throw new Error('No AI config to export');
-    if (!password || password.length < 4) throw new Error('Password must be at least 4 characters');
+    if (!config) {
+      throw createAppError({
+        code: AppErrorCode.AI_CONFIG_EXPORT_MISSING,
+        kind: 'not-found',
+        source: 'settings',
+        userMessageKey: 'errors.AI_CONFIG_EXPORT_MISSING',
+        debugMessage: 'No AI config to export',
+      });
+    }
+    if (!password || password.length < 4) {
+      throw createAppError({
+        code: AppErrorCode.AI_CONFIG_PASSWORD_TOO_SHORT,
+        kind: 'validation',
+        source: 'settings',
+        userMessageKey: 'errors.AI_CONFIG_PASSWORD_TOO_SHORT',
+        debugMessage: 'Password must be at least 4 characters',
+      });
+    }
 
     const encoder = new TextEncoder();
     const salt = crypto.getRandomValues(new Uint8Array(16));
@@ -206,16 +226,36 @@ export const aiConfigApi = {
   },
 
   importAiConfig: async (file: File, password: string): Promise<void> => {
-    if (!password) throw new Error('Password is required');
+    if (!password) {
+      throw createAppError({
+        code: AppErrorCode.AI_CONFIG_PASSWORD_REQUIRED,
+        kind: 'validation',
+        source: 'settings',
+        userMessageKey: 'errors.AI_CONFIG_PASSWORD_REQUIRED',
+        debugMessage: 'Password is required',
+      });
+    }
     const text = await file.text();
     let envelope: { v: number; salt: string; iv: string; data: string };
     try {
       envelope = JSON.parse(text);
     } catch {
-      throw new Error('Invalid config file format');
+      throw createAppError({
+        code: AppErrorCode.AI_CONFIG_FILE_FORMAT_INVALID,
+        kind: 'validation',
+        source: 'settings',
+        userMessageKey: 'errors.AI_CONFIG_FILE_FORMAT_INVALID',
+        debugMessage: 'Invalid config file format',
+      });
     }
     if (envelope.v !== 1 || !envelope.salt || !envelope.iv || !envelope.data) {
-      throw new Error('Invalid config file structure');
+      throw createAppError({
+        code: AppErrorCode.AI_CONFIG_FILE_STRUCTURE_INVALID,
+        kind: 'validation',
+        source: 'settings',
+        userMessageKey: 'errors.AI_CONFIG_FILE_STRUCTURE_INVALID',
+        debugMessage: 'Invalid config file structure',
+      });
     }
 
     const decode64 = (value: string) => Uint8Array.from(atob(value), c => c.charCodeAt(0));
@@ -242,23 +282,47 @@ export const aiConfigApi = {
     try {
       plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ciphertext);
     } catch {
-      throw new Error('Decryption failed. Please check your password.');
+      throw createAppError({
+        code: AppErrorCode.AI_CONFIG_DECRYPT_FAILED,
+        kind: 'validation',
+        source: 'settings',
+        userMessageKey: 'errors.AI_CONFIG_DECRYPT_FAILED',
+        debugMessage: 'Decryption failed. Please check your password.',
+      });
     }
 
     let config: RuntimeAiConfig;
     try {
       config = JSON.parse(new TextDecoder().decode(plaintext)) as RuntimeAiConfig;
     } catch {
-      throw new Error('Decrypted data is not valid JSON');
+      throw createAppError({
+        code: AppErrorCode.AI_CONFIG_JSON_INVALID,
+        kind: 'validation',
+        source: 'settings',
+        userMessageKey: 'errors.AI_CONFIG_JSON_INVALID',
+        debugMessage: 'Decrypted data is not valid JSON',
+      });
     }
 
-    const runtimeConfig = buildRuntimeAnalysisConfig({
-      providerId: config.providerId,
-      apiBaseUrl: config.apiBaseUrl,
-      apiKey: config.apiKey,
-      modelName: config.modelName,
-      contextSize: config.contextSize,
-    });
+    let runtimeConfig;
+    try {
+      runtimeConfig = buildRuntimeAnalysisConfig({
+        providerId: config.providerId,
+        apiBaseUrl: config.apiBaseUrl,
+        apiKey: config.apiKey,
+        modelName: config.modelName,
+        contextSize: config.contextSize,
+      });
+    } catch (error) {
+      throw createAppError({
+        code: AppErrorCode.AI_CONFIG_MISSING_FIELDS,
+        kind: 'validation',
+        source: 'settings',
+        userMessageKey: 'errors.AI_CONFIG_MISSING_FIELDS',
+        debugMessage: 'Imported AI config is missing required fields',
+        cause: error,
+      });
+    }
     await setAiConfig({
       providerId: runtimeConfig.providerId,
       apiBaseUrl: runtimeConfig.providerConfig.apiBaseUrl,

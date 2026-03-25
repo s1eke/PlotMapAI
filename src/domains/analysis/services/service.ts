@@ -1,3 +1,4 @@
+import { AppErrorCode } from '@shared/errors';
 import type { ChapterAnalysis } from '@infra/db';
 import { resolveAnalysisProviderAdapter } from '../providers';
 import { ANALYSIS_RETRY_LIMIT, LLM_MAX_OUTPUT_TOKENS } from './constants';
@@ -68,7 +69,10 @@ export async function runOverviewAnalysis(
   totalChapters: number,
 ): Promise<OverviewAnalysisResult> {
   if (chapterRows.length < totalChapters) {
-    throw new AnalysisExecutionError('章节分析尚未全部完成，无法生成全书概览。');
+    throw new AnalysisExecutionError('章节分析尚未全部完成，无法生成全书概览。', {
+      code: AppErrorCode.CHAPTERS_INCOMPLETE,
+      userMessageKey: 'errors.CHAPTERS_INCOMPLETE',
+    });
   }
   const aggregates = collectAnalysisAggregates(chapterRows);
   const prompt = buildOverviewPrompt(novelTitle, aggregates, totalChapters, config.contextSize);
@@ -97,9 +101,16 @@ async function runAnalysisWithRetry<T>(taskName: string, operation: () => Promis
       if (!(err instanceof AnalysisExecutionError)) throw err;
       errors.push(`第 ${attempt} 次：${err.message}`);
       if (attempt >= ANALYSIS_RETRY_LIMIT) {
-        throw new AnalysisExecutionError(`${taskName}已重试 ${ANALYSIS_RETRY_LIMIT} 次仍失败。${errors.join('；')}`);
+        throw new AnalysisExecutionError(`${taskName}已重试 ${ANALYSIS_RETRY_LIMIT} 次仍失败。${errors.join('；')}`, {
+          code: AppErrorCode.ANALYSIS_EXECUTION_FAILED,
+          retryable: true,
+          userMessageKey: 'errors.ANALYSIS_EXECUTION_FAILED',
+        });
       }
     }
   }
-  throw new AnalysisExecutionError(`${taskName}执行失败。`);
+  throw new AnalysisExecutionError(`${taskName}执行失败。`, {
+    code: AppErrorCode.ANALYSIS_EXECUTION_FAILED,
+    userMessageKey: 'errors.ANALYSIS_EXECUTION_FAILED',
+  });
 }

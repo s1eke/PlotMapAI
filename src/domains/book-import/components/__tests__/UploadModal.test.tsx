@@ -77,7 +77,7 @@ describe('UploadModal', () => {
 
     await user.upload(getFileInput(), new File(['chapter 1'], 'novel.txt', { type: 'text/plain' }));
 
-    expect(await screen.findByText('upload failed')).toBeInTheDocument();
+    expect(await screen.findByText('bookshelf.uploadFailed')).toBeInTheDocument();
     expect(onSuccess).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
   });

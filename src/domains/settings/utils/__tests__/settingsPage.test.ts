@@ -1,11 +1,11 @@
+import { AppErrorCode, createAppError } from '@shared/errors';
 import type { TFunction } from 'i18next';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import {
   buildActionErrorMessage,
   downloadFile,
+  getTranslatedErrorMessage,
   groupPurificationRules,
-  mapAiExportError,
-  mapAiImportError,
 } from '../settingsPage';
 
 describe('settingsPage utilities', () => {
@@ -53,18 +53,36 @@ describe('settingsPage utilities', () => {
     ]);
   });
 
-  it('maps AI import and export errors to translated keys', () => {
+  it('translates structured AppError instances to translated keys', () => {
     const t = ((key: string) => key) as unknown as TFunction;
 
-    expect(mapAiExportError(new Error('No AI config to export'), t)).toBe('settings.ai.errorNoConfig');
-    expect(mapAiExportError(new Error('Password must be at least 4 characters'), t)).toBe('settings.ai.errorPasswordShort');
-    expect(mapAiImportError(new Error('Decryption failed'), t)).toBe('settings.ai.errorDecryptFailed');
-    expect(mapAiImportError(new Error('Invalid config file format'), t)).toBe('settings.ai.errorFileFormat');
+    expect(getTranslatedErrorMessage(createAppError({
+      code: AppErrorCode.AI_CONFIG_EXPORT_MISSING,
+      kind: 'not-found',
+      source: 'settings',
+      userMessageKey: 'errors.AI_CONFIG_EXPORT_MISSING',
+      debugMessage: 'No AI config to export',
+    }), t, 'settings.ai.errorExport')).toBe('errors.AI_CONFIG_EXPORT_MISSING');
+    expect(getTranslatedErrorMessage(createAppError({
+      code: AppErrorCode.AI_CONFIG_DECRYPT_FAILED,
+      kind: 'validation',
+      source: 'settings',
+      userMessageKey: 'errors.AI_CONFIG_DECRYPT_FAILED',
+      debugMessage: 'Decryption failed',
+    }), t, 'settings.ai.errorImport')).toBe('errors.AI_CONFIG_DECRYPT_FAILED');
   });
 
   it('builds prefixed action error messages', () => {
-    expect(buildActionErrorMessage('Failed', new Error('boom'))).toBe('Failed: boom');
-    expect(buildActionErrorMessage('Failed', '')).toBe('Failed');
+    const t = ((key: string) => key) as unknown as TFunction;
+
+    expect(buildActionErrorMessage('Failed', createAppError({
+      code: AppErrorCode.RULE_NOT_FOUND,
+      kind: 'not-found',
+      source: 'settings',
+      userMessageKey: 'errors.RULE_NOT_FOUND',
+      debugMessage: 'Rule not found',
+    }), t, 'settings.common.updateFailed')).toBe('Failed: errors.RULE_NOT_FOUND');
+    expect(buildActionErrorMessage('Failed', '', t, 'settings.common.updateFailed')).toBe('Failed: errors.INTERNAL_ERROR');
   });
 
   it('downloads a file through an object URL', () => {

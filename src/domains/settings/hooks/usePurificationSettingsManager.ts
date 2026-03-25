@@ -6,6 +6,7 @@ import type { PurificationRuleGroup, SettingsFeedbackState } from '../utils/sett
 import {
   buildActionErrorMessage,
   downloadFile,
+  getTranslatedErrorMessage,
   groupPurificationRules,
 } from '../utils/settingsPage';
 
@@ -59,7 +60,7 @@ export function usePurificationSettingsManager(): PurificationSettingsManager {
       console.error('Failed to load purification rules', error);
       setFeedback({
         type: 'error',
-        message: t('settings.common.loadFailed'),
+        message: getTranslatedErrorMessage(error, t, 'settings.common.loadFailed'),
       });
     } finally {
       setIsLoading(false);
@@ -106,7 +107,7 @@ export function usePurificationSettingsManager(): PurificationSettingsManager {
     } catch (error) {
       setFeedback({
         type: 'error',
-        message: buildActionErrorMessage(t('settings.common.updateFailed'), error),
+        message: buildActionErrorMessage(t('settings.common.updateFailed'), error, t, 'settings.common.updateFailed'),
       });
       throw error;
     }
@@ -121,7 +122,7 @@ export function usePurificationSettingsManager(): PurificationSettingsManager {
       setRules((previous) => previous.map((rule) => (rule.id === id ? { ...rule, isEnabled: !isEnabled } : rule)));
       setFeedback({
         type: 'error',
-        message: buildActionErrorMessage(t('settings.common.updateFailed'), error),
+        message: buildActionErrorMessage(t('settings.common.updateFailed'), error, t, 'settings.common.updateFailed'),
       });
     }
   }, [t]);
@@ -148,7 +149,7 @@ export function usePurificationSettingsManager(): PurificationSettingsManager {
     } catch (error) {
       setFeedback({
         type: 'error',
-        message: buildActionErrorMessage(t('settings.common.deleteFailed'), error),
+        message: buildActionErrorMessage(t('settings.common.deleteFailed'), error, t, 'settings.common.deleteFailed'),
       });
     }
   }, [pendingDeleteRule, t]);
@@ -175,7 +176,7 @@ export function usePurificationSettingsManager(): PurificationSettingsManager {
     } catch (error) {
       setFeedback({
         type: 'error',
-        message: buildActionErrorMessage(t('settings.common.deleteFailed'), error),
+        message: buildActionErrorMessage(t('settings.common.deleteFailed'), error, t, 'settings.common.deleteFailed'),
       });
     } finally {
       setIsClearingAll(false);
@@ -195,7 +196,7 @@ export function usePurificationSettingsManager(): PurificationSettingsManager {
     } catch (error) {
       setFeedback({
         type: 'error',
-        message: buildActionErrorMessage(t('settings.common.uploadFailed'), error),
+        message: buildActionErrorMessage(t('settings.common.uploadFailed'), error, t, 'settings.common.uploadFailed'),
       });
     } finally {
       setIsLoading(false);
@@ -213,7 +214,7 @@ export function usePurificationSettingsManager(): PurificationSettingsManager {
     } catch (error) {
       setFeedback({
         type: 'error',
-        message: buildActionErrorMessage(t('settings.common.exportFailed'), error),
+        message: buildActionErrorMessage(t('settings.common.exportFailed'), error, t, 'settings.common.exportFailed'),
       });
     }
   }, [t]);

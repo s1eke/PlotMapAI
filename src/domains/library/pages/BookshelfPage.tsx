@@ -2,6 +2,13 @@ import { lazy, Suspense, useState, useEffect, useCallback } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { loadUploadModal } from '@domains/book-import';
+import { reportAppError } from '@app/debug/service';
+import {
+  AppErrorCode,
+  toAppError,
+  translateAppError,
+  type AppError,
+} from '@shared/errors';
 
 import { libraryApi } from '../api/libraryApi';
 import type { NovelView } from '../api/libraryApi';
@@ -13,7 +20,7 @@ export default function BookshelfPage() {
   const { t } = useTranslation();
   const [novels, setNovels] = useState<NovelView[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<AppError | null>(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
   const fetchNovels = useCallback(async () => {
@@ -23,11 +30,18 @@ export default function BookshelfPage() {
       const data = await libraryApi.list();
       setNovels(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('bookshelf.loadError'));
+      const normalized = toAppError(err, {
+        code: AppErrorCode.STORAGE_OPERATION_FAILED,
+        kind: 'storage',
+        source: 'library',
+        userMessageKey: 'bookshelf.loadError',
+      });
+      reportAppError(normalized);
+      setError(normalized);
     } finally {
       setIsLoading(false);
     }
-  }, [t]);
+  }, []);
 
   useEffect(() => {
     fetchNovels();
@@ -54,7 +68,9 @@ export default function BookshelfPage() {
         </div>
       ) : error ? (
         <div className="flex-1 flex flex-col items-center justify-center text-center p-8 bg-brand-800/20 rounded-2xl border border-white/5">
-          <p className="text-red-400 mb-4">{error}</p>
+          <p className="text-red-400 mb-4">
+            {translateAppError(error, t, 'bookshelf.loadError')}
+          </p>
           <button 
             onClick={fetchNovels}
             className="text-accent hover:text-accent-hover underline underline-offset-4"

@@ -1,3 +1,9 @@
+import {
+  AppErrorCode,
+  deserializeAppError,
+  isSerializedAppError,
+  toAppError,
+} from '@shared/errors';
 import type { WorkerTaskMessage, WorkerTaskResponse } from './protocol';
 
 export interface WorkerTaskOptions<Progress> {
@@ -105,9 +111,16 @@ export function createWorkerTaskRunner<Payload, Result, Progress>({
         return;
       }
 
-      const error = new Error(message.error.message);
-      error.name = message.error.name || 'Error';
-      current.reject(error);
+      current.reject(
+        isSerializedAppError(message.error)
+          ? deserializeAppError(message.error)
+          : toAppError(message.error, {
+            code: AppErrorCode.WORKER_EXECUTION_FAILED,
+            kind: 'execution',
+            source: 'worker',
+            userMessageKey: 'errors.WORKER_EXECUTION_FAILED',
+          }),
+      );
     });
 
     worker.addEventListener('error', (event) => {
@@ -120,7 +133,12 @@ export function createWorkerTaskRunner<Payload, Result, Progress>({
       const error = event.error instanceof Error
         ? event.error
         : new Error(event.message || 'Worker execution failed.');
-      rejectAllPending(error);
+      rejectAllPending(toAppError(error, {
+        code: AppErrorCode.WORKER_EXECUTION_FAILED,
+        kind: 'execution',
+        source: 'worker',
+        userMessageKey: 'errors.WORKER_EXECUTION_FAILED',
+      }));
     });
 
     return worker;
@@ -180,7 +198,14 @@ export function createWorkerTaskRunner<Payload, Result, Progress>({
         Promise.resolve()
           .then(() => fallback(payload, options))
           .then(resolve)
-          .catch(reject);
+          .catch((error) => {
+            reject(toAppError(error, {
+              code: AppErrorCode.WORKER_EXECUTION_FAILED,
+              kind: 'execution',
+              source: 'worker',
+              userMessageKey: 'errors.WORKER_EXECUTION_FAILED',
+            }));
+          });
       }
     });
   };

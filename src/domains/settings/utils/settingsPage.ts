@@ -1,3 +1,4 @@
+import { translateAppError } from '@shared/errors';
 import type { TFunction } from 'i18next';
 import type { PurificationRule } from '../api/types';
 
@@ -23,16 +24,20 @@ export function downloadFile(content: string, filename: string, mimeType: string
   URL.revokeObjectURL(url);
 }
 
-export function getErrorMessage(error: unknown): string {
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-
-  return String(error);
+export function getTranslatedErrorMessage(error: unknown, t: TFunction, fallbackKey: string): string {
+  return translateAppError(error, t, fallbackKey, {
+    kind: 'execution',
+    source: 'settings',
+  });
 }
 
-export function buildActionErrorMessage(prefix: string, error: unknown): string {
-  const detail = error instanceof Error && error.message ? error.message : '';
+export function buildActionErrorMessage(
+  prefix: string,
+  error: unknown,
+  t: TFunction,
+  fallbackKey: string,
+): string {
+  const detail = getTranslatedErrorMessage(error, t, fallbackKey);
   return detail ? `${prefix}: ${detail}` : prefix;
 }
 
@@ -57,26 +62,4 @@ export function groupPurificationRules(
     name,
     rules: groupedRules,
   }));
-}
-
-export function mapAiExportError(error: unknown, t: TFunction): string {
-  const message = getErrorMessage(error);
-
-  if (message.includes('No AI config')) return t('settings.ai.errorNoConfig');
-  if (message.includes('at least 4')) return t('settings.ai.errorPasswordShort');
-
-  return t('settings.ai.errorExport');
-}
-
-export function mapAiImportError(error: unknown, t: TFunction): string {
-  const message = getErrorMessage(error);
-
-  if (message.includes('Password is required')) return t('settings.ai.errorPasswordRequired');
-  if (message.includes('Invalid config file format')) return t('settings.ai.errorFileFormat');
-  if (message.includes('Invalid config file structure')) return t('settings.ai.errorFileStructure');
-  if (message.includes('Decryption failed')) return t('settings.ai.errorDecryptFailed');
-  if (message.includes('not valid JSON')) return t('settings.ai.errorInvalidJson');
-  if (message.includes('missing required fields')) return t('settings.ai.errorMissingFields');
-
-  return t('settings.ai.errorImport');
 }

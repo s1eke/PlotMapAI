@@ -1,6 +1,6 @@
+import { AppErrorCode } from '@shared/errors';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { LLM_TIMEOUT_MS } from '../../services/constants';
-import { AnalysisExecutionError } from '../../services/errors';
 import { resolveAnalysisProviderAdapter } from '../registry';
 import { DEFAULT_ANALYSIS_PROVIDER_ID } from '../types';
 
@@ -68,9 +68,11 @@ describe('openai-compatible provider adapter', () => {
     ));
 
     const adapter = resolveAnalysisProviderAdapter(DEFAULT_ANALYSIS_PROVIDER_ID);
-    await expect(adapter.generateText(CONFIG, REQUEST)).rejects.toThrow(
-      new AnalysisExecutionError('AI 接口返回错误（HTTP 401）：bad api key'),
-    );
+    await expect(adapter.generateText(CONFIG, REQUEST)).rejects.toMatchObject({
+      code: AppErrorCode.AI_RESPONSE_HTTP_ERROR,
+      message: 'AI 接口返回错误（HTTP 401）：bad api key',
+      userMessageKey: 'errors.AI_RESPONSE_HTTP_ERROR',
+    });
   });
 
   it('maps timeouts to a user-facing timeout error', async () => {
@@ -83,9 +85,12 @@ describe('openai-compatible provider adapter', () => {
     }));
 
     const adapter = resolveAnalysisProviderAdapter(DEFAULT_ANALYSIS_PROVIDER_ID);
-    const expectation = expect(adapter.generateText(CONFIG, REQUEST)).rejects.toThrow(
-      new AnalysisExecutionError('AI 接口请求超时，请稍后重试。'),
-    );
+    const expectation = expect(adapter.generateText(CONFIG, REQUEST)).rejects.toMatchObject({
+      code: AppErrorCode.AI_REQUEST_TIMEOUT,
+      message: 'AI 接口请求超时，请稍后重试。',
+      retryable: true,
+      userMessageKey: 'errors.AI_REQUEST_TIMEOUT',
+    });
 
     await vi.advanceTimersByTimeAsync(LLM_TIMEOUT_MS + 1);
     await expectation;

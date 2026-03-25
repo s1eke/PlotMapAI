@@ -1,5 +1,6 @@
 import { db } from '@infra/db';
 import { debugLog } from '@app/debug/service';
+import { AppErrorCode, createAppError } from '@shared/errors';
 import { dumpYaml, loadYaml } from '../services/yaml';
 import type { TocRule } from './types';
 
@@ -48,14 +49,38 @@ export const tocRulesApi = {
     if (data.priority !== undefined) updates.serialNumber = data.priority;
     await db.tocRules.update(id, updates);
     const rule = await db.tocRules.get(id);
-    if (!rule) throw new Error('Rule not found');
+    if (!rule) {
+      throw createAppError({
+        code: AppErrorCode.RULE_NOT_FOUND,
+        kind: 'not-found',
+        source: 'settings',
+        userMessageKey: 'errors.RULE_NOT_FOUND',
+        debugMessage: 'Rule not found',
+      });
+    }
     return tocRuleToApi(rule);
   },
 
   deleteTocRule: async (id: number): Promise<{ message: string }> => {
     const rule = await db.tocRules.get(id);
-    if (!rule) throw new Error('Rule not found');
-    if (rule.isDefault) throw new Error('Cannot delete default rules');
+    if (!rule) {
+      throw createAppError({
+        code: AppErrorCode.RULE_NOT_FOUND,
+        kind: 'not-found',
+        source: 'settings',
+        userMessageKey: 'errors.RULE_NOT_FOUND',
+        debugMessage: 'Rule not found',
+      });
+    }
+    if (rule.isDefault) {
+      throw createAppError({
+        code: AppErrorCode.CANNOT_DELETE_DEFAULT_RULE,
+        kind: 'conflict',
+        source: 'settings',
+        userMessageKey: 'errors.CANNOT_DELETE_DEFAULT_RULE',
+        debugMessage: 'Cannot delete default rules',
+      });
+    }
     await db.tocRules.delete(id);
     return { message: 'Rule deleted' };
   },
@@ -69,9 +94,24 @@ export const tocRulesApi = {
         ? parsed
         : ((parsed as Record<string, unknown>)?.rules as Array<Record<string, unknown>>) || [];
     } catch (error) {
-      throw new Error(`Invalid YAML file: ${error instanceof Error ? error.message : String(error)}`);
+      throw createAppError({
+        code: AppErrorCode.INVALID_YAML_FILE,
+        kind: 'validation',
+        source: 'settings',
+        userMessageKey: 'errors.INVALID_YAML_FILE',
+        debugMessage: `Invalid YAML file: ${error instanceof Error ? error.message : String(error)}`,
+        cause: error,
+      });
     }
-    if (!Array.isArray(rules)) throw new Error('Rules must be a YAML array');
+    if (!Array.isArray(rules)) {
+      throw createAppError({
+        code: AppErrorCode.YAML_RULES_ARRAY_REQUIRED,
+        kind: 'validation',
+        source: 'settings',
+        userMessageKey: 'errors.YAML_RULES_ARRAY_REQUIRED',
+        debugMessage: 'Rules must be a YAML array',
+      });
+    }
 
     const existing = await db.tocRules.toArray();
     const existingRules = new Set(existing.map(rule => rule.rule));

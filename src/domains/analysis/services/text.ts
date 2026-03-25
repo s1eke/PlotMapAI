@@ -1,3 +1,4 @@
+import { AppErrorCode } from '@shared/errors';
 import { AnalysisConfigError } from './errors';
 
 export function cleanText(value: unknown, maxLength?: number): string {
@@ -10,7 +11,12 @@ export function cleanText(value: unknown, maxLength?: number): string {
 
 export function coerceContextSize(value: unknown, defaultVal: number): number {
   const contextSize = Number(value);
-  if (!Number.isFinite(contextSize)) throw new AnalysisConfigError('上下文大小必须是整数。');
+  if (!Number.isFinite(contextSize)) {
+    throw new AnalysisConfigError('上下文大小必须是整数。', {
+      code: AppErrorCode.AI_CONTEXT_SIZE_INVALID,
+      userMessageKey: 'errors.AI_CONTEXT_SIZE_INVALID',
+    });
+  }
   return contextSize || defaultVal;
 }
 

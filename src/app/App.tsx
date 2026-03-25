@@ -10,6 +10,7 @@ import InstallPrompt from './components/InstallPrompt';
 import ReloadPrompt from './components/ReloadPrompt';
 import { isDebugMode, registerDebugHelpers } from './debug/service';
 import DebugPanel from './debug/DebugPanel';
+import { AppErrorBoundary, registerGlobalErrorHandlers } from './errors';
 import Layout from './layout/Layout';
 import { ThemeProvider } from './providers/ThemeContext';
 import { appPaths } from './router/paths';
@@ -37,20 +38,26 @@ function App() {
     return registerDebugHelpers();
   }, []);
 
+  useEffect(() => {
+    return registerGlobalErrorHandlers();
+  }, []);
+
   return (
     <ThemeProvider>
       <Router>
-        <Layout>
-          <Suspense fallback={<RouteFallback />}>
-            <Routes>
-              <Route path={appPaths.bookshelf()} element={<LazyBookshelfPage />} />
-              <Route path="/novel/:id" element={<LazyBookDetailPage />} />
-              <Route path="/novel/:id/read" element={<LazyReaderPage />} />
-              <Route path="/novel/:id/graph" element={<LazyCharacterGraphPage />} />
-              <Route path={appPaths.settings()} element={<LazySettingsPage />} />
-            </Routes>
-          </Suspense>
-        </Layout>
+        <AppErrorBoundary>
+          <Layout>
+            <Suspense fallback={<RouteFallback />}>
+              <Routes>
+                <Route path={appPaths.bookshelf()} element={<LazyBookshelfPage />} />
+                <Route path="/novel/:id" element={<LazyBookDetailPage />} />
+                <Route path="/novel/:id/read" element={<LazyReaderPage />} />
+                <Route path="/novel/:id/graph" element={<LazyCharacterGraphPage />} />
+                <Route path={appPaths.settings()} element={<LazySettingsPage />} />
+              </Routes>
+            </Suspense>
+          </Layout>
+        </AppErrorBoundary>
       </Router>
       {isDebugMode() && <DebugPanel />}
       <InstallPrompt />

@@ -9,26 +9,36 @@ import {
   triggerDebugIosInstallHint,
   triggerDebugUpdateToast,
   triggerDebugResetPwaPrompts,
-  type LogEntry,
+  type DebugEntry,
 } from './service';
 
 import { cn } from '@shared/utils/cn';
 
 const CATEGORY_COLORS: Record<string, string> = {
   Reader: 'text-green-400',
+  reader: 'text-green-400',
   Purify: 'text-yellow-400',
   TXT: 'text-blue-400',
   ChapterDetect: 'text-cyan-400',
   Upload: 'text-purple-400',
+  'book-import': 'text-purple-400',
   Settings: 'text-orange-400',
+  settings: 'text-orange-400',
   AI: 'text-pink-400',
   Analysis: 'text-red-400',
+  analysis: 'text-red-400',
   PWA: 'text-sky-400',
+  app: 'text-sky-400',
+  library: 'text-amber-400',
+  storage: 'text-rose-400',
+  worker: 'text-indigo-400',
+  'character-graph': 'text-cyan-300',
 };
 
 export default function DebugPanel() {
   const [isOpen, setIsOpen] = useState(false);
-  const [logs, setLogs] = useState<LogEntry[]>(() => getRecentLogs());
+  const [logs, setLogs] = useState<DebugEntry[]>(() => getRecentLogs());
+  const [filter, setFilter] = useState<'all' | 'errors' | 'logs'>('all');
   const listRef = useRef<HTMLDivElement>(null);
   const autoScrollRef = useRef(true);
 
@@ -58,6 +68,12 @@ export default function DebugPanel() {
     clearLogs();
     setLogs([]);
   }, []);
+
+  const visibleLogs = logs.filter((entry) => {
+    if (filter === 'errors') return entry.kind === 'error';
+    if (filter === 'logs') return entry.kind === 'log';
+    return true;
+  });
 
   const formatTime = (ts: number) => {
     const d = new Date(ts);
@@ -100,6 +116,38 @@ export default function DebugPanel() {
           </button>
         </div>
       </div>
+      <div className="flex items-center gap-2 border-b border-border-color/50 px-3 py-2">
+        <button
+          type="button"
+          onClick={() => setFilter('all')}
+          className={cn(
+            'rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors',
+            filter === 'all' ? 'bg-accent text-white' : 'bg-white/5 text-text-secondary hover:bg-white/10',
+          )}
+        >
+          All
+        </button>
+        <button
+          type="button"
+          onClick={() => setFilter('errors')}
+          className={cn(
+            'rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors',
+            filter === 'errors' ? 'bg-red-500 text-white' : 'bg-white/5 text-text-secondary hover:bg-white/10',
+          )}
+        >
+          Errors
+        </button>
+        <button
+          type="button"
+          onClick={() => setFilter('logs')}
+          className={cn(
+            'rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors',
+            filter === 'logs' ? 'bg-brand-700 text-white' : 'bg-white/5 text-text-secondary hover:bg-white/10',
+          )}
+        >
+          Logs
+        </button>
+      </div>
       <div className="grid grid-cols-2 gap-2 border-b border-border-color/50 p-2">
         <button
           onClick={() => window.history.back()}
@@ -138,16 +186,50 @@ export default function DebugPanel() {
         </button>
       </div>
       <div ref={listRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-2 space-y-0.5 text-[11px] font-mono leading-relaxed custom-scrollbar">
-        {logs.length === 0 && (
+        {visibleLogs.length === 0 && (
           <div className="text-text-secondary text-center py-8">No logs yet</div>
         )}
-        {logs.map((entry, i) => (
-          <div key={i} className="flex gap-1.5">
-            <span className="text-text-secondary/60 shrink-0">{formatTime(entry.time)}</span>
-            <span className={cn("shrink-0 font-semibold", CATEGORY_COLORS[entry.category] || 'text-text-secondary')}>
-              [{entry.category}]
-            </span>
-            <span className="text-text-primary/80 break-all">{entry.message}</span>
+        {visibleLogs.map((entry, i) => (
+          <div key={i} className="rounded-lg border border-white/5 bg-black/10 px-2 py-1.5">
+            <div className="flex gap-1.5">
+              <span className="text-text-secondary/60 shrink-0">{formatTime(entry.time)}</span>
+              <span className={cn("shrink-0 font-semibold", CATEGORY_COLORS[entry.category] || 'text-text-secondary')}>
+                [{entry.category}]
+              </span>
+              <span className={cn(
+                'shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                entry.kind === 'error' ? 'bg-red-500/20 text-red-300' : 'bg-white/10 text-text-secondary',
+              )}
+              >
+                {entry.kind}
+              </span>
+              <span className="text-text-primary/80 break-all">{entry.message}</span>
+            </div>
+
+            {entry.kind === 'error' && (
+              <details className="mt-2 rounded bg-black/15 p-2 text-[10px] text-text-secondary">
+                <summary className="cursor-pointer select-none font-semibold text-text-primary/85">
+                  {entry.error.code} · {entry.error.kind} · retryable={String(entry.error.retryable)}
+                </summary>
+                <div className="mt-2 space-y-1 break-all">
+                  <div>source: {entry.error.source}</div>
+                  <div>userVisible: {String(entry.error.userVisible)}</div>
+                  <div>debugVisible: {String(entry.error.debugVisible)}</div>
+                  {entry.error.userMessageKey && <div>messageKey: {entry.error.userMessageKey}</div>}
+                  {entry.error.details && (
+                    <pre className="whitespace-pre-wrap text-[10px] text-text-secondary/90">
+                      {JSON.stringify(entry.error.details, null, 2)}
+                    </pre>
+                  )}
+                  {entry.error.cause?.message && <div>cause: {entry.error.cause.message}</div>}
+                  {entry.error.stack && (
+                    <pre className="max-h-48 overflow-auto whitespace-pre-wrap text-[10px] text-text-secondary/90">
+                      {entry.error.stack}
+                    </pre>
+                  )}
+                </div>
+              </details>
+            )}
           </div>
         ))}
       </div>
