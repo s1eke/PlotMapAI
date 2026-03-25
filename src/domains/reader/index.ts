@@ -5,5 +5,6 @@ export {
   ensureSessionPreferencesHydrated,
   setAppTheme,
   useReaderSessionSelector,
+  resetReaderSessionStoreForTests,
 } from './hooks/sessionStore';
 export type { AppTheme } from './hooks/sessionStore';
