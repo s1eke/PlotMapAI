@@ -3,7 +3,7 @@ export const appPaths = {
     return '/';
   },
   settings(): string {
-    return '@domains/settings';
+    return '/settings';
   },
   novel(id: number): string {
     return `/novel/${id}`;

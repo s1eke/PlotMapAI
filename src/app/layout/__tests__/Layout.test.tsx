@@ -29,7 +29,7 @@ describe('Layout component', () => {
     );
 
     expect(screen.getByRole('link', { name: 'common.appName' })).toHaveAttribute('href', '/');
-    expect(screen.getByTitle('common.nav.settings')).toHaveAttribute('href', '/@domains/settings');
+    expect(screen.getByTitle('common.nav.settings')).toHaveAttribute('href', '/settings');
     expect(screen.getByTestId('theme-toggle')).toBeInTheDocument();
     expect(screen.getByTestId('language-switcher')).toBeInTheDocument();
   });
