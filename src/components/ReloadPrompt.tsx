@@ -2,13 +2,13 @@ import { Loader2, RefreshCw, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { useTranslation } from 'react-i18next';
+import { CACHE_KEYS, storage } from '../infra/storage';
 import {
   DEBUG_RESET_PWA_PROMPTS_EVENT,
   DEBUG_SHOW_UPDATE_TOAST_EVENT,
   debugLog,
 } from '../services/debug';
 
-const UPDATE_PROMPT_DISMISS_KEY = 'plotmapai_update_prompt_dismissed';
 const UPDATE_PROMPT_COOLDOWN_MS = 12 * 60 * 60 * 1000;
 
 interface UpdatePromptDismissState {
@@ -17,18 +17,8 @@ interface UpdatePromptDismissState {
 }
 
 function isUpdatePromptDismissed(): boolean {
-  const raw = localStorage.getItem(UPDATE_PROMPT_DISMISS_KEY);
-
-  if (!raw) {
-    return false;
-  }
-
-  let parsed: UpdatePromptDismissState | null = null;
-
-  try {
-    parsed = JSON.parse(raw) as UpdatePromptDismissState;
-  } catch {
-    localStorage.removeItem(UPDATE_PROMPT_DISMISS_KEY);
+  const parsed = storage.cache.getJson<UpdatePromptDismissState>(CACHE_KEYS.updatePromptDismissed);
+  if (!parsed) {
     return false;
   }
 
@@ -37,7 +27,7 @@ function isUpdatePromptDismissed(): boolean {
     !Number.isFinite(parsed.dismissedAt) ||
     Date.now() - parsed.dismissedAt >= UPDATE_PROMPT_COOLDOWN_MS
   ) {
-    localStorage.removeItem(UPDATE_PROMPT_DISMISS_KEY);
+    storage.cache.remove(CACHE_KEYS.updatePromptDismissed);
     return false;
   }
 
@@ -50,11 +40,11 @@ function rememberUpdatePromptDismissal(): void {
     dismissedAt: Date.now(),
   };
 
-  localStorage.setItem(UPDATE_PROMPT_DISMISS_KEY, JSON.stringify(value));
+  storage.cache.set(CACHE_KEYS.updatePromptDismissed, value);
 }
 
 function clearUpdatePromptDismissal(): void {
-  localStorage.removeItem(UPDATE_PROMPT_DISMISS_KEY);
+  storage.cache.remove(CACHE_KEYS.updatePromptDismissed);
 }
 
 export default function ReloadPrompt() {

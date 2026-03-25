@@ -58,7 +58,7 @@ const baseNovel = {
   originalFilename: 'test.txt',
   originalEncoding: 'utf-8',
   totalWords: 1000,
-  chapter_count: 6,
+  chapterCount: 6,
   createdAt: new Date().toISOString(),
 };
 

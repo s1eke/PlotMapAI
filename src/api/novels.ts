@@ -1,7 +1,7 @@
 import { db, ensureDefaultTocRules } from '../services/db';
 import { debugLog } from '../services/debug';
 
-export interface Novel {
+export interface NovelView {
   id: number;
   title: string;
   author: string;
@@ -12,11 +12,11 @@ export interface Novel {
   originalFilename: string;
   originalEncoding: string;
   totalWords: number;
-  chapter_count?: number;
+  chapterCount?: number;
   createdAt: string;
 }
 
-function novelToApi(novel: import('../services/db').Novel, chapterCount: number): Novel {
+function novelToApi(novel: import('../services/db').Novel, chapterCount: number): NovelView {
   return {
     id: novel.id,
     title: novel.title,
@@ -29,7 +29,7 @@ function novelToApi(novel: import('../services/db').Novel, chapterCount: number)
     originalEncoding: novel.originalEncoding,
     totalWords: novel.totalWords,
     createdAt: novel.createdAt,
-    chapter_count: chapterCount,
+    chapterCount,
   };
 }
 
@@ -39,17 +39,19 @@ async function getNextId(): Promise<number> {
 }
 
 export const novelsApi = {
-  list: async (): Promise<Novel[]> => {
-    const novels = await db.novels.orderBy('createdAt').reverse().toArray();
-    const result: Novel[] = [];
-    for (const novel of novels) {
-      const count = await db.chapters.where('novelId').equals(novel.id).count();
-      result.push(novelToApi(novel, count));
+  list: async (): Promise<NovelView[]> => {
+    const [novels, chapters] = await Promise.all([
+      db.novels.orderBy('createdAt').reverse().toArray(),
+      db.chapters.toArray(),
+    ]);
+    const countMap = new Map<number, number>();
+    for (const ch of chapters) {
+      countMap.set(ch.novelId, (countMap.get(ch.novelId) ?? 0) + 1);
     }
-    return result;
+    return novels.map(novel => novelToApi(novel, countMap.get(novel.id) ?? 0));
   },
 
-  get: async (id: number): Promise<Novel> => {
+  get: async (id: number): Promise<NovelView> => {
     const novel = await db.novels.get(id);
     if (!novel) throw new Error('Novel not found');
     const count = await db.chapters.where('novelId').equals(id).count();
@@ -72,7 +74,7 @@ export const novelsApi = {
     return { message: 'Novel deleted' };
   },
 
-  upload: async (file: File): Promise<Novel> => {
+  upload: async (file: File): Promise<NovelView> => {
     const filename = file.name;
     const ext = filename.toLowerCase().split('.').pop();
     if (ext !== 'txt' && ext !== 'epub') {
@@ -112,23 +114,21 @@ export const novelsApi = {
           blob: parsed.coverBlob,
         });
       }
-      for (let i = 0; i < parsed.chapters.length; i++) {
-        await db.chapters.add({
-          id: undefined as unknown as number,
-          novelId: id,
-          title: parsed.chapters[i].title,
-          content: parsed.chapters[i].content,
-          chapterIndex: i,
-          wordCount: parsed.chapters[i].content.length,
-        });
-      }
-      for (const img of parsed.images) {
-        await db.chapterImages.add({
+      await db.chapters.bulkAdd(parsed.chapters.map((ch, i) => ({
+        id: undefined as unknown as number,
+        novelId: id,
+        title: ch.title,
+        content: ch.content,
+        chapterIndex: i,
+        wordCount: ch.content.length,
+      })));
+      if (parsed.images.length > 0) {
+        await db.chapterImages.bulkAdd(parsed.images.map(img => ({
           id: undefined as unknown as number,
           novelId: id,
           imageKey: img.imageKey,
           blob: img.blob,
-        });
+        })));
       }
     });
 

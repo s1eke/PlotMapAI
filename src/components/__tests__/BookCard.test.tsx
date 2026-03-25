@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import BookCard from '../BookCard';
-import type { Novel } from '../../api/novels';
+import type { NovelView } from '../../api/novels';
 import { novelsApi } from '../../api/novels';
 
 vi.mock('react-i18next', () => ({
@@ -19,7 +19,7 @@ vi.mock('../TxtCover', () => ({
   default: ({ title }: { title: string }) => <div data-testid="txt-cover">{title}</div>,
 }));
 
-const mockNovel: Novel = {
+const mockNovel: NovelView = {
   id: 1,
   title: 'Test Novel',
   author: 'Test Author',
@@ -30,7 +30,7 @@ const mockNovel: Novel = {
   originalFilename: 'test.txt',
   originalEncoding: 'utf-8',
   totalWords: 5000,
-  chapter_count: 10,
+  chapterCount: 10,
   createdAt: new Date().toISOString(),
 };
 

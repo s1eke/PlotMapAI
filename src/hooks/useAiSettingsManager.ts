@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { settingsApi } from '../api/settings';
+import { aiConfigApi } from '../api/settings/aiConfig';
 import type {
   AiProviderSettings,
   AiProviderSettingsPayload,
-} from '../api/settings';
+} from '../api/settings/types';
 import type { SettingsFeedbackState } from '../utils/settingsPage';
 import {
   downloadFile,
@@ -85,7 +85,7 @@ export function useAiSettingsManager(): AiSettingsManager {
   const loadSettings = useCallback(async () => {
     setIsLoading(true);
     try {
-      const data = await settingsApi.getAiProviderSettings();
+      const data = await aiConfigApi.getAiProviderSettings();
       setSettings(data);
       syncForm(data);
     } catch (error) {
@@ -128,7 +128,7 @@ export function useAiSettingsManager(): AiSettingsManager {
     setFeedback(null);
 
     try {
-      const data = await settingsApi.updateAiProviderSettings(buildPayload());
+      const data = await aiConfigApi.updateAiProviderSettings(buildPayload());
       setSettings(data);
       syncForm(data);
       setFeedback({
@@ -150,7 +150,7 @@ export function useAiSettingsManager(): AiSettingsManager {
     setFeedback(null);
 
     try {
-      const result = await settingsApi.testAiProviderSettings(buildPayload());
+      const result = await aiConfigApi.testAiProviderSettings(buildPayload());
       const preview = result.preview
         ? ` ${t('settings.ai.testPreviewPrefix', { preview: result.preview })}`
         : '';
@@ -198,7 +198,7 @@ export function useAiSettingsManager(): AiSettingsManager {
     setIsExporting(true);
 
     try {
-      const content = await settingsApi.exportAiConfig(exportPassword);
+      const content = await aiConfigApi.exportAiConfig(exportPassword);
       downloadFile(content, 'plotmapai-ai-config.enc', 'application/octet-stream');
       closeExportModal();
       setFeedback({
@@ -248,7 +248,7 @@ export function useAiSettingsManager(): AiSettingsManager {
     setIsImporting(true);
 
     try {
-      await settingsApi.importAiConfig(pendingImportFile, importPassword);
+      await aiConfigApi.importAiConfig(pendingImportFile, importPassword);
       closeImportModal();
       setFeedback({
         type: 'success',

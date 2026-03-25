@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { StoredReaderState } from './useReaderStatePersistence';
 import { getPageIndexFromProgress } from '../utils/readerPosition';
 
@@ -49,6 +49,7 @@ export function usePagedReaderLayout({
   fontSize,
   lineSpacing,
 }: UsePagedReaderLayoutParams): UsePagedReaderLayoutResult {
+  const prevChapterIndexRef = useRef(chapterIndex);
   const [pagedViewportSize, setPagedViewportSize] = useState({ width: 0, height: 0 });
 
   const twoColumnWidth = pagedViewportSize.width
@@ -135,6 +136,14 @@ export function usePagedReaderLayout({
     setPageIndex,
     stopRestoreMask,
   ]);
+
+  // Reset pageIndex to 0 when chapter changes to prevent using old chapter's pageIndex
+  useLayoutEffect(() => {
+    if (prevChapterIndexRef.current !== chapterIndex) {
+      prevChapterIndexRef.current = chapterIndex;
+      setPageIndex(0);
+    }
+  }, [chapterIndex, setPageIndex]);
 
   useLayoutEffect(() => {
     if (!isPagedMode || !pagedViewportRef.current || !pageTurnStep) return;

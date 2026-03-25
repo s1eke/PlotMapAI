@@ -13,7 +13,7 @@ export const handlers = [
     originalFilename: 'mock.epub',
     originalEncoding: 'utf-8',
     totalWords: 12345,
-    chapter_count: 2,
+    chapterCount: 2,
     createdAt: '2026-03-18T00:00:00Z',
   })),
   http.get('/api/novels/:id/analysis/status', () => HttpResponse.json({

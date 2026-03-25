@@ -115,7 +115,7 @@ describe('BookshelfPage', () => {
         originalFilename: 'uploaded.txt',
         originalEncoding: 'utf-8',
         totalWords: 1200,
-        chapter_count: 4,
+        chapterCount: 4,
         createdAt: new Date().toISOString(),
       },
     ]);

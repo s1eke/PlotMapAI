@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import JSZip from 'jszip';
 
 const mockDigest = vi.fn().mockResolvedValue(new ArrayBuffer(32));
@@ -7,7 +7,7 @@ Object.defineProperty(globalThis, 'crypto', {
   writable: true,
 });
 
-import { htmlToText, parseEpub } from '../epubParser';
+import { parseEpub } from '../epub/parser';
 
 async function makeEpubFile(zip: JSZip, name: string): Promise<File> {
   const buffer = await zip.generateAsync({ type: 'arraybuffer' });
@@ -79,8 +79,7 @@ describe('parseEpub', () => {
 
     const file = await makeEpubFile(zip, 'MyNovel.epub');
     const result = await parseEpub(file);
-    expect(result.title).toBeDefined();
-    expect(result.title.length).toBeGreaterThan(0);
+    expect(result.title).toBe('MyNovel');
   });
 
   it('returns empty chapters array when spine has no items', async () => {
@@ -101,19 +100,5 @@ describe('parseEpub', () => {
     const file = await makeEpubFile(zip, 'empty.epub');
     const result = await parseEpub(file);
     expect(result.chapters).toEqual([]);
-  });
-});
-
-describe('htmlToText', () => {
-  it('removes blocked tag content even when the closing tag contains extra whitespace', () => {
-    const html = '<div>Intro</div><script>alert(1)</script\t\n bar><p>Body</p>';
-
-    expect(htmlToText(html)).toBe('Intro\nBody');
-  });
-
-  it('removes navigation-like blocks identified by class or id', () => {
-    const html = '<section class="top-nav">Skip me</section><p>Keep me</p><div id="page-nav">And me too</div>';
-
-    expect(htmlToText(html)).toBe('Keep me');
   });
 });

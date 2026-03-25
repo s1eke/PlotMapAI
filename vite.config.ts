@@ -6,7 +6,12 @@ import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
 const pkg = JSON.parse(readFileSync('./package.json', 'utf-8'))
-const shortHash = execSync('git rev-parse --short HEAD').toString().trim()
+let shortHash = 'unknown'
+try {
+  shortHash = execSync('git rev-parse --short HEAD').toString().trim()
+} catch {
+  // git not available (e.g. shallow clone, npm publish, Docker build)
+}
 
 const base = process.env.VITE_BASE || '/'
 

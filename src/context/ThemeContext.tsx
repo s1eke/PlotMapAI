@@ -1,38 +1,35 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
-
-type Theme = 'light' | 'dark';
+import { createContext, useContext, useEffect, useMemo, type ReactNode } from 'react';
+import {
+  ensureSessionPreferencesHydrated,
+  setAppTheme,
+  useReaderSessionSelector,
+  type AppTheme,
+} from '../hooks/sessionStore';
 
 interface ThemeContextType {
-  theme: Theme;
+  theme: AppTheme;
   toggleTheme: () => void;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<Theme>(() => {
-    const saved = localStorage.getItem('theme');
-    if (saved === 'dark' || saved === 'light') return saved as Theme;
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  });
+  const theme = useReaderSessionSelector(state => state.appTheme);
 
   useEffect(() => {
-    const root = window.document.documentElement;
-    if (theme === 'dark') {
-      root.classList.add('dark');
-    } else {
-      root.classList.remove('dark');
-    }
-    localStorage.setItem('theme', theme);
-  }, [theme]);
+    void ensureSessionPreferencesHydrated();
+  }, []);
 
-  const toggleTheme = () => {
-    setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
-  };
+  const value = useMemo<ThemeContextType>(() => ({
+    theme,
+    toggleTheme: () => {
+      setAppTheme(theme === 'light' ? 'dark' : 'light');
+    },
+  }), [theme]);
 
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme }}>
+    <ThemeContext.Provider value={value}>
       {children}
     </ThemeContext.Provider>
   );

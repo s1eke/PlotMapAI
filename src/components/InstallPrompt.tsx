@@ -1,6 +1,7 @@
 import { Download, Share2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { CACHE_KEYS, storage } from '../infra/storage';
 import {
   DEBUG_RESET_PWA_PROMPTS_EVENT,
   DEBUG_SHOW_INSTALL_PROMPT_EVENT,
@@ -8,7 +9,6 @@ import {
   debugLog,
 } from '../services/debug';
 
-const INSTALL_PROMPT_DISMISS_KEY = 'plotmapai_install_prompt_dismissed_at';
 const INSTALL_PROMPT_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
 
 interface BeforeInstallPromptEvent extends Event {
@@ -38,7 +38,7 @@ function isIosLikeDevice(): boolean {
 }
 
 function isInstallPromptDismissed(): boolean {
-  const raw = localStorage.getItem(INSTALL_PROMPT_DISMISS_KEY);
+  const raw = storage.cache.getString(CACHE_KEYS.installPromptDismissedAt);
 
   if (!raw) {
     return false;
@@ -47,7 +47,7 @@ function isInstallPromptDismissed(): boolean {
   const dismissedAt = Number(raw);
 
   if (!Number.isFinite(dismissedAt)) {
-    localStorage.removeItem(INSTALL_PROMPT_DISMISS_KEY);
+    storage.cache.remove(CACHE_KEYS.installPromptDismissedAt);
     return false;
   }
 
@@ -55,16 +55,16 @@ function isInstallPromptDismissed(): boolean {
     return true;
   }
 
-  localStorage.removeItem(INSTALL_PROMPT_DISMISS_KEY);
+  storage.cache.remove(CACHE_KEYS.installPromptDismissedAt);
   return false;
 }
 
 function rememberInstallPromptDismissal(): void {
-  localStorage.setItem(INSTALL_PROMPT_DISMISS_KEY, String(Date.now()));
+  storage.cache.set(CACHE_KEYS.installPromptDismissedAt, String(Date.now()));
 }
 
 function clearInstallPromptDismissal(): void {
-  localStorage.removeItem(INSTALL_PROMPT_DISMISS_KEY);
+  storage.cache.remove(CACHE_KEYS.installPromptDismissedAt);
 }
 
 function createDebugInstallPromptEvent(): BeforeInstallPromptEvent {

@@ -1,9 +1,10 @@
 import { act, renderHook } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useReaderRestoreFlow } from '../useReaderRestoreFlow';
 import type { ScrollModeAnchor } from '../useScrollModeChapters';
 import type { StoredReaderState } from '../useReaderStatePersistence';
+import { resetReaderSessionStoreForTests } from '../sessionStore';
 
 function makeContainer({
   scrollTop = 0,
@@ -42,6 +43,10 @@ function createStoredState(overrides: StoredReaderState = {}): StoredReaderState
 }
 
 describe('useReaderRestoreFlow', () => {
+  beforeEach(() => {
+    resetReaderSessionStoreForTests();
+  });
+
   it('restores the last original reading position when switching back from summary view', () => {
     const persistReaderState = vi.fn();
     const markUserInteracted = vi.fn();

@@ -2,11 +2,11 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { novelsApi } from '../api/novels';
-import type { Novel } from '../api/novels';
+import type { NovelView } from '../api/novels';
 import TxtCover from './TxtCover';
 
 interface BookCardProps {
-  novel: Novel;
+  novel: NovelView;
 }
 
 export default function BookCard({ novel }: BookCardProps) {

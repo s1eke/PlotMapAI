@@ -1,4 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie';
+import type { AnalysisCharacter, AnalysisRelationship, OverviewCharacterStat, OverviewRelationship } from './analysis/types';
 
 interface DefaultTocRule {
   name: string;
@@ -72,6 +73,12 @@ export interface ReadingProgress {
   updatedAt: string;
 }
 
+export interface AppSettingRecord {
+  key: string;
+  value: unknown;
+  updatedAt: string;
+}
+
 export interface AnalysisJob {
   id: number;
   novelId: number;
@@ -109,8 +116,8 @@ export interface ChapterAnalysis {
   chapterTitle: string;
   summary: string;
   keyPoints: string[];
-  characters: Array<Record<string, unknown>>;
-  relationships: Array<Record<string, unknown>>;
+  characters: AnalysisCharacter[];
+  relationships: AnalysisRelationship[];
   tags: string[];
   chunkIndex: number;
   updatedAt: string;
@@ -122,8 +129,8 @@ export interface AnalysisOverview {
   bookIntro: string;
   globalSummary: string;
   themes: string[];
-  characterStats: Array<Record<string, unknown>>;
-  relationshipGraph: Array<Record<string, unknown>>;
+  characterStats: OverviewCharacterStat[];
+  relationshipGraph: OverviewRelationship[];
   totalChapters: number;
   analyzedChapters: number;
   updatedAt: string;
@@ -142,7 +149,7 @@ export interface ChapterImage {
   blob: Blob;
 }
 
-const CURRENT_DB_VERSION = 5;
+const CURRENT_DB_VERSION = 6;
 
 const CURRENT_SCHEMA = {
   novels: '++id, createdAt',
@@ -150,6 +157,7 @@ const CURRENT_SCHEMA = {
   tocRules: '++id, serialNumber, enable',
   purificationRules: '++id, order, isEnabled',
   readingProgress: '++id, novelId',
+  appSettings: 'key, updatedAt',
   analysisJobs: '++id, novelId',
   analysisChunks: '++id, novelId, [novelId+chunkIndex]',
   chapterAnalyses: '++id, novelId, [novelId+chapterIndex]',
@@ -164,6 +172,7 @@ const db = new Dexie('PlotMapAI') as Dexie & {
   tocRules: EntityTable<TocRule, 'id'>;
   purificationRules: EntityTable<PurificationRule, 'id'>;
   readingProgress: EntityTable<ReadingProgress, 'id'>;
+  appSettings: EntityTable<AppSettingRecord, 'key'>;
   analysisJobs: EntityTable<AnalysisJob, 'id'>;
   analysisChunks: EntityTable<AnalysisChunk, 'id'>;
   chapterAnalyses: EntityTable<ChapterAnalysis, 'id'>;

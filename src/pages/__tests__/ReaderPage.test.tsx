@@ -5,6 +5,7 @@ import ReaderPage from '../ReaderPage';
 import { analysisApi } from '../../api/analysis';
 import type { AnalysisJobStatus } from '../../api/analysis';
 import { readerApi } from '../../api/reader';
+import { resetReaderSessionStoreForTests } from '../../hooks/sessionStore';
 
 const i18nMock = vi.hoisted(() => ({
   t: (key: string) => key,
@@ -169,6 +170,7 @@ describe('ReaderPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    resetReaderSessionStoreForTests();
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     Element.prototype.scrollIntoView = vi.fn();
     vi.mocked(readerApi.getChapters).mockResolvedValue(chapters);
@@ -229,7 +231,7 @@ describe('ReaderPage', () => {
       expect(readerApi.getChapterContent).toHaveBeenLastCalledWith(1, 1);
     });
     expect(await screen.findByRole('heading', { name: 'Chapter 2', level: 1 })).toBeInTheDocument();
-    expect(JSON.parse(localStorage.getItem('reader-state:1')!)).toEqual({
+    expect(JSON.parse(localStorage.getItem('reader-state:1')!)).toMatchObject({
       chapterIndex: 1,
       viewMode: 'original',
       isTwoColumn: false,

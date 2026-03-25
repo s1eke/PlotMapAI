@@ -1,5 +1,5 @@
 import type { TFunction } from 'i18next';
-import type { PurificationRule } from '../api/settings';
+import type { PurificationRule } from '../api/settings/types';
 
 export type SettingsTabId = 'toc' | 'purification' | 'ai';
 

@@ -9,7 +9,12 @@ import {
   getCharacterGraph as getCharacterGraphService,
   getChapterAnalysis as getChapterAnalysisService,
   getOverview as getOverviewService,
-} from '../services/analysisRunner';
+  initializeAnalysisRuntime,
+} from '../services/analysis-runtime/orchestrator';
+
+void initializeAnalysisRuntime().catch(() => {
+  // best effort recovery
+});
 
 export interface AnalysisCharacter {
   name: string;

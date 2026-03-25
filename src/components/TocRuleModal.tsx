@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Loader2 } from 'lucide-react';
 import Modal from './Modal';
-import type { TocRule } from '../api/settings';
+import type { TocRule } from '../api/settings/types';
 
 interface TocRuleModalProps {
   isOpen: boolean;

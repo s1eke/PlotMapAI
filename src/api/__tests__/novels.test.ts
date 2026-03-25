@@ -87,7 +87,7 @@ describe('novelsApi', () => {
     const file = new File(['content'], 'test.txt', { type: 'text/plain' });
     const novel = await novelsApi.upload(file);
     expect(novel.title).toBe('Parsed Novel');
-    expect(novel.chapter_count).toBe(2);
+    expect(novel.chapterCount).toBe(2);
   });
 
   it('upload throws for unsupported file type', async () => {

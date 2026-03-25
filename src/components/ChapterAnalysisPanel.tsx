@@ -171,7 +171,7 @@ export default function ChapterAnalysisPanel({ novelId, analysis, job, isLoading
           : isPaused
             ? t('reader.analysisPanel.hintPaused')
             : isFailed
-              ? job?.lastError || t('reader.analysisPanel.hintFailed')
+              ? t(`errors.${job?.lastError}`, { defaultValue: job?.lastError }) || t('reader.analysisPanel.hintFailed')
               : hasIncompleteOutputs
                 ? t('reader.analysisPanel.hintIncomplete')
                 : t('reader.analysisPanel.hintEmpty')}

@@ -30,7 +30,7 @@ const { mockParseTxt, mockParseEpub } = vi.hoisted(() => ({
 }));
 
 vi.mock('../txtParser', () => ({ parseTxt: mockParseTxt }));
-vi.mock('../epubParser', () => ({ parseEpub: mockParseEpub }));
+vi.mock('../epub/parser', () => ({ parseEpub: mockParseEpub }));
 
 import { parseBook, registerParser } from '../bookParser';
 import type { BookParser, ParsedBook } from '../bookParser';

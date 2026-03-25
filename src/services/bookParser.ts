@@ -1,5 +1,5 @@
 import { parseTxt } from './txtParser';
-import { parseEpub } from './epubParser';
+import { parseEpub } from './epub/parser';
 
 export interface ParsedBook {
   title: string;

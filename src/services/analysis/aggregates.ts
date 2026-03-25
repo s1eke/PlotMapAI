@@ -78,8 +78,8 @@ export function collectAnalysisAggregates(chapterRows: ChapterAnalysis[]): Analy
       summary: row.summary,
       keyPoints: row.keyPoints,
       tags: row.tags,
-      characters: row.characters as unknown as AnalysisAggregates['chapters'][number]['characters'],
-      relationships: row.relationships as unknown as AnalysisAggregates['chapters'][number]['relationships'],
+      characters: row.characters,
+      relationships: row.relationships,
     });
 
     for (const tag of row.tags) {
@@ -90,12 +90,11 @@ export function collectAnalysisAggregates(chapterRows: ChapterAnalysis[]): Analy
 
     for (const item of row.characters) {
       if (typeof item !== 'object' || item === null) continue;
-      const obj = item as Record<string, unknown>;
-      const name = cleanText(obj.name, 80);
+      const name = cleanText(item.name, 80);
       if (!name) continue;
-      const weight = coerceWeight(obj.weight);
-      const role = cleanText(obj.role, 80);
-      const description = cleanText(obj.description, 200);
+      const weight = coerceWeight(item.weight);
+      const role = cleanText(item.role, 80);
+      const description = cleanText(item.description, 200);
       let target = characterMap.get(name);
       if (!target) {
         target = { name, weight: 0, chapters: new Set<number>(), roles: new Map<string, number>(), descriptions: [] };
@@ -113,14 +112,13 @@ export function collectAnalysisAggregates(chapterRows: ChapterAnalysis[]): Analy
 
     for (const item of row.relationships) {
       if (typeof item !== 'object' || item === null) continue;
-      const obj = item as Record<string, unknown>;
-      const source = cleanText(obj.source, 80);
-      const targetName = cleanText(obj.target, 80);
-      const relationTags = normalizeRelationTags(obj.relationTags, obj.type) || ['未分类'];
+      const source = cleanText(item.source, 80);
+      const targetName = cleanText(item.target, 80);
+      const relationTags = normalizeRelationTags(undefined, item.type) || ['未分类'];
       if (!source || !targetName || source === targetName) continue;
       const [src, tgt] = [source, targetName].sort();
       const key = `${src}::${tgt}`;
-      const relationWeight = coerceWeight(obj.weight);
+      const relationWeight = coerceWeight(item.weight);
       let edge = relationshipMap.get(key);
       if (!edge) {
         edge = {
@@ -140,7 +138,7 @@ export function collectAnalysisAggregates(chapterRows: ChapterAnalysis[]): Analy
       for (const tag of relationTags) {
         edge.relationTypes.set(tag, (edge.relationTypes.get(tag) || 0) + Math.max(relationWeight, 1));
       }
-      const description = cleanText(obj.description, 160);
+      const description = cleanText(item.description, 160);
       if (description && !edge.descriptions.includes(description) && edge.descriptions.length < 6) {
         edge.descriptions.push(description);
       }

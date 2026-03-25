@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { analysisApi } from '../api/analysis';
 import type { AnalysisStatusResponse } from '../api/analysis';
 import { novelsApi } from '../api/novels';
-import type { Novel } from '../api/novels';
+import type { NovelView } from '../api/novels';
 import Modal from '../components/Modal';
 import TxtCover from '../components/TxtCover';
 
@@ -15,7 +15,7 @@ export default function BookDetailPage() {
   const navigate = useNavigate();
   const novelId = Number(id);
 
-  const [novel, setNovel] = useState<Novel | null>(null);
+  const [novel, setNovel] = useState<NovelView | null>(null);
   const [analysisStatus, setAnalysisStatus] = useState<AnalysisStatusResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAnalysisLoading, setIsAnalysisLoading] = useState(true);
@@ -271,7 +271,7 @@ export default function BookDetailPage() {
               <span className="text-xs text-text-secondary uppercase tracking-wider font-semibold mb-1 flex items-center gap-1">
                 <Hash className="w-3 h-3" /> {t('bookDetail.chapters')}
               </span>
-              <span className="font-semibold text-text-primary">{novel.chapter_count || 0}</span>
+              <span className="font-semibold text-text-primary">{novel.chapterCount || 0}</span>
             </span>
             <span className="inline-flex flex-col bg-muted-bg px-4 py-2 rounded-lg border border-border-color/20">
               <span className="text-xs text-text-secondary uppercase tracking-wider font-semibold mb-1 flex items-center gap-1">
@@ -367,7 +367,7 @@ export default function BookDetailPage() {
                         {job.lastError && (
                           <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300 flex gap-3">
                             <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
-                            <span>{job.lastError}</span>
+                            <span>{t(`errors.${job.lastError}`, { defaultValue: job.lastError })}</span>
                           </div>
                         )}
                       </>

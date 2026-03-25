@@ -3,7 +3,9 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import SettingsPage from '../SettingsPage';
-import { settingsApi } from '../../api/settings';
+import { aiConfigApi } from '../../api/settings/aiConfig';
+import { purificationRulesApi } from '../../api/settings/purificationRules';
+import { tocRulesApi } from '../../api/settings/tocRules';
 
 const i18nMock = vi.hoisted(() => ({
   t: (key: string) => key,
@@ -13,14 +15,19 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: i18nMock.t }),
 }));
 
-vi.mock('../../api/settings', () => ({
-  settingsApi: {
+vi.mock('../../api/settings/tocRules', () => ({
+  tocRulesApi: {
     getTocRules: vi.fn(),
     createTocRule: vi.fn(),
     updateTocRule: vi.fn(),
     deleteTocRule: vi.fn(),
     uploadTocRulesYaml: vi.fn(),
     exportTocRulesYaml: vi.fn(),
+  },
+}));
+
+vi.mock('../../api/settings/purificationRules', () => ({
+  purificationRulesApi: {
     getPurificationRules: vi.fn(),
     createPurificationRule: vi.fn(),
     updatePurificationRule: vi.fn(),
@@ -28,6 +35,11 @@ vi.mock('../../api/settings', () => ({
     clearAllPurificationRules: vi.fn(),
     uploadPurificationRulesYaml: vi.fn(),
     exportPurificationRulesYaml: vi.fn(),
+  },
+}));
+
+vi.mock('../../api/settings/aiConfig', () => ({
+  aiConfigApi: {
     getAiProviderSettings: vi.fn(),
     updateAiProviderSettings: vi.fn(),
     testAiProviderSettings: vi.fn(),
@@ -86,24 +98,24 @@ function renderPage() {
 describe('SettingsPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(settingsApi.getTocRules).mockResolvedValue(tocRules);
-    vi.mocked(settingsApi.createTocRule).mockResolvedValue(tocRules[0]);
-    vi.mocked(settingsApi.updateTocRule).mockResolvedValue({ ...tocRules[0], isEnabled: false });
-    vi.mocked(settingsApi.deleteTocRule).mockResolvedValue({ message: 'deleted' });
-    vi.mocked(settingsApi.exportTocRulesYaml).mockResolvedValue('name: TOC Rule');
-    vi.mocked(settingsApi.uploadTocRulesYaml).mockResolvedValue(tocRules);
-    vi.mocked(settingsApi.getPurificationRules).mockResolvedValue(purificationRules);
-    vi.mocked(settingsApi.createPurificationRule).mockResolvedValue(purificationRules[0]);
-    vi.mocked(settingsApi.updatePurificationRule).mockResolvedValue(purificationRules[0]);
-    vi.mocked(settingsApi.deletePurificationRule).mockResolvedValue({ message: 'deleted' });
-    vi.mocked(settingsApi.exportPurificationRulesYaml).mockResolvedValue('name: Cleanup');
-    vi.mocked(settingsApi.uploadPurificationRulesYaml).mockResolvedValue(purificationRules);
-    vi.mocked(settingsApi.clearAllPurificationRules).mockResolvedValue({ message: 'cleared' });
-    vi.mocked(settingsApi.getAiProviderSettings).mockResolvedValue(aiSettings);
-    vi.mocked(settingsApi.updateAiProviderSettings).mockResolvedValue(aiSettings);
-    vi.mocked(settingsApi.testAiProviderSettings).mockResolvedValue({ message: 'Connection ok', preview: 'pong' });
-    vi.mocked(settingsApi.exportAiConfig).mockResolvedValue('encrypted-config');
-    vi.mocked(settingsApi.importAiConfig).mockResolvedValue();
+    vi.mocked(tocRulesApi.getTocRules).mockResolvedValue(tocRules);
+    vi.mocked(tocRulesApi.createTocRule).mockResolvedValue(tocRules[0]);
+    vi.mocked(tocRulesApi.updateTocRule).mockResolvedValue({ ...tocRules[0], isEnabled: false });
+    vi.mocked(tocRulesApi.deleteTocRule).mockResolvedValue({ message: 'deleted' });
+    vi.mocked(tocRulesApi.exportTocRulesYaml).mockResolvedValue('name: TOC Rule');
+    vi.mocked(tocRulesApi.uploadTocRulesYaml).mockResolvedValue(tocRules);
+    vi.mocked(purificationRulesApi.getPurificationRules).mockResolvedValue(purificationRules);
+    vi.mocked(purificationRulesApi.createPurificationRule).mockResolvedValue(purificationRules[0]);
+    vi.mocked(purificationRulesApi.updatePurificationRule).mockResolvedValue(purificationRules[0]);
+    vi.mocked(purificationRulesApi.deletePurificationRule).mockResolvedValue({ message: 'deleted' });
+    vi.mocked(purificationRulesApi.exportPurificationRulesYaml).mockResolvedValue('name: Cleanup');
+    vi.mocked(purificationRulesApi.uploadPurificationRulesYaml).mockResolvedValue(purificationRules);
+    vi.mocked(purificationRulesApi.clearAllPurificationRules).mockResolvedValue({ message: 'cleared' });
+    vi.mocked(aiConfigApi.getAiProviderSettings).mockResolvedValue(aiSettings);
+    vi.mocked(aiConfigApi.updateAiProviderSettings).mockResolvedValue(aiSettings);
+    vi.mocked(aiConfigApi.testAiProviderSettings).mockResolvedValue({ message: 'Connection ok', preview: 'pong' });
+    vi.mocked(aiConfigApi.exportAiConfig).mockResolvedValue('encrypted-config');
+    vi.mocked(aiConfigApi.importAiConfig).mockResolvedValue();
     vi.stubGlobal('URL', {
       ...URL,
       createObjectURL: vi.fn(() => 'blob:mock'),
@@ -116,9 +128,9 @@ describe('SettingsPage', () => {
     renderPage();
 
     expect(await screen.findByText('settings.toc.title')).toBeInTheDocument();
-    expect(settingsApi.getTocRules).toHaveBeenCalledTimes(1);
-    expect(settingsApi.getPurificationRules).toHaveBeenCalledTimes(1);
-    expect(settingsApi.getAiProviderSettings).toHaveBeenCalledTimes(1);
+    expect(tocRulesApi.getTocRules).toHaveBeenCalledTimes(1);
+    expect(purificationRulesApi.getPurificationRules).toHaveBeenCalledTimes(1);
+    expect(aiConfigApi.getAiProviderSettings).toHaveBeenCalledTimes(1);
 
     await user.click(screen.getByRole('button', { name: 'settings.purificationRules' }));
     expect(await screen.findByText('settings.purification.title')).toBeInTheDocument();
@@ -132,7 +144,7 @@ describe('SettingsPage', () => {
   });
 
   it('rolls back a TOC toggle when the update fails and shows inline feedback', async () => {
-    vi.mocked(settingsApi.updateTocRule).mockRejectedValueOnce(new Error('toggle failed'));
+    vi.mocked(tocRulesApi.updateTocRule).mockRejectedValueOnce(new Error('toggle failed'));
     const user = userEvent.setup();
 
     renderPage();
@@ -143,7 +155,7 @@ describe('SettingsPage', () => {
     await user.click(toggle);
 
     await waitFor(() => {
-      expect(settingsApi.updateTocRule).toHaveBeenCalledWith(1, { isEnabled: false });
+      expect(tocRulesApi.updateTocRule).toHaveBeenCalledWith(1, { isEnabled: false });
     });
     expect(toggle).toHaveAttribute('aria-checked', 'true');
     expect(await screen.findByRole('alert')).toHaveTextContent('settings.common.updateFailed');
@@ -157,7 +169,7 @@ describe('SettingsPage', () => {
 
     await user.click(screen.getByRole('button', { name: 'settings.common.moreActions' }));
     await user.click(screen.getByRole('menuitem', { name: 'settings.common.export' }));
-    expect(settingsApi.exportTocRulesYaml).toHaveBeenCalledTimes(1);
+    expect(tocRulesApi.exportTocRulesYaml).toHaveBeenCalledTimes(1);
     expect(await screen.findByText('settings.common.exportSuccess')).toBeInTheDocument();
 
     const input = container.querySelector('input[type="file"]') as HTMLInputElement;
@@ -165,7 +177,7 @@ describe('SettingsPage', () => {
     await user.upload(input, file);
 
     await waitFor(() => {
-      expect(settingsApi.uploadTocRulesYaml).toHaveBeenCalledWith(file);
+      expect(tocRulesApi.uploadTocRulesYaml).toHaveBeenCalledWith(file);
     });
     expect(await screen.findByText('settings.common.importSuccess')).toBeInTheDocument();
     expect(screen.queryByText('settings.common.exportSuccess')).not.toBeInTheDocument();
@@ -179,19 +191,19 @@ describe('SettingsPage', () => {
     await user.click(screen.getByTitle('Delete'));
 
     expect(screen.getByText('settings.toc.deleteConfirm')).toBeInTheDocument();
-    expect(settingsApi.deleteTocRule).not.toHaveBeenCalled();
+    expect(tocRulesApi.deleteTocRule).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole('button', { name: 'common.actions.delete' }));
 
     await waitFor(() => {
-      expect(settingsApi.deleteTocRule).toHaveBeenCalledWith(1);
+      expect(tocRulesApi.deleteTocRule).toHaveBeenCalledWith(1);
     });
     expect(await screen.findByText('settings.common.deleteSuccess')).toBeInTheDocument();
   });
 
   it('shows empty states with actions for TOC and purification tabs', async () => {
-    vi.mocked(settingsApi.getTocRules).mockResolvedValueOnce([]);
-    vi.mocked(settingsApi.getPurificationRules).mockResolvedValueOnce([]);
+    vi.mocked(tocRulesApi.getTocRules).mockResolvedValueOnce([]);
+    vi.mocked(purificationRulesApi.getPurificationRules).mockResolvedValueOnce([]);
     const user = userEvent.setup();
 
     renderPage();
@@ -234,20 +246,20 @@ describe('SettingsPage', () => {
     await user.click(clearButtons[clearButtons.length - 1]);
 
     await waitFor(() => {
-      expect(settingsApi.clearAllPurificationRules).toHaveBeenCalledTimes(1);
+      expect(purificationRulesApi.clearAllPurificationRules).toHaveBeenCalledTimes(1);
     });
     expect(await screen.findByText('settings.common.clearSuccess')).toBeInTheDocument();
   });
 
   it('saves AI settings and surfaces test-connection failures', async () => {
-    vi.mocked(settingsApi.updateAiProviderSettings).mockResolvedValueOnce({
+    vi.mocked(aiConfigApi.updateAiProviderSettings).mockResolvedValueOnce({
       ...aiSettings,
       apiBaseUrl: 'https://api.changed.example/v1',
       modelName: 'gpt-5-mini',
       contextSize: 64000,
       maskedApiKey: 'sk-new',
     });
-    vi.mocked(settingsApi.testAiProviderSettings).mockRejectedValueOnce(new Error('connection failed'));
+    vi.mocked(aiConfigApi.testAiProviderSettings).mockRejectedValueOnce(new Error('connection failed'));
     const user = userEvent.setup();
 
     renderPage();
@@ -265,7 +277,7 @@ describe('SettingsPage', () => {
     await user.click(screen.getByRole('button', { name: 'settings.ai.saveButton' }));
 
     await waitFor(() => {
-      expect(settingsApi.updateAiProviderSettings).toHaveBeenCalledWith({
+      expect(aiConfigApi.updateAiProviderSettings).toHaveBeenCalledWith({
         apiBaseUrl: 'https://api.changed.example/v1',
         apiKey: 'new-key',
         modelName: 'gpt-5-mini',
@@ -292,13 +304,13 @@ describe('SettingsPage', () => {
     await user.click(screen.getByRole('button', { name: 'settings.ai.exportButton' }));
 
     await waitFor(() => {
-      expect(settingsApi.exportAiConfig).toHaveBeenCalledWith('safe-pass');
+      expect(aiConfigApi.exportAiConfig).toHaveBeenCalledWith('safe-pass');
     });
     expect(await screen.findByText('settings.ai.exportSuccess')).toBeInTheDocument();
   });
 
   it('maps AI import errors inside the modal', async () => {
-    vi.mocked(settingsApi.importAiConfig).mockRejectedValueOnce(new Error('Decryption failed'));
+    vi.mocked(aiConfigApi.importAiConfig).mockRejectedValueOnce(new Error('Decryption failed'));
     const user = userEvent.setup();
     const { container } = renderPage();
 
@@ -313,7 +325,7 @@ describe('SettingsPage', () => {
     await user.click(screen.getByRole('button', { name: 'settings.ai.importButton' }));
 
     await waitFor(() => {
-      expect(settingsApi.importAiConfig).toHaveBeenCalledWith(file, 'safe-pass');
+      expect(aiConfigApi.importAiConfig).toHaveBeenCalledWith(file, 'safe-pass');
     });
     expect(await screen.findByText('settings.ai.errorDecryptFailed')).toBeInTheDocument();
   });

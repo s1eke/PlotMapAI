@@ -38,7 +38,7 @@ const novel = {
   originalFilename: 'mock.txt',
   originalEncoding: 'utf-8',
   totalWords: 1200,
-  chapter_count: 2,
+  chapterCount: 2,
   createdAt: new Date().toISOString(),
 };
 

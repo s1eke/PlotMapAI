@@ -13,7 +13,7 @@ import {
   AnalysisConfigError,
   ChunkingError,
   type RuntimeAnalysisConfig,
-} from '../aiAnalysis';
+} from '../analysis';
 import type { Chapter, ChapterAnalysis, AnalysisOverview } from '../db';
 
 describe('maskApiKey', () => {
@@ -213,10 +213,9 @@ describe('isOverviewComplete', () => {
       bookIntro: 'A book about adventure and mystery in a faraway land.',
       globalSummary: 'The story follows multiple characters through a series of events that test their resolve and bring them together.',
       themes: ['adventure', 'mystery'],
-      characterStats: [{ name: 'Hero', weight: 80 }],
+      characterStats: [{ name: 'Hero', role: 'protagonist', description: 'The hero', weight: 80, sharePercent: 100, chapters: [0], chapterCount: 1 }],
       relationshipGraph: [],
-      totalChapters: 10,
-      analyzedChapters: 10,
+      totalChapters: 10, analyzedChapters: 10,
       updatedAt: '',
     } as AnalysisOverview;
     expect(isOverviewComplete(overview, 10)).toBe(true);
@@ -233,7 +232,7 @@ describe('serializeOverview', () => {
       id: 1, novelId: 1,
       bookIntro: 'Intro', globalSummary: 'Summary',
       themes: ['theme1'],
-      characterStats: [{ name: 'A', weight: 80 }],
+      characterStats: [{ name: 'A', role: 'supporting', description: 'desc', weight: 80, sharePercent: 100, chapters: [0], chapterCount: 1 }],
       relationshipGraph: [],
       totalChapters: 5, analyzedChapters: 5,
       updatedAt: '2024-01-01',
@@ -282,7 +281,7 @@ describe('buildCharacterGraphPayload', () => {
       summary: 'Summary',
       keyPoints: ['point'],
       characters: [{ name: 'Alice', role: 'protagonist', description: 'Hero', weight: 80 }],
-      relationships: [{ source: 'Alice', target: 'Bob', type: 'ally', weight: 60 }],
+      relationships: [{ source: 'Alice', target: 'Bob', type: 'ally', description: 'Allies', weight: 60 }],
       tags: ['action'],
       chunkIndex: 0,
       updatedAt: '2024-01-01',

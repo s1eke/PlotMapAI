@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { analysisApi } from '../api/analysis';
 import type { CharacterGraphResponse } from '../api/analysis';
 import { novelsApi } from '../api/novels';
-import type { Novel } from '../api/novels';
+import type { NovelView } from '../api/novels';
 import CharacterGraphStage from '../components/characterGraph/CharacterGraphStage';
 import { useCharacterGraphCanvas } from '../hooks/useCharacterGraphCanvas';
 
@@ -19,7 +19,7 @@ export default function CharacterGraphPage() {
   const novelId = Number(id);
   const fullscreenRef = useRef<HTMLDivElement | null>(null);
 
-  const [novel, setNovel] = useState<Novel | null>(null);
+  const [novel, setNovel] = useState<NovelView | null>(null);
   const [graph, setGraph] = useState<CharacterGraphResponse | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
