@@ -10,6 +10,7 @@ interface ReaderTopBarProps {
   isSidebarOpen: boolean;
   novelId: number;
   viewMode: 'original' | 'summary';
+  onMobileBack: () => void;
   onToggleSidebar: () => void;
   onSetViewMode: (viewMode: 'original' | 'summary') => void;
 }
@@ -19,6 +20,7 @@ export default function ReaderTopBar({
   isSidebarOpen,
   novelId,
   viewMode,
+  onMobileBack,
   onToggleSidebar,
   onSetViewMode,
 }: ReaderTopBarProps) {
@@ -30,9 +32,15 @@ export default function ReaderTopBar({
       !isChromeVisible && '-translate-y-full opacity-0 pointer-events-none',
     )}>
       <div className="flex items-center gap-3">
-        <Link to={appPaths.bookshelf()} className="md:hidden p-2 rounded-full hover:bg-white/10 transition-colors text-text-primary" title={t('reader.exit')}>
+        <button
+          onClick={onMobileBack}
+          aria-label={t('reader.exit')}
+          className="md:hidden p-2 rounded-full hover:bg-white/10 transition-colors text-text-primary"
+          title={t('reader.exit')}
+          type="button"
+        >
           <ArrowLeft className="w-5 h-5" />
-        </Link>
+        </button>
         <button onClick={onToggleSidebar} className="hidden md:flex p-2 rounded-full hover:bg-white/10 transition-colors text-text-primary" title={t('reader.contents')}>
           {isSidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
         </button>

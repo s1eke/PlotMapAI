@@ -22,6 +22,7 @@ import { useContentClick } from '../hooks/useContentClick';
 import { useReaderRestoreFlow } from '../hooks/useReaderRestoreFlow';
 import { useReaderChapterData } from '../hooks/useReaderChapterData';
 import { usePagedReaderLayout } from '../hooks/usePagedReaderLayout';
+import { useReaderMobileBack } from '../hooks/useReaderMobileBack';
 import {
   getReaderSessionSnapshot,
   setChapterIndex as setSessionChapterIndex,
@@ -67,6 +68,9 @@ export default function ReaderPage() {
 
   const preferences = useReaderPreferences();
   const sidebar = useSidebarDrag();
+  const closeSidebar = useCallback(() => {
+    sidebar.setIsSidebarOpen(false);
+  }, [sidebar]);
   const { chapterIndex, isTwoColumn, restoreStatus, viewMode } = useReaderSessionSelector(state => ({
     chapterIndex: state.chapterIndex,
     isTwoColumn: state.isTwoColumn,
@@ -75,6 +79,11 @@ export default function ReaderPage() {
   }));
   const analysis = useChapterAnalysis(novelId, viewMode === 'summary' ? chapterIndex : -1);
   const isPagedMode = isTwoColumn && viewMode === 'original';
+  const { handleMobileBack } = useReaderMobileBack({
+    isSidebarOpen: sidebar.isSidebarOpen,
+    closeSidebar,
+    novelId,
+  });
 
   const setChapterIndex = useCallback((nextState: React.SetStateAction<number>) => {
     const current = getReaderSessionSnapshot().chapterIndex;
@@ -297,7 +306,7 @@ export default function ReaderPage() {
         isSidebarOpen={sidebar.isSidebarOpen}
         dragOffset={sidebar.dragOffset}
         sidebarBgClassName={preferences.currentTheme.sidebarBg}
-        onClose={() => sidebar.setIsSidebarOpen(false)}
+        onClose={closeSidebar}
         onSelectChapter={handleSelectChapter}
         onDragStart={sidebar.handleDragStart}
         onDragMove={sidebar.handleDragMove}
@@ -310,6 +319,7 @@ export default function ReaderPage() {
           isSidebarOpen={sidebar.isSidebarOpen}
           novelId={novelId}
           viewMode={viewMode}
+          onMobileBack={handleMobileBack}
           onToggleSidebar={sidebar.toggleSidebar}
           onSetViewMode={restoreFlow.handleSetViewMode}
         />
