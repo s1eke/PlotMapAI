@@ -241,6 +241,10 @@ describe('useReaderStatePersistence', () => {
     const { result } = renderHook(() => useReaderStatePersistence(1));
     expect(result.current.hasHydratedReaderState).toBe(false);
 
+    act(() => {
+      result.current.persistReaderState({ chapterIndex: 0 });
+    });
+
     act(() => { result.current.setHasHydratedReaderState(true); });
     expect(result.current.hasHydratedReaderState).toBe(true);
   });
@@ -254,5 +258,50 @@ describe('useReaderStatePersistence', () => {
 
     // Should not store anything since novelId is 0 (falsy)
     expect(localStorage.getItem('reader-state:0')).toBeNull();
+  });
+
+  it('does not carry the previous novel state into a new novel before hydration', () => {
+    const { result, rerender } = renderHook(
+      ({ novelId }: { novelId: number }) => useReaderStatePersistence(novelId),
+      { initialProps: { novelId: 1 } },
+    );
+
+    act(() => {
+      result.current.persistReaderState({
+        chapterIndex: 3,
+        chapterProgress: 0.65,
+      });
+    });
+
+    expect(JSON.parse(localStorage.getItem('reader-state:1')!)).toMatchObject({
+      chapterIndex: 3,
+      chapterProgress: 0.65,
+    });
+
+    act(() => {
+      rerender({ novelId: 2 });
+    });
+
+    expect(result.current.hasHydratedReaderState).toBe(false);
+    expect(result.current.latestReaderStateRef.current).toEqual({
+      chapterIndex: 0,
+      mode: 'scroll',
+      viewMode: 'original',
+      isTwoColumn: false,
+      chapterProgress: undefined,
+      scrollPosition: undefined,
+      lastContentMode: 'scroll',
+    });
+    expect(result.current.hasUserInteractedRef.current).toBe(false);
+
+    act(() => {
+      result.current.persistReaderState({
+        chapterIndex: 0,
+        viewMode: 'original',
+        isTwoColumn: false,
+      });
+    });
+
+    expect(localStorage.getItem('reader-state:2')).toBeNull();
   });
 });

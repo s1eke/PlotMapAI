@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   flushPersistence,
   getReaderSessionSnapshot,
@@ -19,6 +19,34 @@ interface PersistReaderStateOptions {
 
 export type { PageTarget, StoredReaderState } from './sessionStore';
 
+function buildNovelScopedInitialState(initialStoredState: StoredReaderState | null): StoredReaderState {
+  if (!initialStoredState) {
+    return {
+      chapterIndex: 0,
+      mode: 'scroll',
+      viewMode: 'original',
+      isTwoColumn: false,
+      chapterProgress: undefined,
+      scrollPosition: undefined,
+      lastContentMode: 'scroll',
+    };
+  }
+
+  return {
+    chapterIndex: initialStoredState.chapterIndex ?? 0,
+    mode: initialStoredState.mode ?? (initialStoredState.viewMode === 'summary'
+      ? 'summary'
+      : initialStoredState.isTwoColumn
+        ? 'paged'
+        : 'scroll'),
+    viewMode: initialStoredState.viewMode ?? (initialStoredState.mode === 'summary' ? 'summary' : 'original'),
+    isTwoColumn: initialStoredState.isTwoColumn ?? (initialStoredState.mode === 'paged'),
+    chapterProgress: initialStoredState.chapterProgress,
+    scrollPosition: initialStoredState.scrollPosition,
+    lastContentMode: initialStoredState.lastContentMode ?? (initialStoredState.mode === 'paged' ? 'paged' : 'scroll'),
+  };
+}
+
 export function useReaderStatePersistence(novelId: number): {
   hasHydratedReaderState: boolean;
   setHasHydratedReaderState: React.Dispatch<React.SetStateAction<boolean>>;
@@ -38,45 +66,50 @@ export function useReaderStatePersistence(novelId: number): {
   }));
 
   const initialStoredState = readInitialStoredReaderState(novelId);
+  const novelScopedInitialState = useMemo(
+    () => buildNovelScopedInitialState(initialStoredState),
+    [initialStoredState],
+  );
+  const isSessionNovelAligned = !novelId || snapshot.novelId === novelId;
+  const canPersistForCurrentNovel = !novelId || snapshot.novelId === novelId || snapshot.novelId === 0;
   const latestReaderStateRef = useRef<StoredReaderState>(
-    initialStoredState
-      ? {
-          chapterIndex: initialStoredState.chapterIndex ?? 0,
-          mode: initialStoredState.mode ?? (initialStoredState.viewMode === 'summary'
-            ? 'summary'
-            : initialStoredState.isTwoColumn
-              ? 'paged'
-              : 'scroll'),
-          viewMode: initialStoredState.viewMode ?? (initialStoredState.mode === 'summary' ? 'summary' : 'original'),
-          isTwoColumn: initialStoredState.isTwoColumn ?? (initialStoredState.mode === 'paged'),
-          chapterProgress: initialStoredState.chapterProgress,
-          scrollPosition: initialStoredState.scrollPosition,
-          lastContentMode: initialStoredState.lastContentMode ?? (initialStoredState.mode === 'paged' ? 'paged' : 'scroll'),
-        }
-      : snapshot.storedState,
+    isSessionNovelAligned ? snapshot.storedState : novelScopedInitialState,
   );
   const hasUserInteractedRef = useRef(snapshot.hasUserInteracted);
 
   useEffect(() => {
-    if (novelId && snapshot.novelId !== novelId) {
+    if (!isSessionNovelAligned) {
+      latestReaderStateRef.current = novelScopedInitialState;
       return;
     }
+
     latestReaderStateRef.current = snapshot.storedState;
-  }, [novelId, snapshot.novelId, snapshot.storedState]);
+  }, [isSessionNovelAligned, novelScopedInitialState, snapshot.storedState]);
 
   useEffect(() => {
+    if (!isSessionNovelAligned) return;
     hasUserInteractedRef.current = snapshot.hasUserInteracted;
-  }, [snapshot.hasUserInteracted]);
+  }, [isSessionNovelAligned, snapshot.hasUserInteracted]);
+
+  useEffect(() => {
+    hasUserInteractedRef.current = false;
+  }, [novelId]);
 
   const handleSetHasHydratedReaderState = useCallback((nextState: React.SetStateAction<boolean>) => {
-    const currentValue = getReaderSessionSnapshot().restoreStatus !== 'hydrating';
+    const currentSnapshot = getReaderSessionSnapshot();
+    const currentValue = currentSnapshot.novelId === novelId
+      && currentSnapshot.restoreStatus !== 'hydrating';
     const resolved = typeof nextState === 'function'
       ? nextState(currentValue)
       : nextState;
     setHasHydratedReaderState(resolved);
-  }, []);
+  }, [novelId]);
 
   const persistReaderState = useCallback((nextState: StoredReaderState, options?: PersistReaderStateOptions) => {
+    if (!canPersistForCurrentNovel) {
+      return;
+    }
+
     if (novelId) {
       setSessionNovelId(novelId);
     }
@@ -98,7 +131,7 @@ export function useReaderStatePersistence(novelId: number): {
       mergedState,
       { flush: options?.flush },
     );
-  }, [novelId]);
+  }, [canPersistForCurrentNovel, novelId]);
 
   const loadPersistedReaderState = useCallback(async (): Promise<StoredReaderState> => {
     return hydrateSession(novelId);
@@ -109,6 +142,7 @@ export function useReaderStatePersistence(novelId: number): {
   }, []);
 
   const handleMarkUserInteracted = useCallback(() => {
+    hasUserInteractedRef.current = true;
     markUserInteracted();
   }, []);
 
@@ -132,7 +166,7 @@ export function useReaderStatePersistence(novelId: number): {
   }, [flushReaderState, novelId]);
 
   return {
-    hasHydratedReaderState: snapshot.restoreStatus !== 'hydrating',
+    hasHydratedReaderState: isSessionNovelAligned && snapshot.restoreStatus !== 'hydrating',
     setHasHydratedReaderState: handleSetHasHydratedReaderState,
     latestReaderStateRef,
     hasUserInteractedRef,
