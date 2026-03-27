@@ -1,3 +1,4 @@
+import type { ChapterChangeSource } from '../navigationTypes';
 import { renderHook, act } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { useReaderNavigation } from '../useReaderNavigation';
@@ -35,7 +36,7 @@ function setupHook(overrides: {
   const persistReaderState = vi.fn();
   const pageTargetRef = { current: 'start' as PageTarget };
   const hasUserInteractedRef = { current: false };
-  const chapterChangeSourceRef = { current: null as 'navigation' | 'scroll' | 'restore' | null };
+  const chapterChangeSourceRef = { current: null as ChapterChangeSource };
   const beforeChapterChange = vi.fn();
 
   const chapterIndex = overrides.chapterIndex ?? 0;

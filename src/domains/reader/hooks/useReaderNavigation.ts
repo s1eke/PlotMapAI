@@ -1,17 +1,10 @@
-import { useCallback, useEffect, useRef } from 'react';
 import type { Chapter, ChapterContent } from '../api/readerApi';
+import type { ChapterChangeSource } from './navigationTypes';
 import type { PageTarget, StoredReaderState } from './useReaderStatePersistence';
 
-type ChapterChangeSource = 'navigation' | 'scroll' | 'restore' | null;
-type NavigationIntent =
-  | { type: 'next' }
-  | { type: 'prev' }
-  | { type: 'chapter'; targetIndex: number; pageTarget: PageTarget };
+import { useCallback, useLayoutEffect, useRef } from 'react';
 
-interface PageNavigationOptions {
-  allowChapterTransition?: boolean;
-  queueDuringTransition?: boolean;
-}
+import { usePagedChapterTransition } from './usePagedChapterTransition';
 
 export function useReaderNavigation(
   chapterIndex: number,
@@ -38,71 +31,49 @@ export function useReaderNavigation(
   toolbarHasPrev: boolean;
   toolbarHasNext: boolean;
 } {
-  const transitionTargetChapterIndexRef = useRef<number | null>(null);
-  const queuedIntentRef = useRef<NavigationIntent | null>(null);
-  const lastChapterIndexRef = useRef(chapterIndex);
+  const replayDirectionalNavigationRef = useRef<(direction: 'next' | 'prev') => void>(() => {});
 
-  const clearPendingNavigation = useCallback(() => {
-    transitionTargetChapterIndexRef.current = null;
-    queuedIntentRef.current = null;
-  }, []);
-
-  const queueIntent = useCallback((intent: NavigationIntent) => {
-    queuedIntentRef.current = intent;
-  }, []);
-
-  const startChapterNavigation = useCallback((targetIndex: number, pageTarget: PageTarget = 'start') => {
+  const commitChapterNavigation = useCallback((targetIndex: number, pageTarget: PageTarget = 'start') => {
     if (targetIndex < 0 || targetIndex >= chapters.length) {
-      return;
+      return false;
     }
 
     beforeChapterChange?.();
     hasUserInteractedRef.current = true;
     chapterChangeSourceRef.current = 'navigation';
     pageTargetRef.current = pageTarget;
-    if (isPagedMode) {
-      transitionTargetChapterIndexRef.current = targetIndex;
-    }
     setChapterIndex(targetIndex);
     persistReaderState({
       chapterIndex: targetIndex,
       chapterProgress: pageTarget === 'end' ? 1 : 0,
     });
+    return true;
   }, [
     beforeChapterChange,
     chapterChangeSourceRef,
     chapters.length,
     hasUserInteractedRef,
-    isPagedMode,
     pageTargetRef,
     persistReaderState,
     setChapterIndex,
   ]);
 
-  const goToChapter = useCallback((targetIndex: number, pageTarget: PageTarget = 'start') => {
-    if (isPagedMode && transitionTargetChapterIndexRef.current !== null) {
-      queueIntent({ type: 'chapter', targetIndex, pageTarget });
-      return;
-    }
+  const { requestChapterNavigation, requestDirectionalNavigation } = usePagedChapterTransition({
+    isPagedMode,
+    chapterIndex,
+    isChapterNavigationReady,
+    chapterChangeSourceRef,
+    onCommitChapterNavigation: commitChapterNavigation,
+    onReplayDirectionalNavigation: (direction) => {
+      replayDirectionalNavigationRef.current(direction);
+    },
+  });
 
-    startChapterNavigation(targetIndex, pageTarget);
-  }, [isPagedMode, queueIntent, startChapterNavigation]);
-
-  const performNextPageNavigation = useCallback((options: PageNavigationOptions = {}) => {
+  const stepNextPage = useCallback((allowChapterTransition: boolean) => {
     if (!currentChapter) return;
-    const { allowChapterTransition = true, queueDuringTransition = true } = options;
 
-    if (isPagedMode) {
-      if (transitionTargetChapterIndexRef.current !== null) {
-        if (queueDuringTransition) {
-          queueIntent({ type: 'next' });
-        }
-        return;
-      }
-
-      if (!isChapterNavigationReady || currentChapter.index !== chapterIndex) {
-        return;
-      }
+    if (isPagedMode && (!isChapterNavigationReady || currentChapter.index !== chapterIndex)) {
+      return;
     }
 
     if (pageIndex < pageCount - 1) {
@@ -111,7 +82,7 @@ export function useReaderNavigation(
     }
 
     if (allowChapterTransition && currentChapter.hasNext) {
-      startChapterNavigation(chapterIndex + 1, 'start');
+      requestChapterNavigation(chapterIndex + 1, 'start');
     }
   }, [
     chapterIndex,
@@ -120,30 +91,15 @@ export function useReaderNavigation(
     isPagedMode,
     pageCount,
     pageIndex,
-    queueIntent,
+    requestChapterNavigation,
     setPageIndex,
-    startChapterNavigation,
   ]);
 
-  const goToNextPage = useCallback(() => {
-    performNextPageNavigation();
-  }, [performNextPageNavigation]);
-
-  const performPrevPageNavigation = useCallback((options: PageNavigationOptions = {}) => {
+  const stepPrevPage = useCallback((allowChapterTransition: boolean) => {
     if (!currentChapter) return;
-    const { allowChapterTransition = true, queueDuringTransition = true } = options;
 
-    if (isPagedMode) {
-      if (transitionTargetChapterIndexRef.current !== null) {
-        if (queueDuringTransition) {
-          queueIntent({ type: 'prev' });
-        }
-        return;
-      }
-
-      if (!isChapterNavigationReady || currentChapter.index !== chapterIndex) {
-        return;
-      }
+    if (isPagedMode && (!isChapterNavigationReady || currentChapter.index !== chapterIndex)) {
+      return;
     }
 
     if (pageIndex > 0) {
@@ -152,7 +108,7 @@ export function useReaderNavigation(
     }
 
     if (allowChapterTransition && currentChapter.hasPrev) {
-      startChapterNavigation(chapterIndex - 1, 'end');
+      requestChapterNavigation(chapterIndex - 1, 'end');
     }
   }, [
     chapterIndex,
@@ -160,14 +116,40 @@ export function useReaderNavigation(
     isChapterNavigationReady,
     isPagedMode,
     pageIndex,
-    queueIntent,
+    requestChapterNavigation,
     setPageIndex,
-    startChapterNavigation,
   ]);
 
+  useLayoutEffect(() => {
+    replayDirectionalNavigationRef.current = (direction) => {
+      if (direction === 'next') {
+        stepNextPage(false);
+        return;
+      }
+
+      stepPrevPage(false);
+    };
+  }, [stepNextPage, stepPrevPage]);
+
+  const goToChapter = useCallback((targetIndex: number, pageTarget: PageTarget = 'start') => {
+    requestChapterNavigation(targetIndex, pageTarget);
+  }, [requestChapterNavigation]);
+
+  const goToNextPage = useCallback(() => {
+    if (!requestDirectionalNavigation('next')) {
+      return;
+    }
+
+    stepNextPage(true);
+  }, [requestDirectionalNavigation, stepNextPage]);
+
   const goToPrevPage = useCallback(() => {
-    performPrevPageNavigation();
-  }, [performPrevPageNavigation]);
+    if (!requestDirectionalNavigation('prev')) {
+      return;
+    }
+
+    stepPrevPage(true);
+  }, [requestDirectionalNavigation, stepPrevPage]);
 
   const handleNext = useCallback(() => {
     if (isPagedMode) {
@@ -190,71 +172,6 @@ export function useReaderNavigation(
       goToChapter(chapterIndex - 1, 'start');
     }
   }, [chapterIndex, goToChapter, goToPrevPage, isPagedMode]);
-
-  useEffect(() => {
-    if (!isPagedMode) {
-      clearPendingNavigation();
-      return;
-    }
-
-    const chapterChanged = lastChapterIndexRef.current !== chapterIndex;
-    lastChapterIndexRef.current = chapterIndex;
-
-    if (!chapterChanged) {
-      return;
-    }
-
-    const changeSource = chapterChangeSourceRef.current;
-    if ((changeSource === 'scroll' || changeSource === 'restore')
-      && transitionTargetChapterIndexRef.current !== null) {
-      clearPendingNavigation();
-    }
-  }, [chapterChangeSourceRef, chapterIndex, clearPendingNavigation, isPagedMode]);
-
-  useEffect(() => {
-    if (!isPagedMode) {
-      return;
-    }
-
-    const transitionTarget = transitionTargetChapterIndexRef.current;
-    if (transitionTarget === null) {
-      return;
-    }
-
-    if (!isChapterNavigationReady || chapterIndex !== transitionTarget) {
-      return;
-    }
-
-    const queuedIntent = queuedIntentRef.current;
-    transitionTargetChapterIndexRef.current = null;
-    queuedIntentRef.current = null;
-
-    if (!queuedIntent) {
-      return;
-    }
-
-    if (queuedIntent.type === 'chapter') {
-      if (queuedIntent.targetIndex === chapterIndex) {
-        return;
-      }
-      startChapterNavigation(queuedIntent.targetIndex, queuedIntent.pageTarget);
-      return;
-    }
-
-    if (queuedIntent.type === 'next') {
-      performNextPageNavigation({ allowChapterTransition: false, queueDuringTransition: false });
-      return;
-    }
-
-    performPrevPageNavigation({ allowChapterTransition: false, queueDuringTransition: false });
-  }, [
-    chapterIndex,
-    isChapterNavigationReady,
-    isPagedMode,
-    performNextPageNavigation,
-    performPrevPageNavigation,
-    startChapterNavigation,
-  ]);
 
   const toolbarHasPrev = isPagedMode
     ? pageIndex > 0 || Boolean(currentChapter?.hasPrev)

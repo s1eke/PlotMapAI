@@ -2,9 +2,8 @@ import { useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { readerApi } from '../api/readerApi';
 import type { Chapter, ChapterContent } from '../api/readerApi';
+import type { ChapterChangeSource } from './navigationTypes';
 import type { PageTarget, StoredReaderState } from './useReaderStatePersistence';
-
-type ChapterChangeSource = 'navigation' | 'scroll' | 'restore' | null;
 
 interface UseReaderChapterDataParams {
   novelId: number;

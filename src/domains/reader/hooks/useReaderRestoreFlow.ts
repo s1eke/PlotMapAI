@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { ChapterContent } from '../api/readerApi';
+import type { ChapterChangeSource } from './navigationTypes';
 import type { ScrollModeAnchor } from './useScrollModeChapters';
 import type { StoredReaderState } from './useReaderStatePersistence';
 import {
@@ -14,8 +15,6 @@ import {
   getContainerProgress,
   shouldMaskReaderPositionRestore,
 } from '../utils/readerPosition';
-
-type ChapterChangeSource = 'navigation' | 'scroll' | 'restore' | null;
 
 interface UseReaderRestoreFlowParams {
   novelId: number;
