@@ -26,4 +26,19 @@ describe('htmlToText', () => {
     const html = '<span class="note" id="n1" title="footnote 1">important</span>';
     expect(htmlToText(html)).toBe('important');
   });
+
+  it('removes head block and its children including title and meta tags', () => {
+    const html = '<head><title>未知</title><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><link href="style.css" rel="stylesheet"></head><body><p>Chapter content</p></body>';
+    expect(htmlToText(html)).toBe('Chapter content');
+  });
+
+  it('does not truncate text after void metadata tags without XML self-closing syntax', () => {
+    const html = '<p>Intro</p><meta charset="utf-8"><link rel="stylesheet" href="style.css"><p>Body</p>';
+    expect(htmlToText(html)).toBe('Intro\nBody');
+  });
+
+  it('treats head as closed when valid HTML omits the closing head tag', () => {
+    const html = '<html><head><title>Title</title><body><p>Chapter content</p></body></html>';
+    expect(htmlToText(html)).toBe('Chapter content');
+  });
 });

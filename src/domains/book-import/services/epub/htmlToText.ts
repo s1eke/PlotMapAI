@@ -1,5 +1,7 @@
 const NAV_LINE_PATTERN = /^(?:chapter\s+\d+\s*[-–—]\s*\d+|第\s*\d+\s*[章节页]\s*[-–—]?\s*(?:第\s*\d+\s*[页节]?)?|(?:上一[章回页节篇]|下一[章回页节篇]|返回目录|目录|首页|末页|back|next|prev(?:ious)?|home|toc|contents?)(?:\s*[｜|]\s*(?:上一[章回页节篇]|下一[章回页节篇]|返回目录|目录|首页|末页|back|next|prev(?:ious)?|home|toc|contents?))*)$/iu;
-const BLOCK_TAG_NAMES = new Set(['script', 'style', 'nav', 'header', 'footer']);
+const BLOCK_TAG_NAMES = new Set(['head', 'link', 'meta', 'script', 'style', 'nav', 'header', 'footer', 'title']);
+const VOID_TAG_NAMES = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'param', 'source', 'track', 'wbr']);
+const HEAD_CONTENT_TAG_NAMES = new Set(['base', 'link', 'meta', 'noscript', 'script', 'style', 'template', 'title']);
 const STRUCTURAL_TAG_NAMES = new Set(['article', 'br', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'ol', 'p', 'section', 'table', 'td', 'th', 'tr', 'ul']);
 
 function isHtmlWhitespace(char: string): boolean {
@@ -105,10 +107,22 @@ function parseHtmlTag(rawTagContent: string): ParsedHtmlTag | null {
   return {
     name,
     isClosing,
-    isSelfClosing: !isClosing && rawTagContent[tail] === '/',
+    isSelfClosing: !isClosing && (rawTagContent[tail] === '/' || VOID_TAG_NAMES.has(name)),
     hasNavMarker: !isClosing && hasNavMarker(rawTagContent.slice(index)),
     isSpecial: false,
   };
+}
+
+function shouldImplicitlyCloseBlockedElement(tagName: string, tag: ParsedHtmlTag): boolean {
+  if (tagName !== 'head') {
+    return false;
+  }
+
+  if (tag.isClosing) {
+    return tag.name === 'body' || tag.name === 'html';
+  }
+
+  return !HEAD_CONTENT_TAG_NAMES.has(tag.name);
 }
 
 function skipBlockedElement(html: string, tagEnd: number, tagName: string): number {
@@ -125,6 +139,9 @@ function skipBlockedElement(html: string, tagEnd: number, tagName: string): numb
     const nextTagEnd = findTagEnd(html, nextTagStart);
     if (nextTagEnd === -1) return html.length;
     const tag = parseHtmlTag(html.slice(nextTagStart + 1, nextTagEnd));
+    if (tag && !tag.isSpecial && depth === 1 && shouldImplicitlyCloseBlockedElement(tagName, tag)) {
+      return nextTagStart;
+    }
     if (tag && !tag.isSpecial && tag.name === tagName) {
       if (tag.isClosing) {
         depth -= 1;
