@@ -3,10 +3,17 @@ import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, Loader2, Sparkles } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { appPaths } from '@app/router/paths';
+import { reportAppError } from '@app/debug/service';
 import { analysisApi } from '@domains/analysis';
 import type { CharacterGraphResponse } from '@domains/analysis';
 import { libraryApi } from '@domains/library';
 import type { NovelView } from '@domains/library';
+import {
+  AppErrorCode,
+  toAppError,
+  translateAppError,
+  type AppError,
+} from '@shared/errors';
 import CharacterGraphStage from '../components/characterGraph/CharacterGraphStage';
 import { useCharacterGraphCanvas } from '../hooks/useCharacterGraphCanvas';
 
@@ -24,16 +31,22 @@ export default function CharacterGraphPage() {
   const [graph, setGraph] = useState<CharacterGraphResponse | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<AppError | null>(null);
   const [isRefreshingOverview, setIsRefreshingOverview] = useState(false);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<AppError | null>(null);
   const [isMobile, setIsMobile] = useState<boolean>(getIsMobileViewport);
 
   const canvas = useCharacterGraphCanvas({ graph, isLoading, isMobile, t });
 
   const loadData = useCallback(async () => {
     if (!Number.isFinite(novelId) || novelId <= 0) {
-      setError(t('characterGraph.loadError'));
+      setError(toAppError('Invalid novel id', {
+        code: AppErrorCode.NOVEL_NOT_FOUND,
+        kind: 'not-found',
+        source: 'character-graph',
+        userMessageKey: 'characterGraph.loadError',
+      }));
       setIsLoading(false);
       return;
     }
@@ -48,11 +61,18 @@ export default function CharacterGraphPage() {
       setNovel(novelData);
       setGraph(graphData);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('characterGraph.loadError'));
+      const normalized = toAppError(err, {
+        code: AppErrorCode.STORAGE_OPERATION_FAILED,
+        kind: 'storage',
+        source: 'character-graph',
+        userMessageKey: 'characterGraph.loadError',
+      });
+      reportAppError(normalized);
+      setError(normalized);
     } finally {
       setIsLoading(false);
     }
-  }, [novelId, t]);
+  }, [novelId]);
 
   useEffect(() => {
     void loadData();
@@ -106,11 +126,19 @@ export default function CharacterGraphPage() {
     if (!canRefreshOverview || !novelId) return;
     setIsRefreshingOverview(true);
     setActionMessage(null);
+    setActionError(null);
     try {
       await analysisApi.refreshOverview(novelId);
       setActionMessage(t('characterGraph.refreshStarted'));
     } catch (err) {
-      setActionMessage(err instanceof Error ? err.message : t('characterGraph.refreshFailed'));
+      const normalized = toAppError(err, {
+        code: AppErrorCode.OVERVIEW_FAILED,
+        kind: 'execution',
+        source: 'character-graph',
+        userMessageKey: 'characterGraph.refreshFailed',
+      });
+      reportAppError(normalized);
+      setActionError(normalized);
     } finally {
       setIsRefreshingOverview(false);
     }
@@ -127,7 +155,9 @@ export default function CharacterGraphPage() {
   if (error || !novel || !graph) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-4 bg-[#f5f2eb] p-8 text-center">
-        <p className="text-[#8f4c42]">{error || t('characterGraph.loadError')}</p>
+        <p className="text-[#8f4c42]">
+          {error ? translateAppError(error, t, 'characterGraph.loadError') : t('characterGraph.loadError')}
+        </p>
         <Link
           to={novelId > 0 ? appPaths.novel(novelId) : appPaths.bookshelf()}
           className="inline-flex items-center gap-2 text-[#5f6b79] transition hover:text-[#18202a]"
@@ -163,7 +193,7 @@ export default function CharacterGraphPage() {
   return (
     <CharacterGraphStage
       fullscreenRef={fullscreenRef}
-      actionMessage={actionMessage}
+      actionMessage={actionError ? translateAppError(actionError, t, 'characterGraph.refreshFailed') : actionMessage}
       canPanCanvas={canvas.canPanCanvas}
       canRefreshOverview={canRefreshOverview}
       focusNodeId={canvas.focusNodeId}

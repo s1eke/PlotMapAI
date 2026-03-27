@@ -1,3 +1,4 @@
+import { AppErrorCode, createAppError } from '@shared/errors';
 import { DEVICE_KEY_STORAGE_KEY } from './keys';
 
 let deviceCryptoKey: CryptoKey | null = null;
@@ -26,7 +27,13 @@ async function getDeviceCryptoKey(): Promise<CryptoKey> {
 
   deviceKeyPromise = (async (): Promise<CryptoKey> => {
     if (!isBrowser()) {
-      throw new Error('Secure storage is unavailable outside the browser');
+      throw createAppError({
+        code: AppErrorCode.STORAGE_SECURE_UNAVAILABLE,
+        kind: 'storage',
+        source: 'storage',
+        debugMessage: 'Secure storage is unavailable outside the browser',
+        userMessageKey: 'errors.STORAGE_SECURE_UNAVAILABLE',
+      });
     }
 
     const existing = localStorage.getItem(DEVICE_KEY_STORAGE_KEY);
@@ -68,7 +75,15 @@ async function encrypt(value: string): Promise<string> {
 
 async function decrypt(payload: string): Promise<string> {
   const dotIndex = payload.indexOf('.');
-  if (dotIndex < 0) throw new Error('Invalid encrypted payload');
+  if (dotIndex < 0) {
+    throw createAppError({
+      code: AppErrorCode.STORAGE_ENCRYPTED_PAYLOAD_INVALID,
+      kind: 'storage',
+      source: 'storage',
+      debugMessage: 'Invalid encrypted payload',
+      userMessageKey: 'errors.STORAGE_ENCRYPTED_PAYLOAD_INVALID',
+    });
+  }
 
   const key = await getDeviceCryptoKey();
   const iv = fromB64(payload.slice(0, dotIndex));

@@ -1,6 +1,14 @@
 import { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { UploadCloud, FileText, Loader2 } from 'lucide-react';
+import { reportAppError } from '@app/debug/service';
+import {
+  AppErrorCode,
+  createAppError,
+  toAppError,
+  translateAppError,
+  type AppError,
+} from '@shared/errors';
 
 import Modal from '@shared/components/Modal';
 import { cn } from '@shared/utils/cn';
@@ -18,7 +26,7 @@ export default function UploadModal({ isOpen, onClose, onSuccess }: UploadModalP
   const { t } = useTranslation();
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<AppError | null>(null);
   const [progress, setProgress] = useState<BookImportProgress | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -39,12 +47,25 @@ export default function UploadModal({ isOpen, onClose, onSuccess }: UploadModalP
     // Validate extension
     const name = file.name.toLowerCase();
     if (!name.endsWith('.txt') && !name.endsWith('.epub')) {
-      setError(t('bookshelf.invalidType'));
+      setError(createAppError({
+        code: AppErrorCode.UNSUPPORTED_FILE_TYPE,
+        kind: 'unsupported',
+        source: 'book-import',
+        userMessageKey: 'bookshelf.invalidType',
+        debugMessage: 'Only .txt and .epub files are supported',
+      }));
       return;
     }
 
     if (file.size > 100 * 1024 * 1024) { // 100MB
-      setError(t('bookshelf.sizeLimit'));
+      setError(createAppError({
+        code: AppErrorCode.BOOK_IMPORT_FAILED,
+        kind: 'validation',
+        source: 'book-import',
+        userMessageKey: 'bookshelf.sizeLimit',
+        debugMessage: 'File size must be less than 100MB',
+        debugVisible: false,
+      }));
       return;
     }
 
@@ -65,7 +86,15 @@ export default function UploadModal({ isOpen, onClose, onSuccess }: UploadModalP
       if (err instanceof Error && err.name === 'AbortError') {
         setError(null);
       } else {
-        setError(err instanceof Error ? err.message : String(err) || t('bookshelf.uploadFailed'));
+        const normalized = toAppError(err, {
+          code: AppErrorCode.BOOK_IMPORT_FAILED,
+          kind: 'execution',
+          source: 'book-import',
+          userMessageKey: 'bookshelf.uploadFailed',
+          retryable: true,
+        });
+        reportAppError(normalized);
+        setError(normalized);
       }
     } finally {
       abortControllerRef.current = null;
@@ -107,7 +136,7 @@ export default function UploadModal({ isOpen, onClose, onSuccess }: UploadModalP
       <div className="flex flex-col gap-4">
         {error && (
           <div className="bg-red-500/10 border border-red-500/20 text-red-500 rounded-lg p-3 text-sm">
-            {error}
+            {translateAppError(error, t, 'bookshelf.uploadFailed')}
           </div>
         )}
 

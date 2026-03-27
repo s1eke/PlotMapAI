@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { appPaths } from '@app/router/paths';
 import { useChapterAnalysis } from '@domains/analysis';
+import { translateAppError, type AppError } from '@shared/errors';
 
 import type { Chapter, ChapterContent } from '../api/readerApi';
 import ReaderSidebar from '../components/reader/ReaderSidebar';
@@ -47,6 +48,7 @@ export default function ReaderPage() {
   const [currentChapter, setCurrentChapter] = useState<ChapterContent | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadingMessage, setLoadingMessage] = useState<string | null>(null);
+  const [readerError, setReaderError] = useState<AppError | null>(null);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageCount, setPageCount] = useState(1);
   const [scrollModeChapters, setScrollModeChapters] = useState<number[]>([]);
@@ -150,6 +152,7 @@ export default function ReaderPage() {
     setIsTwoColumn,
     setPageIndex,
     setPageCount,
+    setReaderError,
     contentRef,
     pagedViewportRef,
     chapterCacheRef,
@@ -276,6 +279,33 @@ export default function ReaderPage() {
 
   const renderableChapter = !isLoading ? currentChapter : null;
   const showLoadingOverlay = isLoading || restoreStatus === 'restoring';
+
+  if (readerError) {
+    return (
+      <div className={cn('flex h-screen w-full items-center justify-center px-6 transition-colors duration-300', preferences.currentTheme.bg)}>
+        <div className="w-full max-w-lg rounded-3xl border border-red-500/20 bg-card-bg/90 p-8 text-center shadow-xl">
+          <p className="text-lg font-semibold text-text-primary">
+            {translateAppError(readerError, t, 'reader.loadError')}
+          </p>
+          <div className="mt-6 flex flex-wrap justify-center gap-3">
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="rounded-xl bg-accent px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-accent-hover"
+            >
+              {t('common.actions.retry')}
+            </button>
+            <Link
+              to={appPaths.novel(novelId)}
+              className="rounded-xl border border-border-color/30 px-4 py-2.5 text-sm font-medium text-text-primary transition-colors hover:bg-white/5"
+            >
+              {t('reader.goBack')}
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={cn('flex h-screen w-full overflow-hidden transition-colors duration-300', preferences.currentTheme.bg)}>

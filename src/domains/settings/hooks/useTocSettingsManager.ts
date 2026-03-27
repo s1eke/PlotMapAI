@@ -6,6 +6,7 @@ import type { SettingsFeedbackState } from '../utils/settingsPage';
 import {
   buildActionErrorMessage,
   downloadFile,
+  getTranslatedErrorMessage,
 } from '../utils/settingsPage';
 
 export interface TocSettingsManager {
@@ -50,7 +51,7 @@ export function useTocSettingsManager(): TocSettingsManager {
       console.error('Failed to load TOC rules', error);
       setFeedback({
         type: 'error',
-        message: t('settings.common.loadFailed'),
+        message: getTranslatedErrorMessage(error, t, 'settings.common.loadFailed'),
       });
     } finally {
       setIsLoading(false);
@@ -92,7 +93,7 @@ export function useTocSettingsManager(): TocSettingsManager {
     } catch (error) {
       setFeedback({
         type: 'error',
-        message: buildActionErrorMessage(t('settings.common.updateFailed'), error),
+        message: buildActionErrorMessage(t('settings.common.updateFailed'), error, t, 'settings.common.updateFailed'),
       });
       throw error;
     }
@@ -107,7 +108,7 @@ export function useTocSettingsManager(): TocSettingsManager {
       setRules((previous) => previous.map((rule) => (rule.id === id ? { ...rule, isEnabled: !isEnabled } : rule)));
       setFeedback({
         type: 'error',
-        message: buildActionErrorMessage(t('settings.common.updateFailed'), error),
+        message: buildActionErrorMessage(t('settings.common.updateFailed'), error, t, 'settings.common.updateFailed'),
       });
     }
   }, [t]);
@@ -134,7 +135,7 @@ export function useTocSettingsManager(): TocSettingsManager {
     } catch (error) {
       setFeedback({
         type: 'error',
-        message: buildActionErrorMessage(t('settings.common.deleteFailed'), error),
+        message: buildActionErrorMessage(t('settings.common.deleteFailed'), error, t, 'settings.common.deleteFailed'),
       });
     }
   }, [pendingDeleteRule, t]);
@@ -152,7 +153,7 @@ export function useTocSettingsManager(): TocSettingsManager {
     } catch (error) {
       setFeedback({
         type: 'error',
-        message: buildActionErrorMessage(t('settings.common.uploadFailed'), error),
+        message: buildActionErrorMessage(t('settings.common.uploadFailed'), error, t, 'settings.common.uploadFailed'),
       });
     } finally {
       setIsLoading(false);
@@ -170,7 +171,7 @@ export function useTocSettingsManager(): TocSettingsManager {
     } catch (error) {
       setFeedback({
         type: 'error',
-        message: buildActionErrorMessage(t('settings.common.exportFailed'), error),
+        message: buildActionErrorMessage(t('settings.common.exportFailed'), error, t, 'settings.common.exportFailed'),
       });
     }
   }, [t]);

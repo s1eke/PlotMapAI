@@ -1,4 +1,5 @@
 import { DEFAULT_ANALYSIS_PROVIDER_ID } from '@domains/analysis';
+import { AppErrorCode, createAppError } from '@shared/errors';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -261,7 +262,13 @@ describe('SettingsPage', () => {
       contextSize: 64000,
       maskedApiKey: 'sk-new',
     });
-    vi.mocked(aiConfigApi.testAiProviderSettings).mockRejectedValueOnce(new Error('connection failed'));
+    vi.mocked(aiConfigApi.testAiProviderSettings).mockRejectedValueOnce(createAppError({
+      code: AppErrorCode.AI_CONNECTION_FAILED,
+      kind: 'network',
+      source: 'settings',
+      userMessageKey: 'errors.AI_CONNECTION_FAILED',
+      debugMessage: 'connection failed',
+    }));
     const user = userEvent.setup();
 
     renderPage();
@@ -291,7 +298,7 @@ describe('SettingsPage', () => {
     expect(await screen.findByText('settings.ai.saveSuccess')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'settings.ai.testButton' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('connection failed');
+    expect(await screen.findByRole('alert')).toHaveTextContent('errors.AI_CONNECTION_FAILED');
   });
 
   it('exports AI config through the backup flow', async () => {
@@ -313,7 +320,13 @@ describe('SettingsPage', () => {
   });
 
   it('maps AI import errors inside the modal', async () => {
-    vi.mocked(aiConfigApi.importAiConfig).mockRejectedValueOnce(new Error('Decryption failed'));
+    vi.mocked(aiConfigApi.importAiConfig).mockRejectedValueOnce(createAppError({
+      code: AppErrorCode.AI_CONFIG_DECRYPT_FAILED,
+      kind: 'validation',
+      source: 'settings',
+      userMessageKey: 'errors.AI_CONFIG_DECRYPT_FAILED',
+      debugMessage: 'Decryption failed',
+    }));
     const user = userEvent.setup();
     const { container } = renderPage();
 
@@ -330,6 +343,6 @@ describe('SettingsPage', () => {
     await waitFor(() => {
       expect(aiConfigApi.importAiConfig).toHaveBeenCalledWith(file, 'safe-pass');
     });
-    expect(await screen.findByText('settings.ai.errorDecryptFailed')).toBeInTheDocument();
+    expect(await screen.findByText('errors.AI_CONFIG_DECRYPT_FAILED')).toBeInTheDocument();
   });
 });

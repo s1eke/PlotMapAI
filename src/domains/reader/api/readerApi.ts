@@ -1,5 +1,6 @@
 import { db } from '@infra/db';
 import type { Chapter as DbChapter } from '@infra/db';
+import { AppErrorCode, createAppError } from '@shared/errors';
 import {
   runPurifyChapterTask,
   runPurifyChaptersTask,
@@ -52,7 +53,16 @@ async function getPurifyRules(): Promise<PurifyRule[]> {
 
 async function getNovelTitle(novelId: number): Promise<string> {
   const novel = await db.novels.get(novelId);
-  if (!novel) throw new Error('Novel not found');
+  if (!novel) {
+    throw createAppError({
+      code: AppErrorCode.NOVEL_NOT_FOUND,
+      kind: 'not-found',
+      source: 'reader',
+      userMessageKey: 'errors.NOVEL_NOT_FOUND',
+      debugMessage: 'Novel not found',
+      details: { novelId },
+    });
+  }
   return novel.title;
 }
 
@@ -128,7 +138,16 @@ export const readerApi = {
       .where('[novelId+chapterIndex]')
       .equals([novelId, chapterIndex])
       .first();
-    if (!chapter) throw new Error('Chapter not found');
+    if (!chapter) {
+      throw createAppError({
+        code: AppErrorCode.CHAPTER_NOT_FOUND,
+        kind: 'not-found',
+        source: 'reader',
+        userMessageKey: 'errors.CHAPTER_NOT_FOUND',
+        debugMessage: 'Chapter not found',
+        details: { chapterIndex, novelId },
+      });
+    }
     const totalChapters = await db.chapters.where('novelId').equals(novelId).count();
     const rules = await getPurifyRules();
     let { title, content } = chapter;

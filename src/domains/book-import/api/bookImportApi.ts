@@ -2,6 +2,7 @@ import { debugLog } from '@app/debug/service';
 import { libraryApi, type NovelView } from '@domains/library';
 import { ensureDefaultTocRules } from '@domains/settings';
 import { db } from '@infra/db';
+import { AppErrorCode, createAppError, toAppError } from '@shared/errors';
 
 import { parseBook } from '../services/bookParser';
 import type { BookImportProgress } from '../services/progress';
@@ -28,7 +29,14 @@ export const bookImportApi = {
     const filename = file.name;
     const ext = filename.toLowerCase().split('.').pop();
     if (ext !== 'txt' && ext !== 'epub') {
-      throw new Error('Only .txt and .epub files are supported');
+      throw createAppError({
+        code: AppErrorCode.UNSUPPORTED_FILE_TYPE,
+        kind: 'unsupported',
+        source: 'book-import',
+        userMessageKey: 'errors.UNSUPPORTED_FILE_TYPE',
+        debugMessage: 'Only .txt and .epub files are supported',
+        details: { filename },
+      });
     }
 
     options.signal?.throwIfAborted?.();
@@ -37,10 +45,22 @@ export const bookImportApi = {
     const ruleDtos = tocRules.map((rule) => ({ rule: rule.rule }));
     debugLog('Upload', `file="${filename}", tocRules=${tocRules.length}`);
 
-    const parsed = await parseBook(file, ruleDtos, {
-      signal: options.signal,
-      onProgress: options.onProgress,
-    });
+    let parsed;
+    try {
+      parsed = await parseBook(file, ruleDtos, {
+        signal: options.signal,
+        onProgress: options.onProgress,
+      });
+    } catch (error) {
+      throw toAppError(error, {
+        code: AppErrorCode.BOOK_IMPORT_FAILED,
+        kind: 'execution',
+        source: 'book-import',
+        userMessageKey: 'errors.BOOK_IMPORT_FAILED',
+        retryable: true,
+        details: { filename },
+      });
+    }
     options.signal?.throwIfAborted?.();
 
     const id = await getNextId();

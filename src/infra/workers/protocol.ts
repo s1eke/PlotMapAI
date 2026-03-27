@@ -1,3 +1,5 @@
+import type { SerializedAppError } from '@shared/errors';
+
 export interface WorkerTaskRunMessage<Payload> {
   kind: 'run';
   requestId: string;
@@ -29,10 +31,7 @@ export interface WorkerTaskResultMessage<Result> {
 export interface WorkerTaskErrorMessage {
   kind: 'error';
   requestId: string;
-  error: {
-    message: string;
-    name?: string;
-  };
+  error: SerializedAppError;
 }
 
 export interface WorkerTaskCancelledMessage {

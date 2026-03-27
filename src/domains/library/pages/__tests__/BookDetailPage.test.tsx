@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { AppErrorCode, createAppError } from '@shared/errors';
 const navigateMock = vi.hoisted(() => vi.fn());
 
 vi.mock('react-router-dom', async () => {
@@ -118,10 +119,16 @@ describe('BookDetailPage', () => {
   });
 
   it('renders the not-found state when loading the novel fails', async () => {
-    vi.mocked(libraryApi.get).mockRejectedValueOnce(new Error('Novel not found'));
+    vi.mocked(libraryApi.get).mockRejectedValueOnce(createAppError({
+      code: AppErrorCode.NOVEL_NOT_FOUND,
+      kind: 'not-found',
+      source: 'library',
+      userMessageKey: 'errors.NOVEL_NOT_FOUND',
+      debugMessage: 'Novel not found',
+    }));
     renderPage();
 
-    expect(await screen.findByText('Novel not found')).toBeInTheDocument();
+    expect(await screen.findByText('errors.NOVEL_NOT_FOUND')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'common.actions.backToBookshelf' })).toHaveAttribute('href', '/');
   });
 

@@ -1,4 +1,5 @@
 import { db } from '@infra/db';
+import { AppErrorCode, createAppError } from '@shared/errors';
 
 export interface NovelView {
   id: number;
@@ -48,7 +49,14 @@ export const libraryApi = {
   async get(id: number): Promise<NovelView> {
     const novel = await db.novels.get(id);
     if (!novel) {
-      throw new Error('Novel not found');
+      throw createAppError({
+        code: AppErrorCode.NOVEL_NOT_FOUND,
+        kind: 'not-found',
+        source: 'library',
+        userMessageKey: 'errors.NOVEL_NOT_FOUND',
+        debugMessage: 'Novel not found',
+        details: { novelId: id },
+      });
     }
     const count = await db.chapters.where('novelId').equals(id).count();
     return novelToApi(novel, count);

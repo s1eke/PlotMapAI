@@ -1,10 +1,9 @@
+import { reportAppError } from '@app/debug/service';
+import { AppErrorCode, toAppError } from '@shared/errors';
 import { buildChunkFromChapters } from '../services/chunking';
 import {
-  AnalysisConfigError,
   AnalysisErrorCode,
-  AnalysisExecutionError,
   AnalysisJobStateError,
-  ChunkingError,
 } from '../services/errors';
 import { isChapterAnalysisComplete } from '../services/aggregates';
 import {
@@ -28,16 +27,14 @@ function nowISO(): string {
   return new Date().toISOString();
 }
 
-function formatExceptionMessage(error: unknown): string {
-  if (
-    error instanceof AnalysisConfigError ||
-    error instanceof AnalysisExecutionError ||
-    error instanceof ChunkingError ||
-    error instanceof AnalysisJobStateError
-  ) {
-    return error.message;
-  }
-  return `Internal error: ${error instanceof Error ? error.message : String(error)}`;
+function normalizeRuntimeError(error: unknown, details?: Record<string, unknown>) {
+  return toAppError(error, {
+    code: AppErrorCode.INTERNAL_ERROR,
+    kind: 'internal',
+    source: 'analysis',
+    userMessageKey: 'errors.INTERNAL_ERROR',
+    details,
+  });
 }
 
 function hydrateChunkPayload(chunk: AnalysisChunk, chapterMap: Map<number, Chapter>): AnalysisChunkPayload {
@@ -134,9 +131,15 @@ export async function runAnalysisExecution({
           lastHeartbeat: nowISO(),
         });
       } catch (error) {
-        const message = `Chunk ${chunk.chunkIndex + 1} failed: ${formatExceptionMessage(error)}`;
+        const normalized = normalizeRuntimeError(error, {
+          novelId,
+          stage: 'chunk',
+          chunkIndex: chunk.chunkIndex,
+        });
+        reportAppError(normalized);
+        const message = `Chunk ${chunk.chunkIndex + 1} failed: ${normalized.debugMessage}`;
         await repository.markChunkFailed(novelId, payload.chunkIndex, message);
-        await failJob(repository, novelId, totalChapters, deriveJobPatchForChunkFailure(message));
+        await failJob(repository, novelId, totalChapters, deriveJobPatchForChunkFailure(normalized.code));
         return;
       }
     }
@@ -171,8 +174,12 @@ export async function runAnalysisExecution({
         });
         return;
       } catch (error) {
-        const message = `Overview generation failed: ${formatExceptionMessage(error)}`;
-        await failJob(repository, novelId, totalChapters, deriveJobPatchForOverviewFailure(message));
+        const normalized = normalizeRuntimeError(error, {
+          novelId,
+          stage: 'overview',
+        });
+        reportAppError(normalized);
+        await failJob(repository, novelId, totalChapters, deriveJobPatchForOverviewFailure(normalized.code));
         return;
       }
     }
@@ -195,11 +202,20 @@ export async function runAnalysisExecution({
     });
   } catch (error) {
     try {
+      const normalized = normalizeRuntimeError(error, {
+        novelId,
+        stage: 'execution',
+      });
+      reportAppError(normalized);
       await failJob(
         repository,
         novelId,
         totalChapters,
-        deriveJobPatchForChunkFailure(formatExceptionMessage(error)),
+        deriveJobPatchForChunkFailure(
+          normalized.code === AppErrorCode.INTERNAL_ERROR
+            ? AnalysisErrorCode.INTERNAL_ERROR
+            : normalized.code,
+        ),
       );
     } catch {
       // swallow secondary errors

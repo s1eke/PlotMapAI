@@ -1,3 +1,4 @@
+import { translateAppError } from '@shared/errors';
 import { DEFAULT_ANALYSIS_PROVIDER_ID } from '@domains/analysis';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -9,8 +10,6 @@ import type {
 import type { SettingsFeedbackState } from '../utils/settingsPage';
 import {
   downloadFile,
-  mapAiExportError,
-  mapAiImportError,
 } from '../utils/settingsPage';
 
 export interface AiSettingsManager {
@@ -95,7 +94,10 @@ export function useAiSettingsManager(): AiSettingsManager {
       console.error('Failed to load AI settings', error);
       setFeedback({
         type: 'error',
-        message: t('settings.ai.loadFailed'),
+        message: translateAppError(error, t, 'settings.ai.loadFailed', {
+          source: 'settings',
+          kind: 'execution',
+        }),
       });
     } finally {
       setIsLoading(false);
@@ -142,7 +144,10 @@ export function useAiSettingsManager(): AiSettingsManager {
     } catch (error) {
       setFeedback({
         type: 'error',
-        message: error instanceof Error ? error.message : t('settings.ai.saveFailed'),
+        message: translateAppError(error, t, 'settings.ai.saveFailed', {
+          source: 'settings',
+          kind: 'execution',
+        }),
       });
     } finally {
       setIsSaving(false);
@@ -166,7 +171,10 @@ export function useAiSettingsManager(): AiSettingsManager {
     } catch (error) {
       setFeedback({
         type: 'error',
-        message: error instanceof Error ? error.message : t('settings.ai.testFailed'),
+        message: translateAppError(error, t, 'settings.ai.testFailed', {
+          source: 'settings',
+          kind: 'execution',
+        }),
       });
     } finally {
       setIsTesting(false);
@@ -212,7 +220,10 @@ export function useAiSettingsManager(): AiSettingsManager {
     } catch (error) {
       setExportDialogFeedback({
         type: 'error',
-        message: mapAiExportError(error, t),
+        message: translateAppError(error, t, 'settings.ai.errorExport', {
+          source: 'settings',
+          kind: 'execution',
+        }),
       });
     } finally {
       setIsExporting(false);
@@ -262,7 +273,10 @@ export function useAiSettingsManager(): AiSettingsManager {
     } catch (error) {
       setImportDialogFeedback({
         type: 'error',
-        message: mapAiImportError(error, t),
+        message: translateAppError(error, t, 'settings.ai.errorImport', {
+          source: 'settings',
+          kind: 'execution',
+        }),
       });
     } finally {
       setIsImporting(false);

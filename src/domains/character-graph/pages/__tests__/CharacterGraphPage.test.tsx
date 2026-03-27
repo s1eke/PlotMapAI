@@ -172,7 +172,7 @@ describe('CharacterGraphPage', () => {
     vi.mocked(analysisApi.getCharacterGraph).mockRejectedValue(new Error('graph load failed'));
     renderPage('/novel/1/graph');
 
-    expect(await screen.findByText('graph load failed')).toBeInTheDocument();
+    expect(await screen.findByText('characterGraph.loadError')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'characterGraph.backToBook' })).toHaveAttribute('href', '/novel/1');
   });
 

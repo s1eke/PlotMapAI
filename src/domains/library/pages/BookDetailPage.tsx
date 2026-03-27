@@ -3,7 +3,14 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { AlertTriangle, ArrowLeft, BookOpen, Bot, FileText, Hash, Loader2, Pause, Play, RefreshCw, Share2, Trash2, type LucideIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { appPaths } from '@app/router/paths';
+import { reportAppError } from '@app/debug/service';
 import { analysisApi, type AnalysisStatusResponse } from '@domains/analysis';
+import {
+  AppErrorCode,
+  toAppError,
+  translateAppError,
+  type AppError,
+} from '@shared/errors';
 
 import Modal from '@shared/components/Modal';
 
@@ -21,8 +28,9 @@ export default function BookDetailPage() {
   const [analysisStatus, setAnalysisStatus] = useState<AnalysisStatusResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAnalysisLoading, setIsAnalysisLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<AppError | null>(null);
   const [analysisMessage, setAnalysisMessage] = useState<string | null>(null);
+  const [analysisError, setAnalysisError] = useState<AppError | null>(null);
   const [analysisAction, setAnalysisAction] = useState<'start' | 'pause' | 'resume' | 'restart' | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -40,11 +48,18 @@ export default function BookDetailPage() {
         setCoverUrl(url);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('bookDetail.loadError'));
+      const normalized = toAppError(err, {
+        code: AppErrorCode.STORAGE_OPERATION_FAILED,
+        kind: 'storage',
+        source: 'library',
+        userMessageKey: 'bookDetail.loadError',
+      });
+      reportAppError(normalized);
+      setError(normalized);
     } finally {
       setIsLoading(false);
     }
-  }, [novelId, t]);
+  }, [novelId]);
 
   const loadAnalysisStatus = useCallback(async (silent = false) => {
     if (!novelId) return;
@@ -52,13 +67,22 @@ export default function BookDetailPage() {
     try {
       const data = await analysisApi.getStatus(novelId);
       setAnalysisStatus(data);
+      setAnalysisError(null);
     } catch (err) {
-      setAnalysisMessage(err instanceof Error ? err.message : t('bookDetail.analysisLoadError'));
+      const normalized = toAppError(err, {
+        code: AppErrorCode.ANALYSIS_EXECUTION_FAILED,
+        kind: 'execution',
+        source: 'analysis',
+        userMessageKey: 'bookDetail.analysisLoadError',
+        retryable: true,
+      });
+      reportAppError(normalized);
+      setAnalysisError(normalized);
       setAnalysisStatus(null);
     } finally {
       if (!silent) setIsAnalysisLoading(false);
     }
-  }, [novelId, t]);
+  }, [novelId]);
 
   useEffect(() => {
     loadNovel();
@@ -108,7 +132,14 @@ export default function BookDetailPage() {
       await libraryApi.delete(novel.id);
       navigate(appPaths.bookshelf(), { replace: true });
     } catch (err) {
-      alert(err instanceof Error ? err.message : t('bookDetail.deleteFailed'));
+      const normalized = toAppError(err, {
+        code: AppErrorCode.STORAGE_OPERATION_FAILED,
+        kind: 'storage',
+        source: 'library',
+        userMessageKey: 'bookDetail.deleteFailed',
+      });
+      reportAppError(normalized);
+      alert(translateAppError(normalized, t, 'bookDetail.deleteFailed'));
       setIsDeleting(false);
       setIsDeleteModalOpen(false);
     }
@@ -118,6 +149,7 @@ export default function BookDetailPage() {
     if (!novelId) return;
     setAnalysisAction(action);
     setAnalysisMessage(null);
+    setAnalysisError(null);
     try {
       const result = await (action === 'start'
         ? analysisApi.start(novelId)
@@ -137,7 +169,15 @@ export default function BookDetailPage() {
               : t('bookDetail.analysisActionStarted')
       );
     } catch (err) {
-      setAnalysisMessage(err instanceof Error ? err.message : t('bookDetail.analysisActionFailed'));
+      const normalized = toAppError(err, {
+        code: AppErrorCode.ANALYSIS_EXECUTION_FAILED,
+        kind: 'execution',
+        source: 'analysis',
+        userMessageKey: 'bookDetail.analysisActionFailed',
+        retryable: true,
+      });
+      reportAppError(normalized);
+      setAnalysisError(normalized);
     } finally {
       setAnalysisAction(null);
     }
@@ -154,7 +194,9 @@ export default function BookDetailPage() {
   if (error || !novel) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
-        <p className="text-red-400 mb-4">{error || t('bookDetail.notFound')}</p>
+        <p className="text-red-400 mb-4">
+          {error ? translateAppError(error, t, 'bookDetail.loadError') : t('bookDetail.notFound')}
+        </p>
         <Link to={appPaths.bookshelf()} className="text-accent hover:text-accent-hover underline flex items-center gap-2">
           <ArrowLeft className="w-4 h-4" /> {t('common.actions.backToBookshelf')}
         </Link>
@@ -324,6 +366,11 @@ export default function BookDetailPage() {
                     {analysisMessage && (
                       <div className="rounded-xl border border-border-color/20 bg-black/10 px-4 py-3 text-sm text-text-secondary leading-6">
                         {analysisMessage}
+                      </div>
+                    )}
+                    {analysisError && (
+                      <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300 leading-6">
+                        {translateAppError(analysisError, t, 'bookDetail.analysisActionFailed')}
                       </div>
                     )}
 

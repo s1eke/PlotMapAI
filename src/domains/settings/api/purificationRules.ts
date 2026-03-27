@@ -1,5 +1,6 @@
 import { db } from '@infra/db';
 import { debugLog } from '@app/debug/service';
+import { AppErrorCode, createAppError } from '@shared/errors';
 import { dumpYaml, loadYaml } from '../services/yaml';
 import type { PurificationRule } from './types';
 
@@ -39,7 +40,15 @@ export const purificationRulesApi = {
   },
 
   createPurificationRule: async (data: Partial<PurificationRule>): Promise<PurificationRule> => {
-    if (!data.name || !data.pattern) throw new Error('Missing field: name or pattern');
+    if (!data.name || !data.pattern) {
+      throw createAppError({
+        code: AppErrorCode.PURIFICATION_RULE_FIELDS_REQUIRED,
+        kind: 'validation',
+        source: 'settings',
+        userMessageKey: 'errors.PURIFICATION_RULE_FIELDS_REQUIRED',
+        debugMessage: 'Missing field: name or pattern',
+      });
+    }
     const now = new Date().toISOString();
     const id = await db.purificationRules.add({
       id: undefined as unknown as number,
@@ -85,13 +94,29 @@ export const purificationRulesApi = {
     }
     await db.purificationRules.update(id, updates);
     const rule = await db.purificationRules.get(id);
-    if (!rule) throw new Error('Rule not found');
+    if (!rule) {
+      throw createAppError({
+        code: AppErrorCode.RULE_NOT_FOUND,
+        kind: 'not-found',
+        source: 'settings',
+        userMessageKey: 'errors.RULE_NOT_FOUND',
+        debugMessage: 'Rule not found',
+      });
+    }
     return purRuleToApi(rule);
   },
 
   deletePurificationRule: async (id: number): Promise<{ message: string }> => {
     const rule = await db.purificationRules.get(id);
-    if (!rule) throw new Error('Rule not found');
+    if (!rule) {
+      throw createAppError({
+        code: AppErrorCode.RULE_NOT_FOUND,
+        kind: 'not-found',
+        source: 'settings',
+        userMessageKey: 'errors.RULE_NOT_FOUND',
+        debugMessage: 'Rule not found',
+      });
+    }
     await db.purificationRules.delete(id);
     return { message: 'Rule deleted' };
   },
@@ -109,7 +134,14 @@ export const purificationRulesApi = {
       const loaded = await loadYaml(text);
       parsed = Array.isArray(loaded) ? loaded : [];
     } catch (error) {
-      throw new Error(`Invalid YAML file: ${error instanceof Error ? error.message : String(error)}`);
+      throw createAppError({
+        code: AppErrorCode.INVALID_YAML_FILE,
+        kind: 'validation',
+        source: 'settings',
+        userMessageKey: 'errors.INVALID_YAML_FILE',
+        debugMessage: `Invalid YAML file: ${error instanceof Error ? error.message : String(error)}`,
+        cause: error,
+      });
     }
     debugLog('Settings', `parsed ${parsed.length} rules`);
     const existing = await db.purificationRules.toArray();

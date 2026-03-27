@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { reportAppError } from '@app/debug/service';
+import { AppErrorCode, toAppError } from '@shared/errors';
 import { analysisApi } from '../api/analysisApi';
 import type { AnalysisStatusResponse, ChapterAnalysisResult } from '../api/analysisApi';
 
@@ -16,6 +18,12 @@ export function useChapterAnalysis(novelId: number, chapterIndex: number) {
       const data = await analysisApi.getStatus(novelId);
       setAnalysisStatus(data);
     } catch (err) {
+      reportAppError(toAppError(err, {
+        code: AppErrorCode.ANALYSIS_EXECUTION_FAILED,
+        kind: 'execution',
+        source: 'analysis',
+        userMessageKey: 'errors.ANALYSIS_EXECUTION_FAILED',
+      }));
       console.error('Failed to load analysis status', err);
       setAnalysisStatus(null);
     }
@@ -44,6 +52,12 @@ export function useChapterAnalysis(novelId: number, chapterIndex: number) {
       chapterAnalysisCacheRef.current.set(cacheKey, data.analysis);
       setChapterAnalysis(data.analysis);
     } catch (err) {
+      reportAppError(toAppError(err, {
+        code: AppErrorCode.ANALYSIS_EXECUTION_FAILED,
+        kind: 'execution',
+        source: 'analysis',
+        userMessageKey: 'errors.ANALYSIS_EXECUTION_FAILED',
+      }));
       console.error('Failed to load chapter analysis', err);
       if (!hasCachedAnalysis) {
         setChapterAnalysis(null);
@@ -61,6 +75,12 @@ export function useChapterAnalysis(novelId: number, chapterIndex: number) {
       chapterAnalysisCacheRef.current.set(`${novelId}:${chapterIndex}`, result.analysis);
       setChapterAnalysis(result.analysis);
     } catch (err) {
+      reportAppError(toAppError(err, {
+        code: AppErrorCode.ANALYSIS_EXECUTION_FAILED,
+        kind: 'execution',
+        source: 'analysis',
+        userMessageKey: 'errors.ANALYSIS_EXECUTION_FAILED',
+      }));
       console.error('Failed to analyze chapter', err);
     } finally {
       setIsAnalyzingChapter(false);

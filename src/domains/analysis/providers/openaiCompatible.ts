@@ -1,4 +1,5 @@
 import { debugLog } from '@app/debug/service';
+import { AppErrorCode } from '@shared/errors';
 import { LLM_TIMEOUT_MS } from '../services/constants';
 import { AnalysisExecutionError } from '../services/errors';
 import type {
@@ -101,16 +102,31 @@ async function requestChatCompletion(
   } catch (error) {
     cleanup();
     if (requestSignal.aborted) {
-      throw new AnalysisExecutionError('AI 接口请求超时，请稍后重试。');
+      throw new AnalysisExecutionError('AI 接口请求超时，请稍后重试。', {
+        code: AppErrorCode.AI_REQUEST_TIMEOUT,
+        retryable: true,
+        userMessageKey: 'errors.AI_REQUEST_TIMEOUT',
+      });
     }
-    throw new AnalysisExecutionError(`AI 接口连接失败：${createAbortErrorMessage(error)}`);
+    throw new AnalysisExecutionError(`AI 接口连接失败：${createAbortErrorMessage(error)}`, {
+      code: AppErrorCode.AI_CONNECTION_FAILED,
+      retryable: true,
+      userMessageKey: 'errors.AI_CONNECTION_FAILED',
+      cause: error,
+    });
   }
 
   cleanup();
 
   if (!response.ok) {
     const detail = await response.text().catch(() => '');
-    throw new AnalysisExecutionError(`AI 接口返回错误（HTTP ${response.status}）：${extractErrorMessage(detail)}`);
+    throw new AnalysisExecutionError(`AI 接口返回错误（HTTP ${response.status}）：${extractErrorMessage(detail)}`, {
+      code: AppErrorCode.AI_RESPONSE_HTTP_ERROR,
+      retryable: response.status >= 500 || response.status === 429,
+      userMessageKey: 'errors.AI_RESPONSE_HTTP_ERROR',
+      userMessageParams: { status: response.status },
+      details: { status: response.status },
+    });
   }
 
   const rawResponse = await response.text();
@@ -120,31 +136,49 @@ async function requestChatCompletion(
   try {
     data = JSON.parse(rawResponse);
   } catch {
-    throw new AnalysisExecutionError('AI 接口返回的不是合法 JSON 响应。');
+    throw new AnalysisExecutionError('AI 接口返回的不是合法 JSON 响应。', {
+      code: AppErrorCode.AI_RESPONSE_INVALID,
+      userMessageKey: 'errors.AI_RESPONSE_INVALID',
+    });
   }
 
   if (typeof data !== 'object' || data === null) {
-    throw new AnalysisExecutionError('AI 接口返回格式无效。');
+    throw new AnalysisExecutionError('AI 接口返回格式无效。', {
+      code: AppErrorCode.AI_RESPONSE_INVALID,
+      userMessageKey: 'errors.AI_RESPONSE_INVALID',
+    });
   }
 
   const choices = data.choices;
   if (!Array.isArray(choices) || choices.length === 0) {
-    throw new AnalysisExecutionError('AI 接口返回内容为空。');
+    throw new AnalysisExecutionError('AI 接口返回内容为空。', {
+      code: AppErrorCode.AI_RESPONSE_EMPTY,
+      userMessageKey: 'errors.AI_RESPONSE_EMPTY',
+    });
   }
 
   const firstChoice = choices[0];
   if (typeof firstChoice !== 'object' || firstChoice === null) {
-    throw new AnalysisExecutionError('AI 接口返回内容格式无效。');
+    throw new AnalysisExecutionError('AI 接口返回内容格式无效。', {
+      code: AppErrorCode.AI_RESPONSE_INVALID,
+      userMessageKey: 'errors.AI_RESPONSE_INVALID',
+    });
   }
 
   const message = (firstChoice as Record<string, unknown>).message;
   if (typeof message !== 'object' || message === null) {
-    throw new AnalysisExecutionError('AI 接口返回内容格式无效。');
+    throw new AnalysisExecutionError('AI 接口返回内容格式无效。', {
+      code: AppErrorCode.AI_RESPONSE_INVALID,
+      userMessageKey: 'errors.AI_RESPONSE_INVALID',
+    });
   }
 
   const content = extractMessageContent((message as Record<string, unknown>).content);
   if (!content.trim()) {
-    throw new AnalysisExecutionError('AI 接口未返回有效文本内容。');
+    throw new AnalysisExecutionError('AI 接口未返回有效文本内容。', {
+      code: AppErrorCode.AI_RESPONSE_NO_TEXT,
+      userMessageKey: 'errors.AI_RESPONSE_NO_TEXT',
+    });
   }
 
   return content;
