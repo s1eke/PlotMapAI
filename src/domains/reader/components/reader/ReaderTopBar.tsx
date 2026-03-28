@@ -1,9 +1,32 @@
 import { ArrowLeft, AlignLeft, Bot, Menu, X } from 'lucide-react';
+import { motion } from 'motion/react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
+
 import { cn } from '@shared/utils/cn';
 
 import { appPaths } from '@app/router/paths';
+
+const READER_TOP_BAR_VARIANTS = {
+  hidden: {
+    y: '-100%',
+    opacity: 0,
+    transition: {
+      duration: 0.2,
+      ease: [0.32, 0.72, 0, 1],
+    },
+  },
+  visible: {
+    y: '0%',
+    opacity: 1,
+    transition: {
+      type: 'spring',
+      stiffness: 420,
+      damping: 34,
+      mass: 0.9,
+    },
+  },
+} as const;
 
 interface ReaderTopBarProps {
   isChromeVisible: boolean;
@@ -27,10 +50,15 @@ export default function ReaderTopBar({
   const { t } = useTranslation();
 
   return (
-    <header className={cn(
-      'h-14 flex items-center justify-between px-4 sm:px-6 border-b border-border-color/20 glass z-30 absolute top-0 left-0 right-0 transition-all duration-300',
-      !isChromeVisible && '-translate-y-full opacity-0 pointer-events-none',
-    )}>
+    <motion.header
+      initial={false}
+      animate={isChromeVisible ? 'visible' : 'hidden'}
+      variants={READER_TOP_BAR_VARIANTS}
+      className={cn(
+        'absolute left-0 right-0 top-0 z-30 flex h-14 items-center justify-between border-b border-border-color/20 glass px-4 sm:px-6',
+        !isChromeVisible && 'pointer-events-none',
+      )}
+    >
       <div className="flex items-center gap-3">
         <button
           onClick={onMobileBack}
@@ -56,6 +84,6 @@ export default function ReaderTopBar({
           <Bot className="w-4 h-4" /> {t('reader.summary')}
         </button>
       </div>
-    </header>
+    </motion.header>
   );
 }

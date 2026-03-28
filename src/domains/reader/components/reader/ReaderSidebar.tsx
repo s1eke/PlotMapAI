@@ -1,12 +1,57 @@
 import type { Chapter } from '../../api/readerApi';
 
 import { Menu, X } from 'lucide-react';
+import { motion } from 'motion/react';
 import { useTranslation } from 'react-i18next';
 
 import BottomSheet from '@shared/components/BottomSheet';
 import { cn } from '@shared/utils/cn';
 
 import ChapterList from '../ChapterList';
+
+const DESKTOP_SIDEBAR_WIDTH = 288;
+const READER_SIDEBAR_VARIANTS = {
+  closed: {
+    width: 0,
+    x: -24,
+    opacity: 0,
+    transition: {
+      width: {
+        duration: 0.22,
+        ease: [0.32, 0.72, 0, 1],
+      },
+      x: {
+        duration: 0.2,
+        ease: [0.32, 0.72, 0, 1],
+      },
+      opacity: {
+        duration: 0.16,
+      },
+    },
+  },
+  open: {
+    width: DESKTOP_SIDEBAR_WIDTH,
+    x: 0,
+    opacity: 1,
+    transition: {
+      width: {
+        type: 'spring',
+        stiffness: 420,
+        damping: 34,
+        mass: 0.9,
+      },
+      x: {
+        type: 'spring',
+        stiffness: 420,
+        damping: 34,
+        mass: 0.9,
+      },
+      opacity: {
+        duration: 0.18,
+      },
+    },
+  },
+} as const;
 
 interface ReaderSidebarProps {
   chapters: Chapter[];
@@ -57,13 +102,14 @@ export default function ReaderSidebar({
         />
       </BottomSheet>
 
-      <aside
+      <motion.aside
+        initial={false}
+        animate={isSidebarOpen ? 'open' : 'closed'}
+        variants={READER_SIDEBAR_VARIANTS}
         className={cn(
-          'hidden overflow-hidden text-text-primary transition-all duration-300 ease-in-out md:flex md:h-full md:flex-col',
+          'hidden overflow-hidden text-text-primary md:flex md:h-full md:flex-col will-change-transform',
           sidebarBgClassName,
-          isSidebarOpen
-            ? 'md:w-72 md:translate-x-0 md:border-r md:border-border-color/30'
-            : 'md:w-0 md:-translate-x-full md:border-r-0',
+          isSidebarOpen ? 'md:border-r md:border-border-color/30' : 'pointer-events-none md:border-r-0',
         )}
       >
         <div className="flex h-full w-72 shrink-0 flex-col">
@@ -89,7 +135,7 @@ export default function ReaderSidebar({
             />
           </div>
         </div>
-      </aside>
+      </motion.aside>
     </>
   );
 }

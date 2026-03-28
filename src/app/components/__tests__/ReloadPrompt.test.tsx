@@ -1,6 +1,7 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import userEvent from '@testing-library/user-event';
+
 import ReloadPrompt from '../ReloadPrompt';
 import { __resetRegisterSwState, __setRegisterSwState } from '@test/mocks/pwaRegisterReact';
 import { DEBUG_SHOW_UPDATE_TOAST_EVENT } from '@app/debug/service';
@@ -33,9 +34,11 @@ describe('ReloadPrompt', () => {
 
   it('triggers the service worker update when refreshing', async () => {
     const updateServiceWorker = vi.fn().mockResolvedValue(undefined);
+    const setNeedRefresh = vi.fn();
 
     __setRegisterSwState({
       needRefresh: true,
+      setNeedRefresh,
       updateServiceWorker,
     });
 
@@ -45,6 +48,10 @@ describe('ReloadPrompt', () => {
     await user.click(screen.getByRole('button', { name: 'pwa.reload' }));
 
     expect(updateServiceWorker).toHaveBeenCalledWith(true);
+    await waitFor(() => {
+      expect(setNeedRefresh).toHaveBeenCalledWith(false);
+      expect(screen.queryByText('pwa.updateAvailable')).not.toBeInTheDocument();
+    });
   });
 
   it('remembers dismissal for the current version', async () => {
@@ -60,7 +67,10 @@ describe('ReloadPrompt', () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'pwa.later' }));
 
-    expect(setNeedRefresh).toHaveBeenCalledWith(false);
+    await waitFor(() => {
+      expect(setNeedRefresh).toHaveBeenCalledWith(false);
+      expect(screen.queryByText('pwa.updateAvailable')).not.toBeInTheDocument();
+    });
     expect(localStorage.getItem('plotmapai_update_prompt_dismissed')).toContain('1.0.1-test');
   });
 
@@ -73,6 +83,26 @@ describe('ReloadPrompt', () => {
 
     return waitFor(() => {
       expect(screen.getByText('pwa.updateAvailable')).toBeInTheDocument();
+    });
+  });
+
+  it('switches to the updating label while refreshing', async () => {
+    const updateServiceWorker = vi.fn().mockImplementation(async () => {
+      await new Promise(resolve => setTimeout(resolve, 20));
+    });
+
+    __setRegisterSwState({
+      needRefresh: true,
+      updateServiceWorker,
+    });
+
+    render(<ReloadPrompt />);
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'pwa.reload' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('pwa.updating')).toBeInTheDocument();
     });
   });
 });

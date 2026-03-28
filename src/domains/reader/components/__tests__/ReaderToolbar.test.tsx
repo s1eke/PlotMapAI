@@ -150,4 +150,10 @@ describe('ReaderToolbar', () => {
 
     expect(screen.queryByTitle('reader.contents')).not.toBeInTheDocument();
   });
+
+  it('disables pointer interaction when hidden', () => {
+    const { container } = render(<ReaderToolbar {...defaultProps} hidden />);
+
+    expect(container.firstChild).toHaveClass('pointer-events-none');
+  });
 });

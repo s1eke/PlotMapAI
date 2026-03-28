@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect, useCallback, useMemo, useSyncExternalStore } from 'react';
 import { AlignJustify, Columns2, List, MoreVertical, ArrowLeft, ArrowRight, Check } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
 import { useTranslation } from 'react-i18next';
+
 import { cn } from '@shared/utils/cn';
 import { READER_SLIDER_CONFIG, MOBILE_SLIDER_KEYS, OVERFLOW_SLIDER_KEYS } from '../constants/readerSliderConfig';
 import { isPagedPageTurnMode, type ReaderPageTurnMode } from '../constants/pageTurnMode';
@@ -50,6 +52,50 @@ const SETTERS: Record<string, keyof SliderValues> = {
   lineSpacing: 'setLineSpacing',
   paragraphSpacing: 'setParagraphSpacing',
 };
+
+const READER_TOOLBAR_VARIANTS = {
+  hidden: {
+    y: 'calc(100% + 24px)',
+    opacity: 0,
+    transition: {
+      duration: 0.2,
+      ease: [0.32, 0.72, 0, 1],
+    },
+  },
+  visible: {
+    y: '0%',
+    opacity: 1,
+    transition: {
+      type: 'spring',
+      stiffness: 420,
+      damping: 34,
+      mass: 0.9,
+    },
+  },
+} as const;
+
+const READER_MENU_VARIANTS = {
+  hidden: {
+    opacity: 0,
+    y: 8,
+    scale: 0.98,
+    transition: {
+      duration: 0.16,
+      ease: [0.32, 0.72, 0, 1],
+    },
+  },
+  visible: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: {
+      type: 'spring',
+      stiffness: 440,
+      damping: 34,
+      mass: 0.9,
+    },
+  },
+} as const;
 
 function getIsDesktopViewport(): boolean {
   if (typeof window === 'undefined') {
@@ -226,10 +272,15 @@ export default function ReaderToolbar({
   }
 
   return (
-    <div className={cn(
-      'fixed bottom-6 left-1/2 -translate-x-1/2 bg-bg-secondary/90 dark:bg-brand-800/90 backdrop-blur-xl rounded-full px-3 sm:px-6 py-3 flex items-center gap-2 sm:gap-4 shadow-2xl border border-border-color z-40 transition-all hover:bg-bg-secondary dark:hover:bg-brand-800',
-      hidden && 'translate-y-[calc(100%+24px)] opacity-0 pointer-events-none',
-    )}>
+    <motion.div
+      initial={false}
+      animate={hidden ? 'hidden' : 'visible'}
+      variants={READER_TOOLBAR_VARIANTS}
+      className={cn(
+        'fixed bottom-6 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-full border border-border-color bg-bg-secondary/90 px-3 py-3 shadow-2xl backdrop-blur-xl hover:bg-bg-secondary dark:bg-brand-800/90 dark:hover:bg-brand-800 sm:gap-4 sm:px-6 will-change-transform',
+        hidden && 'pointer-events-none',
+      )}
+    >
 
       {/* Mobile: TOC button (first position, replaces prev/next) */}
       {onToggleSidebar && (
@@ -291,37 +342,43 @@ export default function ReaderToolbar({
           >
             {isPagedMode ? <Columns2 className="w-5 h-5" /> : <AlignJustify className="w-5 h-5" />}
           </button>
-          {pageTurnModeOpen && (
-            <div
-              ref={pageTurnModeRef}
-              className="absolute bottom-full mb-3 left-1/2 min-w-[176px] -translate-x-1/2 rounded-xl border border-border-color bg-bg-secondary px-2 py-2 shadow-xl dark:bg-brand-800"
-            >
-              <div className="absolute bottom-0 left-1/2 h-2.5 w-2.5 -translate-x-1/2 translate-y-1/2 rotate-45 border-b border-r border-border-color bg-bg-secondary dark:bg-brand-800" />
-              <div className="px-2 pb-2 pt-1 text-xs text-text-secondary">{t('reader.pageTurnMode')}</div>
-              <div className="space-y-1">
-                {pageTurnModes.map(mode => (
-                  <button
-                    key={mode.id}
-                    type="button"
-                    onClick={() => {
-                      setPageTurnMode(mode.id);
-                      setPageTurnModeOpen(false);
-                    }}
-                    className={cn(
-                      'flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors',
-                      pageTurnMode === mode.id
-                        ? 'bg-accent text-white'
-                        : 'text-text-primary hover:bg-muted-bg',
-                    )}
-                    title={mode.label}
-                  >
-                    <span>{mode.label}</span>
-                    {pageTurnMode === mode.id ? <Check className="h-4 w-4" /> : null}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+          <AnimatePresence initial={false}>
+            {pageTurnModeOpen ? (
+              <motion.div
+                ref={pageTurnModeRef}
+                variants={READER_MENU_VARIANTS}
+                initial="hidden"
+                animate="visible"
+                exit="hidden"
+                className="absolute bottom-full left-1/2 mb-3 min-w-[176px] -translate-x-1/2 rounded-xl border border-border-color bg-bg-secondary px-2 py-2 shadow-xl dark:bg-brand-800"
+              >
+                <div className="absolute bottom-0 left-1/2 h-2.5 w-2.5 -translate-x-1/2 translate-y-1/2 rotate-45 border-b border-r border-border-color bg-bg-secondary dark:bg-brand-800" />
+                <div className="px-2 pb-2 pt-1 text-xs text-text-secondary">{t('reader.pageTurnMode')}</div>
+                <div className="space-y-1">
+                  {pageTurnModes.map(mode => (
+                    <button
+                      key={mode.id}
+                      type="button"
+                      onClick={() => {
+                        setPageTurnMode(mode.id);
+                        setPageTurnModeOpen(false);
+                      }}
+                      className={cn(
+                        'flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors',
+                        pageTurnMode === mode.id
+                          ? 'bg-accent text-white'
+                          : 'text-text-primary hover:bg-muted-bg',
+                      )}
+                      title={mode.label}
+                    >
+                      <span>{mode.label}</span>
+                      {pageTurnMode === mode.id ? <Check className="h-4 w-4" /> : null}
+                    </button>
+                  ))}
+                </div>
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
         </div>
 
         {/* Desktop: two separate buttons */}
@@ -383,38 +440,44 @@ export default function ReaderToolbar({
         >
           <MoreVertical className="w-5 h-5" />
         </button>
-        {overflowOpen && (
-          <div
-            ref={overflowRef}
-            className="absolute bottom-full mb-3 right-0 bg-bg-secondary dark:bg-brand-800 border border-border-color rounded-xl px-5 py-4 shadow-xl min-w-[220px] space-y-4"
-          >
-            <div className="absolute bottom-0 right-5 translate-y-1/2 rotate-45 w-2.5 h-2.5 bg-bg-secondary dark:bg-brand-800 border-r border-b border-border-color" />
+        <AnimatePresence initial={false}>
+          {overflowOpen ? (
+            <motion.div
+              ref={overflowRef}
+              variants={READER_MENU_VARIANTS}
+              initial="hidden"
+              animate="visible"
+              exit="hidden"
+              className="absolute bottom-full right-0 mb-3 min-w-[220px] space-y-4 rounded-xl border border-border-color bg-bg-secondary px-5 py-4 shadow-xl dark:bg-brand-800"
+            >
+              <div className="absolute bottom-0 right-5 h-2.5 w-2.5 translate-y-1/2 rotate-45 border-b border-r border-border-color bg-bg-secondary dark:bg-brand-800" />
 
-            {overflowSliders.map(renderSliderRow)}
+              {overflowSliders.map(renderSliderRow)}
 
-            <div className="space-y-2 pt-2 border-t border-border-color/50">
-              <span className="text-xs text-text-secondary">{t('reader.background')}</span>
-              <div className="flex items-center gap-3">
-                {themes.map(theme => (
-                  <button
-                    key={theme.id}
-                    onClick={() => setReaderTheme(theme.id)}
-                    className={cn(
-                      "w-7 h-7 rounded-full border transition-all flex items-center justify-center overflow-hidden",
-                      readerTheme === theme.id ? "ring-2 ring-accent ring-offset-2 ring-offset-bg-secondary scale-110" : "border-border-color hover:scale-105",
-                      theme.id === 'auto' && "bg-gradient-to-tr from-white to-brand-900"
-                    )}
-                    style={{ backgroundColor: theme.id === 'auto' ? undefined : theme.color }}
-                    title={theme.label}
-                  >
-                    {theme.id === 'auto' && <div className="sr-only">Auto</div>}
-                  </button>
-                ))}
+              <div className="space-y-2 border-t border-border-color/50 pt-2">
+                <span className="text-xs text-text-secondary">{t('reader.background')}</span>
+                <div className="flex items-center gap-3">
+                  {themes.map(theme => (
+                    <button
+                      key={theme.id}
+                      onClick={() => setReaderTheme(theme.id)}
+                      className={cn(
+                        "w-7 h-7 rounded-full border transition-all flex items-center justify-center overflow-hidden",
+                        readerTheme === theme.id ? "ring-2 ring-accent ring-offset-2 ring-offset-bg-secondary scale-110" : "border-border-color hover:scale-105",
+                        theme.id === 'auto' && "bg-gradient-to-tr from-white to-brand-900"
+                      )}
+                      style={{ backgroundColor: theme.id === 'auto' ? undefined : theme.color }}
+                      title={theme.label}
+                    >
+                      {theme.id === 'auto' && <div className="sr-only">Auto</div>}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-          </div>
-        )}
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
       </div>
-    </div>
+    </motion.div>
   );
 }
