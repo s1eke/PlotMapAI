@@ -74,6 +74,19 @@ describe('BookshelfPage', () => {
     expect(screen.queryByTestId('book-card')).not.toBeInTheDocument();
   });
 
+  it('keeps the bookshelf header sticky below the global nav on mobile', async () => {
+    vi.mocked(libraryApi.list).mockResolvedValue([]);
+
+    render(
+      <MemoryRouter>
+        <BookshelfPage />
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByText('bookshelf.noBooks')).toBeInTheDocument();
+    expect(screen.getByTestId('bookshelf-page-header')).toHaveClass('sticky', 'top-16', 'sm:static');
+  });
+
   it('retries loading after a failed fetch', async () => {
     vi.mocked(libraryApi.list).mockRejectedValue(new Error('load failed'));
     const user = userEvent.setup();
