@@ -225,4 +225,20 @@ describe('BookDetailPage', () => {
     });
     expect(navigateMock).toHaveBeenCalledWith('/', { replace: true });
   });
+
+  it('resets the main scroll container to the top when the page opens', async () => {
+    const scrollContainer = document.createElement('main');
+    scrollContainer.setAttribute('data-scroll-container', 'true');
+    scrollContainer.scrollTop = 240;
+    document.body.appendChild(scrollContainer);
+
+    try {
+      renderPage();
+
+      expect(await screen.findByRole('heading', { name: 'Mock Novel', level: 1 })).toBeInTheDocument();
+      expect(scrollContainer.scrollTop).toBe(0);
+    } finally {
+      scrollContainer.remove();
+    }
+  });
 });

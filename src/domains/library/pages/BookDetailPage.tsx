@@ -36,6 +36,16 @@ export default function BookDetailPage() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
 
+  useEffect(() => {
+    const scrollContainer = document.querySelector<HTMLElement>('[data-scroll-container="true"]');
+    if (scrollContainer) {
+      scrollContainer.scrollTop = 0;
+      return;
+    }
+
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }, [novelId]);
+
   const loadNovel = useCallback(async () => {
     if (!novelId) return;
     setIsLoading(true);
