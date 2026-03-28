@@ -18,7 +18,7 @@ vi.mock('../../components/LanguageSwitcher', () => ({
 
 describe('Layout component', () => {
   it('shows global navigation outside reader mode', () => {
-    render(
+    const { getByTestId } = render(
       <MemoryRouter initialEntries={['/']}>
         <ThemeProvider>
           <Layout>
@@ -32,10 +32,21 @@ describe('Layout component', () => {
     expect(screen.getByTitle('common.nav.settings')).toHaveAttribute('href', '/settings');
     expect(screen.getByTestId('theme-toggle')).toBeInTheDocument();
     expect(screen.getByTestId('language-switcher')).toBeInTheDocument();
+    expect(getByTestId('app-layout-shell')).toHaveStyle({
+      '--app-header-height': 'calc(4rem + env(safe-area-inset-top, 0px))',
+      '--app-header-offset': '0px',
+    });
+    expect(getByTestId('app-layout-shell')).toHaveClass('h-[100dvh]', 'overflow-hidden');
+    const main = screen.getByText('Page Content').closest('main');
+    expect(main).toHaveAttribute('data-scroll-container', 'true');
+    expect(main).toHaveClass('hide-scrollbar', 'overflow-y-auto', 'overscroll-y-contain');
+    expect(main).toHaveStyle({
+      touchAction: 'pan-y',
+    });
   });
 
   it('hides the global navigation in reader mode', () => {
-    render(
+    const { getByTestId } = render(
       <MemoryRouter initialEntries={['/novel/1/read']}>
         <ThemeProvider>
           <Layout>
@@ -50,5 +61,12 @@ describe('Layout component', () => {
     expect(screen.queryByTestId('theme-toggle')).not.toBeInTheDocument();
     expect(screen.queryByTestId('language-switcher')).not.toBeInTheDocument();
     expect(screen.getByText('Reader Content')).toBeInTheDocument();
+    expect(getByTestId('app-layout-shell')).toHaveStyle({
+      '--app-header-height': '0px',
+      '--app-header-offset': '0px',
+    });
+    const main = screen.getByText('Reader Content').closest('main');
+    expect(main).not.toHaveAttribute('data-scroll-container');
+    expect(main).not.toHaveClass('hide-scrollbar');
   });
 });

@@ -25,13 +25,13 @@ export default function BookCard({ novel }: BookCardProps) {
   }, [novel.id, novel.hasCover]);
 
   return (
-    <Link 
+    <Link
       to={appPaths.novel(novel.id)}
-      className="group flex flex-col gap-3 rounded-xl p-3 hover:bg-white/5 transition-colors"
+      className="group flex h-full touch-manipulation flex-col gap-2 rounded-2xl p-1.5 transition-all duration-200 active:scale-[0.98] active:bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-primary sm:gap-3 sm:rounded-xl sm:p-2.5 sm:hover:bg-white/5"
     >
-      <div className="relative aspect-[2/3] w-full overflow-hidden rounded-lg shadow-md group-hover:shadow-lg transition-shadow bg-brand-800">
+      <div className="relative aspect-[2/3] w-full overflow-hidden rounded-[1rem] bg-brand-800 shadow-md transition-shadow duration-200 group-active:shadow-sm sm:rounded-lg sm:group-hover:shadow-lg">
         {novel.hasCover && coverUrl ? (
-          <img 
+          <img
             src={coverUrl}
             alt={novel.title}
             className="w-full h-full object-cover"
@@ -39,21 +39,20 @@ export default function BookCard({ novel }: BookCardProps) {
         ) : (
           <TxtCover title={novel.title} />
         )}
-        
-        {/* Hover overlay */}
-        <div className="absolute inset-0 bg-brand-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+
+        <div className="absolute inset-0 hidden items-center justify-center bg-brand-900/40 opacity-0 transition-opacity md:flex md:group-hover:opacity-100">
           <span className="text-white font-medium px-4 py-2 rounded-full glass backdrop-blur-md">
             {t('common.actions.viewDetails')}
           </span>
         </div>
       </div>
-      
-      <div className="flex flex-col">
-        <h3 className="font-semibold text-text-primary line-clamp-1 group-hover:text-accent transition-colors" title={novel.title}>
+
+      <div className="min-w-0 flex flex-1 flex-col">
+        <h3 className="line-clamp-2 text-sm font-semibold leading-5 text-text-primary transition-colors sm:line-clamp-1 sm:text-base sm:group-hover:text-accent" title={novel.title}>
           {novel.title}
         </h3>
         {novel.author && (
-          <span className="text-sm text-text-secondary line-clamp-1">
+          <span className="mt-0.5 line-clamp-1 text-xs text-text-secondary sm:text-sm">
             {novel.author}
           </span>
         )}

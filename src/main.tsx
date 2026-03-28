@@ -5,6 +5,30 @@ import './i18n/config'
 import App from '@app/App'
 import { initializeApp } from '@app/bootstrap/initializeApp'
 
+function findNearestScrollableAncestor(target: EventTarget | null): HTMLElement | null {
+  if (!(target instanceof HTMLElement)) {
+    return null;
+  }
+
+  const declaredScrollContainer = target.closest<HTMLElement>('[data-scroll-container="true"]');
+  if (declaredScrollContainer && declaredScrollContainer.scrollHeight > declaredScrollContainer.clientHeight) {
+    return declaredScrollContainer;
+  }
+
+  let element: HTMLElement | null = target;
+  while (element && element !== document.body) {
+    const style = window.getComputedStyle(element);
+    if (style.overflowY === 'auto' || style.overflowY === 'scroll' || style.overflowY === 'overlay') {
+      if (element.scrollHeight > element.clientHeight) {
+        return element;
+      }
+    }
+    element = element.parentElement;
+  }
+
+  return null;
+}
+
 // PWA standalone: prevent iOS Safari rubber-band overscroll
 // CSS overscroll-behavior is unsupported on iOS, so we intercept touchmove
 if (window.matchMedia('(display-mode: standalone)').matches) {
@@ -22,19 +46,7 @@ if (window.matchMedia('(display-mode: standalone)').matches) {
     const dy = currentY - lastY;
     lastY = currentY;
 
-    // Find the nearest scrollable ancestor (or document.scrollingElement)
-    let el: HTMLElement | null = target;
-    let scrollable: Element = document.scrollingElement!;
-    while (el && el !== document.body) {
-      const style = window.getComputedStyle(el);
-      if (style.overflowY === 'auto' || style.overflowY === 'scroll' || style.overflowY === 'overlay') {
-        if (el.scrollHeight > el.clientHeight) {
-          scrollable = el;
-          break;
-        }
-      }
-      el = el.parentElement;
-    }
+    const scrollable = findNearestScrollableAncestor(target) ?? document.scrollingElement!;
 
     const atTop = scrollable.scrollTop <= 0;
     const atBottom = scrollable.scrollTop + scrollable.clientHeight >= scrollable.scrollHeight - 1;

@@ -74,7 +74,7 @@ describe('BookshelfPage', () => {
     expect(screen.queryByTestId('book-card')).not.toBeInTheDocument();
   });
 
-  it('keeps the bookshelf header sticky below the global nav on mobile', async () => {
+  it('lets the bookshelf header scroll away naturally on mobile', async () => {
     vi.mocked(libraryApi.list).mockResolvedValue([]);
 
     render(
@@ -84,7 +84,44 @@ describe('BookshelfPage', () => {
     );
 
     expect(await screen.findByText('bookshelf.noBooks')).toBeInTheDocument();
-    expect(screen.getByTestId('bookshelf-page-header')).toHaveClass('sticky', 'top-16', 'sm:static');
+    expect(screen.getByTestId('bookshelf-scroll-container')).toHaveClass(
+      'w-full',
+    );
+    expect(screen.getByTestId('bookshelf-scroll-container')).not.toHaveClass('flex-1');
+    expect(screen.getByTestId('bookshelf-page-header')).not.toHaveClass('sticky');
+    expect(screen.getByTestId('bookshelf-page-header')).not.toHaveAttribute('style');
+    expect(screen.getByText('bookshelf.subtitle')).toBeInTheDocument();
+  });
+
+  it('uses an adaptive grid instead of a fixed two-column shelf layout', async () => {
+    vi.mocked(libraryApi.list).mockResolvedValue([
+      {
+        id: 1,
+        title: 'Uploaded Novel',
+        author: '',
+        description: '',
+        tags: [],
+        fileType: 'txt',
+        hasCover: false,
+        originalFilename: 'uploaded.txt',
+        originalEncoding: 'utf-8',
+        totalWords: 1200,
+        chapterCount: 4,
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+
+    render(
+      <MemoryRouter>
+        <BookshelfPage />
+      </MemoryRouter>
+    );
+
+    await screen.findByTestId('book-card');
+    expect(screen.getByTestId('bookshelf-grid').className).toContain(
+      'grid-cols-[repeat(auto-fill,minmax(6.5rem,1fr))]',
+    );
+    expect(screen.getByTestId('bookshelf-grid').className).not.toContain('grid-cols-2');
   });
 
   it('retries loading after a failed fetch', async () => {

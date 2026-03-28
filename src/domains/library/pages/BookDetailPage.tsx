@@ -185,7 +185,7 @@ export default function BookDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="flex-1 flex items-center justify-center">
+      <div className="flex min-h-[calc(100dvh-var(--app-header-height,0px)-2rem)] items-center justify-center px-6 py-8">
         <Loader2 className="w-8 h-8 animate-spin text-accent" />
       </div>
     );
@@ -193,7 +193,7 @@ export default function BookDetailPage() {
 
   if (error || !novel) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
+      <div className="flex min-h-[calc(100dvh-var(--app-header-height,0px)-2rem)] flex-col items-center justify-center p-8 text-center">
         <p className="text-red-400 mb-4">
           {error ? translateAppError(error, t, 'bookDetail.loadError') : t('bookDetail.notFound')}
         </p>
@@ -205,7 +205,7 @@ export default function BookDetailPage() {
   }
 
   return (
-    <div className="flex-1 flex flex-col p-6 max-w-5xl mx-auto w-full">
+    <div className="mx-auto flex w-full max-w-5xl flex-col p-6">
       <div className="glass rounded-2xl p-6 md:p-8">
         <Link to={appPaths.bookshelf()} className="inline-flex items-center gap-2 text-text-secondary hover:text-text-primary transition-colors mb-6 w-fit">
           <ArrowLeft className="w-4 h-4" />

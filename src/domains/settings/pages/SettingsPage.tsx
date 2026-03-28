@@ -18,7 +18,7 @@ export default function SettingsPage() {
   const aiManager = useAiSettingsManager();
 
   return (
-    <div className="flex-1 flex flex-col p-4 sm:p-6 max-w-6xl mx-auto w-full">
+    <div className="mx-auto flex w-full max-w-6xl flex-col p-4 sm:p-6">
       <div className="space-y-2 mb-6 sm:mb-8">
         <h1 className="text-2xl sm:text-3xl font-bold text-text-primary tracking-tight">{t('settings.title')}</h1>
         <p className="text-sm sm:text-base text-text-secondary max-w-3xl leading-6">

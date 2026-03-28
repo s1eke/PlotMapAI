@@ -75,4 +75,24 @@ describe('BookCard', () => {
 
     expect(screen.getByRole('link')).toHaveAttribute('href', '/novel/1');
   });
+
+  it('uses touch-friendly mobile classes while keeping the desktop hover overlay available', () => {
+    render(
+      <MemoryRouter>
+        <BookCard novel={mockNovel} />
+      </MemoryRouter>
+    );
+
+    const link = screen.getByRole('link');
+    expect(link.className).toContain('touch-manipulation');
+    expect(link.className).toContain('active:scale-[0.98]');
+
+    const title = screen.getByRole('heading', { name: 'Test Novel' });
+    expect(title.className).toContain('line-clamp-2');
+    expect(title.className).toContain('sm:line-clamp-1');
+
+    const overlay = screen.getByText('common.actions.viewDetails').parentElement;
+    expect(overlay?.className).toContain('hidden');
+    expect(overlay?.className).toContain('md:flex');
+  });
 });
