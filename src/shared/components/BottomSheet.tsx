@@ -1,14 +1,45 @@
 import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { animate, AnimatePresence, motion, useMotionValue, useTransform } from 'motion/react';
 import { X } from 'lucide-react';
 
 import { cn } from '@shared/utils/cn';
 
-const EXIT_DURATION_MS = 250;
 const DRAG_CLOSE_THRESHOLD = 0.3;
 const DRAG_MIN_DISTANCE = 120;
-const DRAG_CLOSE_VELOCITY = 0.55;
-const DRAG_REBOUND_TRANSITION = 'transform 0.18s cubic-bezier(0.2, 0.9, 0.25, 1)';
+const DRAG_CLOSE_VELOCITY = 550;
+const BACKDROP_MIN_OPACITY = 0.35;
+const BACKDROP_FADE_DISTANCE = 240;
+const PANEL_ENTER_TRANSITION = {
+  type: 'spring',
+  stiffness: 420,
+  damping: 34,
+  mass: 0.9,
+} as const;
+const PANEL_EXIT_TRANSITION = {
+  duration: 0.28,
+  ease: [0.32, 0.72, 0, 1],
+} as const;
+const PANEL_REBOUND_TRANSITION = {
+  type: 'spring',
+  stiffness: 560,
+  damping: 40,
+  mass: 0.9,
+} as const;
+const BACKDROP_TRANSITION = {
+  duration: 0.2,
+  ease: [0.22, 1, 0.36, 1],
+} as const;
+const PANEL_SHELL_VARIANTS = {
+  hidden: {
+    y: '100%',
+    transition: PANEL_EXIT_TRANSITION,
+  },
+  visible: {
+    y: 0,
+    transition: PANEL_ENTER_TRANSITION,
+  },
+} as const;
 
 interface DragState {
   pointerId: number;
@@ -49,49 +80,24 @@ export default function BottomSheet({
   contentClassName,
 }: BottomSheetProps) {
   const titleId = useId();
-  const [mounted, setMounted] = useState(() => isOpen);
-  const [closing, setClosing] = useState(false);
-  const [dragOffset, setDragOffset] = useState(0);
-  const [dragProgress, setDragProgress] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout>>(null);
-  const dragRef = useRef<DragState | null>(null);
+  const dragOffset = useMotionValue(0);
+  const backdropOpacity = useTransform(
+    dragOffset,
+    [0, BACKDROP_FADE_DISTANCE],
+    [1, BACKDROP_MIN_OPACITY],
+  );
   const panelRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<DragState | null>(null);
 
   useEffect(() => {
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
-
     if (isOpen) {
-      timerRef.current = setTimeout(() => {
-        setClosing(false);
-        setMounted(true);
-        setDragProgress(0);
-        timerRef.current = null;
-      }, 0);
-    } else {
-      timerRef.current = setTimeout(() => {
-        setClosing(true);
-        timerRef.current = setTimeout(() => {
-          setMounted(false);
-          setClosing(false);
-          timerRef.current = null;
-        }, EXIT_DURATION_MS);
-      }, 0);
+      dragOffset.set(0);
     }
-
-    return () => {
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-        timerRef.current = null;
-      }
-    };
-  }, [isOpen]);
+  }, [dragOffset, isOpen]);
 
   useEffect(() => {
-    if (mounted) {
+    if (isOpen) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = 'unset';
@@ -99,10 +105,10 @@ export default function BottomSheet({
     return () => {
       document.body.style.overflow = 'unset';
     };
-  }, [mounted]);
+  }, [isOpen]);
 
   useEffect(() => {
-    if (!mounted || closing) return undefined;
+    if (!isOpen) return undefined;
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
@@ -112,7 +118,7 @@ export default function BottomSheet({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [mounted, closing, onClose]);
+  }, [isOpen, onClose]);
 
   const handleBackdropClick = useCallback(() => {
     if (closeOnBackdrop) {
@@ -121,9 +127,6 @@ export default function BottomSheet({
   }, [closeOnBackdrop, onClose]);
 
   const handlePointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
-    const panel = panelRef.current;
-    if (!panel) return;
-
     dragRef.current = {
       pointerId: event.pointerId,
       startY: event.clientY,
@@ -134,14 +137,13 @@ export default function BottomSheet({
     };
 
     event.currentTarget.setPointerCapture(event.pointerId);
-    panel.style.transition = 'none';
+    event.preventDefault();
+    event.stopPropagation();
   }, []);
 
   const handlePointerMove = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     const drag = dragRef.current;
     if (!drag || event.pointerId !== drag.pointerId) return;
-    const panel = panelRef.current;
-    if (!panel) return;
 
     const deltaY = event.clientY - drag.startY;
 
@@ -154,18 +156,16 @@ export default function BottomSheet({
     const elapsed = Math.max(1, now - drag.lastTime);
     const deltaSinceLast = event.clientY - drag.lastY;
     if (elapsed >= 16) {
-      drag.velocityY = deltaSinceLast / elapsed;
+      drag.velocityY = (deltaSinceLast / elapsed) * 1000;
     }
     drag.lastY = event.clientY;
     drag.lastTime = now;
 
     if (drag.isDragging && deltaY > 0) {
-      setDragOffset(deltaY);
-      const panelHeight = Math.max(1, panel.getBoundingClientRect().height);
-      setDragProgress(Math.min(1, Math.max(0, deltaY / panelHeight)));
+      dragOffset.set(deltaY);
       event.preventDefault();
     }
-  }, []);
+  }, [dragOffset]);
 
   const handlePointerUp = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     const drag = dragRef.current;
@@ -174,130 +174,134 @@ export default function BottomSheet({
     dragRef.current = null;
     setIsDragging(false);
 
-    const panel = panelRef.current;
-    if (!panel) {
-      setDragOffset(0);
-      return;
-    }
-
-    const threshold = Math.max(DRAG_MIN_DISTANCE, panel.getBoundingClientRect().height * DRAG_CLOSE_THRESHOLD);
+    const panelHeight = Math.max(1, panelRef.current?.getBoundingClientRect().height ?? 0);
+    const threshold = Math.max(DRAG_MIN_DISTANCE, panelHeight * DRAG_CLOSE_THRESHOLD);
     const shouldClose = drag.isDragging && (
-      dragOffset >= threshold
+      dragOffset.get() >= threshold
       || drag.velocityY >= DRAG_CLOSE_VELOCITY
     );
 
     if (shouldClose) {
-      setDragOffset(0);
-      setDragProgress(0);
-      panel.style.transition = '';
       onClose();
-    } else {
-      panel.style.transition = DRAG_REBOUND_TRANSITION;
-      setDragOffset(0);
-      setDragProgress(0);
+      return;
     }
+
+    animate(dragOffset, 0, PANEL_REBOUND_TRANSITION);
   }, [dragOffset, onClose]);
 
-  const handlePointerCancel = useCallback(() => {
-    const panel = panelRef.current;
+  const handlePointerCancel = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = dragRef.current;
+    if (!drag || event.pointerId !== drag.pointerId) return;
+
     dragRef.current = null;
     setIsDragging(false);
-    if (panel) {
-      panel.style.transition = DRAG_REBOUND_TRANSITION;
-    }
-    setDragOffset(0);
-    setDragProgress(0);
-  }, []);
+    animate(dragOffset, 0, PANEL_REBOUND_TRANSITION);
+  }, [dragOffset]);
 
-  if (!mounted) return null;
+  const handleExitComplete = useCallback(() => {
+    dragRef.current = null;
+    dragOffset.set(0);
+    setIsDragging(false);
+  }, [dragOffset]);
 
   const hasHeader = Boolean(title || subtitle);
-  const animationClass = isDragging
-    ? ''
-    : closing
-      ? 'animate-sheet-down'
-      : 'animate-sheet-up';
-  const backdropAnimation = closing ? 'animate-fade-out' : 'animate-fade-in';
-  const backdropOpacity = dragOffset > 0
-    ? Math.max(0.35, 1 - dragProgress * 0.7)
-    : undefined;
 
   return (
-    <div data-slot="sheet-root" className={cn('absolute inset-0 z-30 flex items-end', containerClassName)}>
-      <button
-        data-slot="sheet-backdrop"
-        type="button"
-        aria-hidden="true"
-        tabIndex={-1}
-        onPointerDown={handleBackdropClick}
-        className={`absolute inset-0 bg-[#18202a]/18 backdrop-blur-[2px] ${backdropAnimation}`}
-        style={{ opacity: backdropOpacity }}
-      />
-      <div
-        ref={panelRef}
-        data-slot="sheet-panel"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={title ? titleId : undefined}
-        className={cn(
-          'relative flex w-full flex-col overflow-hidden rounded-t-[30px] border-t border-[#ddd7cc] bg-[#fffdfa]/98 shadow-[0_-20px_56px_rgba(24,32,42,0.16)]',
-          animationClass,
-          panelClassName,
-        )}
-        style={{
-          maxHeight,
-          transform: dragOffset > 0 ? `translateY(${dragOffset}px)` : undefined,
-        }}
-      >
-        {showDragHandle && (
-          <div
-            data-slot="sheet-handle-area"
-            className="flex touch-none select-none justify-center pt-5 pb-1"
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-            onPointerCancel={handlePointerCancel}
+    <AnimatePresence initial={false} onExitComplete={handleExitComplete}>
+      {isOpen && (
+        <div data-slot="sheet-root" className={cn('absolute inset-0 z-30 flex items-end', containerClassName)}>
+          <motion.div
+            className="absolute inset-0"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={BACKDROP_TRANSITION}
           >
-            <span data-slot="sheet-drag-handle" className="h-1.5 w-12 rounded-full bg-[#d8d1c6]" />
-          </div>
-        )}
+            <motion.button
+              data-slot="sheet-backdrop"
+              type="button"
+              aria-hidden="true"
+              tabIndex={-1}
+              onPointerDown={handleBackdropClick}
+              className="absolute inset-0 bg-[#18202a]/18 backdrop-blur-[2px]"
+              style={{ opacity: backdropOpacity }}
+            />
+          </motion.div>
 
-        {hasHeader && (
-          <div data-slot="sheet-header" className="flex items-start justify-between gap-3 px-4 pb-4 pt-3">
-            <div className="min-w-0">
-              {title && (
-                <p
-                  id={titleId}
-                  data-slot="sheet-title"
-                  className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#34527a]"
-                >
-                  {title}
-                </p>
+          <motion.div
+            className="relative w-full"
+            variants={PANEL_SHELL_VARIANTS}
+            initial="hidden"
+            animate="visible"
+            exit="hidden"
+          >
+            <motion.div
+              ref={panelRef}
+              data-slot="sheet-panel"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby={title ? titleId : undefined}
+              className={cn(
+                'relative flex w-full touch-pan-y flex-col overflow-hidden rounded-t-[30px] border-t border-[#ddd7cc] bg-[#fffdfa]/98 shadow-[0_-20px_56px_rgba(24,32,42,0.16)] will-change-transform',
+                panelClassName,
               )}
-              {subtitle && (
-                <div data-slot="sheet-subtitle" className={title ? 'mt-2' : ''}>
-                  {typeof subtitle === 'string'
-                    ? <p className="text-sm leading-6 text-[#5f6b79]">{subtitle}</p>
-                    : subtitle}
+              style={{ maxHeight, y: dragOffset }}
+            >
+              {showDragHandle && (
+                <div
+                  data-slot="sheet-handle-area"
+                  className={cn(
+                    'flex touch-none select-none justify-center pt-5 pb-1',
+                    isDragging ? 'cursor-grabbing' : 'cursor-grab',
+                  )}
+                  onPointerDown={handlePointerDown}
+                  onPointerMove={handlePointerMove}
+                  onPointerUp={handlePointerUp}
+                  onPointerCancel={handlePointerCancel}
+                >
+                  <span data-slot="sheet-drag-handle" className="h-1.5 w-12 rounded-full bg-[#d8d1c6]" />
                 </div>
               )}
-            </div>
-            <button
-              data-slot="sheet-close"
-              type="button"
-              onClick={onClose}
-              aria-label={closeLabel}
-              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#ddd7cc] bg-[#f8f7f3] text-[#697384]"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        )}
 
-        <div data-slot="sheet-content" className={cn('min-h-0 flex-1 overflow-y-auto px-4 pb-6', contentClassName)}>
-          {children}
+              {hasHeader && (
+                <div data-slot="sheet-header" className="flex items-start justify-between gap-3 px-4 pb-4 pt-3">
+                  <div className="min-w-0">
+                    {title && (
+                      <p
+                        id={titleId}
+                        data-slot="sheet-title"
+                        className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#34527a]"
+                      >
+                        {title}
+                      </p>
+                    )}
+                    {subtitle && (
+                      <div data-slot="sheet-subtitle" className={title ? 'mt-2' : ''}>
+                        {typeof subtitle === 'string'
+                          ? <p className="text-sm leading-6 text-[#5f6b79]">{subtitle}</p>
+                          : subtitle}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    data-slot="sheet-close"
+                    type="button"
+                    onClick={onClose}
+                    aria-label={closeLabel}
+                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#ddd7cc] bg-[#f8f7f3] text-[#697384]"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
+
+              <div data-slot="sheet-content" className={cn('min-h-0 flex-1 overflow-y-auto px-4 pb-6', contentClassName)}>
+                {children}
+              </div>
+            </motion.div>
+          </motion.div>
         </div>
-      </div>
-    </div>
+      )}
+    </AnimatePresence>
   );
 }

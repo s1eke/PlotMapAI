@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import ReaderSidebar from '../ReaderSidebar';
@@ -49,8 +49,12 @@ function SidebarHarness({
 
 describe('ReaderSidebar', () => {
   beforeEach(() => {
-    vi.useFakeTimers();
     Object.defineProperty(Element.prototype, 'setPointerCapture', {
+      configurable: true,
+      writable: true,
+      value: vi.fn(),
+    });
+    Object.defineProperty(Element.prototype, 'releasePointerCapture', {
       configurable: true,
       writable: true,
       value: vi.fn(),
@@ -59,33 +63,24 @@ describe('ReaderSidebar', () => {
   });
 
   afterEach(() => {
-    act(() => {
-      vi.runOnlyPendingTimers();
-    });
-    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
-  it('renders the mobile table of contents in a bottom sheet and closes from the backdrop', () => {
+  it('renders the mobile table of contents in a bottom sheet and closes from the backdrop', async () => {
     const { container } = render(<SidebarHarness />);
 
     expect(screen.getByRole('dialog')).toBeInTheDocument();
 
     fireEvent.pointerDown(container.querySelector('[data-slot="sheet-backdrop"]') as HTMLButtonElement);
-    act(() => {
-      vi.runAllTimers();
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Open contents' }));
-    act(() => {
-      vi.runAllTimers();
-    });
-
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
   });
 
-  it('closes the mobile table of contents when the drag handle is pulled down', () => {
+  it('closes the mobile table of contents when the drag handle is pulled down', async () => {
     const { container } = render(<SidebarHarness />);
     const dragHandle = container.querySelector('[data-slot="sheet-handle-area"]');
 
@@ -95,13 +90,12 @@ describe('ReaderSidebar', () => {
     fireEvent.pointerMove(dragHandle as HTMLDivElement, { pointerId: 1, clientY: 280 });
     fireEvent.pointerUp(dragHandle as HTMLDivElement, { pointerId: 1, clientY: 280 });
 
-    act(() => {
-      vi.runAllTimers();
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  it('scrolls the active chapter into view and closes after a chapter is selected', () => {
+  it('scrolls the active chapter into view and closes after a chapter is selected', async () => {
     const onSelect = vi.fn();
 
     render(<SidebarHarness onSelect={onSelect} />);
@@ -112,10 +106,9 @@ describe('ReaderSidebar', () => {
 
     expect(onSelect).toHaveBeenCalledWith(1);
 
-    act(() => {
-      vi.runAllTimers();
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('keeps the sheet content scrollable for long chapter lists', () => {

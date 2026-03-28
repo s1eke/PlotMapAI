@@ -255,73 +255,71 @@ export default function CharacterGraphStage({
               </div>
             </div>
 
-            {mobileSheetMode && (
-              <BottomSheet
-                isOpen
-                onClose={handleCloseMobileSheet}
-                title={detailNode ? t('characterGraph.profileTitle') : t('characterGraph.graphStatusTitle')}
-                closeLabel={t('characterGraph.closePanel')}
-                subtitle={detailNode
-                  ? (
-                    <>
-                      <h2 className="mt-2 truncate text-2xl font-semibold text-[#18202a]">{detailNode.name}</h2>
-                      <p className="mt-2 text-xs text-[#697384]">{detailNode.role || t('characterGraph.noRole')}</p>
-                    </>
-                  )
-                  : t('characterGraph.mobileGuideSummary')}
-              >
-                {detailNode ? (
-                  <CharacterGraphProfileContent
-                    selectedNode={detailNode}
-                    relatedEdges={relatedEdges}
-                    onSelectNode={onSelectNode}
-                  />
-                ) : (
-                  <div className="space-y-4">
-                    <div className="flex flex-wrap gap-2">
-                      {stageMeta.map((item) => (
-                        <span
-                          key={item}
-                          className="rounded-full border border-[#ddd7cc] bg-[#f8f7f3] px-3 py-2 text-xs text-[#5f6b79]"
-                        >
-                          {item}
-                        </span>
-                      ))}
-                      <span className={`rounded-full border px-3 py-2 text-xs ${
-                        isComplete
-                          ? 'border-[#d6dde5] bg-[#eef1f4] text-[#34527a]'
-                          : 'border-[#ffd6a5] bg-[#fff5e8] text-[#a06528]'
-                      }`}>
-                        {isComplete ? t('characterGraph.metaComplete') : t('characterGraph.metaPartial')}
+            <BottomSheet
+              isOpen={Boolean(mobileSheetMode)}
+              onClose={handleCloseMobileSheet}
+              title={detailNode ? t('characterGraph.profileTitle') : t('characterGraph.graphStatusTitle')}
+              closeLabel={t('characterGraph.closePanel')}
+              subtitle={detailNode
+                ? (
+                  <>
+                    <h2 className="mt-2 truncate text-2xl font-semibold text-[#18202a]">{detailNode?.name}</h2>
+                    <p className="mt-2 text-xs text-[#697384]">{detailNode?.role || t('characterGraph.noRole')}</p>
+                  </>
+                )
+                : t('characterGraph.mobileGuideSummary')}
+            >
+              {detailNode ? (
+                <CharacterGraphProfileContent
+                  selectedNode={detailNode}
+                  relatedEdges={relatedEdges}
+                  onSelectNode={onSelectNode}
+                />
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex flex-wrap gap-2">
+                    {stageMeta.map((item) => (
+                      <span
+                        key={item}
+                        className="rounded-full border border-[#ddd7cc] bg-[#f8f7f3] px-3 py-2 text-xs text-[#5f6b79]"
+                      >
+                        {item}
                       </span>
-                    </div>
-
-                    {generatedAtText && (
-                      <div className="rounded-[20px] border border-[#ddd7cc] bg-[#f8f7f3] px-4 py-3 text-sm text-[#5f6b79]">
-                        {generatedAtText}
-                      </div>
-                    )}
-
-                    {actionMessage && (
-                      <div className="rounded-[20px] border border-[#d7deea] bg-[#f8fafc] px-4 py-3 text-sm text-[#5f6b79]">
-                        {actionMessage}
-                      </div>
-                    )}
-
-                    {!isComplete && (
-                      <div className="rounded-[20px] border border-[#ffd6a5] bg-[#fff5e8] px-4 py-3 text-sm leading-6 text-[#a06528]">
-                        {t('characterGraph.partialHint')}
-                      </div>
-                    )}
-
-                    <div className="flex flex-wrap gap-2 text-[11px] font-semibold tracking-[0.08em] text-[#34527a]">
-                      <span className="rounded-full bg-[#eef1f4] px-3 py-1.5">{t('characterGraph.legendCore')}</span>
-                      <span className="rounded-full bg-[#f4f2ed] px-3 py-1.5 text-[#697384]">{t('characterGraph.legendRelation')}</span>
-                    </div>
+                    ))}
+                    <span className={`rounded-full border px-3 py-2 text-xs ${
+                      isComplete
+                        ? 'border-[#d6dde5] bg-[#eef1f4] text-[#34527a]'
+                        : 'border-[#ffd6a5] bg-[#fff5e8] text-[#a06528]'
+                    }`}>
+                      {isComplete ? t('characterGraph.metaComplete') : t('characterGraph.metaPartial')}
+                    </span>
                   </div>
-                )}
-              </BottomSheet>
-            )}
+
+                  {generatedAtText && (
+                    <div className="rounded-[20px] border border-[#ddd7cc] bg-[#f8f7f3] px-4 py-3 text-sm text-[#5f6b79]">
+                      {generatedAtText}
+                    </div>
+                  )}
+
+                  {actionMessage && (
+                    <div className="rounded-[20px] border border-[#d7deea] bg-[#f8fafc] px-4 py-3 text-sm text-[#5f6b79]">
+                      {actionMessage}
+                    </div>
+                  )}
+
+                  {!isComplete && (
+                    <div className="rounded-[20px] border border-[#ffd6a5] bg-[#fff5e8] px-4 py-3 text-sm leading-6 text-[#a06528]">
+                      {t('characterGraph.partialHint')}
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap gap-2 text-[11px] font-semibold tracking-[0.08em] text-[#34527a]">
+                    <span className="rounded-full bg-[#eef1f4] px-3 py-1.5">{t('characterGraph.legendCore')}</span>
+                    <span className="rounded-full bg-[#f4f2ed] px-3 py-1.5 text-[#697384]">{t('characterGraph.legendRelation')}</span>
+                  </div>
+                </div>
+              )}
+            </BottomSheet>
           </>
         ) : (
           <>

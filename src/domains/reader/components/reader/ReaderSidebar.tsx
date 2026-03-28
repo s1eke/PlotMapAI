@@ -31,33 +31,31 @@ export default function ReaderSidebar({
 
   return (
     <>
-      {isSidebarOpen && (
-        <BottomSheet
-          isOpen={isSidebarOpen}
-          onClose={onClose}
-          title={t('reader.contents')}
-          closeLabel={t('common.actions.close')}
-          maxHeight="calc(100dvh - env(safe-area-inset-top, 0px) - 0.75rem)"
-          containerClassName="fixed inset-0 z-50 md:hidden"
-          panelClassName={cn(
-            sidebarBgClassName,
-            'text-text-primary border-t border-border-color/20 shadow-[0_-20px_56px_rgba(24,32,42,0.16)]',
-            '[&_[data-slot=sheet-drag-handle]]:bg-border-color/50',
-            '[&_[data-slot=sheet-header]]:items-center [&_[data-slot=sheet-header]]:border-b [&_[data-slot=sheet-header]]:border-border-color/20',
-            '[&_[data-slot=sheet-title]]:text-sm [&_[data-slot=sheet-title]]:font-semibold [&_[data-slot=sheet-title]]:normal-case [&_[data-slot=sheet-title]]:tracking-normal [&_[data-slot=sheet-title]]:text-text-primary',
-            '[&_[data-slot=sheet-close]]:border-border-color/20 [&_[data-slot=sheet-close]]:bg-transparent [&_[data-slot=sheet-close]]:text-text-primary',
-          )}
-          contentClassName="px-0 pb-0"
-        >
-          <ChapterList
-            chapters={chapters}
-            currentIndex={currentIndex}
-            onSelect={onSelectChapter}
-            contentTextColor={contentTextColor}
-            isSidebarOpen={isSidebarOpen}
-          />
-        </BottomSheet>
-      )}
+      <BottomSheet
+        isOpen={isSidebarOpen}
+        onClose={onClose}
+        title={t('reader.contents')}
+        closeLabel={t('common.actions.close')}
+        maxHeight="calc(100dvh - env(safe-area-inset-top, 0px) - 0.75rem)"
+        containerClassName="fixed inset-0 z-50 md:hidden"
+        panelClassName={cn(
+          sidebarBgClassName,
+          'text-text-primary border-t border-border-color/20 shadow-[0_-20px_56px_rgba(24,32,42,0.16)]',
+          '[&_[data-slot=sheet-drag-handle]]:bg-border-color/50',
+          '[&_[data-slot=sheet-header]]:items-center [&_[data-slot=sheet-header]]:border-b [&_[data-slot=sheet-header]]:border-border-color/20',
+          '[&_[data-slot=sheet-title]]:text-sm [&_[data-slot=sheet-title]]:font-semibold [&_[data-slot=sheet-title]]:normal-case [&_[data-slot=sheet-title]]:tracking-normal [&_[data-slot=sheet-title]]:text-text-primary',
+          '[&_[data-slot=sheet-close]]:border-border-color/20 [&_[data-slot=sheet-close]]:bg-transparent [&_[data-slot=sheet-close]]:text-text-primary',
+        )}
+        contentClassName="px-0 pb-0"
+      >
+        <ChapterList
+          chapters={chapters}
+          currentIndex={currentIndex}
+          onSelect={onSelectChapter}
+          contentTextColor={contentTextColor}
+          isSidebarOpen={isSidebarOpen}
+        />
+      </BottomSheet>
 
       <aside
         className={cn(

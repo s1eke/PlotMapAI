@@ -93,14 +93,6 @@
     animation: slide-up 0.35s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
-  .animate-sheet-up {
-    animation: sheet-up 0.26s cubic-bezier(0.22, 1, 0.36, 1);
-  }
-
-  .animate-sheet-down {
-    animation: sheet-down 0.22s cubic-bezier(0.32, 0, 0.2, 1);
-  }
-
   .animate-fade-in {
     animation: fade-in 0.22s ease-out;
   }
@@ -121,23 +113,6 @@
   }
 }
 
-@keyframes sheet-up {
-  from {
-    transform: translateY(100%);
-  }
-  to {
-    transform: translateY(0);
-  }
-}
-
-@keyframes sheet-down {
-  from {
-    transform: translateY(0);
-  }
-  to {
-    transform: translateY(100%);
-  }
-}
 
 @keyframes fade-in {
   from {
