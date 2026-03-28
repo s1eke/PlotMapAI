@@ -1,5 +1,5 @@
 import type { StoredReaderState } from './useReaderStatePersistence';
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { getPageIndexFromProgress } from '../utils/readerPosition';
 
 const TWO_COLUMN_GAP = 48;
@@ -91,19 +91,6 @@ export function usePagedReaderLayout({
   const prevChapterIndexRef = useRef(chapterIndex);
   const [pagedViewportSize, setPagedViewportSize] = useState({ width: 0, height: 0 });
   const [resolvedLayoutChapterIndex, setResolvedLayoutChapterIndex] = useState<number | null>(null);
-  const [contentMeasurementVersion, setContentMeasurementVersion] = useState(0);
-  const contentMeasurementFrameRef = useRef<number | null>(null);
-
-  const requestContentMeasurement = useCallback(() => {
-    if (contentMeasurementFrameRef.current !== null) {
-      cancelAnimationFrame(contentMeasurementFrameRef.current);
-    }
-
-    contentMeasurementFrameRef.current = requestAnimationFrame(() => {
-      contentMeasurementFrameRef.current = null;
-      setContentMeasurementVersion((prev) => prev + 1);
-    });
-  }, []);
 
   const twoColumnWidth = pagedViewportSize.width
     ? pagedViewportSize.width >= 2 * MIN_COLUMN_WIDTH + TWO_COLUMN_GAP
@@ -141,31 +128,6 @@ export function usePagedReaderLayout({
       observer.disconnect();
     };
   }, [currentChapter, isLoading, isPagedMode, pagedViewportRef]);
-
-  useEffect(() => {
-    if (!isPagedMode || isLoading || !currentChapter) return;
-
-    const content = pagedContentRef.current;
-    if (!content) return;
-
-    const handleContentLoad = () => {
-      requestContentMeasurement();
-    };
-
-    content.addEventListener('load', handleContentLoad, true);
-
-    return () => {
-      content.removeEventListener('load', handleContentLoad, true);
-    };
-  }, [currentChapter, isLoading, isPagedMode, pagedContentRef, requestContentMeasurement]);
-
-  useEffect(() => {
-    return () => {
-      if (contentMeasurementFrameRef.current !== null) {
-        cancelAnimationFrame(contentMeasurementFrameRef.current);
-      }
-    };
-  }, []);
 
   useEffect(() => {
     if (isLoading || !isPagedMode || !pagedViewportSize.width || !pagedViewportSize.height || !currentChapter) {
@@ -213,7 +175,6 @@ export function usePagedReaderLayout({
     pageTurnStep,
     pagedViewportSize.width,
     pagedContentRef,
-    contentMeasurementVersion,
     pagedViewportSize.height,
     pendingRestoreStateRef,
     setPageCount,
@@ -237,7 +198,7 @@ export function usePagedReaderLayout({
 
     const maxScrollLeft = Math.max(0, content.scrollWidth - pagedViewportSize.width);
     pagedViewportRef.current.scrollLeft = getPagedScrollLeft(pageIndex, pageTurnStep, maxScrollLeft);
-  }, [contentMeasurementVersion, isPagedMode, pageIndex, pageTurnStep, pagedContentRef, pagedViewportRef, pagedViewportSize.width]);
+  }, [isPagedMode, pageIndex, pageTurnStep, pagedContentRef, pagedViewportRef, pagedViewportSize.width]);
 
   return {
     pagedViewportRef,

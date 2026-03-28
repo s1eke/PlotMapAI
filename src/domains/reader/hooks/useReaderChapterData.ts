@@ -4,6 +4,11 @@ import { reportAppError } from '@app/debug/service';
 import { AppErrorCode, toAppError, type AppError } from '@shared/errors';
 import { readerApi } from '../api/readerApi';
 import type { Chapter, ChapterContent } from '../api/readerApi';
+import { extractImageKeysFromText } from '../utils/chapterImages';
+import {
+  areReaderImageResourcesReady,
+  preloadReaderImageResources,
+} from '../utils/readerImageResourceCache';
 import type { ChapterChangeSource } from './navigationTypes';
 import type { PageTarget, StoredReaderState } from './useReaderStatePersistence';
 
@@ -94,6 +99,31 @@ export function useReaderChapterData({
   const { t } = useTranslation();
   const preloadTimeoutIdsRef = useRef<number[]>([]);
   const preloadControllersRef = useRef<AbortController[]>([]);
+  const chapterImageKeysRef = useRef<Map<number, string[]>>(new Map());
+
+  const getChapterImageKeys = useCallback((chapter: ChapterContent): string[] => {
+    const cachedKeys = chapterImageKeysRef.current.get(chapter.index);
+    if (cachedKeys) {
+      return cachedKeys;
+    }
+
+    const nextKeys = extractImageKeysFromText(chapter.content);
+    chapterImageKeysRef.current.set(chapter.index, nextKeys);
+    return nextKeys;
+  }, []);
+
+  const warmChapterImages = useCallback(async (chapter: ChapterContent): Promise<void> => {
+    if (!isPagedMode) {
+      return;
+    }
+
+    const imageKeys = getChapterImageKeys(chapter);
+    if (imageKeys.length === 0 || areReaderImageResourcesReady(novelId, imageKeys)) {
+      return;
+    }
+
+    await preloadReaderImageResources(novelId, imageKeys);
+  }, [getChapterImageKeys, isPagedMode, novelId]);
 
   const clearScheduledPreloads = useCallback(() => {
     preloadTimeoutIdsRef.current.forEach((timeoutId) => {
@@ -150,7 +180,16 @@ export function useReaderChapterData({
         })
           .then((data) => {
             chapterCacheRef.current.set(adjacentIndex, data);
-            onChapterContentResolved?.(adjacentIndex);
+            if (!isPagedMode) {
+              onChapterContentResolved?.(adjacentIndex);
+              return;
+            }
+
+            void warmChapterImages(data)
+              .catch(() => undefined)
+              .finally(() => {
+                onChapterContentResolved?.(adjacentIndex);
+              });
           })
           .catch(() => {});
       }, delay);
@@ -165,7 +204,15 @@ export function useReaderChapterData({
         }
       }
     }
-  }, [chapterCacheRef, chapters.length, clearScheduledPreloads, novelId, onChapterContentResolved]);
+  }, [
+    chapterCacheRef,
+    chapters.length,
+    clearScheduledPreloads,
+    isPagedMode,
+    novelId,
+    onChapterContentResolved,
+    warmChapterImages,
+  ]);
 
   const updateChapterWindow = useCallback((nextWindow: number[]) => {
     setCurrentChapterWindow((previousWindow) => {
@@ -194,6 +241,7 @@ export function useReaderChapterData({
       hasUserInteractedRef.current = false;
       chapterChangeSourceRef.current = null;
       chapterCacheRef.current.clear();
+      chapterImageKeysRef.current.clear();
       setChapters([]);
       setCurrentChapter(null);
       setReaderError(null);
@@ -371,11 +419,14 @@ export function useReaderChapterData({
       const shouldRestoreNavigatedChapter = chapterChangeSourceRef.current === 'navigation'
         && viewMode === 'original'
         && !isPagedMode;
-
-      const cached = chapterCacheRef.current.get(chapterIndex);
-      if (cached) {
+      const applyCurrentChapter = async (data: ChapterContent) => {
+        if (isPagedMode) {
+          await warmChapterImages(data).catch(() => undefined);
+        }
         if (cancelled) return;
-        setCurrentChapter(cached);
+
+        setCurrentChapter(data);
+        onChapterContentResolved?.(chapterIndex);
         resetChapterInteractionState();
         if (viewMode === 'original' && !isPagedMode) {
           initScrollModeWindow();
@@ -391,6 +442,22 @@ export function useReaderChapterData({
         resetViewportPosition();
         preloadAdjacent(chapterIndex);
         chapterChangeSourceRef.current = null;
+      };
+
+      const cached = chapterCacheRef.current.get(chapterIndex);
+      if (cached) {
+        if (cancelled) return;
+        const cachedImageKeys = getChapterImageKeys(cached);
+        if (
+          isPagedMode
+          && cachedImageKeys.length > 0
+          && !areReaderImageResourcesReady(novelId, cachedImageKeys)
+        ) {
+          setIsLoading(true);
+          setLoadingMessage(t('reader.processingChapter', { percent: 100 }));
+        }
+
+        await applyCurrentChapter(cached);
         setIsLoading(false);
         setLoadingMessage(null);
         return;
@@ -411,22 +478,7 @@ export function useReaderChapterData({
         });
         if (cancelled) return;
         chapterCacheRef.current.set(chapterIndex, data);
-        setCurrentChapter(data);
-        resetChapterInteractionState();
-        if (viewMode === 'original' && !isPagedMode) {
-          initScrollModeWindow();
-        }
-        if (shouldRestoreNavigatedChapter) {
-          setPendingRestoreState({
-            chapterIndex,
-            viewMode,
-            isTwoColumn,
-            chapterProgress: pageTargetRef.current === 'end' ? 1 : 0,
-          }, { force: true });
-        }
-        resetViewportPosition();
-        preloadAdjacent(chapterIndex);
-        chapterChangeSourceRef.current = null;
+        await applyCurrentChapter(data);
       } catch (error) {
         if (!cancelled) {
           const normalized = toAppError(error, {
@@ -463,9 +515,11 @@ export function useReaderChapterData({
     clearScheduledPreloads,
     contentRef,
     fetchChapterContent,
+    getChapterImageKeys,
     isPagedMode,
     isTwoColumn,
     novelId,
+    onChapterContentResolved,
     pageTargetRef,
     pagedViewportRef,
     pageTurnLockedRef,
@@ -482,6 +536,7 @@ export function useReaderChapterData({
     t,
     updateChapterWindow,
     viewMode,
+    warmChapterImages,
     wheelDeltaRef,
   ]);
 

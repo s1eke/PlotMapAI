@@ -4,6 +4,7 @@ const RELEASE_DELAY_MS = 10_000;
 
 interface ReaderImageResourceEntry {
   imageKey: string;
+  isDecoded: boolean;
   isDisposed: boolean;
   novelId: number;
   url: string | null | undefined;
@@ -28,6 +29,7 @@ function getOrCreateEntry(novelId: number, imageKey: string): ReaderImageResourc
 
   const nextEntry: ReaderImageResourceEntry = {
     imageKey,
+    isDecoded: false,
     isDisposed: false,
     novelId,
     url: undefined,
@@ -91,6 +93,7 @@ async function ensureLoaded(entry: ReaderImageResourceEntry): Promise<string | n
     .then((blob) => {
       if (!blob) {
         entry.url = null;
+        entry.isDecoded = true;
         return null;
       }
 
@@ -165,6 +168,23 @@ export function releaseReaderImageResource(novelId: number, imageKey: string): v
   }
 }
 
+export function peekReaderImageResource(novelId: number, imageKey: string): string | null | undefined {
+  return imageResourceCache.get(getCacheKey(novelId, imageKey))?.url;
+}
+
+export function areReaderImageResourcesReady(novelId: number, imageKeys: Iterable<string>): boolean {
+  const uniqueImageKeys = new Set(imageKeys);
+
+  for (const imageKey of uniqueImageKeys) {
+    const entry = imageResourceCache.get(getCacheKey(novelId, imageKey));
+    if (!entry || !entry.isDecoded || entry.url === undefined) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 export function preloadReaderImageResources(novelId: number, imageKeys: Iterable<string>): Promise<void> {
   const uniqueImageKeys = Array.from(new Set(imageKeys));
 
@@ -175,12 +195,19 @@ export function preloadReaderImageResources(novelId: number, imageKeys: Iterable
       return;
     }
 
+    if (entry.isDecoded) {
+      return;
+    }
+
     if (!entry.preloadPromise) {
       if (entry.isDisposed) {
         return;
       }
 
       entry.preloadPromise = decodeImage(url)
+        .then(() => {
+          entry.isDecoded = true;
+        })
         .catch(() => undefined)
         .finally(() => {
           entry.preloadPromise = null;

@@ -21,9 +21,10 @@ function InlineImage({
     <img
       src={url}
       alt=""
-      className="max-w-full mx-auto my-4 rounded-lg shadow-md"
+      className="block max-w-full mx-auto my-4 rounded-lg shadow-md"
       loading={imageRenderMode === 'paged' ? 'eager' : 'lazy'}
       decoding="async"
+      draggable={false}
     />
   );
 }

@@ -1,5 +1,5 @@
 import type { Dispatch, RefObject, SetStateAction } from 'react';
-import { act, fireEvent, renderHook } from '@testing-library/react';
+import { act, renderHook } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -201,35 +201,6 @@ describe('usePagedReaderLayout', () => {
         setPageIndex,
       }));
     });
-
-    await animationFrames.flushAnimationFrames();
-    expect(setPageCount).toHaveBeenLastCalledWith(3);
-
-    animationFrames.restore();
-  });
-
-  it('remeasures when descendant media load events fire', async () => {
-    const animationFrames = createAnimationFrameController();
-    const viewport = createViewport(600, 800);
-    let scrollWidth = 1248;
-    const content = createContent(() => scrollWidth);
-    const image = document.createElement('img');
-    content.appendChild(image);
-    const setPageCount = vi.fn();
-    const setPageIndex = vi.fn();
-
-    renderHook(() => usePagedReaderLayout(createHookProps({
-      pagedViewportRef: { current: viewport },
-      pagedContentRef: { current: content },
-      setPageCount,
-      setPageIndex,
-    })));
-
-    await animationFrames.flushAnimationFrames();
-    expect(setPageCount).toHaveBeenLastCalledWith(2);
-
-    scrollWidth = 1896;
-    fireEvent.load(image);
 
     await animationFrames.flushAnimationFrames();
     expect(setPageCount).toHaveBeenLastCalledWith(3);

@@ -124,7 +124,7 @@ function PagedContentBody({
   return (
     <div
       ref={contentRef}
-      className="h-full font-serif text-justify tracking-wide opacity-90 selection:bg-accent/30 md:text-left"
+      className="h-full font-serif text-justify tracking-wide selection:bg-accent/30 md:text-left"
       style={{
         fontSize: `${fontSize}px`,
         lineHeight: String(lineSpacing),
@@ -334,12 +334,10 @@ export default function PagedReaderContent({
     const observer = new ResizeObserver(measureLayout);
     observer.observe(viewport);
     observer.observe(content);
-    content.addEventListener('load', measureLayout, true);
 
     return () => {
       cancelAnimationFrame(frameId);
       observer.disconnect();
-      content.removeEventListener('load', measureLayout, true);
     };
   }, [
     chapter.index,
@@ -375,22 +373,14 @@ export default function PagedReaderContent({
     const observer = new ResizeObserver(updatePreviewMeasurements);
     if (previousContent) {
       observer.observe(previousContent);
-      previousContent.addEventListener('load', updatePreviewMeasurements, true);
     }
     if (nextContent) {
       observer.observe(nextContent);
-      nextContent.addEventListener('load', updatePreviewMeasurements, true);
     }
 
     return () => {
       cancelAnimationFrame(frameId);
       observer.disconnect();
-      if (previousContent) {
-        previousContent.removeEventListener('load', updatePreviewMeasurements, true);
-      }
-      if (nextContent) {
-        nextContent.removeEventListener('load', updatePreviewMeasurements, true);
-      }
     };
   }, [
     fitsTwoColumns,

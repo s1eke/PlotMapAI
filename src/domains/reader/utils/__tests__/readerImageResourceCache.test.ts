@@ -3,7 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readerApi } from '../../api/readerApi';
 import {
   acquireReaderImageResource,
+  areReaderImageResourcesReady,
   clearReaderImageResourcesForNovel,
+  peekReaderImageResource,
   preloadReaderImageResources,
   releaseReaderImageResource,
   resetReaderImageResourceCacheForTests,
@@ -76,6 +78,8 @@ describe('readerImageResourceCache', () => {
 
     expect(readerApi.getImageBlob).toHaveBeenCalledTimes(2);
     expect(URL.createObjectURL).toHaveBeenCalledTimes(2);
+    expect(peekReaderImageResource(1, 'hero')).toBe('blob:10');
+    expect(areReaderImageResourcesReady(1, ['hero', 'cover'])).toBe(true);
   });
 
   it('clears all URLs for a novel without touching other novels', async () => {
