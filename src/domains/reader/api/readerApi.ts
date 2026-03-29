@@ -48,6 +48,7 @@ async function getPurifyRules(): Promise<PurifyRule[]> {
     scope_content: r.scopeContent,
     book_scope: r.bookScope,
     exclude_book_scope: r.excludeBookScope,
+    exclusive_group: r.exclusiveGroup,
   }));
 }
 

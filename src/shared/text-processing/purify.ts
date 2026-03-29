@@ -76,6 +76,7 @@ export function loadRulesFromJson(json: string): PurifyRule[] {
     excludeBookScope: 'exclude_book_scope',
     group: 'group',
     id: 'external_id',
+    exclusiveGroup: 'exclusive_group',
     isEnabled: 'is_enabled',
     isRegex: 'is_regex',
     name: 'name',
@@ -151,7 +152,22 @@ export function purify(
     })
     .sort((first, second) => (first.order ?? 0) - (second.order ?? 0));
 
-  for (const rule of activeRules) {
+  const seenExclusiveGroups = new Set<string>();
+  const orderedRules = activeRules.filter((rule) => {
+    const exclusiveGroup = rule.exclusive_group?.trim();
+    if (!exclusiveGroup) {
+      return true;
+    }
+
+    if (seenExclusiveGroups.has(exclusiveGroup)) {
+      return false;
+    }
+
+    seenExclusiveGroups.add(exclusiveGroup);
+    return true;
+  });
+
+  for (const rule of orderedRules) {
     const pattern = rule.pattern ?? '';
     let replacement = rule.replacement ?? '';
     const isRegex = rule.is_regex ?? true;

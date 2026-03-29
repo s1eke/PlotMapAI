@@ -28,6 +28,7 @@ export interface PurifyRule {
   scope_content?: boolean;
   book_scope?: string;
   exclude_book_scope?: string;
+  exclusive_group?: string;
 }
 
 export interface PurifiedTitle {

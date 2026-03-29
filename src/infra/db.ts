@@ -86,6 +86,8 @@ export interface PurificationRule {
   scopeContent: boolean;
   bookScope: string;
   excludeBookScope: string;
+  exclusiveGroup: string;
+  isDefault: boolean;
   timeoutMs: number;
   createdAt: string;
 }

@@ -23,6 +23,7 @@ describe('purificationRulesApi', () => {
     expect(rule.name).toBe('Purify Rule');
     expect(rule.pattern).toBe('foo');
     expect(rule.replacement).toBe('bar');
+    expect(rule.isDefault).toBe(false);
   });
 
   it('createPurificationRule throws without name or pattern', async () => {
@@ -49,6 +50,30 @@ describe('purificationRulesApi', () => {
     expect(result.message).toBe('Rule deleted');
   });
 
+  it('deletePurificationRule rejects default rules', async () => {
+    const id = await db.purificationRules.add({
+      id: undefined as unknown as number,
+      externalId: 1,
+      name: 'Default Rule',
+      group: 'Purification',
+      pattern: 'foo',
+      replacement: '',
+      isRegex: true,
+      isEnabled: true,
+      order: 0,
+      scopeTitle: true,
+      scopeContent: true,
+      bookScope: '',
+      excludeBookScope: '',
+      exclusiveGroup: '',
+      isDefault: true,
+      timeoutMs: 3000,
+      createdAt: new Date().toISOString(),
+    });
+
+    await expect(purificationRulesApi.deletePurificationRule(id)).rejects.toThrow('Cannot delete default rules');
+  });
+
   it('clearAllPurificationRules clears all', async () => {
     await purificationRulesApi.createPurificationRule({ name: 'A', pattern: 'a', replacement: '' });
     await purificationRulesApi.createPurificationRule({ name: 'B', pattern: 'b', replacement: '' });
@@ -71,10 +96,12 @@ describe('purificationRulesApi', () => {
 - name: Rule 2
   pattern: bar
   replacement: baz
+  exclusive_group: formatting
 `], 'purification.yaml', { type: 'text/yaml' });
 
     const rules = await purificationRulesApi.uploadPurificationRulesYaml(file);
     expect(rules.map(rule => rule.pattern)).toEqual(['foo', 'bar']);
+    expect(rules.find((rule) => rule.pattern === 'bar')?.exclusiveGroup).toBe('formatting');
   });
 
   it('unescapes replacement sequences when importing and saving', async () => {
@@ -87,9 +114,15 @@ describe('purificationRulesApi', () => {
   });
 
   it('exportPurificationRulesYaml returns YAML string', async () => {
-    await purificationRulesApi.createPurificationRule({ name: 'Test', pattern: 't', replacement: 'r' });
+    await purificationRulesApi.createPurificationRule({
+      name: 'Test',
+      pattern: 't',
+      replacement: 'r',
+      exclusiveGroup: 'cleanup',
+    });
     const yaml = await purificationRulesApi.exportPurificationRulesYaml();
     expect(yaml).toContain('Test');
     expect(yaml).toContain('t');
+    expect(yaml).toContain('exclusive_group: cleanup');
   });
 });

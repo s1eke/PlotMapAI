@@ -28,6 +28,8 @@ function purRuleToApi(rule: import('@infra/db').PurificationRule): PurificationR
     scopeContent: rule.scopeContent,
     bookScope: rule.bookScope || undefined,
     excludeBookScope: rule.excludeBookScope || undefined,
+    exclusiveGroup: rule.exclusiveGroup || undefined,
+    isDefault: rule.isDefault,
     timeoutMs: rule.timeoutMs,
     createdAt: rule.createdAt,
   };
@@ -64,6 +66,8 @@ export const purificationRulesApi = {
       scopeContent: data.scopeContent ?? true,
       bookScope: data.bookScope || '',
       excludeBookScope: data.excludeBookScope || '',
+      exclusiveGroup: data.exclusiveGroup || '',
+      isDefault: false,
       timeoutMs: data.timeoutMs ?? 3000,
       createdAt: now,
     });
@@ -84,6 +88,7 @@ export const purificationRulesApi = {
       'scopeContent',
       'bookScope',
       'excludeBookScope',
+      'exclusiveGroup',
       'timeoutMs',
     ] as const;
     for (const field of fields) {
@@ -115,6 +120,15 @@ export const purificationRulesApi = {
         source: 'settings',
         userMessageKey: 'errors.RULE_NOT_FOUND',
         debugMessage: 'Rule not found',
+      });
+    }
+    if (rule.isDefault) {
+      throw createAppError({
+        code: AppErrorCode.CANNOT_DELETE_DEFAULT_RULE,
+        kind: 'conflict',
+        source: 'settings',
+        userMessageKey: 'errors.CANNOT_DELETE_DEFAULT_RULE',
+        debugMessage: 'Cannot delete default rules',
       });
     }
     await db.purificationRules.delete(id);
@@ -155,6 +169,7 @@ export const purificationRulesApi = {
       const pattern = (rule.pattern as string) || '';
       const isRegex = (rule.is_regex ?? rule.isRegex ?? true) as boolean;
       const name = (rule.name as string) || `Imported Rule ${index}`;
+      const exclusiveGroup = (rule.exclusive_group ?? rule.exclusiveGroup ?? '') as string;
       const key = `${pattern}\u0000${isRegex}`;
       if (!pattern || existingKeys.has(key)) {
         debugLog('Settings', `    skip duplicate: "${name}"`);
@@ -175,6 +190,8 @@ export const purificationRulesApi = {
         scopeContent: (rule.scope_content ?? rule.scopeContent ?? true) as boolean,
         bookScope: (rule.book_scope ?? rule.bookScope ?? '') as string,
         excludeBookScope: (rule.exclude_book_scope ?? rule.excludeBookScope ?? '') as string,
+        exclusiveGroup,
+        isDefault: false,
         timeoutMs: 3000,
         createdAt: now,
       });
@@ -198,6 +215,7 @@ export const purificationRulesApi = {
       scope_content: rule.scopeContent,
       book_scope: rule.bookScope || '',
       exclude_book_scope: rule.excludeBookScope || '',
+      exclusive_group: rule.exclusiveGroup || '',
     }));
     return dumpYaml(exportData, { lineWidth: 200, noRefs: true });
   },

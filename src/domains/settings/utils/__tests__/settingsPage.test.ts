@@ -26,6 +26,7 @@ describe('settingsPage utilities', () => {
         order: 1,
         scopeTitle: true,
         scopeContent: true,
+        isDefault: false,
         timeoutMs: 3000,
       },
       {
@@ -39,6 +40,7 @@ describe('settingsPage utilities', () => {
         order: 2,
         scopeTitle: true,
         scopeContent: false,
+        isDefault: false,
         timeoutMs: 3000,
       },
     ], 'Ungrouped')).toEqual([

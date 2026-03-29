@@ -91,6 +91,8 @@ describe('db', () => {
       scopeContent: true,
       bookScope: '',
       excludeBookScope: '',
+      exclusiveGroup: '',
+      isDefault: false,
       timeoutMs: 3000,
       createdAt: new Date().toISOString(),
     });

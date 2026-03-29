@@ -105,6 +105,7 @@ export default function PurificationSettingsPanel({ manager }: PurificationSetti
                     pattern={rule.pattern}
                     isEnabled={rule.isEnabled}
                     priority={rule.order}
+                    isDefault={rule.isDefault}
                     type={rule.isRegex ? 'regex' : 'text'}
                     scopes={[
                       rule.scopeTitle ? t('settings.purification.scopeTitle') : '',
@@ -112,7 +113,8 @@ export default function PurificationSettingsPanel({ manager }: PurificationSetti
                     ].filter(Boolean)}
                     onToggle={(checked) => void manager.toggleRule(rule.id, checked)}
                     onEdit={() => manager.openEditRule(rule)}
-                    onDelete={() => manager.requestDeleteRule(rule)}
+                    onDelete={rule.isDefault ? undefined : () => manager.requestDeleteRule(rule)}
+                    isCustom={!rule.isDefault}
                   />
                 ))}
               </div>

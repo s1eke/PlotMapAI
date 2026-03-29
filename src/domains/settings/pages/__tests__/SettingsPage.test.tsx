@@ -76,6 +76,7 @@ const purificationRules = [
     scopeContent: true,
     bookScope: '',
     excludeBookScope: '',
+    isDefault: false,
     timeoutMs: 3000,
   },
 ];
@@ -252,6 +253,24 @@ describe('SettingsPage', () => {
       expect(purificationRulesApi.clearAllPurificationRules).toHaveBeenCalledTimes(1);
     });
     expect(await screen.findByText('settings.common.clearSuccess')).toBeInTheDocument();
+  });
+
+  it('does not show a delete button for default purification rules', async () => {
+    vi.mocked(purificationRulesApi.getPurificationRules).mockResolvedValueOnce([
+      {
+        ...purificationRules[0],
+        id: 99,
+        name: 'Default Cleanup',
+        isDefault: true,
+      },
+    ]);
+    const user = userEvent.setup();
+
+    renderPage();
+
+    await user.click(screen.getByRole('button', { name: 'settings.purificationRules' }));
+    expect(await screen.findByText('Default Cleanup')).toBeInTheDocument();
+    expect(screen.queryByTitle('Delete')).not.toBeInTheDocument();
   });
 
   it('saves AI settings and surfaces test-connection failures', async () => {

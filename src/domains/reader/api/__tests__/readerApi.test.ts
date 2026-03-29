@@ -173,6 +173,7 @@ describe('loadAndPurifyChapters', () => {
       bookScope: '',
       excludeBookScope: '',
       timeoutMs: 3000,
+      isDefault: false,
       createdAt: new Date().toISOString(),
     });
     const novel = await db.novels.orderBy('id').last();
@@ -196,10 +197,58 @@ describe('loadAndPurifyChapters', () => {
       bookScope: '',
       excludeBookScope: '',
       timeoutMs: 3000,
+      isDefault: false,
       createdAt: new Date().toISOString(),
     });
     const novel = await db.novels.orderBy('id').last();
     const chapters = await loadAndPurifyChapters(novel!.id);
     expect(chapters[0].content).toBe('Hello world');
+  });
+
+  it('respects order precedence for mutually exclusive rules', async () => {
+    await db.purificationRules.bulkAdd([
+      {
+        id: undefined as unknown as number,
+        externalId: null,
+        name: 'Indent Two',
+        group: 'formatting',
+        pattern: '(^|\\n)[ \\t　]*(?=\\S)',
+        replacement: '$1　　',
+        isRegex: true,
+        isEnabled: true,
+        order: 0,
+        scopeTitle: false,
+        scopeContent: true,
+        bookScope: '',
+        excludeBookScope: '',
+        exclusiveGroup: 'indentation',
+        isDefault: false,
+        timeoutMs: 3000,
+        createdAt: new Date().toISOString(),
+      },
+      {
+        id: undefined as unknown as number,
+        externalId: null,
+        name: 'Flush Left',
+        group: 'formatting',
+        pattern: '(^|\\n)[ \\t　]+(?=\\S)',
+        replacement: '$1',
+        isRegex: true,
+        isEnabled: true,
+        order: 1,
+        scopeTitle: false,
+        scopeContent: true,
+        bookScope: '',
+        excludeBookScope: '',
+        exclusiveGroup: 'indentation',
+        isDefault: false,
+        timeoutMs: 3000,
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+    const novel = await db.novels.orderBy('id').last();
+    const chapters = await loadAndPurifyChapters(novel!.id);
+
+    expect(chapters[0].content).toBe('　　Hello world');
   });
 });

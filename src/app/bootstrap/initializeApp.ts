@@ -1,5 +1,5 @@
 import { initializeAnalysisRuntime } from '@domains/analysis';
-import { ensureDefaultTocRules } from '@domains/settings';
+import { ensureDefaultPurificationRules, ensureDefaultTocRules } from '@domains/settings';
 
 let initialized = false;
 
@@ -10,6 +10,7 @@ export async function initializeApp(): Promise<void> {
 
   initialized = true;
   await Promise.all([
+    ensureDefaultPurificationRules(),
     ensureDefaultTocRules(),
     initializeAnalysisRuntime(),
   ]);

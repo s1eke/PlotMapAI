@@ -63,4 +63,32 @@ describe('PurificationRuleModal', () => {
 
     expect(screen.getByText('settings.purification.jsSecurityBadge')).toBeInTheDocument();
   });
+
+  it('keeps optional inputs controlled when editing a sparse rule', () => {
+    render(
+      <PurificationRuleModal
+        isOpen={true}
+        onClose={() => {}}
+        onSave={() => Promise.resolve()}
+        rule={{
+          id: 1,
+          name: 'Sparse Rule',
+          group: 'Custom',
+          pattern: 'foo',
+          replacement: '',
+          isRegex: true,
+          isEnabled: true,
+          order: 3,
+          scopeTitle: true,
+          scopeContent: true,
+          isDefault: false,
+          timeoutMs: 3000,
+        }}
+      />,
+    );
+
+    expect(screen.getByPlaceholderText('settings.purification.bookScopePlaceholder')).toHaveValue('');
+    expect(screen.getByPlaceholderText('settings.purification.excludeBookScopePlaceholder')).toHaveValue('');
+    expect(screen.getByPlaceholderText('settings.purification.replacementPlaceholder')).toHaveValue('');
+  });
 });

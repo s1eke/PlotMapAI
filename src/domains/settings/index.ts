@@ -7,6 +7,7 @@ export type {
   PurificationRule,
   TocRule,
 } from './api/types';
+export { ensureDefaultPurificationRules } from './services/defaultPurificationRules';
 export { ensureDefaultTocRules } from './services/defaultTocRules';
 export { purify } from './services/purifier';
 
