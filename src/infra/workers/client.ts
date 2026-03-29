@@ -1,10 +1,17 @@
+import type { WorkerTaskMessage, WorkerTaskResponse } from './protocol';
+import type {
+  WorkerTaskPayload,
+  WorkerTaskProgress,
+  WorkerTaskResult,
+  WorkerTaskSpecMap,
+} from './types';
+
 import {
   AppErrorCode,
   deserializeAppError,
   isSerializedAppError,
   toAppError,
 } from '@shared/errors';
-import type { WorkerTaskMessage, WorkerTaskResponse } from './protocol';
 
 export interface WorkerTaskOptions<Progress> {
   signal?: AbortSignal;
@@ -15,6 +22,18 @@ export interface CreateWorkerTaskRunnerOptions<Payload, Result, Progress> {
   createWorker: () => Worker;
   task: string;
   fallback: (payload: Payload, options: WorkerTaskOptions<Progress>) => Promise<Result> | Result;
+}
+
+interface CreateMappedWorkerTaskRunnerOptions<
+  TMap extends WorkerTaskSpecMap,
+  TTask extends keyof TMap & string,
+> {
+  createWorker: () => Worker;
+  task: TTask;
+  fallback: (
+    payload: WorkerTaskPayload<TMap, TTask>,
+    options: WorkerTaskOptions<WorkerTaskProgress<TMap, TTask>>,
+  ) => Promise<WorkerTaskResult<TMap, TTask>> | WorkerTaskResult<TMap, TTask>;
 }
 
 interface PendingWorkerRequest<Result, Progress> {
@@ -44,6 +63,21 @@ function createRequestId(): string {
   return `worker-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+export function createWorkerTaskRunner<
+  TMap extends WorkerTaskSpecMap,
+  TTask extends keyof TMap & string,
+>(
+  options: CreateMappedWorkerTaskRunnerOptions<TMap, TTask>,
+): (
+  payload: WorkerTaskPayload<TMap, TTask>,
+  options?: WorkerTaskOptions<WorkerTaskProgress<TMap, TTask>>,
+) => Promise<WorkerTaskResult<TMap, TTask>>;
+export function createWorkerTaskRunner<Payload, Result, Progress>(
+  options: CreateWorkerTaskRunnerOptions<Payload, Result, Progress>,
+): (
+  payload: Payload,
+  options?: WorkerTaskOptions<Progress>,
+) => Promise<Result>;
 export function createWorkerTaskRunner<Payload, Result, Progress>({
   createWorker,
   task,

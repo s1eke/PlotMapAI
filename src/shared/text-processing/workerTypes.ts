@@ -1,3 +1,10 @@
+import type {
+  WorkerTaskPayload,
+  WorkerTaskProgress,
+  WorkerTaskResult,
+  WorkerTaskSpec,
+} from '@infra/workers';
+
 import type { ChapterDetectionRule, ParsedTextDocument, PurifiedChapter, PurifiedTitle, PurifyRule } from './types';
 
 export interface TextProcessingProgress {
@@ -28,16 +35,21 @@ export interface PurifyChaptersPayload {
   bookTitle: string;
 }
 
+export type TextProcessingTaskMap = {
+  'parse-txt': WorkerTaskSpec<ParseTxtPayload, ParsedTextDocument, TextProcessingProgress>;
+  'purify-chapter': WorkerTaskSpec<PurifyChapterPayload, PurifiedChapter, TextProcessingProgress>;
+  'purify-chapters': WorkerTaskSpec<PurifyChaptersPayload, PurifiedChapter[], TextProcessingProgress>;
+  'purify-titles': WorkerTaskSpec<PurifyTitlesPayload, PurifiedTitle[], TextProcessingProgress>;
+};
+
 export type TextProcessingTaskPayloadMap = {
-  'parse-txt': ParseTxtPayload;
-  'purify-chapter': PurifyChapterPayload;
-  'purify-chapters': PurifyChaptersPayload;
-  'purify-titles': PurifyTitlesPayload;
+  [Task in keyof TextProcessingTaskMap]: WorkerTaskPayload<TextProcessingTaskMap, Task>;
 };
 
 export type TextProcessingTaskResultMap = {
-  'parse-txt': ParsedTextDocument;
-  'purify-chapter': PurifiedChapter;
-  'purify-chapters': PurifiedChapter[];
-  'purify-titles': PurifiedTitle[];
+  [Task in keyof TextProcessingTaskMap]: WorkerTaskResult<TextProcessingTaskMap, Task>;
+};
+
+export type TextProcessingTaskProgressMap = {
+  [Task in keyof TextProcessingTaskMap]: WorkerTaskProgress<TextProcessingTaskMap, Task>;
 };

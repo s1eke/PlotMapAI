@@ -1,36 +1,50 @@
 import type { WorkerTaskMessage, WorkerTaskResponse } from './protocol';
+import type {
+  WorkerTaskHandler,
+  WorkerTaskHandlerMap,
+  WorkerTaskSpecMap,
+} from './types';
 
 import {
   AppErrorCode,
   serializeAppError,
   toAppError,
 } from '@shared/errors';
-
-export type WorkerTaskHandler<Payload, Result, Progress> = (
-  payload: Payload,
-  emitProgress: (progress: Progress) => void,
-  signal: AbortSignal,
-) => Promise<Result> | Result;
+export type { WorkerTaskHandler } from './types';
 
 type WorkerTaskHandlers = Record<string, WorkerTaskHandler<unknown, unknown, unknown>>;
+
+interface WorkerTaskRegistration {
+  taskName: string;
+  handler: WorkerTaskHandler<unknown, unknown, unknown>;
+}
 
 function isAbortError(error: unknown): boolean {
   return error instanceof Error && error.name === 'AbortError';
 }
 
+function getWorkerTaskRegistrations(handlers: WorkerTaskHandlers): WorkerTaskRegistration[] {
+  const registrations: WorkerTaskRegistration[] = [];
+
+  for (const [taskName, handler] of Object.entries(handlers)) {
+    if (typeof handler === 'function') {
+      registrations.push({ taskName, handler });
+    }
+  }
+
+  return registrations;
+}
+
+export function registerWorkerTaskHandlers<TMap extends WorkerTaskSpecMap>(
+  handlers: WorkerTaskHandlerMap<TMap>,
+): void;
 export function registerWorkerTaskHandlers(handlers: WorkerTaskHandlers): void {
   const workerContext = self as {
     onmessage: ((event: MessageEvent<WorkerTaskMessage<unknown>>) => void) | null;
     postMessage: (message: WorkerTaskResponse<unknown, unknown>) => void;
   };
   const controllers = new Map<string, AbortController>();
-  const taskHandlers = new Map<string, WorkerTaskHandler<unknown, unknown, unknown>>();
-
-  for (const [taskName, handler] of Object.entries(handlers)) {
-    if (typeof handler === 'function') {
-      taskHandlers.set(taskName, handler);
-    }
-  }
+  const taskRegistrations = getWorkerTaskRegistrations(handlers);
 
   workerContext.onmessage = (event: MessageEvent<WorkerTaskMessage<unknown>>) => {
     const message = event.data;
@@ -39,8 +53,8 @@ export function registerWorkerTaskHandlers(handlers: WorkerTaskHandlers): void {
       return;
     }
 
-    const handler = taskHandlers.get(message.task);
-    if (!handler) {
+    const registration = taskRegistrations.find((taskRegistration) => taskRegistration.taskName === message.task);
+    if (!registration) {
       workerContext.postMessage({
         kind: 'error',
         requestId: message.requestId,
@@ -68,7 +82,7 @@ export function registerWorkerTaskHandlers(handlers: WorkerTaskHandlers): void {
       } satisfies WorkerTaskResponse<unknown, unknown>);
     };
 
-    Promise.resolve(handler(message.payload, emitProgress, controller.signal))
+    Promise.resolve(registration.handler(message.payload, emitProgress, controller.signal))
       .then((result) => {
         controllers.delete(message.requestId);
         if (controller.signal.aborted) {

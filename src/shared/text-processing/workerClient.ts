@@ -1,5 +1,10 @@
 import { createWorkerTaskRunner } from '@infra/workers';
-import type { WorkerTaskOptions } from '@infra/workers';
+import type {
+  WorkerTaskOptions,
+  WorkerTaskPayload,
+  WorkerTaskProgress,
+  WorkerTaskResult,
+} from '@infra/workers';
 import { parseTxtDocument } from './txt';
 import { purifyChapter, purifyChapters, purifyTitles } from './purify';
 import type {
@@ -7,33 +12,46 @@ import type {
   PurifyChapterPayload,
   PurifyChaptersPayload,
   PurifyTitlesPayload,
+  TextProcessingTaskMap,
   TextProcessingProgress,
 } from './workerTypes';
 import type { ParsedTextDocument, PurifiedChapter, PurifiedTitle } from './types';
 
-const runParseTxtWorkerTask = createWorkerTaskRunner<ParseTxtPayload, ParsedTextDocument, TextProcessingProgress>({
-  createWorker: () => new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' }),
-  task: 'parse-txt',
-  fallback: ({ file, tocRules }, options) => parseTxtDocument(file, tocRules, options),
-});
+type TextProcessingTaskName = keyof TextProcessingTaskMap & string;
 
-const runPurifyTitlesWorkerTask = createWorkerTaskRunner<PurifyTitlesPayload, PurifiedTitle[], TextProcessingProgress>({
-  createWorker: () => new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' }),
-  task: 'purify-titles',
-  fallback: ({ titles, rules, bookTitle }) => purifyTitles(titles, rules, bookTitle),
-});
+function createTextProcessingTaskRunner<TTask extends TextProcessingTaskName>(
+  task: TTask,
+  fallback: (
+    payload: WorkerTaskPayload<TextProcessingTaskMap, TTask>,
+    options: WorkerTaskOptions<WorkerTaskProgress<TextProcessingTaskMap, TTask>>,
+  ) => Promise<WorkerTaskResult<TextProcessingTaskMap, TTask>> | WorkerTaskResult<TextProcessingTaskMap, TTask>,
+) {
+  return createWorkerTaskRunner<TextProcessingTaskMap, TTask>({
+    createWorker: () => new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' }),
+    task,
+    fallback,
+  });
+}
 
-const runPurifyChapterWorkerTask = createWorkerTaskRunner<PurifyChapterPayload, PurifiedChapter, TextProcessingProgress>({
-  createWorker: () => new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' }),
-  task: 'purify-chapter',
-  fallback: ({ chapter, rules, bookTitle }) => purifyChapter(chapter, rules, bookTitle),
-});
+const runParseTxtWorkerTask = createTextProcessingTaskRunner(
+  'parse-txt',
+  ({ file, tocRules }, options) => parseTxtDocument(file, tocRules, options),
+);
 
-const runPurifyChaptersWorkerTask = createWorkerTaskRunner<PurifyChaptersPayload, PurifiedChapter[], TextProcessingProgress>({
-  createWorker: () => new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' }),
-  task: 'purify-chapters',
-  fallback: ({ chapters, rules, bookTitle }) => purifyChapters(chapters, rules, bookTitle),
-});
+const runPurifyTitlesWorkerTask = createTextProcessingTaskRunner(
+  'purify-titles',
+  ({ titles, rules, bookTitle }) => purifyTitles(titles, rules, bookTitle),
+);
+
+const runPurifyChapterWorkerTask = createTextProcessingTaskRunner(
+  'purify-chapter',
+  ({ chapter, rules, bookTitle }) => purifyChapter(chapter, rules, bookTitle),
+);
+
+const runPurifyChaptersWorkerTask = createTextProcessingTaskRunner(
+  'purify-chapters',
+  ({ chapters, rules, bookTitle }) => purifyChapters(chapters, rules, bookTitle),
+);
 
 export function runParseTxtTask(
   payload: ParseTxtPayload,
