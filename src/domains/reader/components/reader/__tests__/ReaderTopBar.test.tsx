@@ -17,6 +17,9 @@ function renderTopBar(overrides: Partial<React.ComponentProps<typeof ReaderTopBa
   const renderResult = render(
     <MemoryRouter>
       <ReaderTopBar
+        readerTheme="parchment"
+        headerBgClassName="bg-[#f4ecd8]"
+        textClassName="text-[#5b4636]"
         isChromeVisible
         isSidebarOpen={false}
         novelId={1}
@@ -52,5 +55,12 @@ describe('ReaderTopBar', () => {
     const { container } = renderTopBar({ isChromeVisible: false });
 
     expect(container.querySelector('header')).toHaveClass('pointer-events-none');
+  });
+
+  it('uses the reader theme classes so the top bar feels unified with the page', () => {
+    const { container } = renderTopBar();
+
+    expect(container.querySelector('header')).toHaveClass('bg-[#f4ecd8]');
+    expect(screen.getByRole('button', { name: 'reader.exit' })).toHaveClass('text-[#5b4636]');
   });
 });

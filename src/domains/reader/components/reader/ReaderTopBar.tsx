@@ -29,6 +29,9 @@ const READER_TOP_BAR_VARIANTS = {
 } as const;
 
 interface ReaderTopBarProps {
+  readerTheme: string;
+  headerBgClassName: string;
+  textClassName: string;
   isChromeVisible: boolean;
   isSidebarOpen: boolean;
   novelId: number;
@@ -39,6 +42,9 @@ interface ReaderTopBarProps {
 }
 
 export default function ReaderTopBar({
+  readerTheme,
+  headerBgClassName,
+  textClassName,
   isChromeVisible,
   isSidebarOpen,
   novelId,
@@ -48,6 +54,23 @@ export default function ReaderTopBar({
   onSetViewMode,
 }: ReaderTopBarProps) {
   const { t } = useTranslation();
+  const isNightTheme = readerTheme === 'night';
+  const isAutoTheme = readerTheme === 'auto';
+  const borderClassName = isAutoTheme
+    ? 'border-border-color/20'
+    : isNightTheme
+      ? 'border-white/10'
+      : 'border-black/[0.06]';
+  const chromeHoverClassName = isAutoTheme
+    ? 'hover:bg-muted-bg'
+    : isNightTheme
+      ? 'hover:bg-white/10'
+      : 'hover:bg-black/[0.05]';
+  const segmentedControlClassName = isAutoTheme
+    ? 'bg-muted-bg/90 border-border-color/50 shadow-inner'
+    : isNightTheme
+      ? 'bg-white/[0.06] border-white/10 shadow-inner shadow-black/20'
+      : 'bg-black/[0.035] border-black/[0.06] shadow-inner shadow-black/[0.04]';
 
   return (
     <motion.header
@@ -55,7 +78,9 @@ export default function ReaderTopBar({
       animate={isChromeVisible ? 'visible' : 'hidden'}
       variants={READER_TOP_BAR_VARIANTS}
       className={cn(
-        'absolute left-0 right-0 top-0 z-30 flex h-14 items-center justify-between border-b border-border-color/20 glass px-4 sm:px-6',
+        'absolute left-0 right-0 top-0 z-30 flex h-14 items-center justify-between border-b px-4 sm:px-6',
+        headerBgClassName,
+        borderClassName,
         !isChromeVisible && 'pointer-events-none',
       )}
     >
@@ -63,24 +88,50 @@ export default function ReaderTopBar({
         <button
           onClick={onMobileBack}
           aria-label={t('reader.exit')}
-          className="md:hidden p-2 rounded-full hover:bg-white/10 transition-colors text-text-primary"
+          className={cn('rounded-full p-2 transition-colors md:hidden', textClassName, chromeHoverClassName)}
           title={t('reader.exit')}
           type="button"
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
-        <button onClick={onToggleSidebar} className="hidden md:flex p-2 rounded-full hover:bg-white/10 transition-colors text-text-primary" title={t('reader.contents')}>
+        <button
+          onClick={onToggleSidebar}
+          className={cn('hidden rounded-full p-2 transition-colors md:flex', textClassName, chromeHoverClassName)}
+          title={t('reader.contents')}
+          type="button"
+        >
           {isSidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
         </button>
-        <Link to={appPaths.novel(novelId)} className="text-sm font-medium hover:text-accent transition-colors hidden md:block text-text-primary">
+        <Link
+          to={appPaths.novel(novelId)}
+          className={cn('hidden text-sm font-medium transition-colors hover:text-accent md:block', textClassName)}
+        >
           {t('reader.exit')}
         </Link>
       </div>
-      <div className="flex bg-muted-bg rounded-lg p-1 border border-border-color/50 shadow-inner">
-        <button onClick={() => onSetViewMode('original')} className={cn('px-3 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2', viewMode === 'original' ? 'bg-accent text-white shadow' : 'text-text-secondary hover:text-text-primary')}>
+      <div className={cn('flex rounded-lg border p-1', segmentedControlClassName)}>
+        <button
+          onClick={() => onSetViewMode('original')}
+          className={cn(
+            'flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-all',
+            viewMode === 'original'
+              ? 'bg-accent text-white shadow'
+              : cn(textClassName, 'opacity-70 hover:opacity-100'),
+          )}
+          type="button"
+        >
           <AlignLeft className="w-4 h-4" /> {t('reader.original')}
         </button>
-        <button onClick={() => onSetViewMode('summary')} className={cn('px-3 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2', viewMode === 'summary' ? 'bg-accent text-white shadow' : 'text-text-secondary hover:text-text-primary')}>
+        <button
+          onClick={() => onSetViewMode('summary')}
+          className={cn(
+            'flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-all',
+            viewMode === 'summary'
+              ? 'bg-accent text-white shadow'
+              : cn(textClassName, 'opacity-70 hover:opacity-100'),
+          )}
+          type="button"
+        >
           <Bot className="w-4 h-4" /> {t('reader.summary')}
         </button>
       </div>

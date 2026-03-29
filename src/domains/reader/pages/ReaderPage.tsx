@@ -406,6 +406,9 @@ export default function ReaderPage() {
 
       <main className="flex-1 flex flex-col min-w-0 relative text-text-primary">
         <ReaderTopBar
+          readerTheme={preferences.readerTheme}
+          headerBgClassName={preferences.headerBg}
+          textClassName={preferences.currentTheme.text}
           isChromeVisible={isChromeVisible}
           isSidebarOpen={sidebar.isSidebarOpen}
           novelId={novelId}
