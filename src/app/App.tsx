@@ -5,6 +5,7 @@ import { loadBookDetailPage, loadBookshelfPage } from '@domains/library';
 import { loadCharacterGraphPage } from '@domains/character-graph';
 import { loadReaderPage } from '@domains/reader';
 import { loadSettingsPage } from '@domains/settings';
+import type { AppError } from '@shared/errors';
 
 import InstallPrompt from './components/InstallPrompt';
 import ReloadPrompt from './components/ReloadPrompt';
@@ -29,7 +30,11 @@ function RouteFallback() {
   );
 }
 
-function App() {
+interface AppProps {
+  startupError?: AppError | null;
+}
+
+function App({ startupError = null }: AppProps) {
   useEffect(() => {
     if (!isDebugMode()) {
       return undefined;
@@ -45,7 +50,7 @@ function App() {
   return (
     <ThemeProvider>
       <Router>
-        <AppErrorBoundary>
+        <AppErrorBoundary initialError={startupError}>
           <Layout>
             <Suspense fallback={<RouteFallback />}>
               <Routes>

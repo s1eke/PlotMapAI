@@ -7,6 +7,7 @@ import { reportAppError } from '@app/debug/service';
 
 interface AppErrorBoundaryProps {
   children: ReactNode;
+  initialError?: AppError | null;
 }
 
 interface AppErrorBoundaryState {
@@ -99,8 +100,9 @@ export default class AppErrorBoundary extends Component<AppErrorBoundaryProps, A
   }
 
   override render(): ReactNode {
-    if (this.state.error) {
-      return <AppErrorFallback error={this.state.error} />;
+    const error = this.state.error ?? this.props.initialError ?? null;
+    if (error) {
+      return <AppErrorFallback error={error} />;
     }
 
     return this.props.children;
