@@ -22,6 +22,7 @@ export async function runChunkAnalysis(
   novelTitle: string,
   chunk: AnalysisChunkPayload,
   totalChunks: number,
+  signal?: AbortSignal,
 ): Promise<ChunkAnalysisResult> {
   const prompt = buildChunkPrompt(novelTitle, chunk, totalChunks);
   const request = {
@@ -34,9 +35,10 @@ export async function runChunkAnalysis(
     `第 ${chunk.chunkIndex + 1} 块章节分析`,
     async () => {
       const content = await resolveAnalysisProviderAdapter(config.providerId)
-        .generateText(config.providerConfig, request);
+        .generateText(config.providerConfig, request, signal);
       return normalizeChunkResult(extractJsonObject(content), chunk);
     },
+    signal,
   );
 }
 
@@ -44,6 +46,7 @@ export async function runSingleChapterAnalysis(
   config: RuntimeAnalysisConfig,
   novelTitle: string,
   chapter: PromptChapter,
+  signal?: AbortSignal,
 ): Promise<ChunkAnalysisResult> {
   const prompt = buildSingleChapterPrompt(novelTitle, chapter);
   const request = {
@@ -56,9 +59,10 @@ export async function runSingleChapterAnalysis(
     `第 ${chapter.chapterIndex + 1} 章单章分析`,
     async () => {
       const content = await resolveAnalysisProviderAdapter(config.providerId)
-        .generateText(config.providerConfig, request);
+        .generateText(config.providerConfig, request, signal);
       return normalizeSingleChapterResult(extractJsonObject(content), chapter);
     },
+    signal,
   );
 }
 
@@ -67,6 +71,7 @@ export async function runOverviewAnalysis(
   novelTitle: string,
   chapterRows: ChapterAnalysis[],
   totalChapters: number,
+  signal?: AbortSignal,
 ): Promise<OverviewAnalysisResult> {
   if (chapterRows.length < totalChapters) {
     throw new AnalysisExecutionError('章节分析尚未全部完成，无法生成全书概览。', {
@@ -86,18 +91,34 @@ export async function runOverviewAnalysis(
     '全书概览分析',
     async () => {
       const content = await resolveAnalysisProviderAdapter(config.providerId)
-        .generateText(config.providerConfig, request);
+        .generateText(config.providerConfig, request, signal);
       return normalizeOverviewResult(extractJsonObject(content), aggregates, totalChapters);
     },
+    signal,
   );
 }
 
-async function runAnalysisWithRetry<T>(taskName: string, operation: () => Promise<T>): Promise<T> {
+async function runAnalysisWithRetry<T>(
+  taskName: string,
+  operation: () => Promise<T>,
+  signal?: AbortSignal,
+): Promise<T> {
   const errors: string[] = [];
   for (let attempt = 1; attempt <= ANALYSIS_RETRY_LIMIT; attempt++) {
+    if (signal?.aborted) {
+      throw new AnalysisExecutionError('AI 请求已取消。', {
+        code: AppErrorCode.ANALYSIS_EXECUTION_FAILED,
+        debugVisible: false,
+        retryable: false,
+        userVisible: false,
+      });
+    }
     try {
       return await operation();
     } catch (err) {
+      if (signal?.aborted) {
+        throw err;
+      }
       if (!(err instanceof AnalysisExecutionError)) throw err;
       errors.push(`第 ${attempt} 次：${err.message}`);
       if (attempt >= ANALYSIS_RETRY_LIMIT) {

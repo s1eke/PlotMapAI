@@ -253,22 +253,22 @@ export default function BookDetailPage() {
               {t('bookDetail.characterGraphEntry')}
             </Link>
 
-            {job?.status === 'running' || job?.status === 'pausing' ? (
+            {job?.status === 'running' ? (
               <DetailActionButton
                 icon={Pause}
-                label={job.status === 'pausing' ? t('bookDetail.pausingAnalysis') : t('bookDetail.pauseAnalysis')}
+                label={t('bookDetail.pauseAnalysis')}
                 onClick={() => runAnalysisAction('pause')}
                 loading={analysisAction === 'pause'}
                 disabled={analysisAction !== null}
                 tone="warning"
               />
-            ) : job?.canResume ? (
+            ) : job?.status === 'pausing' || job?.canResume ? (
               <DetailActionButton
                 icon={Play}
                 label={t('bookDetail.resumeAnalysis')}
                 onClick={() => runAnalysisAction('resume')}
                 loading={analysisAction === 'resume'}
-                disabled={analysisAction !== null}
+                disabled={job?.status === 'pausing' || analysisAction !== null}
                 tone="brand-soft"
               />
             ) : (!job || job.canStart) ? (

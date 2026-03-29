@@ -184,6 +184,28 @@ describe('BookDetailPage', () => {
 
     expect(analysisApi.pause).toHaveBeenCalledWith(1);
     expect(await screen.findByText('bookDetail.analysisActionPauseRequested')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'bookDetail.resumeAnalysis' })).toBeDisabled();
+  });
+
+  it('shows the resume action while a pause request is still settling', async () => {
+    vi.mocked(analysisApi.getStatus).mockResolvedValue(
+      createStatusResponse({
+        status: 'pausing',
+        currentStage: 'chapters',
+        totalChunks: 2,
+        completedChunks: 1,
+        analyzedChapters: 3,
+        totalChapters: 6,
+        canStart: false,
+        canPause: true,
+        canResume: false,
+      }),
+    );
+    renderPage();
+
+    const resumeButton = await screen.findByRole('button', { name: 'bookDetail.resumeAnalysis' });
+    expect(screen.queryByRole('button', { name: 'bookDetail.pauseAnalysis' })).not.toBeInTheDocument();
+    expect(resumeButton).toBeDisabled();
   });
 
   it('renders resume and restart actions for a paused analysis job', async () => {

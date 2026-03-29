@@ -20,6 +20,9 @@ interface ChatCompletionPayload {
   messages: ChatMessage[];
 }
 
+const TIMEOUT_ABORT_REASON = 'analysis-timeout';
+const UPSTREAM_ABORT_REASON = 'analysis-upstream-abort';
+
 function createAbortErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -65,10 +68,14 @@ function createTimeoutController(signal?: AbortSignal): {
   signal: AbortSignal;
 } {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), LLM_TIMEOUT_MS);
+  const timeoutId = setTimeout(() => controller.abort(TIMEOUT_ABORT_REASON), LLM_TIMEOUT_MS);
 
-  const abortFromParent = () => controller.abort();
-  signal?.addEventListener('abort', abortFromParent, { once: true });
+  const abortFromParent = () => controller.abort(UPSTREAM_ABORT_REASON);
+  if (signal?.aborted) {
+    controller.abort(UPSTREAM_ABORT_REASON);
+  } else {
+    signal?.addEventListener('abort', abortFromParent, { once: true });
+  }
 
   return {
     cleanup: () => {
@@ -102,10 +109,18 @@ async function requestChatCompletion(
   } catch (error) {
     cleanup();
     if (requestSignal.aborted) {
-      throw new AnalysisExecutionError('AI 接口请求超时，请稍后重试。', {
-        code: AppErrorCode.AI_REQUEST_TIMEOUT,
-        retryable: true,
-        userMessageKey: 'errors.AI_REQUEST_TIMEOUT',
+      if (requestSignal.reason === TIMEOUT_ABORT_REASON) {
+        throw new AnalysisExecutionError('AI 接口请求超时，请稍后重试。', {
+          code: AppErrorCode.AI_REQUEST_TIMEOUT,
+          retryable: true,
+          userMessageKey: 'errors.AI_REQUEST_TIMEOUT',
+        });
+      }
+      throw new AnalysisExecutionError('AI 请求已取消。', {
+        code: AppErrorCode.ANALYSIS_EXECUTION_FAILED,
+        debugVisible: false,
+        retryable: false,
+        userVisible: false,
       });
     }
     throw new AnalysisExecutionError(`AI 接口连接失败：${createAbortErrorMessage(error)}`, {

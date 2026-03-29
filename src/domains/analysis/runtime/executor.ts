@@ -120,7 +120,7 @@ export async function runAnalysisExecution({
       });
 
       try {
-        const result = await runChunkAnalysis(runtimeConfig, novelTitle, payload, chunks.length);
+        const result = await runChunkAnalysis(runtimeConfig, novelTitle, payload, chunks.length, signal);
         await repository.saveChunkAnalysisResult(novelId, payload.chunkIndex, result);
         const snapshot = await repository.refreshJobProgress(novelId, totalChapters);
         if (snapshot.pauseRequested) {
@@ -131,6 +131,7 @@ export async function runAnalysisExecution({
           lastHeartbeat: nowISO(),
         });
       } catch (error) {
+        if (await handlePauseCheckpoint(repository, novelId, signal)) return;
         const normalized = normalizeRuntimeError(error, {
           novelId,
           stage: 'chunk',
@@ -165,7 +166,7 @@ export async function runAnalysisExecution({
         lastHeartbeat: nowISO(),
       });
       try {
-        const result = await runOverviewAnalysis(runtimeConfig, novelTitle, chapterRows, totalChapters);
+        const result = await runOverviewAnalysis(runtimeConfig, novelTitle, chapterRows, totalChapters, signal);
         await repository.saveOverviewAnalysisResult(novelId, result);
         await repository.refreshJobProgress(novelId, totalChapters);
         await repository.saveJobPatch(novelId, deriveJobPatchForOverviewSuccess(), {
@@ -174,6 +175,7 @@ export async function runAnalysisExecution({
         });
         return;
       } catch (error) {
+        if (await handlePauseCheckpoint(repository, novelId, signal)) return;
         const normalized = normalizeRuntimeError(error, {
           novelId,
           stage: 'overview',
@@ -202,6 +204,7 @@ export async function runAnalysisExecution({
     });
   } catch (error) {
     try {
+      if (await handlePauseCheckpoint(repository, novelId, signal)) return;
       const normalized = normalizeRuntimeError(error, {
         novelId,
         stage: 'execution',

@@ -95,4 +95,23 @@ describe('openai-compatible provider adapter', () => {
     await vi.advanceTimersByTimeAsync(LLM_TIMEOUT_MS + 1);
     await expectation;
   });
+
+  it('does not map caller aborts to timeout errors', async () => {
+    const controller = new AbortController();
+    vi.spyOn(globalThis, 'fetch').mockImplementation((_input, init) => new Promise((_resolve, reject) => {
+      const signal = init?.signal as AbortSignal | undefined;
+      signal?.addEventListener('abort', () => {
+        reject(new DOMException('Aborted', 'AbortError'));
+      }, { once: true });
+      queueMicrotask(() => controller.abort());
+    }));
+
+    const adapter = resolveAnalysisProviderAdapter(DEFAULT_ANALYSIS_PROVIDER_ID);
+    await expect(adapter.generateText(CONFIG, REQUEST, controller.signal)).rejects.toMatchObject({
+      code: AppErrorCode.ANALYSIS_EXECUTION_FAILED,
+      message: 'AI 请求已取消。',
+      retryable: false,
+      userVisible: false,
+    });
+  });
 });
