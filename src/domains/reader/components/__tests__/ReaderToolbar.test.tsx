@@ -39,7 +39,10 @@ describe('ReaderToolbar', () => {
     hasNext: true,
     navigationMode: 'chapter' as const,
     readerTheme: 'paper',
+    headerBgClassName: 'bg-[#f4ecd8]',
+    textClassName: 'text-[#5b4636]',
     setReaderTheme: vi.fn(),
+    onCloseSidebar: vi.fn(),
   };
 
   it('keeps the desktop slider popover open while adjusting font size', () => {
@@ -108,6 +111,26 @@ describe('ReaderToolbar', () => {
     expect(onToggleSidebar).toHaveBeenCalledTimes(1);
   });
 
+  it('uses the TOC button as a close toggle when the sidebar is already open', () => {
+    mockMatchMedia(false);
+    const onToggleSidebar = vi.fn();
+    const onCloseSidebar = vi.fn();
+
+    render(
+      <ReaderToolbar
+        {...defaultProps}
+        onToggleSidebar={onToggleSidebar}
+        onCloseSidebar={onCloseSidebar}
+        isSidebarOpen={true}
+      />,
+    );
+
+    fireEvent.click(screen.getByTitle('reader.contents'));
+
+    expect(onCloseSidebar).toHaveBeenCalledTimes(1);
+    expect(onToggleSidebar).not.toHaveBeenCalled();
+  });
+
   it('opens the mobile page-turn menu and applies the selected mode', () => {
     mockMatchMedia(false);
     const setPageTurnMode = vi.fn();
@@ -124,6 +147,24 @@ describe('ReaderToolbar', () => {
     fireEvent.click(screen.getByTitle('reader.pageTurnModes.slide'));
 
     expect(setPageTurnMode).toHaveBeenCalledWith('slide');
+  });
+
+  it('closes the open sidebar before showing the mobile page-turn menu', () => {
+    mockMatchMedia(false);
+    const onCloseSidebar = vi.fn();
+
+    render(
+      <ReaderToolbar
+        {...defaultProps}
+        isSidebarOpen={true}
+        onCloseSidebar={onCloseSidebar}
+      />,
+    );
+
+    fireEvent.click(screen.getByTitle('reader.pageTurnMode'));
+
+    expect(onCloseSidebar).toHaveBeenCalledTimes(1);
+    expect(screen.getByTitle('reader.pageTurnModes.scroll')).toBeInTheDocument();
   });
 
   it('maps desktop single and two-column buttons to scroll and cover', () => {
@@ -154,6 +195,6 @@ describe('ReaderToolbar', () => {
   it('disables pointer interaction when hidden', () => {
     const { container } = render(<ReaderToolbar {...defaultProps} hidden />);
 
-    expect(container.firstChild).toHaveClass('pointer-events-none');
+    expect(container.querySelectorAll('.pointer-events-none')).toHaveLength(2);
   });
 });

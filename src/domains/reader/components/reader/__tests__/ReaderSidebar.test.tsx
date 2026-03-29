@@ -70,6 +70,7 @@ describe('ReaderSidebar', () => {
     const { container } = render(<SidebarHarness />);
 
     expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(container.querySelector('[data-slot="sheet-root"]')).toHaveClass('bottom-[calc(76px+env(safe-area-inset-bottom,0px))]');
 
     fireEvent.pointerDown(container.querySelector('[data-slot="sheet-backdrop"]') as HTMLDivElement);
     await waitFor(() => {

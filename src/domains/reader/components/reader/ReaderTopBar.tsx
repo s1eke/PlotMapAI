@@ -6,6 +6,7 @@ import { Link } from 'react-router-dom';
 import { cn } from '@shared/utils/cn';
 
 import { appPaths } from '@app/router/paths';
+import { getReaderChromeThemeClasses } from '../../utils/readerChromeTheme';
 
 const READER_TOP_BAR_VARIANTS = {
   hidden: {
@@ -54,23 +55,11 @@ export default function ReaderTopBar({
   onSetViewMode,
 }: ReaderTopBarProps) {
   const { t } = useTranslation();
-  const isNightTheme = readerTheme === 'night';
-  const isAutoTheme = readerTheme === 'auto';
-  const borderClassName = isAutoTheme
-    ? 'border-border-color/20'
-    : isNightTheme
-      ? 'border-white/10'
-      : 'border-black/[0.06]';
-  const chromeHoverClassName = isAutoTheme
-    ? 'hover:bg-muted-bg'
-    : isNightTheme
-      ? 'hover:bg-white/10'
-      : 'hover:bg-black/[0.05]';
-  const segmentedControlClassName = isAutoTheme
-    ? 'bg-muted-bg/90 border-border-color/50 shadow-inner'
-    : isNightTheme
-      ? 'bg-white/[0.06] border-white/10 shadow-inner shadow-black/20'
-      : 'bg-black/[0.035] border-black/[0.06] shadow-inner shadow-black/[0.04]';
+  const {
+    borderClassName,
+    hoverClassName,
+    segmentedControlClassName,
+  } = getReaderChromeThemeClasses(readerTheme);
 
   return (
     <motion.header
@@ -88,7 +77,7 @@ export default function ReaderTopBar({
         <button
           onClick={onMobileBack}
           aria-label={t('reader.exit')}
-          className={cn('rounded-full p-2 transition-colors md:hidden', textClassName, chromeHoverClassName)}
+          className={cn('rounded-full p-2 transition-colors md:hidden', textClassName, hoverClassName)}
           title={t('reader.exit')}
           type="button"
         >
@@ -96,7 +85,7 @@ export default function ReaderTopBar({
         </button>
         <button
           onClick={onToggleSidebar}
-          className={cn('hidden rounded-full p-2 transition-colors md:flex', textClassName, chromeHoverClassName)}
+          className={cn('hidden rounded-full p-2 transition-colors md:flex', textClassName, hoverClassName)}
           title={t('reader.contents')}
           type="button"
         >

@@ -503,10 +503,13 @@ export default function ReaderPage() {
             onNext={navigation.handleNext}
             navigationMode={isPagedMode ? 'page' : 'chapter'}
             readerTheme={preferences.readerTheme}
+            headerBgClassName={preferences.headerBg}
+            textClassName={preferences.currentTheme.text}
             setReaderTheme={preferences.setReaderTheme}
             hidden={!isChromeVisible}
             isSidebarOpen={sidebar.isSidebarOpen}
             onToggleSidebar={sidebar.toggleSidebar}
+            onCloseSidebar={closeSidebar}
           />
         )}
       </main>

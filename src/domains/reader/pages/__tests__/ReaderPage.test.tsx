@@ -323,6 +323,21 @@ describe('ReaderPage', () => {
     });
   });
 
+  it('lets the mobile contents button close the table of contents after it has opened', async () => {
+    renderPage();
+
+    expect(await screen.findByRole('heading', { name: 'Chapter 1', level: 1 })).toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByTitle('reader.contents')[0]);
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByTitle('reader.contents')[0]);
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+  });
+
   it('renders adjacent chapters in scroll mode without waiting for a scroll event', async () => {
     const shortChapters = Array.from({ length: 4 }, (_, index) => ({
       index,

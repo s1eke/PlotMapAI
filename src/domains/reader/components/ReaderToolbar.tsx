@@ -7,6 +7,7 @@ import { cn } from '@shared/utils/cn';
 import { READER_SLIDER_CONFIG, MOBILE_SLIDER_KEYS, OVERFLOW_SLIDER_KEYS } from '../constants/readerSliderConfig';
 import { isPagedPageTurnMode, type ReaderPageTurnMode } from '../constants/pageTurnMode';
 import { READER_THEME_DISPLAY } from '../constants/readerThemeConfig';
+import { getReaderChromeThemeClasses } from '../utils/readerChromeTheme';
 
 interface SliderValues {
   fontSize: number;
@@ -27,10 +28,13 @@ interface ReaderToolbarProps {
   hasNext: boolean;
   navigationMode: 'chapter' | 'page';
   readerTheme: string;
+  headerBgClassName: string;
+  textClassName: string;
   setReaderTheme: (theme: string) => void;
   hidden?: boolean;
   isSidebarOpen?: boolean;
   onToggleSidebar?: () => void;
+  onCloseSidebar?: () => void;
 }
 
 type SliderKey = 'fontSize' | 'lineSpacing' | 'paragraphSpacing' | null;
@@ -132,10 +136,13 @@ export default function ReaderToolbar({
   hasNext,
   navigationMode,
   readerTheme,
+  headerBgClassName,
+  textClassName,
   setReaderTheme,
   hidden,
   isSidebarOpen,
   onToggleSidebar,
+  onCloseSidebar,
 }: ReaderToolbarProps) {
   const { t } = useTranslation();
   const [activeSlider, setActiveSlider] = useState<SliderKey>(null);
@@ -153,6 +160,11 @@ export default function ReaderToolbar({
     () => true,
   );
   const isPagedMode = isPagedPageTurnMode(pageTurnMode);
+  const {
+    borderClassName,
+    dividerClassName,
+    hoverClassName,
+  } = getReaderChromeThemeClasses(readerTheme);
 
   const toggleSlider = useCallback((key: SliderKey) => {
     setActiveSlider(prev => prev === key ? null : key);
@@ -209,30 +221,105 @@ export default function ReaderToolbar({
     { id: 'none', label: t('reader.pageTurnModes.none') },
   ] satisfies Array<{ id: ReaderPageTurnMode; label: string }>), [t]);
 
+  const mobileFontSlider = mobileSliders[0] ?? null;
+
+  const runMobileAction = useCallback((action: () => void) => {
+    if (isSidebarOpen) {
+      if (onCloseSidebar) {
+        onCloseSidebar();
+      } else {
+        onToggleSidebar?.();
+      }
+    }
+
+    action();
+  }, [isSidebarOpen, onCloseSidebar, onToggleSidebar]);
+
+  const handleMobileSidebarToggle = useCallback(() => {
+    setActiveSlider(null);
+    setOverflowOpen(false);
+    setPageTurnModeOpen(false);
+
+    if (isSidebarOpen) {
+      if (onCloseSidebar) {
+        onCloseSidebar();
+      } else {
+        onToggleSidebar?.();
+      }
+      return;
+    }
+
+    onToggleSidebar?.();
+  }, [isSidebarOpen, onCloseSidebar, onToggleSidebar]);
+
+  const handleMobileSliderToggle = useCallback((key: SliderKey) => {
+    runMobileAction(() => {
+      setOverflowOpen(false);
+      setPageTurnModeOpen(false);
+      toggleSlider(key);
+    });
+  }, [runMobileAction, toggleSlider]);
+
+  const handleMobilePageTurnToggle = useCallback(() => {
+    runMobileAction(() => {
+      setOverflowOpen(false);
+      setActiveSlider(null);
+      setPageTurnModeOpen(prev => !prev);
+    });
+  }, [runMobileAction]);
+
+  const handleMobileOverflowToggle = useCallback(() => {
+    runMobileAction(() => {
+      setPageTurnModeOpen(false);
+      setActiveSlider(null);
+      setOverflowOpen(prev => !prev);
+    });
+  }, [runMobileAction]);
+
   function renderSliderButton(s: ResolvedSlider, mode: 'desktop' | 'mobile') {
     const isActiveMode = (mode === 'desktop') === isDesktopViewport;
+    const isMobile = mode === 'mobile';
 
     return (
       <div key={`${mode}-${s.key}`} className="relative">
         <button
           ref={el => { buttonRefs.current[mode + '-' + s.key] = el; }}
-          onClick={() => toggleSlider(s.key)}
+          type="button"
+          onClick={() => {
+            if (isMobile) {
+              handleMobileSliderToggle(s.key);
+              return;
+            }
+
+            toggleSlider(s.key);
+          }}
           className={cn(
-            "px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 text-sm transition-colors",
-            activeSlider === s.key ? "bg-accent text-white" : "hover:bg-muted-bg text-text-primary"
+            isMobile
+              ? 'flex h-14 w-full flex-col items-center justify-center gap-1 rounded-2xl px-2 text-center transition-colors'
+              : 'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm transition-colors',
+            activeSlider === s.key
+              ? 'bg-accent text-white'
+              : cn(textClassName, hoverClassName),
           )}
           title={s.label}
         >
           <s.icon className="w-4 h-4" />
-          <span className="font-medium text-xs">{s.display}</span>
+          <span className={cn('font-medium', isMobile ? 'text-[11px]' : 'text-xs')}>{s.display}</span>
         </button>
         {activeSlider === s.key && isActiveMode && (
           <div
             ref={popoverRef}
-            className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 bg-bg-secondary dark:bg-brand-800 border border-border-color rounded-xl px-5 py-4 shadow-xl min-w-[200px]"
+            className={cn(
+              'absolute border border-border-color bg-bg-secondary shadow-xl dark:bg-brand-800',
+              isMobile
+                ? 'bottom-full left-1/2 mb-2 w-[min(260px,calc(100vw-1.5rem))] -translate-x-1/2 rounded-2xl px-4 py-4'
+                : 'bottom-full left-1/2 mb-3 min-w-[200px] -translate-x-1/2 rounded-xl px-5 py-4',
+            )}
           >
-            <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 rotate-45 w-2.5 h-2.5 bg-bg-secondary dark:bg-brand-800 border-r border-b border-border-color" />
-            <div className="text-xs text-text-secondary mb-2 text-center">{s.label}</div>
+            {!isMobile ? (
+              <div className="absolute bottom-0 left-1/2 h-2.5 w-2.5 -translate-x-1/2 translate-y-1/2 rotate-45 border-b border-r border-border-color bg-bg-secondary dark:bg-brand-800" />
+            ) : null}
+            <div className={cn('text-xs text-text-secondary', isMobile ? 'mb-3 text-left' : 'mb-2 text-center')}>{s.label}</div>
             <div className="flex items-center gap-3">
               <input
                 type="range"
@@ -271,210 +358,235 @@ export default function ReaderToolbar({
     );
   }
 
+  const currentPageTurnMode = pageTurnModes.find(mode => mode.id === pageTurnMode);
+
   return (
-    <motion.div
-      initial={false}
-      animate={hidden ? 'hidden' : 'visible'}
-      variants={READER_TOOLBAR_VARIANTS}
-      className={cn(
-        'fixed bottom-6 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-full border border-border-color bg-bg-secondary/90 px-3 py-3 shadow-2xl backdrop-blur-xl hover:bg-bg-secondary dark:bg-brand-800/90 dark:hover:bg-brand-800 sm:gap-4 sm:px-6 will-change-transform',
-        hidden && 'pointer-events-none',
-      )}
-    >
-
-      {/* Mobile: TOC button (first position, replaces prev/next) */}
-      {onToggleSidebar && (
-        <button
-          onClick={onToggleSidebar}
-          className={cn(
-            "p-2 rounded-full transition-colors sm:hidden border-r border-border-color/50 pr-3",
-            isSidebarOpen ? "bg-accent text-white shadow-sm" : "text-text-secondary hover:text-text-primary hover:bg-muted-bg"
-          )}
-          title={t('reader.contents')}
-        >
-          <List className="w-5 h-5" />
-        </button>
-      )}
-
-      <div className="hidden sm:flex items-center gap-2 border-r border-border-color/50 pr-3 sm:pr-5">
-        <button
-          onClick={onPrev}
-          disabled={!hasPrev}
-          className="p-2 rounded-full hover:bg-muted-bg disabled:opacity-30 disabled:hover:bg-transparent transition-colors text-text-primary"
-          title={t(navigationMode === 'page' ? 'reader.prevPage' : 'reader.prev')}
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </button>
-        <button
-          onClick={onNext}
-          disabled={!hasNext}
-          className="p-2 rounded-full hover:bg-muted-bg disabled:opacity-30 disabled:hover:bg-transparent transition-colors text-text-primary"
-          title={t(navigationMode === 'page' ? 'reader.nextPage' : 'reader.next')}
-        >
-          <ArrowRight className="w-5 h-5" />
-        </button>
-      </div>
-
-      {/* Desktop: all sliders inline */}
-      <div className="hidden sm:flex items-center gap-1 border-r border-border-color/50 pr-5 relative">
-        {desktopSliders.map(s => renderSliderButton(s, 'desktop'))}
-      </div>
-
-      {/* Mobile: only font size */}
-      <div className="flex sm:hidden items-center gap-1 border-r border-border-color/50 pr-3 relative">
-        {mobileSliders.map(s => renderSliderButton(s, 'mobile'))}
-      </div>
-
-      <div className="flex items-center gap-2 border-r border-border-color/50 pr-3 sm:pr-5">
-        <div className="relative sm:hidden">
+    <>
+      <motion.div
+        initial={false}
+        animate={hidden ? 'hidden' : 'visible'}
+        variants={READER_TOOLBAR_VARIANTS}
+        className={cn(
+          'fixed bottom-6 left-1/2 z-40 hidden -translate-x-1/2 items-center gap-2 rounded-full border border-border-color bg-bg-secondary/90 px-3 py-3 shadow-2xl backdrop-blur-xl hover:bg-bg-secondary dark:bg-brand-800/90 dark:hover:bg-brand-800 sm:flex sm:gap-4 sm:px-6 will-change-transform',
+          hidden && 'pointer-events-none',
+        )}
+      >
+        <div className="flex items-center gap-2 border-r border-border-color/50 pr-3 sm:pr-5">
           <button
-            ref={pageTurnModeBtnRef}
-            onClick={() => {
-              setPageTurnModeOpen(prev => !prev);
-              setOverflowOpen(false);
-              setActiveSlider(null);
-            }}
-            className={cn(
-              "p-2 rounded-full transition-colors",
-              pageTurnModeOpen ? "bg-accent text-white shadow-sm" : "text-text-secondary hover:text-text-primary hover:bg-muted-bg"
-            )}
-            title={t('reader.pageTurnMode')}
+            type="button"
+            onClick={onPrev}
+            disabled={!hasPrev}
+            className="rounded-full p-2 text-text-primary transition-colors hover:bg-muted-bg disabled:opacity-30 disabled:hover:bg-transparent"
+            title={t(navigationMode === 'page' ? 'reader.prevPage' : 'reader.prev')}
           >
-            {isPagedMode ? <Columns2 className="w-5 h-5" /> : <AlignJustify className="w-5 h-5" />}
+            <ArrowLeft className="w-5 h-5" />
           </button>
-          <AnimatePresence initial={false}>
-            {pageTurnModeOpen ? (
-              <motion.div
-                ref={pageTurnModeRef}
-                variants={READER_MENU_VARIANTS}
-                initial="hidden"
-                animate="visible"
-                exit="hidden"
-                className="absolute bottom-full left-1/2 mb-3 min-w-[176px] -translate-x-1/2 rounded-xl border border-border-color bg-bg-secondary px-2 py-2 shadow-xl dark:bg-brand-800"
-              >
-                <div className="px-2 pb-2 pt-1 text-xs text-text-secondary">{t('reader.pageTurnMode')}</div>
-                <div className="space-y-1">
-                  {pageTurnModes.map(mode => (
-                    <button
-                      key={mode.id}
-                      type="button"
-                      onClick={() => {
-                        setPageTurnMode(mode.id);
-                        setPageTurnModeOpen(false);
-                      }}
-                      className={cn(
-                        'flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors',
-                        pageTurnMode === mode.id
-                          ? 'bg-accent text-white'
-                          : 'text-text-primary hover:bg-muted-bg',
-                      )}
-                      title={mode.label}
-                    >
-                      <span>{mode.label}</span>
-                      {pageTurnMode === mode.id ? <Check className="h-4 w-4" /> : null}
-                    </button>
-                  ))}
-                </div>
-              </motion.div>
-            ) : null}
-          </AnimatePresence>
+          <button
+            type="button"
+            onClick={onNext}
+            disabled={!hasNext}
+            className="rounded-full p-2 text-text-primary transition-colors hover:bg-muted-bg disabled:opacity-30 disabled:hover:bg-transparent"
+            title={t(navigationMode === 'page' ? 'reader.nextPage' : 'reader.next')}
+          >
+            <ArrowRight className="w-5 h-5" />
+          </button>
         </div>
 
-        {/* Desktop: two separate buttons */}
-        <button
-          onClick={() => setPageTurnMode('scroll')}
-          className={cn(
-            "p-2 rounded-full transition-colors hidden sm:block",
-            !isPagedMode ? "bg-accent text-white shadow-sm" : "text-text-secondary hover:text-text-primary hover:bg-muted-bg"
-          )}
-          title={t('reader.singleColumn')}
-        >
-          <AlignJustify className="w-5 h-5" />
-        </button>
-        <button
-          onClick={() => setPageTurnMode('cover')}
-          className={cn(
-            "p-2 rounded-full transition-colors hidden sm:block",
-            isPagedMode ? "bg-accent text-white shadow-sm" : "text-text-secondary hover:text-text-primary hover:bg-muted-bg"
-          )}
-          title={t('reader.twoColumn')}
-        >
-          <Columns2 className="w-5 h-5" />
-        </button>
-      </div>
+        <div className="relative flex items-center gap-1 border-r border-border-color/50 pr-5">
+          {desktopSliders.map(s => renderSliderButton(s, 'desktop'))}
+        </div>
 
-      {/* Desktop: themes inline */}
-      <div className="hidden sm:flex items-center gap-2">
-        {themes.map(theme => (
+        <div className="flex items-center gap-2 border-r border-border-color/50 pr-5">
           <button
-            key={theme.id}
-            onClick={() => setReaderTheme(theme.id)}
+            type="button"
+            onClick={() => setPageTurnMode('scroll')}
             className={cn(
-              "w-6 h-6 rounded-full border transition-all flex items-center justify-center overflow-hidden",
-              readerTheme === theme.id ? "ring-2 ring-accent ring-offset-2 ring-offset-bg-secondary scale-110" : "border-border-color hover:scale-105",
-              theme.id === 'auto' && "bg-gradient-to-tr from-white to-brand-900"
+              'rounded-full p-2 transition-colors',
+              !isPagedMode ? 'bg-accent text-white shadow-sm' : 'text-text-secondary hover:bg-muted-bg hover:text-text-primary',
             )}
-            style={{ backgroundColor: theme.id === 'auto' ? undefined : theme.color }}
-            title={theme.label}
+            title={t('reader.singleColumn')}
           >
-            {theme.id === 'auto' && <div className="sr-only">Auto</div>}
+            <AlignJustify className="w-5 h-5" />
           </button>
-        ))}
-      </div>
+          <button
+            type="button"
+            onClick={() => setPageTurnMode('cover')}
+            className={cn(
+              'rounded-full p-2 transition-colors',
+              isPagedMode ? 'bg-accent text-white shadow-sm' : 'text-text-secondary hover:bg-muted-bg hover:text-text-primary',
+            )}
+            title={t('reader.twoColumn')}
+          >
+            <Columns2 className="w-5 h-5" />
+          </button>
+        </div>
 
-      {/* Mobile: overflow menu for spacing + themes */}
-      <div className="relative sm:hidden">
-        <button
-          ref={overflowBtnRef}
-          onClick={() => {
-            setOverflowOpen(prev => !prev);
-            setPageTurnModeOpen(false);
-            setActiveSlider(null);
-          }}
-          className={cn(
-            "p-2 rounded-full transition-colors",
-            overflowOpen ? "bg-accent text-white" : "text-text-primary hover:bg-muted-bg"
-          )}
-          title={t('reader.moreSettings')}
-        >
-          <MoreVertical className="w-5 h-5" />
-        </button>
-        <AnimatePresence initial={false}>
-          {overflowOpen ? (
-            <motion.div
-              ref={overflowRef}
-              variants={READER_MENU_VARIANTS}
-              initial="hidden"
-              animate="visible"
-              exit="hidden"
-              className="absolute bottom-full right-0 mb-3 min-w-[220px] space-y-4 rounded-xl border border-border-color bg-bg-secondary px-5 py-4 shadow-xl dark:bg-brand-800"
+        <div className="flex items-center gap-2">
+          {themes.map(theme => (
+            <button
+              key={theme.id}
+              type="button"
+              onClick={() => setReaderTheme(theme.id)}
+              className={cn(
+                'flex h-6 w-6 items-center justify-center overflow-hidden rounded-full border transition-all',
+                readerTheme === theme.id ? 'scale-110 ring-2 ring-accent ring-offset-2 ring-offset-bg-secondary' : 'border-border-color hover:scale-105',
+                theme.id === 'auto' && 'bg-gradient-to-tr from-white to-brand-900',
+              )}
+              style={{ backgroundColor: theme.id === 'auto' ? undefined : theme.color }}
+              title={theme.label}
             >
-              {overflowSliders.map(renderSliderRow)}
+              {theme.id === 'auto' ? <div className="sr-only">Auto</div> : null}
+            </button>
+          ))}
+        </div>
+      </motion.div>
 
-              <div className="space-y-2 border-t border-border-color/50 pt-2">
-                <span className="text-xs text-text-secondary">{t('reader.background')}</span>
-                <div className="flex items-center gap-3">
-                  {themes.map(theme => (
-                    <button
-                      key={theme.id}
-                      onClick={() => setReaderTheme(theme.id)}
-                      className={cn(
-                        "w-7 h-7 rounded-full border transition-all flex items-center justify-center overflow-hidden",
-                        readerTheme === theme.id ? "ring-2 ring-accent ring-offset-2 ring-offset-bg-secondary scale-110" : "border-border-color hover:scale-105",
-                        theme.id === 'auto' && "bg-gradient-to-tr from-white to-brand-900"
-                      )}
-                      style={{ backgroundColor: theme.id === 'auto' ? undefined : theme.color }}
-                      title={theme.label}
-                    >
-                      {theme.id === 'auto' && <div className="sr-only">Auto</div>}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
-      </div>
-    </motion.div>
+      <motion.div
+        initial={false}
+        animate={hidden ? 'hidden' : 'visible'}
+        variants={READER_TOOLBAR_VARIANTS}
+        className={cn(
+          'fixed inset-x-0 bottom-0 z-50 border-t px-3 pt-2 pb-[calc(env(safe-area-inset-bottom,0px)+0.5rem)] shadow-[0_-16px_40px_rgba(24,32,42,0.12)] backdrop-blur-xl sm:hidden will-change-transform',
+          headerBgClassName,
+          borderClassName,
+          hidden && 'pointer-events-none',
+        )}
+      >
+        <div className="grid grid-cols-4 gap-2">
+          {onToggleSidebar ? (
+            <button
+              type="button"
+              onClick={handleMobileSidebarToggle}
+              className={cn(
+                'flex h-14 flex-col items-center justify-center gap-1 rounded-2xl px-2 text-center transition-colors',
+                isSidebarOpen ? 'bg-accent text-white shadow-sm' : cn(textClassName, hoverClassName),
+              )}
+              title={t('reader.contents')}
+            >
+              <List className="h-5 w-5" />
+              <span className="text-[11px] font-medium">{t('reader.contents')}</span>
+            </button>
+          ) : (
+            <div />
+          )}
+
+          <div className="relative">
+            {mobileFontSlider ? renderSliderButton(mobileFontSlider, 'mobile') : null}
+          </div>
+
+          <div className="relative">
+            <button
+              ref={pageTurnModeBtnRef}
+              type="button"
+              onClick={handleMobilePageTurnToggle}
+              className={cn(
+                'flex h-14 w-full flex-col items-center justify-center gap-1 rounded-2xl px-2 text-center transition-colors',
+                pageTurnModeOpen ? 'bg-accent text-white shadow-sm' : cn(textClassName, hoverClassName),
+              )}
+              title={t('reader.pageTurnMode')}
+            >
+              {isPagedMode ? <Columns2 className="h-5 w-5" /> : <AlignJustify className="h-5 w-5" />}
+              <span className="text-[11px] font-medium">{currentPageTurnMode?.label ?? t('reader.pageTurnMode')}</span>
+            </button>
+            <AnimatePresence initial={false}>
+              {pageTurnModeOpen ? (
+                <motion.div
+                  ref={pageTurnModeRef}
+                  variants={READER_MENU_VARIANTS}
+                  initial="hidden"
+                  animate="visible"
+                  exit="hidden"
+                  className={cn(
+                    'absolute bottom-full left-1/2 mb-2 w-[min(220px,calc(100vw-1.5rem))] -translate-x-1/2 rounded-2xl border px-2 py-2 shadow-xl',
+                    headerBgClassName,
+                    borderClassName,
+                  )}
+                >
+                  <div className="px-2 pb-2 pt-1 text-xs text-text-secondary">{t('reader.pageTurnMode')}</div>
+                  <div className="space-y-1">
+                    {pageTurnModes.map(mode => (
+                      <button
+                        key={mode.id}
+                        type="button"
+                        onClick={() => {
+                          setPageTurnMode(mode.id);
+                          setPageTurnModeOpen(false);
+                        }}
+                        className={cn(
+                          'flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors',
+                          pageTurnMode === mode.id
+                            ? 'bg-accent text-white'
+                            : cn(textClassName, hoverClassName),
+                        )}
+                        title={mode.label}
+                      >
+                        <span>{mode.label}</span>
+                        {pageTurnMode === mode.id ? <Check className="h-4 w-4" /> : null}
+                      </button>
+                    ))}
+                  </div>
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
+          </div>
+
+          <div className="relative">
+            <button
+              ref={overflowBtnRef}
+              type="button"
+              onClick={handleMobileOverflowToggle}
+              className={cn(
+                'flex h-14 w-full flex-col items-center justify-center gap-1 rounded-2xl px-2 text-center transition-colors',
+                overflowOpen ? 'bg-accent text-white shadow-sm' : cn(textClassName, hoverClassName),
+              )}
+              title={t('reader.moreSettings')}
+            >
+              <MoreVertical className="h-5 w-5" />
+              <span className="text-[11px] font-medium">{t('reader.moreSettings')}</span>
+            </button>
+            <AnimatePresence initial={false}>
+              {overflowOpen ? (
+                <motion.div
+                  ref={overflowRef}
+                  variants={READER_MENU_VARIANTS}
+                  initial="hidden"
+                  animate="visible"
+                  exit="hidden"
+                  className={cn(
+                    'absolute bottom-full right-0 mb-2 w-[min(280px,calc(100vw-1.5rem))] space-y-4 rounded-2xl border px-5 py-4 shadow-xl',
+                    headerBgClassName,
+                    borderClassName,
+                  )}
+                >
+                  {overflowSliders.map(renderSliderRow)}
+
+                  <div className={cn('space-y-2 border-t pt-2', dividerClassName)}>
+                    <span className="text-xs text-text-secondary">{t('reader.background')}</span>
+                    <div className="flex items-center gap-3">
+                      {themes.map(theme => (
+                        <button
+                          key={theme.id}
+                          type="button"
+                          onClick={() => setReaderTheme(theme.id)}
+                          className={cn(
+                            'flex h-7 w-7 items-center justify-center overflow-hidden rounded-full border transition-all',
+                            readerTheme === theme.id ? 'scale-110 ring-2 ring-accent ring-offset-2 ring-offset-bg-secondary' : 'border-border-color hover:scale-105',
+                            theme.id === 'auto' && 'bg-gradient-to-tr from-white to-brand-900',
+                          )}
+                          style={{ backgroundColor: theme.id === 'auto' ? undefined : theme.color }}
+                          title={theme.label}
+                        >
+                          {theme.id === 'auto' ? <div className="sr-only">Auto</div> : null}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
+          </div>
+        </div>
+      </motion.div>
+    </>
   );
 }

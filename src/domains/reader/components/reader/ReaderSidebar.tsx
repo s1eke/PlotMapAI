@@ -81,8 +81,8 @@ export default function ReaderSidebar({
         onClose={onClose}
         title={t('reader.contents')}
         closeLabel={t('common.actions.close')}
-        maxHeight="calc(100dvh - env(safe-area-inset-top, 0px) - 0.75rem)"
-        containerClassName="fixed inset-0 z-50 md:hidden"
+        maxHeight="calc(100dvh - env(safe-area-inset-top, 0px) - 76px - env(safe-area-inset-bottom, 0px))"
+        containerClassName="fixed inset-x-0 top-0 bottom-[calc(76px+env(safe-area-inset-bottom,0px))] z-40 md:hidden"
         panelClassName={cn(
           sidebarBgClassName,
           'text-text-primary border-t border-border-color/20 shadow-[0_-20px_56px_rgba(24,32,42,0.16)]',
