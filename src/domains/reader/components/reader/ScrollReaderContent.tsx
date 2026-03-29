@@ -43,7 +43,8 @@ export default function ScrollReaderContent({
               <h1 className={cn('text-sm font-medium truncate transition-colors', readerTheme === 'auto' ? 'text-text-secondary' : 'opacity-60')}>{chapter.title}</h1>
             </div>
             <div
-              className="leading-relaxed font-serif mx-auto w-full transition-all text-justify md:text-left selection:bg-accent/30 tracking-wide opacity-90"
+              data-testid="scroll-reader-content-body"
+              className="leading-relaxed mx-auto w-full transition-all text-justify md:text-left selection:bg-accent/30 tracking-wide opacity-90"
               style={{ fontSize: `${fontSize}px`, maxWidth: '800px', lineHeight: String(lineSpacing) }}
             >
               <ReaderChapterSection

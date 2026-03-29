@@ -1,4 +1,4 @@
-import { render } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import PagedReaderContent from '../PagedReaderContent';
@@ -166,6 +166,44 @@ describe('PagedReaderContent', () => {
     const pageFrame = container.querySelector('[data-testid="paged-reader-interactive"] > .absolute.inset-0.overflow-hidden [data-testid="paged-reader-page-frame"]');
     expect(pageFrame).toBeInTheDocument();
     expect(pageFrame).toHaveClass('h-full', 'w-full', 'flex-col');
+  });
+
+  it('lets the paged text body inherit the global sans font stack', () => {
+    render(
+      <PagedReaderContent
+        chapter={{
+          index: 0,
+          title: 'Chapter 1',
+          content: 'Text',
+          wordCount: 100,
+          totalChapters: 1,
+          hasPrev: false,
+          hasNext: false,
+        }}
+        novelId={1}
+        pageIndex={0}
+        pageCount={1}
+        pagedViewportRef={{ current: null }}
+        pagedContentRef={{ current: null }}
+        fontSize={18}
+        lineSpacing={1.8}
+        paragraphSpacing={24}
+        readerTheme="auto"
+        textClassName=""
+        headerBgClassName=""
+        pageBgClassName="bg-[#f4ecd8]"
+        fitsTwoColumns={false}
+        twoColumnWidth={undefined}
+        twoColumnGap={48}
+        pageTurnMode="cover"
+        pageTurnDirection="next"
+        pageTurnToken={1}
+      />,
+    );
+
+    for (const contentBody of screen.getAllByTestId('paged-reader-content-body')) {
+      expect(contentBody).not.toHaveClass('font-serif');
+    }
   });
 
   it('clamps drag offsets to the available navigation directions', () => {

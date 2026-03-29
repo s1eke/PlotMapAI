@@ -34,6 +34,9 @@
     --accent: var(--color-gold-500);
     --accent-hover: var(--color-gold-600);
     --border-color: #e2e8f0;
+    --font-latin-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-cjk-ui: "Xiaomi Lanting Pro", "Xiaomi Lan Ting", MiSans, "HarmonyOS Sans SC", "HarmonyOS Sans", "Huawei Sans", "vivo Sans", "vivo Type", "OPPO Sans", OPPOSans, "Source Han Sans SC", "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", "Microsoft YaHei", "WenQuanYi Micro Hei", sans-serif;
+    --font-app: var(--font-latin-ui), var(--font-cjk-ui), "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
   }
 
   html,
@@ -56,10 +59,14 @@
     --border-color: #334155; /* brand-700 */
   }
 
-  body {
+  body,
+  button,
+  input,
+  select,
+  textarea {
     background-color: var(--bg-primary);
     color: var(--text-primary);
-    font-family: system-ui, sans-serif;
+    font-family: var(--font-app);
     transition: background-color 0.3s ease, color 0.3s ease;
   }
 }

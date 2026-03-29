@@ -34,4 +34,9 @@ describe('TxtCover', () => {
     expect(div.style.width).toBe('100%');
     expect(div.style.height).toBe('100%');
   });
+
+  it('lets the cover title inherit the global sans font stack', () => {
+    render(<TxtCover title="My Novel" />);
+    expect(screen.getByRole('heading', { level: 3 })).not.toHaveClass('font-serif');
+  });
 });

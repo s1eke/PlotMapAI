@@ -26,7 +26,7 @@ export default function TxtCover({ title, width = '100%', height = '100%' }: { t
 
       {/* Title moved to top third */}
       <div className="relative z-10 w-full mt-2">
-        <h3 className="text-xl sm:text-2xl font-serif font-bold text-white/90 drop-shadow-md leading-snug line-clamp-4">
+        <h3 className="text-xl sm:text-2xl font-bold text-white/90 drop-shadow-md leading-snug line-clamp-4">
           {title}
         </h3>
       </div>

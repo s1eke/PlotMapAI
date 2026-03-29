@@ -126,7 +126,8 @@ function PagedContentBody({
   return (
     <div
       ref={contentRef}
-      className="h-full font-serif text-justify tracking-wide selection:bg-accent/30 md:text-left"
+      data-testid="paged-reader-content-body"
+      className="h-full text-justify tracking-wide selection:bg-accent/30 md:text-left"
       style={{
         fontSize: `${fontSize}px`,
         lineHeight: String(lineSpacing),
