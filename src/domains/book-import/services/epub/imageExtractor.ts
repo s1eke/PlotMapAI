@@ -28,6 +28,33 @@ function decodeBase64(data: string): ArrayBuffer {
   return buffer;
 }
 
+function decodeDataUriText(data: string): ArrayBuffer {
+  const text = decodeURIComponent(data);
+  const encoded = new TextEncoder().encode(text);
+  const buffer = new ArrayBuffer(encoded.length);
+  new Uint8Array(buffer).set(encoded);
+  return buffer;
+}
+
+function extractInlineImageBlob(src: string): Blob | null {
+  const separatorIndex = src.indexOf(',');
+  if (separatorIndex === -1) {
+    return null;
+  }
+
+  const meta = src.slice(0, separatorIndex);
+  const data = src.slice(separatorIndex + 1);
+  const mime = meta.match(/^data:([^;,]+)/u)?.[1] || 'image/png';
+  const isBase64 = /;base64(?:;|$)/iu.test(meta);
+
+  try {
+    const payload = isBase64 ? decodeBase64(data) : decodeDataUriText(data);
+    return new Blob([payload], { type: mime });
+  } catch {
+    return null;
+  }
+}
+
 export async function extractChapterImages(
   html: string,
   zip: JSZip,
@@ -67,10 +94,15 @@ export async function extractChapterImages(
     }
 
     if (src.startsWith('data:')) {
+      const blob = extractInlineImageBlob(src);
+      if (!blob) {
+        transformedHtml += originalTag;
+        index = tagEnd + 1;
+        continue;
+      }
+
       const key = generateImageKey();
-      const [meta, data = ''] = src.split(',', 2);
-      const mime = meta.match(/data:([^;]+)/u)?.[1] || 'image/png';
-      images.push({ imageKey: key, blob: new Blob([decodeBase64(data)], { type: mime }) });
+      images.push({ imageKey: key, blob });
       transformedHtml += `[IMG:${key}]`;
       index = tagEnd + 1;
       continue;

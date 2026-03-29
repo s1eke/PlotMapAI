@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import JSZip from 'jszip';
+
 import { extractChapterImages, extractCoverBlob } from '../epub/imageExtractor';
 import { loadOpfPackage } from '../epub/opf';
 
@@ -14,6 +15,30 @@ describe('extractChapterImages', () => {
 
     expect(extracted.images).toHaveLength(1);
     expect(extracted.html).toContain('[IMG:img_');
+  });
+
+  it('extracts url-encoded inline svg images without requiring base64', async () => {
+    const zip = new JSZip();
+    const extracted = await extractChapterImages(
+      '<html><body><img src="data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http://www.w3.org/2000/svg%22%3E%3C/svg%3E" /></body></html>',
+      zip,
+      '',
+    );
+
+    expect(extracted.images).toHaveLength(1);
+    expect(extracted.images[0].blob.type).toBe('image/svg+xml');
+    await expect(extracted.images[0].blob.text()).resolves.toContain('<svg');
+    expect(extracted.html).toContain('[IMG:img_');
+  });
+
+  it('skips malformed inline data-uri images without aborting extraction', async () => {
+    const zip = new JSZip();
+    const html = '<html><body><img src="data:image/png;base64,%%%bad%%%" /></body></html>';
+
+    await expect(extractChapterImages(html, zip, '')).resolves.toEqual({
+      html,
+      images: [],
+    });
   });
 
   it('extracts zip-backed images relative to the opf directory', async () => {
