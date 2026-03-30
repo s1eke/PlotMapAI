@@ -14,7 +14,8 @@ try {
   // git not available (e.g. shallow clone, npm publish, Docker build)
 }
 
-const base = process.env.VITE_BASE || '/'
+const base = process.env.VITE_BASE || '/PlotMapAI/'
+const PWA_DEFAULT_SURFACE_COLOR = '#f8fafc'
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -41,11 +42,12 @@ export default defineConfig({
         name: 'PlotMapAI',
         short_name: 'PlotMapAI',
         description: 'AI-powered novel reader with chapter analysis and character graph visualization',
-        theme_color: '#1a1a2e',
-        background_color: '#1a1a2e',
+        theme_color: PWA_DEFAULT_SURFACE_COLOR,
+        background_color: PWA_DEFAULT_SURFACE_COLOR,
         display: 'standalone',
-        scope: base,
-        start_url: base,
+        id: "/PlotMapAI/",
+        start_url: "/PlotMapAI/",
+        scope: "/PlotMapAI/",
         icons: [
           {
             src: 'pwa-192x192.png',
@@ -68,6 +70,43 @@ export default defineConfig({
             sizes: '512x512',
             type: 'image/png',
             purpose: 'maskable',
+          },
+        ],
+        screenshots: [
+          {
+            src: 'pwa-screenshots/bookshelf-mobile.png',
+            sizes: '800x1734',
+            type: 'image/png',
+            form_factor: 'narrow',
+            label: 'Bookshelf page',
+          },
+          {
+            src: 'pwa-screenshots/book-detail-mobile.png',
+            sizes: '800x1734',
+            type: 'image/png',
+            form_factor: 'narrow',
+            label: 'Book detail page',
+          },
+          {
+            src: 'pwa-screenshots/reader-mobile.png',
+            sizes: '800x1734',
+            type: 'image/png',
+            form_factor: 'narrow',
+            label: 'Reader page',
+          },
+          {
+            src: 'pwa-screenshots/character-graph-mobile.png',
+            sizes: '800x1734',
+            type: 'image/png',
+            form_factor: 'narrow',
+            label: 'Character graph page',
+          },
+          {
+            src: 'pwa-screenshots/settings-mobile.png',
+            sizes: '800x1734',
+            type: 'image/png',
+            form_factor: 'narrow',
+            label: 'Settings page',
           },
         ],
       },

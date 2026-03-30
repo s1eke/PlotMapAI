@@ -16,6 +16,11 @@ describe('PWA icon assets', () => {
       'public/pwa-512x512.png',
       'public/pwa-maskable-192x192.png',
       'public/pwa-maskable-512x512.png',
+      'public/pwa-screenshots/bookshelf-mobile.png',
+      'public/pwa-screenshots/book-detail-mobile.png',
+      'public/pwa-screenshots/reader-mobile.png',
+      'public/pwa-screenshots/character-graph-mobile.png',
+      'public/pwa-screenshots/settings-mobile.png',
     ].map((relativePath) => resolve(process.cwd(), relativePath));
 
     for (const assetPath of assetPaths) {
@@ -34,6 +39,26 @@ describe('PWA icon assets', () => {
     expect(viteConfig).toContain("src: 'pwa-maskable-192x192.png'");
     expect(viteConfig).toContain("src: 'pwa-maskable-512x512.png'");
     expect(viteConfig).not.toContain("purpose: 'any maskable'");
+  });
+
+  it('declares narrow-form-factor screenshots in the manifest config', () => {
+    const viteConfig = readFileSync(resolve(process.cwd(), 'vite.config.ts'), 'utf8');
+
+    expect(viteConfig).toContain('screenshots: [');
+    expect(viteConfig).toContain("src: 'pwa-screenshots/bookshelf-mobile.png'");
+    expect(viteConfig).toContain("src: 'pwa-screenshots/book-detail-mobile.png'");
+    expect(viteConfig).toContain("src: 'pwa-screenshots/reader-mobile.png'");
+    expect(viteConfig).toContain("src: 'pwa-screenshots/character-graph-mobile.png'");
+    expect(viteConfig).toContain("src: 'pwa-screenshots/settings-mobile.png'");
+    expect(viteConfig).toContain("form_factor: 'narrow'");
+  });
+
+  it('uses the light app surface as the default PWA colors', () => {
+    const viteConfig = readFileSync(resolve(process.cwd(), 'vite.config.ts'), 'utf8');
+
+    expect(viteConfig).toContain("const PWA_DEFAULT_SURFACE_COLOR = '#f8fafc'");
+    expect(viteConfig).toContain('theme_color: PWA_DEFAULT_SURFACE_COLOR');
+    expect(viteConfig).toContain('background_color: PWA_DEFAULT_SURFACE_COLOR');
   });
 
   it('commits generated Android maskable icon assets', () => {
