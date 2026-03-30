@@ -58,10 +58,8 @@ export default function Layout({ children }: LayoutProps) {
   const { t } = useTranslation();
   const location = useLocation();
   const isReader = location.pathname.includes('/read');
-  const { appTheme, readerTheme } = useReaderSessionSelector(state => ({
-    appTheme: state.appTheme,
-    readerTheme: state.readerTheme,
-  }));
+  const appTheme = useReaderSessionSelector(state => state.appTheme);
+  const readerTheme = useReaderSessionSelector(state => state.readerTheme);
   const shellSurfaceColor = resolveShellSurfaceColor(isReader, readerTheme, appTheme);
   const layoutStyle = {
     '--app-header-height': isReader ? '0px' : 'calc(4rem + env(safe-area-inset-top, 0px))',

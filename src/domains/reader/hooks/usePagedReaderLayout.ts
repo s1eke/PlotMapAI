@@ -1,6 +1,6 @@
 import type { StoredReaderState } from './useReaderStatePersistence';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { getPageIndexFromProgress } from '../utils/readerPosition';
+import { getPageIndexFromProgress, resolvePagedTargetPage } from '../utils/readerPosition';
 
 const TWO_COLUMN_GAP = 48;
 const MIN_COLUMN_WIDTH = 260;
@@ -14,7 +14,7 @@ interface UsePagedReaderLayoutParams {
   pagedViewportRef: React.RefObject<HTMLDivElement | null>;
   pagedContentRef: React.RefObject<HTMLDivElement | null>;
   pageIndex: number;
-  pageTargetRef: React.MutableRefObject<'start' | 'end'>;
+  pageTargetRef: React.MutableRefObject<'start' | 'end' | null>;
   pendingRestoreStateRef: React.MutableRefObject<StoredReaderState | null>;
   clearPendingRestoreState: () => void;
   stopRestoreMask: () => void;
@@ -196,9 +196,7 @@ export function usePagedReaderLayout({
         && typeof pendingRestoreState.chapterProgress === 'number';
       const targetPage = hasRestorablePage
         ? getPageIndexFromProgress(pendingRestoreState?.chapterProgress, nextPageCount)
-        : pageTargetRef.current === 'end'
-          ? nextPageCount - 1
-          : Math.min(pageIndex, nextPageCount - 1);
+        : resolvePagedTargetPage(pageTargetRef.current, pageIndex, nextPageCount);
 
       setPageCount(nextPageCount);
       setResolvedPageTurnStep((previous) => (
@@ -211,7 +209,7 @@ export function usePagedReaderLayout({
             viewportWidth: pagedViewportSize.width,
           });
       setPageIndex(targetPage);
-      pageTargetRef.current = 'start';
+      pageTargetRef.current = null;
       setResolvedLayoutChapterIndex(chapterIndex);
       if (hasRestorablePage || pendingRestoreState) {
         clearPendingRestoreState();

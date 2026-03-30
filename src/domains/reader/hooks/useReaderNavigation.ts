@@ -17,7 +17,8 @@ export function useReaderNavigation(
   setPageIndex: React.Dispatch<React.SetStateAction<number>>,
   pageCount: number,
   persistReaderState: (s: StoredReaderState) => void,
-  pageTargetRef: React.MutableRefObject<PageTarget>,
+  pageTargetRef: React.MutableRefObject<PageTarget | null>,
+  setPendingPageTarget: React.Dispatch<React.SetStateAction<PageTarget | null>>,
   chapters: Chapter[],
   scrollModeChapters: number[],
   hasUserInteractedRef: React.MutableRefObject<boolean>,
@@ -61,6 +62,7 @@ export function useReaderNavigation(
     hasUserInteractedRef.current = true;
     chapterChangeSourceRef.current = 'navigation';
     pageTargetRef.current = pageTarget;
+    setPendingPageTarget(pageTarget);
     setChapterIndex(targetIndex);
     persistReaderState({
       chapterIndex: targetIndex,
@@ -74,6 +76,7 @@ export function useReaderNavigation(
     hasUserInteractedRef,
     pageTargetRef,
     persistReaderState,
+    setPendingPageTarget,
     setChapterIndex,
   ]);
 

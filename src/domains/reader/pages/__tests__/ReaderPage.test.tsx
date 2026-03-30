@@ -6,6 +6,14 @@ import { analysisApi } from '@domains/analysis';
 import type { AnalysisJobStatus } from '@domains/analysis';
 import { readerApi } from '../../api/readerApi';
 import { resetReaderSessionStoreForTests } from '../../hooks/sessionStore';
+import {
+  composePaginatedChapterLayout,
+  createReaderTypographyMetrics,
+  createReaderViewportMetrics,
+  getPagedContentHeight,
+  measureReaderChapterLayout,
+} from '../../utils/readerLayout';
+import { getPageIndexFromProgress } from '../../utils/readerPosition';
 
 const i18nMock = vi.hoisted(() => ({
   t: (key: string) => key,
@@ -205,13 +213,52 @@ function getPagedReaderContainer(container: HTMLElement): HTMLDivElement {
   return readerContainer;
 }
 
-function getPagedViewport(container: HTMLElement): HTMLDivElement {
-  const pagedViewport = container.querySelector('[data-testid="paged-reader-measurement-viewport"]') as HTMLDivElement | null;
-  if (!pagedViewport) {
-    throw new Error('Paged viewport not found');
+function buildPagedTestLayout(chapter: (typeof chapterContent)[number]) {
+  const viewportMetrics = createReaderViewportMetrics(600, 800, 600, 800);
+  const typography = createReaderTypographyMetrics(18, 1.8, 16, viewportMetrics.pagedViewportWidth);
+  const measuredLayout = measureReaderChapterLayout(
+    chapter,
+    viewportMetrics.pagedColumnWidth,
+    typography,
+    new Map(),
+  );
+
+  return composePaginatedChapterLayout(
+    measuredLayout,
+    getPagedContentHeight(viewportMetrics.pagedViewportHeight),
+    viewportMetrics.pagedColumnCount,
+    viewportMetrics.pagedColumnGap,
+  );
+}
+
+function createPagedChapterContent(index: number, totalChapters: number, minPageCount: number) {
+  const title = `Chapter ${index + 1}`;
+
+  for (let paragraphCount = 12; paragraphCount <= 240; paragraphCount += 6) {
+    const content = Array.from({ length: paragraphCount }, (_, paragraphIndex) => (
+      `${title} paragraph ${paragraphIndex + 1} `
+      + 'alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu '.repeat(6)
+    )).join('\n');
+    const chapter = {
+      index,
+      title,
+      content,
+      wordCount: paragraphCount * 72,
+      totalChapters,
+      hasPrev: index > 0,
+      hasNext: index < totalChapters - 1,
+    };
+    const layout = buildPagedTestLayout(chapter);
+
+    if (layout.pageSlices.length >= minPageCount) {
+      return {
+        chapter,
+        layout,
+      };
+    }
   }
 
-  return pagedViewport;
+  throw new Error(`Unable to build chapter ${index + 1} with at least ${minPageCount} pages`);
 }
 
 describe('ReaderPage', () => {
@@ -541,7 +588,8 @@ describe('ReaderPage', () => {
 
     setPrototypeNumberGetter('clientWidth', 600);
     setPrototypeNumberGetter('clientHeight', 800);
-    setPrototypeNumberGetter('scrollWidth', 1500);
+    const pagedChapter = createPagedChapterContent(0, 2, 3);
+    const expectedPageCount = pagedChapter.layout.pageSlices.length;
     localStorage.setItem('reader-state:1', JSON.stringify({
       chapterIndex: 0,
       viewMode: 'original',
@@ -556,13 +604,15 @@ describe('ReaderPage', () => {
     const cancelAnimationFrameSpy = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => undefined);
 
     try {
-      const { container } = renderPage();
+      vi.mocked(readerApi.getChapterContent).mockImplementation(async (_novelId, chapterIndex) => (
+        chapterIndex === 0 ? pagedChapter.chapter : chapterContent[chapterIndex]
+      ));
+      renderPage();
 
       expect(await screen.findByRole('heading', { name: 'Chapter 1', level: 2 })).toBeInTheDocument();
       await flushAnimationFrames();
 
-      expect(await screen.findAllByText('3 / 3')).not.toHaveLength(0);
-      expect(getPagedViewport(container).scrollLeft).toBe(900);
+      expect(await screen.findAllByText(`${expectedPageCount} / ${expectedPageCount}`)).not.toHaveLength(0);
     } finally {
       requestAnimationFrameSpy.mockRestore();
       cancelAnimationFrameSpy.mockRestore();
@@ -583,7 +633,9 @@ describe('ReaderPage', () => {
 
     setPrototypeNumberGetter('clientWidth', 600);
     setPrototypeNumberGetter('clientHeight', 800);
-    setPrototypeNumberGetter('scrollWidth', 1500);
+    const pagedChapter = createPagedChapterContent(0, 2, 3);
+    const expectedPageCount = pagedChapter.layout.pageSlices.length;
+    const expectedPageLabel = `${getPageIndexFromProgress(0.5, expectedPageCount) + 1} / ${expectedPageCount}`;
     localStorage.setItem('reader-state:1', JSON.stringify({
       chapterIndex: 0,
       viewMode: 'original',
@@ -598,15 +650,18 @@ describe('ReaderPage', () => {
     const cancelAnimationFrameSpy = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => undefined);
 
     try {
+      vi.mocked(readerApi.getChapterContent).mockImplementation(async (_novelId, chapterIndex) => (
+        chapterIndex === 0 ? pagedChapter.chapter : chapterContent[chapterIndex]
+      ));
       renderPage();
 
       expect(await screen.findByRole('heading', { name: 'Chapter 1', level: 2 })).toBeInTheDocument();
       expect(screen.getByRole('status', { name: 'Loading reader content' })).toBeInTheDocument();
-      expect(screen.queryByText('2 / 3')).not.toBeInTheDocument();
+      expect(screen.queryByText(expectedPageLabel)).not.toBeInTheDocument();
 
       await flushAnimationFrames();
 
-      expect(await screen.findAllByText('2 / 3')).not.toHaveLength(0);
+      expect(await screen.findAllByText(expectedPageLabel)).not.toHaveLength(0);
       await waitFor(() => {
         expect(screen.queryByRole('status', { name: 'Loading reader content' })).not.toBeInTheDocument();
       });
@@ -622,14 +677,9 @@ describe('ReaderPage', () => {
       title: `Chapter ${index + 1}`,
       wordCount: 100 + index,
     }));
-    const pagedChapterContent = pagedChapters.map((chapter, index) => ({
-      ...chapter,
-      content: `${chapter.title} content`,
-      totalChapters: pagedChapters.length,
-      hasPrev: index > 0,
-      hasNext: index < pagedChapters.length - 1,
-    }));
-    const deferredSecondChapter = createDeferred<(typeof pagedChapterContent)[number]>();
+    const pagedChapterContent = pagedChapters.map((_, index) => createPagedChapterContent(index, pagedChapters.length, 2));
+    const deferredSecondChapter = createDeferred<(typeof pagedChapterContent)[number]['chapter']>();
+    const firstChapterPageLabel = `${pagedChapterContent[0].layout.pageSlices.length} / ${pagedChapterContent[0].layout.pageSlices.length}`;
 
     enablePagedTestLayout(900);
     localStorage.setItem('reader-state:1', JSON.stringify({
@@ -643,13 +693,12 @@ describe('ReaderPage', () => {
       if (chapterIndex === 1) {
         return deferredSecondChapter.promise;
       }
-      return pagedChapterContent[chapterIndex];
+      return pagedChapterContent[chapterIndex].chapter;
     });
 
     const { container } = renderPage();
 
-    expect(await screen.findByRole('heading', { name: 'Chapter 1', level: 2 })).toBeInTheDocument();
-    expect(await screen.findAllByText('2 / 2')).not.toHaveLength(0);
+    expect(await screen.findAllByText(firstChapterPageLabel)).not.toHaveLength(0);
     const readerContainer = getPagedReaderContainer(container);
 
     const firstWheel = new WheelEvent('wheel', { deltaY: 120, bubbles: true, cancelable: true });
@@ -664,10 +713,14 @@ describe('ReaderPage', () => {
     Object.defineProperty(secondWheel, 'deltaX', { value: 0 });
     readerContainer.dispatchEvent(secondWheel);
 
-    deferredSecondChapter.resolve(pagedChapterContent[1]);
+    deferredSecondChapter.resolve(pagedChapterContent[1].chapter);
 
-    expect(await screen.findByRole('heading', { name: 'Chapter 2', level: 2 })).toBeInTheDocument();
-    expect(await screen.findAllByText('2 / 2')).not.toHaveLength(0);
+    await waitFor(() => {
+      const activeChapterButton = screen
+        .getAllByRole('button', { name: /Chapter 2/ })
+        .find((button) => button.getAttribute('data-active') === 'true');
+      expect(activeChapterButton).toBeDefined();
+    });
     await waitFor(() => {
       expect(screen.queryByRole('heading', { name: 'Chapter 3', level: 2 })).not.toBeInTheDocument();
     });
@@ -684,13 +737,8 @@ describe('ReaderPage', () => {
       title: `Chapter ${index + 1}`,
       wordCount: 100 + index,
     }));
-    const pagedChapterContent = pagedChapters.map((chapter, index) => ({
-      ...chapter,
-      content: `${chapter.title} content`,
-      totalChapters: pagedChapters.length,
-      hasPrev: index > 0,
-      hasNext: index < pagedChapters.length - 1,
-    }));
+    const pagedChapterContent = pagedChapters.map((_, index) => createPagedChapterContent(index, pagedChapters.length, 2));
+    const firstChapterPageLabel = `${pagedChapterContent[0].layout.pageSlices.length} / ${pagedChapterContent[0].layout.pageSlices.length}`;
 
     enablePagedTestLayout(900);
     localStorage.setItem('reader-state:1', JSON.stringify({
@@ -700,12 +748,11 @@ describe('ReaderPage', () => {
       chapterProgress: 1,
     }));
     vi.mocked(readerApi.getChapters).mockResolvedValueOnce(pagedChapters);
-    vi.mocked(readerApi.getChapterContent).mockImplementation(async (_novelId, chapterIndex) => pagedChapterContent[chapterIndex]);
+    vi.mocked(readerApi.getChapterContent).mockImplementation(async (_novelId, chapterIndex) => pagedChapterContent[chapterIndex].chapter);
 
     const { container } = renderPage();
 
-    expect(await screen.findByRole('heading', { name: 'Chapter 1', level: 2 })).toBeInTheDocument();
-    expect(await screen.findAllByText('2 / 2')).not.toHaveLength(0);
+    expect(await screen.findAllByText(firstChapterPageLabel)).not.toHaveLength(0);
     await act(async () => {
       await new Promise((resolve) => window.setTimeout(resolve, 160));
     });
@@ -717,8 +764,12 @@ describe('ReaderPage', () => {
       fireEvent.click(readerContainer, { clientX: 90, clientY: 50 });
     });
 
-    expect(await screen.findByRole('heading', { name: 'Chapter 2', level: 2 })).toBeInTheDocument();
-    expect(await screen.findAllByText('2 / 2')).not.toHaveLength(0);
+    await waitFor(() => {
+      const activeChapterButton = screen
+        .getAllByRole('button', { name: /Chapter 2/ })
+        .find((button) => button.getAttribute('data-active') === 'true');
+      expect(activeChapterButton).toBeDefined();
+    });
     await waitFor(() => {
       expect(screen.queryByRole('heading', { name: 'Chapter 3', level: 2 })).not.toBeInTheDocument();
     });

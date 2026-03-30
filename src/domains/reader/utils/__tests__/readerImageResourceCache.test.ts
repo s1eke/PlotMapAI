@@ -95,4 +95,63 @@ describe('readerImageResourceCache', () => {
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:3');
     expect(URL.revokeObjectURL).toHaveBeenCalledTimes(1);
   });
+
+  it('keeps preloaded resources alive until decode finishes', async () => {
+    vi.mocked(readerApi.getImageBlob).mockResolvedValue(new Blob(['image-data']));
+
+    let resolveDecode!: () => void;
+    const decodePromise = new Promise<void>((resolve) => {
+      resolveDecode = resolve;
+    });
+    globalThis.Image = class {
+      naturalWidth = 120;
+      naturalHeight = 60;
+      src = '';
+
+      decode() {
+        return decodePromise;
+      }
+    } as unknown as typeof Image;
+
+    const preloadPromise = preloadReaderImageResources(1, ['hero']);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    vi.advanceTimersByTime(10_000);
+    expect(peekReaderImageResource(1, 'hero')).toBe('blob:10');
+    expect(URL.revokeObjectURL).not.toHaveBeenCalled();
+
+    resolveDecode();
+    await preloadPromise;
+
+    vi.advanceTimersByTime(10_000);
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:10');
+  });
+
+  it('assigns image.src only once when decode() is unavailable', async () => {
+    vi.mocked(readerApi.getImageBlob).mockResolvedValue(new Blob(['image-data']));
+
+    let srcAssignments = 0;
+    globalThis.Image = class {
+      naturalWidth = 200;
+      naturalHeight = 100;
+      onerror: (() => void) | null = null;
+      onload: (() => void) | null = null;
+
+      get src() {
+        return '';
+      }
+
+      set src(_value: string) {
+        srcAssignments += 1;
+        queueMicrotask(() => {
+          this.onload?.();
+        });
+      }
+    } as unknown as typeof Image;
+
+    await preloadReaderImageResources(1, ['hero']);
+
+    expect(srcAssignments).toBe(1);
+  });
 });

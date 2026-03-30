@@ -36,7 +36,7 @@ interface UseReaderChapterDataParams {
   hasUserInteractedRef: React.MutableRefObject<boolean>;
   wheelDeltaRef: React.MutableRefObject<number>;
   pageTurnLockedRef: React.MutableRefObject<boolean>;
-  pageTargetRef: React.MutableRefObject<PageTarget>;
+  pageTargetRef: React.MutableRefObject<PageTarget | null>;
   chapterChangeSourceRef: React.MutableRefObject<ChapterChangeSource>;
   loadPersistedReaderState: () => Promise<StoredReaderState>;
   setHasHydratedReaderState: React.Dispatch<React.SetStateAction<boolean>>;
@@ -259,6 +259,8 @@ export function useReaderChapterData({
         isTwoColumn: storedState.isTwoColumn ?? false,
         chapterProgress: storedState.chapterProgress,
         scrollPosition: storedState.scrollPosition,
+        locatorVersion: storedState.locator ? 1 : undefined,
+        locator: storedState.locator,
       };
 
       latestReaderStateRef.current = nextStoredState;
@@ -291,6 +293,8 @@ export function useReaderChapterData({
             isTwoColumn: nextStoredState.isTwoColumn,
             chapterProgress: hasChapter ? nextStoredState.chapterProgress : 0,
             scrollPosition: hasChapter ? nextStoredState.scrollPosition : undefined,
+            locatorVersion: hasChapter && nextStoredState.locator ? 1 : undefined,
+            locator: hasChapter ? nextStoredState.locator : undefined,
           };
 
           latestReaderStateRef.current = resolvedState;
@@ -437,6 +441,8 @@ export function useReaderChapterData({
             viewMode,
             isTwoColumn,
             chapterProgress: pageTargetRef.current === 'end' ? 1 : 0,
+            locatorVersion: undefined,
+            locator: undefined,
           }, { force: true });
         }
         resetViewportPosition();

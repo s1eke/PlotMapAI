@@ -3,22 +3,19 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import PagedReaderContent from '../PagedReaderContent';
 import {
+  composePaginatedChapterLayout,
+  createReaderTypographyMetrics,
+  createReaderViewportMetrics,
+  getPagedContentHeight,
+  measureReaderChapterLayout,
+} from '../../../utils/readerLayout';
+import {
   clampDragOffset,
   getPagedDragLayerOffsets,
   shouldCommitPageTurnDrag,
 } from '../../../utils/pagedDrag';
 
-const chapterSectionSpy = vi.hoisted(() => vi.fn());
 const preloadReaderImageResourcesSpy = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
-const originalClientWidthDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth');
-const originalScrollWidthDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollWidth');
-
-vi.mock('../ReaderChapterSection', () => ({
-  default: (props: unknown) => {
-    chapterSectionSpy(props);
-    return <div data-testid="reader-chapter-section" />;
-  },
-}));
 
 vi.mock('../../../utils/readerImageResourceCache', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../utils/readerImageResourceCache')>();
@@ -28,99 +25,115 @@ vi.mock('../../../utils/readerImageResourceCache', async (importOriginal) => {
   };
 });
 
+function renderPagedContent(overrides: Partial<React.ComponentProps<typeof PagedReaderContent>> = {}) {
+  const chapter = overrides.chapter ?? {
+    index: 0,
+    title: 'Chapter 1',
+    content: 'Text',
+    wordCount: 100,
+    totalChapters: 1,
+    hasPrev: false,
+    hasNext: false,
+  };
+  const viewportMetrics = createReaderViewportMetrics(720, 1200, 720, 1200, 18);
+  const typography = createReaderTypographyMetrics(18, 1.8, 24, viewportMetrics.pagedViewportWidth);
+  const measuredLayout = measureReaderChapterLayout(chapter, viewportMetrics.pagedColumnWidth, typography, new Map());
+  const defaultLayout = composePaginatedChapterLayout(
+    measuredLayout,
+    getPagedContentHeight(viewportMetrics.pagedViewportHeight),
+    viewportMetrics.pagedColumnCount,
+    viewportMetrics.pagedColumnGap,
+  );
+
+  return render(
+    <PagedReaderContent
+      chapter={chapter}
+      currentLayout={overrides.currentLayout ?? defaultLayout}
+      novelId={1}
+      pageIndex={0}
+      pagedViewportRef={{ current: null }}
+      readerTheme="auto"
+      textClassName=""
+      headerBgClassName=""
+      pageBgClassName="bg-[#f4ecd8]"
+      fitsTwoColumns={false}
+      twoColumnWidth={undefined}
+      twoColumnGap={48}
+      pageTurnMode="cover"
+      pageTurnDirection="next"
+      pageTurnToken={1}
+      {...overrides}
+    />,
+  );
+}
+
+function buildMultiPageLayout() {
+  const chapter = {
+    index: 0,
+    title: 'Chapter 1',
+    content: Array.from(
+      { length: 14 },
+      (_, paragraphIndex) => `Paragraph ${paragraphIndex + 1} ${'alpha beta gamma delta epsilon '.repeat(8)}`,
+    ).join('\n'),
+    wordCount: 1600,
+    totalChapters: 1,
+    hasPrev: false,
+    hasNext: false,
+  };
+  const viewportMetrics = createReaderViewportMetrics(720, 1200, 720, 1200, 18);
+  const typography = createReaderTypographyMetrics(18, 1.8, 24, viewportMetrics.pagedViewportWidth);
+  const measuredLayout = measureReaderChapterLayout(chapter, viewportMetrics.pagedColumnWidth, typography, new Map());
+  const currentLayout = composePaginatedChapterLayout(
+    measuredLayout,
+    getPagedContentHeight(viewportMetrics.pagedViewportHeight),
+    viewportMetrics.pagedColumnCount,
+    viewportMetrics.pagedColumnGap,
+  );
+
+  if (currentLayout.pageSlices.length < 2) {
+    throw new Error('Expected test layout to span multiple pages');
+  }
+
+  return {
+    chapter,
+    currentLayout,
+  };
+}
+
 describe('PagedReaderContent', () => {
+  const originalClientWidthDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth');
+  const originalClientHeightDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientHeight');
+
   afterEach(() => {
     vi.clearAllMocks();
-
     if (originalClientWidthDescriptor) {
       Object.defineProperty(HTMLElement.prototype, 'clientWidth', originalClientWidthDescriptor);
-    } else {
-      Reflect.deleteProperty(HTMLElement.prototype, 'clientWidth');
     }
-
-    if (originalScrollWidthDescriptor) {
-      Object.defineProperty(HTMLElement.prototype, 'scrollWidth', originalScrollWidthDescriptor);
-    } else {
-      Reflect.deleteProperty(HTMLElement.prototype, 'scrollWidth');
+    if (originalClientHeightDescriptor) {
+      Object.defineProperty(HTMLElement.prototype, 'clientHeight', originalClientHeightDescriptor);
     }
   });
 
-  it('passes paged break rules that allow plain text paragraphs to split naturally', () => {
-    render(
-      <PagedReaderContent
-        chapter={{
-          index: 0,
-          title: 'Chapter 1',
-          content: 'Text',
-          wordCount: 100,
-          totalChapters: 1,
-          hasPrev: false,
-          hasNext: false,
-        }}
-        novelId={1}
-        pageIndex={0}
-        pageCount={2}
-        pagedViewportRef={{ current: null }}
-        pagedContentRef={{ current: null }}
-        fontSize={18}
-        lineSpacing={1.8}
-        paragraphSpacing={24}
-        readerTheme="auto"
-        textClassName=""
-        headerBgClassName=""
-        pageBgClassName="bg-[#f4ecd8]"
-        fitsTwoColumns={false}
-        twoColumnWidth={undefined}
-        twoColumnGap={48}
-        pageTurnMode="cover"
-        pageTurnDirection="next"
-        pageTurnToken={1}
-      />,
-    );
+  it('renders paged text blocks inside the page frame', () => {
+    renderPagedContent();
 
-    const forwardedProps = chapterSectionSpy.mock.calls.at(-1)?.[0];
-
-    expect(forwardedProps).toEqual(expect.objectContaining({
-      headingClassName: expect.stringContaining('break-inside-avoid'),
-      imageRenderMode: 'paged',
-      mixedParagraphClassName: 'break-inside-avoid',
-    }));
-    expect(forwardedProps).not.toHaveProperty('paragraphClassName');
-    expect(forwardedProps).not.toHaveProperty('blankParagraphClassName');
+    expect(screen.getByTestId('paged-reader-page-frame')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Chapter 1', level: 2 })).toBeInTheDocument();
+    expect(screen.getByText('Text')).toBeInTheDocument();
   });
 
   it('applies an opaque page background to animated layers', () => {
-    const { container } = render(
-      <PagedReaderContent
-        chapter={{
-          index: 0,
-          title: 'Chapter 1',
-          content: 'Text',
-          wordCount: 100,
-          totalChapters: 1,
-          hasPrev: false,
-          hasNext: true,
-        }}
-        novelId={1}
-        pageIndex={0}
-        pageCount={2}
-        pagedViewportRef={{ current: null }}
-        pagedContentRef={{ current: null }}
-        fontSize={18}
-        lineSpacing={1.8}
-        paragraphSpacing={24}
-        readerTheme="auto"
-        textClassName=""
-        headerBgClassName=""
-        pageBgClassName="bg-[#f4ecd8]"
-        fitsTwoColumns={false}
-        twoColumnWidth={undefined}
-        twoColumnGap={48}
-        pageTurnMode="cover"
-        pageTurnDirection="next"
-        pageTurnToken={1}
-      />,
-    );
+    const { container } = renderPagedContent({
+      chapter: {
+        index: 0,
+        title: 'Chapter 1',
+        content: 'Text',
+        wordCount: 100,
+        totalChapters: 1,
+        hasPrev: false,
+        hasNext: true,
+      },
+    });
 
     const interactiveLayer = container.querySelector('[data-testid="paged-reader-interactive"]');
     const pageFrame = interactiveLayer?.querySelector('[data-testid="paged-reader-page-frame"]');
@@ -131,37 +144,19 @@ describe('PagedReaderContent', () => {
   });
 
   it('renders the animated page as a full-page frame instead of only animating the text column', () => {
-    const { container } = render(
-      <PagedReaderContent
-        chapter={{
-          index: 0,
-          title: 'Chapter 1',
-          content: 'Text',
-          wordCount: 100,
-          totalChapters: 1,
-          hasPrev: false,
-          hasNext: true,
-        }}
-        novelId={1}
-        pageIndex={0}
-        pageCount={2}
-        pagedViewportRef={{ current: null }}
-        pagedContentRef={{ current: null }}
-        fontSize={18}
-        lineSpacing={1.8}
-        paragraphSpacing={24}
-        readerTheme="auto"
-        textClassName="text-text-primary"
-        headerBgClassName="bg-bg-primary"
-        pageBgClassName="bg-[#f4ecd8]"
-        fitsTwoColumns={false}
-        twoColumnWidth={undefined}
-        twoColumnGap={48}
-        pageTurnMode="cover"
-        pageTurnDirection="next"
-        pageTurnToken={1}
-      />,
-    );
+    const { container } = renderPagedContent({
+      chapter: {
+        index: 0,
+        title: 'Chapter 1',
+        content: 'Text',
+        wordCount: 100,
+        totalChapters: 1,
+        hasPrev: false,
+        hasNext: true,
+      },
+      textClassName: 'text-text-primary',
+      headerBgClassName: 'bg-bg-primary',
+    });
 
     const pageFrame = container.querySelector('[data-testid="paged-reader-interactive"] > .absolute.inset-0.overflow-hidden [data-testid="paged-reader-page-frame"]');
     expect(pageFrame).toBeInTheDocument();
@@ -169,41 +164,77 @@ describe('PagedReaderContent', () => {
   });
 
   it('lets the paged text body inherit the global sans font stack', () => {
-    render(
-      <PagedReaderContent
-        chapter={{
-          index: 0,
-          title: 'Chapter 1',
-          content: 'Text',
-          wordCount: 100,
-          totalChapters: 1,
-          hasPrev: false,
-          hasNext: false,
-        }}
-        novelId={1}
-        pageIndex={0}
-        pageCount={1}
-        pagedViewportRef={{ current: null }}
-        pagedContentRef={{ current: null }}
-        fontSize={18}
-        lineSpacing={1.8}
-        paragraphSpacing={24}
-        readerTheme="auto"
-        textClassName=""
-        headerBgClassName=""
-        pageBgClassName="bg-[#f4ecd8]"
-        fitsTwoColumns={false}
-        twoColumnWidth={undefined}
-        twoColumnGap={48}
-        pageTurnMode="cover"
-        pageTurnDirection="next"
-        pageTurnToken={1}
-      />,
-    );
+    renderPagedContent();
 
     for (const contentBody of screen.getAllByTestId('paged-reader-content-body')) {
       expect(contentBody).not.toHaveClass('font-serif');
     }
+  });
+
+  it('renders the provided single-column static layout without recomposing it in the component', () => {
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
+      configurable: true,
+      get: () => 720,
+    });
+    Object.defineProperty(HTMLElement.prototype, 'clientHeight', {
+      configurable: true,
+      get: () => 1200,
+    });
+
+    const chapter = {
+      index: 0,
+      title: 'Chapter 1',
+      content: Array.from(
+        { length: 12 },
+        (_, paragraphIndex) => `Paragraph ${paragraphIndex + 1} ${'alpha beta gamma delta epsilon '.repeat(6)}`,
+      ).join('\n'),
+      wordCount: 1200,
+      totalChapters: 1,
+      hasPrev: false,
+      hasNext: false,
+    };
+    const viewportMetrics = createReaderViewportMetrics(720, 1200, 720, 1200, 18);
+    const typography = createReaderTypographyMetrics(18, 1.8, 24, viewportMetrics.pagedViewportWidth);
+    const measuredLayout = measureReaderChapterLayout(chapter, viewportMetrics.pagedColumnWidth, typography, new Map());
+    const currentLayout = composePaginatedChapterLayout(
+      measuredLayout,
+      getPagedContentHeight(viewportMetrics.pagedViewportHeight),
+      viewportMetrics.pagedColumnCount,
+      viewportMetrics.pagedColumnGap,
+    );
+
+    renderPagedContent({
+      chapter,
+      currentLayout,
+    });
+
+    const contentBody = screen.getByTestId('paged-reader-content-body');
+    expect(contentBody.children).toHaveLength(currentLayout.columnCount);
+  });
+
+  it('renders the visible page count from the current layout', () => {
+    const { chapter, currentLayout } = buildMultiPageLayout();
+
+    renderPagedContent({
+      chapter,
+      currentLayout,
+      pageIndex: 0,
+    });
+
+    expect(screen.getByText(`1 / ${currentLayout.pageSlices.length}`)).toBeInTheDocument();
+  });
+
+  it('renders the pending end target page while parent pageIndex is still stale after a previous-chapter transition', () => {
+    const { chapter, currentLayout } = buildMultiPageLayout();
+
+    renderPagedContent({
+      chapter,
+      currentLayout,
+      pageIndex: 0,
+      pendingPageTarget: 'end',
+    });
+
+    expect(screen.getByText(`${currentLayout.pageSlices.length} / ${currentLayout.pageSlices.length}`)).toBeInTheDocument();
   });
 
   it('clamps drag offsets to the available navigation directions', () => {
@@ -233,55 +264,35 @@ describe('PagedReaderContent', () => {
   });
 
   it('preloads image keys from the current and adjacent preview chapters', () => {
-    render(
-      <PagedReaderContent
-        chapter={{
-          index: 1,
-          title: 'Chapter 2',
-          content: 'Current [IMG:current] [IMG:shared]',
-          wordCount: 100,
-          totalChapters: 3,
-          hasPrev: true,
-          hasNext: true,
-        }}
-        novelId={1}
-        pageIndex={0}
-        pageCount={2}
-        pagedViewportRef={{ current: null }}
-        pagedContentRef={{ current: null }}
-        fontSize={18}
-        lineSpacing={1.8}
-        paragraphSpacing={24}
-        readerTheme="auto"
-        textClassName=""
-        headerBgClassName=""
-        pageBgClassName="bg-[#f4ecd8]"
-        fitsTwoColumns={false}
-        twoColumnWidth={undefined}
-        twoColumnGap={48}
-        pageTurnMode="cover"
-        pageTurnDirection="next"
-        pageTurnToken={1}
-        previousChapterPreview={{
-          index: 0,
-          title: 'Chapter 1',
-          content: 'Prev [IMG:shared] [IMG:prev]',
-          wordCount: 100,
-          totalChapters: 3,
-          hasPrev: false,
-          hasNext: true,
-        }}
-        nextChapterPreview={{
-          index: 2,
-          title: 'Chapter 3',
-          content: 'Next [IMG:next]',
-          wordCount: 100,
-          totalChapters: 3,
-          hasPrev: true,
-          hasNext: false,
-        }}
-      />,
-    );
+    renderPagedContent({
+      chapter: {
+        index: 1,
+        title: 'Chapter 2',
+        content: 'Current [IMG:current] [IMG:shared]',
+        wordCount: 100,
+        totalChapters: 3,
+        hasPrev: true,
+        hasNext: true,
+      },
+      previousChapterPreview: {
+        index: 0,
+        title: 'Chapter 1',
+        content: 'Prev [IMG:shared] [IMG:prev]',
+        wordCount: 100,
+        totalChapters: 3,
+        hasPrev: false,
+        hasNext: true,
+      },
+      nextChapterPreview: {
+        index: 2,
+        title: 'Chapter 3',
+        content: 'Next [IMG:next]',
+        wordCount: 100,
+        totalChapters: 3,
+        hasPrev: true,
+        hasNext: false,
+      },
+    });
 
     expect(preloadReaderImageResourcesSpy).toHaveBeenCalledWith(1, ['current', 'shared', 'prev', 'next']);
   });

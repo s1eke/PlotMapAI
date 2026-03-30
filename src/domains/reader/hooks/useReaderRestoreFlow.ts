@@ -3,6 +3,7 @@ import type { ChapterContent } from '../api/readerApi';
 import type { ChapterChangeSource } from './navigationTypes';
 import type { ScrollModeAnchor } from './useScrollModeChapters';
 import type { StoredReaderState } from './useReaderStatePersistence';
+import type { ReaderLocator } from '../utils/readerLayout';
 import {
   beginRestore,
   completeRestore,
@@ -39,6 +40,9 @@ interface UseReaderRestoreFlowParams {
   getCurrentAnchorRef: React.MutableRefObject<() => ScrollModeAnchor | null>;
   handleScrollModeScrollRef: React.MutableRefObject<() => void>;
   readingAnchorHandlerRef: React.MutableRefObject<(anchor: ScrollModeAnchor) => void>;
+  getCurrentOriginalLocatorRef?: React.MutableRefObject<() => ReaderLocator | null>;
+  getCurrentPagedLocatorRef?: React.MutableRefObject<() => ReaderLocator | null>;
+  resolveScrollLocatorOffsetRef?: React.MutableRefObject<(locator: ReaderLocator) => number | null>;
   summaryRestoreSignal: unknown;
   isChapterAnalysisLoading: boolean;
 }
@@ -58,6 +62,14 @@ interface UseReaderRestoreFlowResult {
   stopRestoreMask: () => void;
   suppressScrollSyncTemporarily: () => void;
 }
+
+const EMPTY_LOCATOR_REF: React.MutableRefObject<() => ReaderLocator | null> = {
+  current: () => null,
+};
+
+const EMPTY_SCROLL_LOCATOR_OFFSET_REF: React.MutableRefObject<(locator: ReaderLocator) => number | null> = {
+  current: () => null,
+};
 
 export function useReaderRestoreFlow({
   novelId,
@@ -82,6 +94,9 @@ export function useReaderRestoreFlow({
   getCurrentAnchorRef,
   handleScrollModeScrollRef,
   readingAnchorHandlerRef,
+  getCurrentOriginalLocatorRef,
+  getCurrentPagedLocatorRef,
+  resolveScrollLocatorOffsetRef,
   summaryRestoreSignal,
   isChapterAnalysisLoading,
 }: UseReaderRestoreFlowParams): UseReaderRestoreFlowResult {
@@ -94,6 +109,9 @@ export function useReaderRestoreFlow({
   const summaryProgressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const suppressScrollSyncRef = useRef(false);
   const scrollSyncReleaseFrameRef = useRef<number | null>(null);
+  const getOriginalLocator = getCurrentOriginalLocatorRef ?? EMPTY_LOCATOR_REF;
+  const getPagedLocator = getCurrentPagedLocatorRef ?? EMPTY_LOCATOR_REF;
+  const resolveScrollLocatorOffset = resolveScrollLocatorOffsetRef ?? EMPTY_SCROLL_LOCATOR_OFFSET_REF;
 
   useEffect(() => {
     pendingRestoreStateRef.current = pendingRestoreState;
@@ -117,7 +135,7 @@ export function useReaderRestoreFlow({
 
     const hasChapterProgress = typeof nextState.chapterProgress === 'number' && nextState.chapterProgress > 0;
     const hasLegacyScrollPosition = typeof nextState.scrollPosition === 'number' && nextState.scrollPosition > 0;
-    setStorePendingRestoreState(hasChapterProgress || hasLegacyScrollPosition ? nextState : null);
+    setStorePendingRestoreState(nextState.locator || hasChapterProgress || hasLegacyScrollPosition ? nextState : null);
   }, []);
 
   const clearPendingRestoreState = useCallback(() => {
@@ -165,6 +183,8 @@ export function useReaderRestoreFlow({
       scrollPosition: typeof state.scrollPosition === 'number' && Number.isFinite(state.scrollPosition)
         ? state.scrollPosition
         : undefined,
+      locatorVersion: state.locator ? 1 : undefined,
+      locator: state.locator,
     };
 
     if (normalizedState.viewMode === 'summary') {
@@ -180,16 +200,19 @@ export function useReaderRestoreFlow({
     if (pendingRestoreStateRef.current) return;
     if (suppressScrollSyncRef.current) return;
     if (chapterChangeSourceRef.current === 'navigation' || chapterChangeSourceRef.current === 'restore') return;
+    const locator = getOriginalLocator.current();
 
     persistReaderState({
       chapterIndex: anchor.chapterIndex,
       chapterProgress: clampProgress(anchor.chapterProgress),
+      locatorVersion: locator ? 1 : undefined,
+      locator: locator ?? undefined,
     });
 
     if (anchor.chapterIndex === chapterIndex) return;
     chapterChangeSourceRef.current = 'scroll';
     setChapterIndex(anchor.chapterIndex);
-  }, [chapterIndex, isPagedMode, persistReaderState, setChapterIndex, viewMode]);
+  }, [chapterIndex, getOriginalLocator, isPagedMode, persistReaderState, setChapterIndex, viewMode]);
 
   useEffect(() => {
     readingAnchorHandlerRef.current = handleReadingAnchorChange;
@@ -215,15 +238,26 @@ export function useReaderRestoreFlow({
 
     if (isPagedMode) {
       nextState.chapterProgress = getPagedProgress();
+      const locator = getPagedLocator.current();
+      if (locator) {
+        nextState.chapterIndex = locator.chapterIndex;
+        nextState.locatorVersion = 1;
+        nextState.locator = locator;
+      }
     } else if (viewMode === 'summary') {
       nextState.chapterProgress = getContainerProgress(contentRef.current);
+      nextState.locatorVersion = undefined;
+      nextState.locator = undefined;
     } else {
       const anchor = shouldPreferLatestReaderState ? null : getCurrentAnchorRef.current();
+      const locator = shouldPreferLatestReaderState ? null : getOriginalLocator.current();
       if (anchor) {
         nextState = {
           ...nextState,
           chapterIndex: anchor.chapterIndex,
           chapterProgress: clampProgress(anchor.chapterProgress),
+          locatorVersion: locator ? 1 : undefined,
+          locator: locator ?? undefined,
         };
       } else if (shouldPreferLatestReaderState) {
         nextState = {
@@ -235,9 +269,13 @@ export function useReaderRestoreFlow({
           scrollPosition: typeof preferredReaderState.scrollPosition === 'number' && Number.isFinite(preferredReaderState.scrollPosition)
             ? preferredReaderState.scrollPosition
             : undefined,
+          locatorVersion: preferredReaderState.locator ? 1 : undefined,
+          locator: preferredReaderState.locator,
         };
       } else if (typeof latestReaderStateRef.current.chapterProgress === 'number') {
         nextState.chapterProgress = latestReaderStateRef.current.chapterProgress;
+        nextState.locatorVersion = latestReaderStateRef.current.locator ? 1 : undefined;
+        nextState.locator = latestReaderStateRef.current.locator;
       }
     }
 
@@ -251,6 +289,8 @@ export function useReaderRestoreFlow({
     chapterIndex,
     contentRef,
     getCurrentAnchorRef,
+    getOriginalLocator,
+    getPagedLocator,
     getPagedProgress,
     isPagedMode,
     isTwoColumn,
@@ -328,14 +368,22 @@ export function useReaderRestoreFlow({
       const targetIndex = pendingRestoreState.chapterIndex ?? chapterIndex;
       const targetElement = scrollChapterElementsRef.current.get(targetIndex);
 
-        if (!container || !targetElement) {
-          frameId = requestAnimationFrame(restoreScrollPosition);
-          return;
+      if (!container || !targetElement) {
+        frameId = requestAnimationFrame(restoreScrollPosition);
+        return;
       }
 
       chapterChangeSourceRef.current = 'restore';
       suppressScrollSyncTemporarily();
-      if (typeof pendingRestoreState.chapterProgress === 'number') {
+      if (pendingRestoreState.locator) {
+        const nextScrollTop = resolveScrollLocatorOffset.current(pendingRestoreState.locator);
+        if (nextScrollTop === null) {
+          chapterChangeSourceRef.current = null;
+          frameId = requestAnimationFrame(restoreScrollPosition);
+          return;
+        }
+        container.scrollTop = Math.round(nextScrollTop);
+      } else if (typeof pendingRestoreState.chapterProgress === 'number') {
         container.scrollTop = Math.round(
           targetElement.offsetTop + targetElement.offsetHeight * clampProgress(pendingRestoreState.chapterProgress),
         );
@@ -364,6 +412,7 @@ export function useReaderRestoreFlow({
     scrollModeChapters,
     stopRestoreMask,
     suppressScrollSyncTemporarily,
+    resolveScrollLocatorOffset,
     viewMode,
   ]);
 

@@ -1,5 +1,7 @@
-import { useCallback, useEffect } from 'react';
 import type { ReaderPageTurnMode } from '../constants/pageTurnMode';
+
+import { useCallback, useEffect, useMemo } from 'react';
+
 import { READER_THEMES } from '../constants/readerThemes';
 import {
   ensureSessionPreferencesHydrated,
@@ -22,13 +24,18 @@ export function useReaderPreferences() {
     void ensureSessionPreferencesHydrated();
   }, []);
 
-  const preferences = useReaderSessionSelector(state => ({
-    fontSize: state.fontSize,
-    readerTheme: state.readerTheme,
-    pageTurnMode: state.pageTurnMode,
-    lineSpacing: state.lineSpacing,
-    paragraphSpacing: state.paragraphSpacing,
-  }));
+  const fontSize = useReaderSessionSelector(state => state.fontSize);
+  const readerTheme = useReaderSessionSelector(state => state.readerTheme);
+  const pageTurnMode = useReaderSessionSelector(state => state.pageTurnMode);
+  const lineSpacing = useReaderSessionSelector(state => state.lineSpacing);
+  const paragraphSpacing = useReaderSessionSelector(state => state.paragraphSpacing);
+  const preferences = useMemo(() => ({
+    fontSize,
+    readerTheme,
+    pageTurnMode,
+    lineSpacing,
+    paragraphSpacing,
+  }), [fontSize, lineSpacing, pageTurnMode, paragraphSpacing, readerTheme]);
 
   const currentTheme = READER_THEMES[preferences.readerTheme] || READER_THEMES.auto;
   const headerBg = HEADER_BG_MAP[preferences.readerTheme] || HEADER_BG_MAP.auto;

@@ -1,61 +1,75 @@
 import type { ChapterContent } from '../../api/readerApi';
+import type { StaticScrollChapterTree } from '../../utils/readerLayout';
+
 import { cn } from '@shared/utils/cn';
-import ReaderChapterSection from './ReaderChapterSection';
+
+import ReaderFlowBlock from './ReaderFlowBlock';
 
 interface ScrollReaderChapter {
-  index: number;
   chapter: ChapterContent;
+  index: number;
+  layout: StaticScrollChapterTree;
 }
 
 interface ScrollReaderContentProps {
   chapters: ScrollReaderChapter[];
+  headerBgClassName: string;
   novelId: number;
-  fontSize: number;
-  lineSpacing: number;
-  paragraphSpacing: number;
+  onChapterBodyElement?: (chapterIndex: number, element: HTMLDivElement | null) => void;
+  onChapterElement: (chapterIndex: number, element: HTMLDivElement | null) => void;
   readerTheme: string;
   textClassName: string;
-  headerBgClassName: string;
-  onChapterElement: (chapterIndex: number, element: HTMLDivElement | null) => void;
 }
 
 export default function ScrollReaderContent({
   chapters,
+  headerBgClassName,
   novelId,
-  fontSize,
-  lineSpacing,
-  paragraphSpacing,
+  onChapterBodyElement,
+  onChapterElement,
   readerTheme,
   textClassName,
-  headerBgClassName,
-  onChapterElement,
 }: ScrollReaderContentProps) {
   return (
-    <div className={cn('px-4 sm:px-8 md:px-12 max-w-[1200px] mx-auto w-full relative', textClassName)}>
+    <div className={cn('relative mx-auto w-full max-w-[1200px] px-4 sm:px-8 md:px-12', textClassName)}>
       <div className="pt-6">
-        {chapters.map(({ index, chapter }) => (
+        {chapters.map(({ chapter, index, layout }) => (
           <div
             key={index}
             ref={(element) => onChapterElement(index, element)}
             className="mb-12"
           >
-            <div className={cn('sticky top-0 z-10 -mx-4 sm:-mx-8 md:-mx-12 px-4 sm:px-8 md:px-12 py-3 border-b border-border-color/20 backdrop-blur-sm', headerBgClassName)}>
-              <h1 className={cn('text-sm font-medium truncate transition-colors', readerTheme === 'auto' ? 'text-text-secondary' : 'opacity-60')}>{chapter.title}</h1>
+            <div
+              className={cn(
+                'sticky top-0 z-10 -mx-4 border-b border-border-color/20 px-4 py-3 backdrop-blur-sm sm:-mx-8 sm:px-8 md:-mx-12 md:px-12',
+                headerBgClassName,
+              )}
+            >
+              <h1 className={cn('truncate text-sm font-medium transition-colors', readerTheme === 'auto' ? 'text-text-secondary' : 'opacity-60')}>
+                {chapter.title}
+              </h1>
             </div>
+
             <div
               data-testid="scroll-reader-content-body"
-              className="leading-relaxed mx-auto w-full transition-all text-justify md:text-left selection:bg-accent/30 tracking-wide opacity-90"
-              style={{ fontSize: `${fontSize}px`, maxWidth: '800px', lineHeight: String(lineSpacing) }}
+              ref={(element) => onChapterBodyElement?.(index, element)}
+              className="mx-auto w-full max-w-[920px] selection:bg-accent/30"
+              style={{ height: layout.totalHeight, position: 'relative' }}
             >
-              <ReaderChapterSection
-                title={chapter.title}
-                content={chapter.content}
-                novelId={novelId}
-                paragraphSpacing={paragraphSpacing}
-                imageRenderMode="scroll"
-                headingClassName="text-xl sm:text-2xl font-bold text-center mb-8 mt-2"
-                headingStyle={{ lineHeight: '1.4' }}
-              />
+              {layout.metrics.map((metric) => (
+                <ReaderFlowBlock
+                  key={metric.block.key}
+                  imageRenderMode="scroll"
+                  item={metric}
+                  novelId={novelId}
+                  positionStyle={{
+                    left: 0,
+                    position: 'absolute',
+                    right: 0,
+                    top: metric.top,
+                  }}
+                />
+              ))}
             </div>
           </div>
         ))}

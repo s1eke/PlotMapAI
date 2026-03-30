@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   flushPersistence,
   getReaderSessionSnapshot,
-  getStoredReaderStateSnapshot,
   hydrateSession,
   markUserInteracted,
   persistStoredReaderState,
@@ -29,6 +28,8 @@ function buildNovelScopedInitialState(initialStoredState: StoredReaderState | nu
       chapterProgress: undefined,
       scrollPosition: undefined,
       lastContentMode: 'scroll',
+      locatorVersion: undefined,
+      locator: undefined,
     };
   }
 
@@ -44,6 +45,8 @@ function buildNovelScopedInitialState(initialStoredState: StoredReaderState | nu
     chapterProgress: initialStoredState.chapterProgress,
     scrollPosition: initialStoredState.scrollPosition,
     lastContentMode: initialStoredState.lastContentMode ?? (initialStoredState.mode === 'paged' ? 'paged' : 'scroll'),
+    locatorVersion: initialStoredState.locator ? 1 : undefined,
+    locator: initialStoredState.locator,
   };
 }
 
@@ -58,12 +61,45 @@ export function useReaderStatePersistence(novelId: number): {
   loadPersistedReaderState: () => Promise<StoredReaderState>;
   initialStoredState: StoredReaderState | null;
 } {
-  const snapshot = useReaderSessionSelector(state => ({
-    novelId: state.novelId,
-    restoreStatus: state.restoreStatus,
-    hasUserInteracted: state.hasUserInteracted,
-    storedState: getStoredReaderStateSnapshot(),
-  }));
+  const sessionNovelId = useReaderSessionSelector(state => state.novelId);
+  const restoreStatus = useReaderSessionSelector(state => state.restoreStatus);
+  const hasUserInteracted = useReaderSessionSelector(state => state.hasUserInteracted);
+  const chapterIndex = useReaderSessionSelector(state => state.chapterIndex);
+  const mode = useReaderSessionSelector(state => state.mode);
+  const viewMode = useReaderSessionSelector(state => state.viewMode);
+  const isTwoColumn = useReaderSessionSelector(state => state.isTwoColumn);
+  const chapterProgress = useReaderSessionSelector(state => state.chapterProgress);
+  const scrollPosition = useReaderSessionSelector(state => state.scrollPosition);
+  const lastContentMode = useReaderSessionSelector(state => state.lastContentMode);
+  const locatorVersion = useReaderSessionSelector(state => state.locatorVersion);
+  const locator = useReaderSessionSelector(state => state.locator);
+  const storedState = useMemo<StoredReaderState>(() => ({
+    chapterIndex,
+    mode,
+    viewMode,
+    isTwoColumn,
+    chapterProgress,
+    scrollPosition,
+    lastContentMode,
+    locatorVersion,
+    locator,
+  }), [
+    chapterIndex,
+    chapterProgress,
+    isTwoColumn,
+    lastContentMode,
+    locator,
+    locatorVersion,
+    mode,
+    scrollPosition,
+    viewMode,
+  ]);
+  const snapshot = useMemo(() => ({
+    novelId: sessionNovelId,
+    restoreStatus,
+    hasUserInteracted,
+    storedState,
+  }), [hasUserInteracted, restoreStatus, sessionNovelId, storedState]);
 
   const initialStoredState = readInitialStoredReaderState(novelId);
   const novelScopedInitialState = useMemo(

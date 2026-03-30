@@ -34,7 +34,8 @@ function setupHook(overrides: {
   const setChapterIndex = vi.fn();
   const setPageIndex = vi.fn();
   const persistReaderState = vi.fn();
-  const pageTargetRef = { current: 'start' as PageTarget };
+  const pageTargetRef = { current: null as PageTarget | null };
+  const setPendingPageTarget = vi.fn();
   const hasUserInteractedRef = { current: false };
   const chapterChangeSourceRef = { current: null as ChapterChangeSource };
   const beforeChapterChange = vi.fn();
@@ -68,6 +69,7 @@ function setupHook(overrides: {
       props.pageCount,
       persistReaderState,
       pageTargetRef,
+      setPendingPageTarget,
       chapters,
       props.scrollModeChapters,
       hasUserInteractedRef,
@@ -85,6 +87,7 @@ function setupHook(overrides: {
     setPageIndex,
     persistReaderState,
     pageTargetRef,
+    setPendingPageTarget,
     hasUserInteractedRef,
     chapterChangeSourceRef,
     beforeChapterChange,
@@ -112,9 +115,10 @@ describe('useReaderNavigation', () => {
     });
 
     it('sets pageTargetRef', () => {
-      const { result, pageTargetRef, persistReaderState } = setupHook();
+      const { result, pageTargetRef, persistReaderState, setPendingPageTarget } = setupHook();
       result.current.goToChapter(1, 'end');
       expect(pageTargetRef.current).toBe('end');
+      expect(setPendingPageTarget).toHaveBeenCalledWith('end');
       expect(persistReaderState).toHaveBeenCalledWith({ chapterIndex: 1, chapterProgress: 1 });
     });
   });

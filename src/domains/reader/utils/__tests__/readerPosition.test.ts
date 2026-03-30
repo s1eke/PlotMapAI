@@ -4,6 +4,7 @@ import {
   clampProgress,
   getContainerProgress,
   getPageIndexFromProgress,
+  resolvePagedTargetPage,
   shouldMaskReaderPositionRestore,
 } from '../readerPosition';
 
@@ -31,6 +32,14 @@ describe('readerPosition', () => {
     expect(getPageIndexFromProgress(0.5, 5)).toBe(2);
     expect(getPageIndexFromProgress(1, 5)).toBe(4);
     expect(getPageIndexFromProgress(0.6, 1)).toBe(0);
+  });
+
+  it('resolves paged chapter targets before falling back to the carried page index', () => {
+    expect(resolvePagedTargetPage('start', 7, 10)).toBe(0);
+    expect(resolvePagedTargetPage('end', 2, 10)).toBe(9);
+    expect(resolvePagedTargetPage(null, 7, 10)).toBe(7);
+    expect(resolvePagedTargetPage(undefined, 12, 10)).toBe(9);
+    expect(resolvePagedTargetPage('start', 4, 1)).toBe(0);
   });
 
   it('detects when restore should keep the loading mask visible', () => {

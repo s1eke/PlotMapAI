@@ -24,12 +24,33 @@ export function getPageIndexFromProgress(progress: number | undefined, totalPage
   return Math.max(0, Math.min(totalPages - 1, Math.round(clampProgress(progress) * (totalPages - 1))));
 }
 
+export function resolvePagedTargetPage(
+  pageTarget: 'start' | 'end' | null | undefined,
+  pageIndex: number,
+  totalPages: number,
+): number {
+  if (totalPages <= 1) {
+    return 0;
+  }
+
+  if (pageTarget === 'start') {
+    return 0;
+  }
+
+  if (pageTarget === 'end') {
+    return totalPages - 1;
+  }
+
+  return Math.max(0, Math.min(totalPages - 1, pageIndex));
+}
+
 export function shouldMaskReaderPositionRestore(state: StoredReaderState | null | undefined): boolean {
   if (!state) return false;
 
   return (state.chapterIndex ?? 0) > 0
     || state.viewMode === 'summary'
     || state.isTwoColumn === true
+    || state.locator !== undefined
     || (typeof state.chapterProgress === 'number' && state.chapterProgress > 0)
     || (typeof state.scrollPosition === 'number' && state.scrollPosition > 0);
 }

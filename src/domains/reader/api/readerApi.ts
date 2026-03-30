@@ -1,6 +1,7 @@
 import { db } from '@infra/db';
 import type { Chapter as DbChapter } from '@infra/db';
 import { AppErrorCode, createAppError } from '@shared/errors';
+import type { ReaderLocator } from '../utils/readerLayout';
 import {
   runPurifyChapterTask,
   runPurifyChaptersTask,
@@ -28,6 +29,8 @@ export interface ReadingProgress {
   viewMode: 'summary' | 'original';
   chapterProgress?: number;
   isTwoColumn?: boolean;
+  locatorVersion?: 1;
+  locator?: ReaderLocator;
 }
 
 export interface ReaderTextProcessingOptions {
@@ -189,6 +192,7 @@ export const readerApi = {
         viewMode: 'original',
         chapterProgress: 0,
         isTwoColumn: false,
+        locatorVersion: 1,
       };
     }
     return {
@@ -197,6 +201,8 @@ export const readerApi = {
       viewMode: (progress.viewMode || 'original') as 'summary' | 'original',
       chapterProgress: typeof progress.chapterProgress === 'number' ? progress.chapterProgress : undefined,
       isTwoColumn: typeof progress.isTwoColumn === 'boolean' ? progress.isTwoColumn : undefined,
+      locatorVersion: progress.locatorVersion === 1 ? 1 : undefined,
+      locator: progress.locatorVersion === 1 ? progress.locator : undefined,
     };
   },
 
@@ -210,6 +216,8 @@ export const readerApi = {
         viewMode: data.viewMode ?? existing.viewMode,
         chapterProgress: data.chapterProgress ?? existing.chapterProgress,
         isTwoColumn: data.isTwoColumn ?? existing.isTwoColumn,
+        locatorVersion: data.locatorVersion ?? existing.locatorVersion,
+        locator: data.locator ?? existing.locator,
         updatedAt: now,
       });
     } else {
@@ -221,6 +229,8 @@ export const readerApi = {
         viewMode: data.viewMode ?? 'original',
         chapterProgress: data.chapterProgress,
         isTwoColumn: data.isTwoColumn,
+        locatorVersion: data.locatorVersion,
+        locator: data.locator,
         updatedAt: now,
       });
     }

@@ -98,7 +98,7 @@ function createHookProps(overrides?: {
     pagedViewportRef: overrides?.pagedViewportRef ?? { current: null },
     pagedContentRef: overrides?.pagedContentRef ?? { current: null },
     pageIndex: overrides?.pageIndex ?? 0,
-    pageTargetRef: { current: 'start' as const },
+    pageTargetRef: { current: null as 'start' | 'end' | null },
     pendingRestoreStateRef: { current: null },
     clearPendingRestoreState: vi.fn(),
     stopRestoreMask: vi.fn(),

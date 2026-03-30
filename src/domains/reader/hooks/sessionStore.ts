@@ -1,3 +1,5 @@
+import type { ReaderLocator } from '../utils/readerLayout';
+
 import { useSyncExternalStore } from 'react';
 import { APP_SETTING_KEYS, CACHE_KEYS, storage } from '@infra/storage';
 import { readerApi, type ReadingProgress } from '../api/readerApi';
@@ -23,6 +25,8 @@ export interface StoredReaderState {
   chapterProgress?: number;
   scrollPosition?: number;
   lastContentMode?: 'scroll' | 'paged';
+  locatorVersion?: 1;
+  locator?: ReaderLocator;
 }
 
 export interface ReaderSessionState {
@@ -31,6 +35,8 @@ export interface ReaderSessionState {
   chapterIndex: number;
   chapterProgress?: number;
   scrollPosition?: number;
+  locatorVersion?: 1;
+  locator?: ReaderLocator;
   readerTheme: string;
   pageTurnMode: ReaderPageTurnMode;
   appTheme: AppTheme;
@@ -158,12 +164,59 @@ function clampChapterProgress(value: number | undefined): number | undefined {
   return value;
 }
 
+function sanitizeLocator(raw: unknown): ReaderLocator | undefined {
+  if (!raw || typeof raw !== 'object') {
+    return undefined;
+  }
+
+  const parsed = raw as Record<string, unknown>;
+  if (
+    typeof parsed.chapterIndex !== 'number'
+    || typeof parsed.blockIndex !== 'number'
+    || (parsed.kind !== 'heading' && parsed.kind !== 'text' && parsed.kind !== 'image')
+  ) {
+    return undefined;
+  }
+
+  const startCursor = parsed.startCursor && typeof parsed.startCursor === 'object'
+    ? parsed.startCursor as Record<string, unknown>
+    : null;
+  const endCursor = parsed.endCursor && typeof parsed.endCursor === 'object'
+    ? parsed.endCursor as Record<string, unknown>
+    : null;
+
+  return {
+    blockIndex: parsed.blockIndex,
+    chapterIndex: parsed.chapterIndex,
+    edge: parsed.edge === 'start' || parsed.edge === 'end' ? parsed.edge : undefined,
+    endCursor: endCursor
+      && typeof endCursor.segmentIndex === 'number'
+      && typeof endCursor.graphemeIndex === 'number'
+      ? {
+          graphemeIndex: endCursor.graphemeIndex,
+          segmentIndex: endCursor.segmentIndex,
+        }
+      : undefined,
+    kind: parsed.kind,
+    lineIndex: typeof parsed.lineIndex === 'number' ? parsed.lineIndex : undefined,
+    startCursor: startCursor
+      && typeof startCursor.segmentIndex === 'number'
+      && typeof startCursor.graphemeIndex === 'number'
+      ? {
+          graphemeIndex: startCursor.graphemeIndex,
+          segmentIndex: startCursor.segmentIndex,
+        }
+      : undefined,
+  };
+}
+
 function shouldMaskRestore(state: StoredReaderState | null | undefined): boolean {
   if (!state) return false;
   const mode = resolveModeFromStoredState(state);
   return (state.chapterIndex ?? 0) > 0
     || mode === 'summary'
     || mode === 'paged'
+    || state.locator !== undefined
     || (typeof state.chapterProgress === 'number' && state.chapterProgress > 0)
     || (typeof state.scrollPosition === 'number' && state.scrollPosition > 0);
 }
@@ -195,6 +248,8 @@ function toStoredReaderState(state: ReaderSessionInternalState): StoredReaderSta
       ? state.scrollPosition
       : undefined,
     lastContentMode: state.lastContentMode,
+    locatorVersion: state.locator ? 1 : undefined,
+    locator: state.locator,
   };
 }
 
@@ -218,6 +273,8 @@ function sanitizeStoredReaderState(raw: unknown): StoredReaderState | null {
     lastContentMode: parsed.lastContentMode === 'paged' || parsed.lastContentMode === 'scroll'
       ? parsed.lastContentMode
       : undefined,
+    locatorVersion: parsed.locatorVersion === 1 ? 1 : undefined,
+    locator: sanitizeLocator(parsed.locator),
   };
 }
 
@@ -234,6 +291,8 @@ function buildStoredReaderState(state: StoredReaderState | null | undefined): St
       ? state.scrollPosition
       : undefined,
     lastContentMode: state?.lastContentMode ?? (mode === 'paged' ? 'paged' : 'scroll'),
+    locatorVersion: state?.locator ? 1 : undefined,
+    locator: state?.locator,
   };
 }
 
@@ -248,6 +307,11 @@ function mergeStoredReaderState(
     ?? (overrideState?.viewMode || overrideState?.isTwoColumn !== undefined
       ? resolveModeFromStoredState(overrideState)
       : baseState?.mode ?? resolveModeFromStoredState(baseState));
+  const shouldResetLocator = overrideState?.locator === undefined && (
+    (typeof overrideState?.chapterIndex === 'number' && overrideState.chapterIndex !== baseState?.chapterIndex)
+    || overrideState?.chapterProgress !== undefined
+    || overrideState?.scrollPosition !== undefined
+  );
   return buildStoredReaderState({
     chapterIndex: overrideState?.chapterIndex ?? baseState?.chapterIndex,
     mode,
@@ -258,6 +322,8 @@ function mergeStoredReaderState(
       : overrideState?.chapterProgress ?? baseState?.chapterProgress,
     scrollPosition: overrideState?.scrollPosition ?? baseState?.scrollPosition,
     lastContentMode: overrideState?.lastContentMode ?? baseState?.lastContentMode,
+    locatorVersion: shouldResetLocator ? undefined : overrideState?.locatorVersion ?? baseState?.locatorVersion,
+    locator: shouldResetLocator ? undefined : overrideState?.locator ?? baseState?.locator,
   });
 }
 
@@ -283,6 +349,8 @@ function getRemoteProgressSnapshot(progress: ReadingProgress): string {
     viewMode: progress.viewMode,
     chapterProgress: clampChapterProgress(progress.chapterProgress) ?? 0,
     isTwoColumn: progress.isTwoColumn ?? false,
+    locatorVersion: progress.locatorVersion === 1 ? 1 : undefined,
+    locator: progress.locator ?? null,
   });
 }
 
@@ -464,6 +532,8 @@ function toRemoteProgress(state: ReaderSessionInternalState): ReadingProgress {
     viewMode: state.viewMode,
     chapterProgress: clampChapterProgress(state.chapterProgress) ?? 0,
     isTwoColumn: state.isTwoColumn,
+    locatorVersion: state.locator ? 1 : undefined,
+    locator: state.locator,
   };
 }
 
@@ -476,6 +546,8 @@ function createInitialState(): ReaderSessionInternalState {
     chapterIndex: 0,
     chapterProgress: undefined,
     scrollPosition: undefined,
+    locatorVersion: undefined,
+    locator: undefined,
     ...preferences,
     restoreStatus: 'hydrating',
     lastContentMode: 'scroll',
@@ -548,6 +620,8 @@ function updateStoredReaderState(
     scrollPosition: typeof merged.scrollPosition === 'number' && Number.isFinite(merged.scrollPosition)
       ? merged.scrollPosition
       : undefined,
+    locatorVersion: merged.locator ? 1 : undefined,
+    locator: merged.locator,
     lastContentMode: mode === 'summary' ? nextLastContentMode : mode === 'paged' ? 'paged' : 'scroll',
     hasUserInteracted: options.markUserInteracted ?? state.hasUserInteracted,
   });
@@ -575,6 +649,8 @@ export async function hydrateSession(novelId: number): Promise<StoredReaderState
     chapterIndex: 0,
     chapterProgress: undefined,
     scrollPosition: undefined,
+    locatorVersion: undefined,
+    locator: undefined,
     mode: 'scroll',
     viewMode: 'original',
     isTwoColumn: false,
@@ -602,6 +678,8 @@ export async function hydrateSession(novelId: number): Promise<StoredReaderState
         viewMode: progress.viewMode ?? 'original',
         chapterProgress: progress.chapterProgress,
         isTwoColumn: progress.isTwoColumn,
+        locatorVersion: progress.locatorVersion,
+        locator: progress.locator,
       });
     }
   } catch {
@@ -636,6 +714,8 @@ export async function hydrateSession(novelId: number): Promise<StoredReaderState
     scrollPosition: typeof mergedState.scrollPosition === 'number' && Number.isFinite(mergedState.scrollPosition)
       ? mergedState.scrollPosition
       : undefined,
+    locatorVersion: mergedState.locator ? 1 : undefined,
+    locator: mergedState.locator,
     pageTurnMode: resolvedPageTurnMode,
     lastContentMode: nextLastContentMode,
     pendingRestoreState: shouldMaskRestore(mergedState) ? mergedState : null,
@@ -799,12 +879,11 @@ export async function flushPersistence(): Promise<void> {
 }
 
 export function useReaderSessionSelector<T>(selector: (state: ReaderSessionSnapshot) => T): T {
-  const snapshot = useSyncExternalStore(
+  return useSyncExternalStore(
     subscribe,
-    getReaderSessionSnapshot,
-    getReaderSessionSnapshot,
+    () => selector(getReaderSessionSnapshot()),
+    () => selector(getReaderSessionSnapshot()),
   );
-  return selector(snapshot);
 }
 
 export function useReaderSessionActions(): ReaderSessionActions {

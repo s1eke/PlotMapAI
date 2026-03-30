@@ -2,7 +2,14 @@ import { readerApi } from '../api/readerApi';
 
 const RELEASE_DELAY_MS = 10_000;
 
+export interface ReaderImageDimensions {
+  width: number;
+  height: number;
+  aspectRatio: number;
+}
+
 interface ReaderImageResourceEntry {
+  dimensions?: ReaderImageDimensions | null;
   imageKey: string;
   isDecoded: boolean;
   isDisposed: boolean;
@@ -31,6 +38,7 @@ function getOrCreateEntry(novelId: number, imageKey: string): ReaderImageResourc
     imageKey,
     isDecoded: false,
     isDisposed: false,
+    dimensions: undefined,
     novelId,
     url: undefined,
     refCount: 0,
@@ -120,22 +128,39 @@ async function ensureLoaded(entry: ReaderImageResourceEntry): Promise<string | n
   return entry.loadPromise;
 }
 
-async function decodeImage(url: string): Promise<void> {
+async function decodeImage(url: string): Promise<ReaderImageDimensions | null> {
   const image = new Image();
 
-  try {
-    image.src = url;
-    if (typeof image.decode === 'function') {
+  if (typeof image.decode === 'function') {
+    try {
+      image.src = url;
       await image.decode();
-      return;
+      if (image.naturalWidth > 0 && image.naturalHeight > 0) {
+        return {
+          width: image.naturalWidth,
+          height: image.naturalHeight,
+          aspectRatio: image.naturalWidth / image.naturalHeight,
+        };
+      }
+      return null;
+    } catch {
+      return null;
     }
-  } catch {
-    return;
   }
 
-  await new Promise<void>((resolve) => {
-    image.onload = () => resolve();
-    image.onerror = () => resolve();
+  return new Promise<ReaderImageDimensions | null>((resolve) => {
+    image.onload = () => {
+      if (image.naturalWidth > 0 && image.naturalHeight > 0) {
+        resolve({
+          width: image.naturalWidth,
+          height: image.naturalHeight,
+          aspectRatio: image.naturalWidth / image.naturalHeight,
+        });
+        return;
+      }
+      resolve(null);
+    };
+    image.onerror = () => resolve(null);
     image.src = url;
   });
 }
@@ -172,6 +197,10 @@ export function peekReaderImageResource(novelId: number, imageKey: string): stri
   return imageResourceCache.get(getCacheKey(novelId, imageKey))?.url;
 }
 
+export function peekReaderImageDimensions(novelId: number, imageKey: string): ReaderImageDimensions | null | undefined {
+  return imageResourceCache.get(getCacheKey(novelId, imageKey))?.dimensions;
+}
+
 export function areReaderImageResourcesReady(novelId: number, imageKeys: Iterable<string>): boolean {
   const uniqueImageKeys = new Set(imageKeys);
 
@@ -190,34 +219,41 @@ export function preloadReaderImageResources(novelId: number, imageKeys: Iterable
 
   return Promise.all(uniqueImageKeys.map(async (imageKey) => {
     const entry = getOrCreateEntry(novelId, imageKey);
-    const url = await ensureLoaded(entry);
-    if (!url) {
-      return;
-    }
+    const cacheKey = getCacheKey(novelId, imageKey);
+    entry.refCount += 1;
 
-    if (entry.isDecoded) {
-      return;
-    }
-
-    if (!entry.preloadPromise) {
-      if (entry.isDisposed) {
+    try {
+      const url = await ensureLoaded(entry);
+      if (!url || entry.isDecoded) {
         return;
       }
 
-      entry.preloadPromise = decodeImage(url)
-        .then(() => {
-          entry.isDecoded = true;
-        })
-        .catch(() => undefined)
-        .finally(() => {
-          entry.preloadPromise = null;
-          if (!entry.isDisposed && entry.refCount === 0) {
-            scheduleRelease(getCacheKey(novelId, imageKey), entry);
-          }
-        });
-    }
+      if (!entry.preloadPromise) {
+        if (entry.isDisposed) {
+          return;
+        }
 
-    await entry.preloadPromise;
+        entry.preloadPromise = decodeImage(url)
+          .then((dimensions) => {
+            entry.dimensions = dimensions;
+            entry.isDecoded = true;
+          })
+          .catch(() => undefined)
+          .finally(() => {
+            entry.preloadPromise = null;
+            if (!entry.isDisposed && entry.refCount === 0) {
+              scheduleRelease(cacheKey, entry);
+            }
+          });
+      }
+
+      await entry.preloadPromise;
+    } finally {
+      entry.refCount = Math.max(0, entry.refCount - 1);
+      if (!entry.isDisposed && entry.refCount === 0 && !entry.loadPromise && !entry.preloadPromise) {
+        scheduleRelease(cacheKey, entry);
+      }
+    }
   })).then(() => undefined);
 }
 

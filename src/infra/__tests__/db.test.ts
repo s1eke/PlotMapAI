@@ -23,6 +23,7 @@ describe('db', () => {
       'coverImages',
       'novels',
       'purificationRules',
+      'readerRenderCache',
       'readingProgress',
       'tocRules',
     ]);
