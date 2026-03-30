@@ -12,6 +12,7 @@ import type { SettingsTabId } from '../utils/settingsPage';
 export default function SettingsPage() {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<SettingsTabId>('toc');
+  const appVersion = typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : '';
 
   const tocManager = useTocSettingsManager();
   const purificationManager = usePurificationSettingsManager();
@@ -43,6 +44,12 @@ export default function SettingsPage() {
         {activeTab === 'purification' && <PurificationSettingsPanel manager={purificationManager} />}
         {activeTab === 'ai' && <AiSettingsPanel manager={aiManager} />}
       </div>
+
+      {appVersion ? (
+        <p className="mt-6 text-center text-xs text-text-secondary sm:text-right">
+          {t('settings.versionLabel', { version: appVersion })}
+        </p>
+      ) : null}
     </div>
   );
 }

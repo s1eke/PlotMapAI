@@ -10,7 +10,8 @@ import { purificationRulesApi } from '../../api/purificationRules';
 import { tocRulesApi } from '../../api/tocRules';
 
 const i18nMock = vi.hoisted(() => ({
-  t: (key: string) => key,
+  t: (key: string, options?: { version?: string }) =>
+    options?.version ? `${key} ${options.version}` : key,
 }));
 
 vi.mock('react-i18next', () => ({
@@ -102,6 +103,7 @@ function renderPage() {
 describe('SettingsPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubGlobal('__APP_VERSION__', '1.1.0-test');
     vi.mocked(tocRulesApi.getTocRules).mockResolvedValue(tocRules);
     vi.mocked(tocRulesApi.createTocRule).mockResolvedValue(tocRules[0]);
     vi.mocked(tocRulesApi.updateTocRule).mockResolvedValue({ ...tocRules[0], isEnabled: false });
@@ -125,6 +127,12 @@ describe('SettingsPage', () => {
       createObjectURL: vi.fn(() => 'blob:mock'),
       revokeObjectURL: vi.fn(),
     });
+  });
+
+  it('shows the current app version at the bottom of the page', async () => {
+    renderPage();
+
+    expect(await screen.findByText('settings.versionLabel 1.1.0-test')).toBeInTheDocument();
   });
 
   it('switches between TOC, purification, and AI tabs', async () => {

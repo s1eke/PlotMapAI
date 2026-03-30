@@ -250,6 +250,7 @@
   "settings": {
     "title": "Settings",
     "subtitle": "Manage chapter parsing, text purification, and AI analysis settings from one place.",
+    "versionLabel": "Version {{version}}",
     "tocRules": "Book Parsing Rules",
     "purificationRules": "Purification Rules",
     "language": "Language",

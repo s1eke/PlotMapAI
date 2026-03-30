@@ -250,6 +250,7 @@
   "settings": {
     "title": "设置",
     "subtitle": "集中管理章节识别、文本净化和 AI 分析配置，让解析与阅读体验保持一致。",
+    "versionLabel": "版本 {{version}}",
     "tocRules": "目录规则",
     "purificationRules": "净化规则",
     "language": "语言设置",
