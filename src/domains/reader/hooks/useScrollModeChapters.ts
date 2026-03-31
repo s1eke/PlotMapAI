@@ -1,4 +1,4 @@
-import { useRef, useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Chapter, ChapterContent } from '../api/readerApi';
 
 export interface ScrollModeAnchor {
@@ -21,10 +21,35 @@ export function useScrollModeChapters(
   scrollChapterElementsRef: React.MutableRefObject<Map<number, HTMLDivElement>>;
   handleScroll: () => void;
   getCurrentAnchor: () => ScrollModeAnchor | null;
+  scrollViewportTop: number;
+  syncViewportState: (options?: { force?: boolean }) => void;
 } {
   const scrollChapterElementsRef = useRef<Map<number, HTMLDivElement>>(new Map());
   const scrollThrottleRef = useRef(0);
   const pendingScrollFetchesRef = useRef<Set<number>>(new Set());
+  const viewportSyncFrameRef = useRef<number | null>(null);
+  const pendingViewportTopRef = useRef(0);
+  const [scrollViewportTop, setScrollViewportTop] = useState(0);
+
+  const syncViewportState = useCallback((options?: { force?: boolean }) => {
+    const nextScrollTop = contentRef.current?.scrollTop ?? 0;
+    if (!options?.force && pendingViewportTopRef.current === nextScrollTop && viewportSyncFrameRef.current !== null) {
+      return;
+    }
+
+    pendingViewportTopRef.current = nextScrollTop;
+    if (viewportSyncFrameRef.current !== null) {
+      return;
+    }
+
+    viewportSyncFrameRef.current = requestAnimationFrame(() => {
+      viewportSyncFrameRef.current = null;
+      const committedScrollTop = pendingViewportTopRef.current;
+      setScrollViewportTop((previousScrollTop) => (
+        previousScrollTop === committedScrollTop ? previousScrollTop : committedScrollTop
+      ));
+    });
+  }, [contentRef]);
 
   const appendNextChapter = useCallback((nextIdx: number) => {
     if (
@@ -71,13 +96,14 @@ export function useScrollModeChapters(
           if (container) {
             container.scrollTop += container.scrollHeight - prevHeight;
           }
+          syncViewportState({ force: true });
           preloadAdjacent(prevIdx, false);
         });
       })
       .finally(() => {
         pendingScrollFetchesRef.current.delete(prevIdx);
       });
-  }, [contentRef, fetchChapterContent, preloadAdjacent, scrollModeChapters, setScrollModeChapters]);
+  }, [contentRef, fetchChapterContent, preloadAdjacent, scrollModeChapters, setScrollModeChapters, syncViewportState]);
 
   const getCurrentAnchor = useCallback((): ScrollModeAnchor | null => {
     if (isPagedMode || !contentRef.current || viewMode !== 'original' || scrollModeChapters.length === 0) {
@@ -121,6 +147,8 @@ export function useScrollModeChapters(
   const handleScroll = useCallback(() => {
     if (isPagedMode || !contentRef.current || viewMode !== 'original') return;
 
+    syncViewportState();
+
     const now = Date.now();
     if (now - scrollThrottleRef.current < 150) return;
     scrollThrottleRef.current = now;
@@ -148,7 +176,18 @@ export function useScrollModeChapters(
       const prevIdx = firstIdx - 1;
       prependPrevChapter(prevIdx);
     }
-  }, [appendNextChapter, chapters, contentRef, getCurrentAnchor, isPagedMode, onReadingAnchorChange, prependPrevChapter, scrollModeChapters, viewMode]);
+  }, [
+    appendNextChapter,
+    chapters,
+    contentRef,
+    getCurrentAnchor,
+    isPagedMode,
+    onReadingAnchorChange,
+    prependPrevChapter,
+    scrollModeChapters,
+    syncViewportState,
+    viewMode,
+  ]);
 
   useEffect(() => {
     if (isPagedMode || viewMode !== 'original' || scrollModeChapters.length === 0) return;
@@ -174,9 +213,27 @@ export function useScrollModeChapters(
     };
   }, [appendNextChapter, contentRef, contentVersion, isPagedMode, scrollModeChapters, viewMode]);
 
+  useEffect(() => {
+    if (isPagedMode || viewMode !== 'original') {
+      return;
+    }
+
+    syncViewportState({ force: true });
+  }, [contentVersion, isPagedMode, scrollModeChapters, syncViewportState, viewMode]);
+
+  useEffect(() => {
+    return () => {
+      if (viewportSyncFrameRef.current !== null) {
+        cancelAnimationFrame(viewportSyncFrameRef.current);
+      }
+    };
+  }, []);
+
   return {
     scrollChapterElementsRef,
     handleScroll,
     getCurrentAnchor,
+    scrollViewportTop,
+    syncViewportState,
   };
 }

@@ -170,6 +170,11 @@ export interface PageSlice {
   startLocator: ReaderLocator | null;
 }
 
+export interface VisibleBlockRange {
+  endIndex: number;
+  startIndex: number;
+}
+
 export interface PaginatedChapterLayout {
   chapterIndex: number;
   columnCount: number;
@@ -833,30 +838,46 @@ export function findVisibleBlockRange(
   offsetTop: number,
   viewportHeight: number,
   overscanPx: number,
-): { startIndex: number; endIndex: number } {
-  const viewportStart = Math.max(0, offsetTop - overscanPx);
+): VisibleBlockRange {
+  if (layout.metrics.length === 0) {
+    return {
+      endIndex: -1,
+      startIndex: 0,
+    };
+  }
+
+  const viewportStart = offsetTop - overscanPx;
   const viewportEnd = offsetTop + viewportHeight + overscanPx;
-  let startIndex = 0;
-  let endIndex = Math.max(0, layout.metrics.length - 1);
-
-  for (let index = 0; index < layout.metrics.length; index += 1) {
-    const metric = layout.metrics[index];
-    if (metric.top + metric.height >= viewportStart) {
-      startIndex = index;
-      break;
-    }
+  if (viewportEnd <= 0 || viewportStart >= layout.totalHeight) {
+    return {
+      endIndex: -1,
+      startIndex: 0,
+    };
   }
 
-  for (let index = startIndex; index < layout.metrics.length; index += 1) {
-    const metric = layout.metrics[index];
-    if (metric.top <= viewportEnd) {
-      endIndex = index;
-      continue;
-    }
-    break;
+  const clampedViewportStart = Math.max(0, viewportStart);
+  const clampedViewportEnd = Math.min(layout.totalHeight, viewportEnd);
+  if (clampedViewportEnd <= clampedViewportStart) {
+    return {
+      endIndex: -1,
+      startIndex: 0,
+    };
   }
 
-  return { endIndex, startIndex };
+  const startIndex = findFirstVisibleMetricIndex(layout.metrics, clampedViewportStart);
+  const endIndex = findLastVisibleMetricIndex(layout.metrics, clampedViewportEnd);
+
+  if (startIndex === -1 || endIndex === -1 || endIndex < startIndex) {
+    return {
+      endIndex: -1,
+      startIndex: 0,
+    };
+  }
+
+  return {
+    endIndex,
+    startIndex,
+  };
 }
 
 export function findLocatorForLayoutOffset(
@@ -994,6 +1015,44 @@ function finalizePageLocators(page: PageSlice): void {
 
   page.startLocator = startLocator;
   page.endLocator = endLocator;
+}
+
+function findFirstVisibleMetricIndex(metrics: VirtualBlockMetrics[], viewportStart: number): number {
+  let low = 0;
+  let high = metrics.length - 1;
+  let result = -1;
+
+  while (low <= high) {
+    const mid = Math.floor((low + high) / 2);
+    const metric = metrics[mid];
+    if (metric.top + metric.height > viewportStart) {
+      result = mid;
+      high = mid - 1;
+      continue;
+    }
+    low = mid + 1;
+  }
+
+  return result;
+}
+
+function findLastVisibleMetricIndex(metrics: VirtualBlockMetrics[], viewportEnd: number): number {
+  let low = 0;
+  let high = metrics.length - 1;
+  let result = -1;
+
+  while (low <= high) {
+    const mid = Math.floor((low + high) / 2);
+    const metric = metrics[mid];
+    if (metric.top < viewportEnd) {
+      result = mid;
+      low = mid + 1;
+      continue;
+    }
+    high = mid - 1;
+  }
+
+  return result;
 }
 
 function createMetricStartLocator(metric: VirtualBlockMetrics): ReaderLocator | null {

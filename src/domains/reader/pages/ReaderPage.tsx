@@ -34,6 +34,7 @@ import {
 } from '../hooks/sessionStore';
 import { clearReaderImageResourcesForNovel } from '../utils/readerImageResourceCache';
 import {
+  findVisibleBlockRange,
   findLocatorForLayoutOffset,
   findPageIndexForLocator,
   getOffsetForLocator,
@@ -65,6 +66,7 @@ export default function ReaderPage() {
   const [pendingPagedPageTarget, setPendingPagedPageTarget] = useState<PageTarget | null>(null);
   const [scrollModeChapters, setScrollModeChapters] = useState<number[]>([]);
   const [scrollReaderChapters, setScrollReaderChapters] = useState<Array<{ index: number; chapter: ChapterContent }>>([]);
+  const [scrollChapterBodyOffsets, setScrollChapterBodyOffsets] = useState<Map<number, number>>(new Map());
   const [chapterCacheSnapshotState, setChapterCacheSnapshotState] = useState<{
     novelId: number;
     snapshot: Map<number, ChapterContent>;
@@ -230,15 +232,22 @@ export default function ReaderPage() {
     scrollContentVersion,
     handleReadingAnchorChange,
   );
+  const {
+    getCurrentAnchor: getCurrentScrollAnchor,
+    handleScroll: handleScrollMode,
+    scrollChapterElementsRef,
+    scrollViewportTop,
+    syncViewportState,
+  } = scrollMode;
 
   useEffect(() => {
-    getCurrentAnchorRef.current = scrollMode.getCurrentAnchor;
-    handleScrollModeScrollRef.current = scrollMode.handleScroll;
+    getCurrentAnchorRef.current = getCurrentScrollAnchor;
+    handleScrollModeScrollRef.current = handleScrollMode;
     return () => {
       getCurrentAnchorRef.current = () => null;
       handleScrollModeScrollRef.current = () => {};
     };
-  }, [scrollMode]);
+  }, [getCurrentScrollAnchor, handleScrollMode]);
 
   useEffect(() => {
     setScrollReaderChapters(
@@ -425,6 +434,78 @@ export default function ReaderPage() {
     [renderCache.scrollLayouts, scrollReaderChapters],
   );
 
+  useEffect(() => {
+    const frameId = requestAnimationFrame(() => {
+      if (isPagedMode || viewMode !== 'original') {
+        setScrollChapterBodyOffsets((previousOffsets) => (previousOffsets.size === 0 ? previousOffsets : new Map()));
+        return;
+      }
+
+      const nextOffsets = new Map<number, number>();
+      for (const renderableChapter of renderableScrollLayouts) {
+        const chapterBodyElement = scrollChapterBodyElementsBridgeRef.current.get(renderableChapter.index);
+        if (chapterBodyElement) {
+          nextOffsets.set(renderableChapter.index, chapterBodyElement.offsetTop);
+        }
+      }
+
+      setScrollChapterBodyOffsets((previousOffsets) => {
+        if (previousOffsets.size !== nextOffsets.size) {
+          return nextOffsets;
+        }
+
+        for (const [chapterIndex, offsetTop] of nextOffsets) {
+          if (previousOffsets.get(chapterIndex) !== offsetTop) {
+            return nextOffsets;
+          }
+        }
+
+        return previousOffsets;
+      });
+    });
+
+    return () => {
+      cancelAnimationFrame(frameId);
+    };
+  }, [isPagedMode, renderableScrollLayouts, viewMode]);
+
+  const visibleScrollBlockRangeByChapter = useMemo(() => {
+    const ranges = new Map<number, ReturnType<typeof findVisibleBlockRange>>();
+    if (isPagedMode || viewMode !== 'original') {
+      return ranges;
+    }
+
+    const viewportHeight = renderCache.viewportMetrics.scrollViewportHeight;
+    if (viewportHeight <= 0) {
+      return ranges;
+    }
+
+    const overscanPx = Math.max(240, Math.round(viewportHeight * 0.75));
+    for (const renderableChapter of renderableScrollLayouts) {
+      const chapterBodyOffsetTop = scrollChapterBodyOffsets.get(renderableChapter.index);
+      if (chapterBodyOffsetTop === undefined) {
+        continue;
+      }
+
+      const blockRange = findVisibleBlockRange(
+        renderableChapter.layout,
+        scrollViewportTop - chapterBodyOffsetTop,
+        viewportHeight,
+        overscanPx,
+      );
+      ranges.set(renderableChapter.index, blockRange);
+    }
+
+    return ranges;
+  }, [
+    isPagedMode,
+    renderCache.viewportMetrics.scrollViewportHeight,
+    renderableScrollLayouts,
+    scrollChapterBodyOffsets,
+    scrollViewportTop,
+    viewMode,
+  ]);
+
   const isChapterNavigationReady = !isLoading
     && currentChapter?.index === chapterIndex
     && (!isPagedMode || currentPagedLayout?.chapterIndex === chapterIndex);
@@ -497,6 +578,11 @@ export default function ReaderPage() {
 
     handleContentClick(event);
   }, [closeSidebar, handleContentClick, setIsChromeVisible, sidebar.isSidebarOpen]);
+  const handleRestoreContentScroll = restoreFlow.handleContentScroll;
+  const handleViewportScroll = useCallback(() => {
+    syncViewportState();
+    handleRestoreContentScroll();
+  }, [handleRestoreContentScroll, syncViewportState]);
   const toolbarHasPrev = navigation.toolbarHasPrev;
   const toolbarHasNext = navigation.toolbarHasNext;
 
@@ -507,14 +593,14 @@ export default function ReaderPage() {
 
   const handleScrollChapterElement = useCallback((index: number, element: HTMLDivElement | null) => {
     if (element) {
-      scrollMode.scrollChapterElementsRef.current.set(index, element);
+      scrollChapterElementsRef.current.set(index, element);
       scrollChapterElementsBridgeRef.current.set(index, element);
       return;
     }
 
-    scrollMode.scrollChapterElementsRef.current.delete(index);
+    scrollChapterElementsRef.current.delete(index);
     scrollChapterElementsBridgeRef.current.delete(index);
-  }, [scrollMode.scrollChapterElementsRef]);
+  }, [scrollChapterElementsRef]);
 
   const handleScrollChapterBodyElement = useCallback((index: number, element: HTMLDivElement | null) => {
     if (element) {
@@ -592,7 +678,7 @@ export default function ReaderPage() {
           isRestoringPosition={restoreFlow.isRestoringPosition}
           loadingLabel={restoreStatus === 'restoring' ? t('reader.restoringPosition') : loadingMessage}
           onContentClick={handleViewportClick}
-          onContentScroll={restoreFlow.handleContentScroll}
+          onContentScroll={handleViewportScroll}
           emptyHref={appPaths.novel(novelId)}
           emptyLabel={t('reader.noChapters')}
           goBackLabel={t('reader.goBack')}
@@ -627,6 +713,7 @@ export default function ReaderPage() {
             headerBgClassName: preferences.headerBg,
             onChapterElement: handleScrollChapterElement,
             onChapterBodyElement: handleScrollChapterBodyElement,
+            visibleBlockRangeByChapter: visibleScrollBlockRangeByChapter,
           } : undefined}
           summaryContentProps={renderableChapter && viewMode === 'summary' ? {
             chapter: renderableChapter,

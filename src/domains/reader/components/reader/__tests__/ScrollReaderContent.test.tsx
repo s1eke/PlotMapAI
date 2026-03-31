@@ -70,4 +70,29 @@ describe('ScrollReaderContent', () => {
 
     expect(screen.getByTestId('scroll-reader-content-body')).not.toHaveClass('font-serif');
   });
+
+  it('renders only the windowed block range when one is provided', () => {
+    const { chapter, layout } = createScrollChapterLayout('First paragraph\nSecond paragraph');
+
+    render(
+      <ScrollReaderContent
+        chapters={[{
+          index: 0,
+          chapter,
+          layout,
+        }]}
+        novelId={1}
+        readerTheme="auto"
+        textClassName=""
+        headerBgClassName=""
+        onChapterElement={() => {}}
+        visibleBlockRangeByChapter={new Map([
+          [0, { startIndex: 1, endIndex: 1 }],
+        ])}
+      />,
+    );
+
+    expect(screen.getByText('First paragraph')).toBeInTheDocument();
+    expect(screen.queryByText('Second paragraph')).not.toBeInTheDocument();
+  });
 });

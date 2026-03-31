@@ -103,6 +103,93 @@ describe('useScrollModeChapters', () => {
     expect(result.current.scrollChapterElementsRef).toBeDefined();
     expect(typeof result.current.handleScroll).toBe('function');
     expect(typeof result.current.getCurrentAnchor).toBe('function');
+    expect(typeof result.current.syncViewportState).toBe('function');
+    expect(result.current.scrollViewportTop).toBe(0);
+  });
+
+  it('tracks the latest scrollTop for block windowing', () => {
+    const frameCallbacks: FrameRequestCallback[] = [];
+    const requestAnimationFrameSpy = vi
+      .spyOn(window, 'requestAnimationFrame')
+      .mockImplementation((callback: FrameRequestCallback) => {
+        frameCallbacks.push(callback);
+        return frameCallbacks.length;
+      });
+    const cancelAnimationFrameSpy = vi
+      .spyOn(window, 'cancelAnimationFrame')
+      .mockImplementation(() => undefined);
+
+    try {
+      const { result, contentRef } = setupHook();
+
+      act(() => {
+        const initialFrame = frameCallbacks.shift();
+        initialFrame?.(0);
+      });
+
+      contentRef.current.scrollTop = 180;
+
+      act(() => {
+        result.current.syncViewportState();
+      });
+
+      expect(result.current.scrollViewportTop).toBe(0);
+
+      act(() => {
+        const viewportFrame = frameCallbacks.shift();
+        viewportFrame?.(0);
+      });
+
+      expect(result.current.scrollViewportTop).toBe(180);
+    } finally {
+      requestAnimationFrameSpy.mockRestore();
+      cancelAnimationFrameSpy.mockRestore();
+    }
+  });
+
+  it('batches repeated viewport sync requests into one animation frame', () => {
+    const frameCallbacks: FrameRequestCallback[] = [];
+    const requestAnimationFrameSpy = vi
+      .spyOn(window, 'requestAnimationFrame')
+      .mockImplementation((callback: FrameRequestCallback) => {
+        frameCallbacks.push(callback);
+        return frameCallbacks.length;
+      });
+    const cancelAnimationFrameSpy = vi
+      .spyOn(window, 'cancelAnimationFrame')
+      .mockImplementation(() => undefined);
+
+    try {
+      const { result, contentRef } = setupHook();
+
+      act(() => {
+        const initialFrame = frameCallbacks.shift();
+        initialFrame?.(0);
+      });
+      requestAnimationFrameSpy.mockClear();
+
+      act(() => {
+        contentRef.current.scrollTop = 120;
+        result.current.syncViewportState();
+        contentRef.current.scrollTop = 280;
+        result.current.syncViewportState();
+        contentRef.current.scrollTop = 360;
+        result.current.syncViewportState();
+      });
+
+      expect(frameCallbacks).toHaveLength(1);
+      expect(result.current.scrollViewportTop).toBe(0);
+
+      act(() => {
+        const viewportFrame = frameCallbacks.shift();
+        viewportFrame?.(0);
+      });
+
+      expect(result.current.scrollViewportTop).toBe(360);
+    } finally {
+      requestAnimationFrameSpy.mockRestore();
+      cancelAnimationFrameSpy.mockRestore();
+    }
   });
 
   describe('handleScroll guards', () => {

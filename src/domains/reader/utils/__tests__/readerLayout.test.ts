@@ -5,6 +5,7 @@ import {
   composePaginatedChapterLayout,
   createReaderTypographyMetrics,
   createReaderViewportMetrics,
+  findVisibleBlockRange,
   findLocatorForLayoutOffset,
   findPageIndexForLocator,
   getReaderLayoutPretextCacheSizeForTests,
@@ -342,6 +343,40 @@ describe('readerLayout', () => {
     expect(findLocatorForLayoutOffset(measuredLayout, 20)).toMatchObject({
       blockIndex: 0,
       kind: 'text',
+    });
+  });
+
+  it('returns only the block range overlapping the viewport window', () => {
+    const measuredLayout = createMeasuredLayout([
+      createTextMetric({ blockIndex: 0, lineCount: 1, top: 0 }),
+      createTextMetric({ blockIndex: 1, lineCount: 1, top: 16 }),
+      createTextMetric({ blockIndex: 2, lineCount: 1, top: 32 }),
+      createTextMetric({ blockIndex: 3, lineCount: 1, top: 48 }),
+    ]);
+
+    expect(findVisibleBlockRange(measuredLayout, 16, 16, 0)).toEqual({
+      endIndex: 1,
+      startIndex: 1,
+    });
+    expect(findVisibleBlockRange(measuredLayout, 16, 16, 16)).toEqual({
+      endIndex: 2,
+      startIndex: 0,
+    });
+  });
+
+  it('returns an empty range when the viewport is fully outside the chapter body', () => {
+    const measuredLayout = createMeasuredLayout([
+      createTextMetric({ blockIndex: 0, lineCount: 1, top: 0 }),
+      createTextMetric({ blockIndex: 1, lineCount: 1, top: 16 }),
+    ]);
+
+    expect(findVisibleBlockRange(measuredLayout, -80, 32, 0)).toEqual({
+      endIndex: -1,
+      startIndex: 0,
+    });
+    expect(findVisibleBlockRange(measuredLayout, 80, 32, 0)).toEqual({
+      endIndex: -1,
+      startIndex: 0,
     });
   });
 });
