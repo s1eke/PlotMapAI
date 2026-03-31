@@ -26,21 +26,21 @@ export function useReaderNavigation(
   isChapterNavigationReady: boolean,
   beforeChapterChange?: () => void,
 ): {
-  goToChapter: (targetIndex: number, pageTarget?: PageTarget) => void;
-  goToNextPage: () => void;
-  goToPrevPage: () => void;
-  goToNextPageSilently: () => void;
-  goToPrevPageSilently: () => void;
-  handleNext: () => void;
-  handlePrev: () => void;
-  toolbarHasPrev: boolean;
-  toolbarHasNext: boolean;
-  pageTurnDirection: NavigationDirection;
-  pageTurnToken: number;
-} {
+    goToChapter: (targetIndex: number, pageTarget?: PageTarget) => void;
+    goToNextPage: () => void;
+    goToPrevPage: () => void;
+    goToNextPageSilently: () => void;
+    goToPrevPageSilently: () => void;
+    handleNext: () => void;
+    handlePrev: () => void;
+    toolbarHasPrev: boolean;
+    toolbarHasNext: boolean;
+    pageTurnDirection: NavigationDirection;
+    pageTurnToken: number;
+  } {
   const replayDirectionalNavigationRef = useRef<
     (direction: NavigationDirection, shouldAnimate: boolean) => void
-  >(() => {});
+      >(() => {});
   const [pageTurnState, setPageTurnState] = useState<{ direction: NavigationDirection; token: number }>({
     direction: 'next',
     token: 0,

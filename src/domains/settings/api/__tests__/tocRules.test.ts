@@ -51,7 +51,7 @@ describe('tocRulesApi', () => {
     const result = await tocRulesApi.deleteTocRule(created.id);
     expect(result.message).toBe('Rule deleted');
     const rules = await tocRulesApi.getTocRules();
-    expect(rules.find(rule => rule.id === created.id)).toBeUndefined();
+    expect(rules.find((rule) => rule.id === created.id)).toBeUndefined();
   });
 
   it('deleteTocRule throws for default rules', async () => {
@@ -85,7 +85,7 @@ describe('tocRulesApi', () => {
 `], 'toc-rules.yaml', { type: 'text/yaml' });
 
     const rules = await tocRulesApi.uploadTocRulesYaml(file);
-    expect(rules.map(rule => rule.rule)).toEqual(['^Chapter', '^Section']);
+    expect(rules.map((rule) => rule.rule)).toEqual(['^Chapter', '^Section']);
   });
 
   it('exportTocRulesYaml returns YAML string', async () => {

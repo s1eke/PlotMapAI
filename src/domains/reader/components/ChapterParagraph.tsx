@@ -61,7 +61,7 @@ export default function ChapterParagraph({
   return (
     <div className={containerClassName} style={{ marginBottom }}>
       {segments.map((seg, i) =>
-        seg.type === 'image' ? (
+        (seg.type === 'image' ? (
           <InlineImage
             key={i}
             novelId={novelId}
@@ -74,8 +74,7 @@ export default function ChapterParagraph({
               {seg.value}
             </p>
           ) : null
-        ),
-      )}
+        )))}
     </div>
   );
 }

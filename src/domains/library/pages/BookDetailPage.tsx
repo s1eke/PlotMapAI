@@ -176,7 +176,7 @@ export default function BookDetailPage() {
             ? t('bookDetail.analysisActionResumed')
             : action === 'restart'
               ? t('bookDetail.analysisActionRestarted')
-              : t('bookDetail.analysisActionStarted')
+              : t('bookDetail.analysisActionStarted'),
       );
     } catch (err) {
       const normalized = toAppError(err, {
@@ -223,66 +223,66 @@ export default function BookDetailPage() {
         </Link>
 
         <div className="flex flex-col md:flex-row gap-8">
-        <div className="w-full md:w-64 shrink-0 flex flex-col gap-6">
-          <div className="aspect-[2/3] w-full max-w-[240px] mx-auto overflow-hidden rounded-xl shadow-xl bg-muted-bg border border-border-color/20">
-            {novel.hasCover && coverUrl ? (
-              <img
-                src={coverUrl}
-                alt={novel.title}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <TxtCover title={novel.title} />
-            )}
-          </div>
+          <div className="w-full md:w-64 shrink-0 flex flex-col gap-6">
+            <div className="aspect-[2/3] w-full max-w-[240px] mx-auto overflow-hidden rounded-xl shadow-xl bg-muted-bg border border-border-color/20">
+              {novel.hasCover && coverUrl ? (
+                <img
+                  src={coverUrl}
+                  alt={novel.title}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <TxtCover title={novel.title} />
+              )}
+            </div>
 
-          <div className="flex flex-col gap-3">
-            <Link
-              to={appPaths.reader(novel.id)}
-              className={`${PRIMARY_DETAIL_ACTION_CLASS} bg-accent hover:bg-accent-hover`}
-            >
-              <BookOpen className="w-5 h-5" />
-              {t('common.actions.startReading')}
-            </Link>
+            <div className="flex flex-col gap-3">
+              <Link
+                to={appPaths.reader(novel.id)}
+                className={`${PRIMARY_DETAIL_ACTION_CLASS} bg-accent hover:bg-accent-hover`}
+              >
+                <BookOpen className="w-5 h-5" />
+                {t('common.actions.startReading')}
+              </Link>
 
-            <Link
-              to={appPaths.characterGraph(novel.id)}
-              className={`${PRIMARY_DETAIL_ACTION_CLASS} bg-brand-700 hover:bg-brand-600`}
-            >
-              <Share2 className="w-5 h-5" />
-              {t('bookDetail.characterGraphEntry')}
-            </Link>
+              <Link
+                to={appPaths.characterGraph(novel.id)}
+                className={`${PRIMARY_DETAIL_ACTION_CLASS} bg-brand-700 hover:bg-brand-600`}
+              >
+                <Share2 className="w-5 h-5" />
+                {t('bookDetail.characterGraphEntry')}
+              </Link>
 
-            {job?.status === 'running' ? (
-              <DetailActionButton
-                icon={Pause}
-                label={t('bookDetail.pauseAnalysis')}
-                onClick={() => runAnalysisAction('pause')}
-                loading={analysisAction === 'pause'}
-                disabled={analysisAction !== null}
-                tone="warning"
-              />
-            ) : job?.status === 'pausing' || job?.canResume ? (
-              <DetailActionButton
-                icon={Play}
-                label={t('bookDetail.resumeAnalysis')}
-                onClick={() => runAnalysisAction('resume')}
-                loading={analysisAction === 'resume'}
-                disabled={job?.status === 'pausing' || analysisAction !== null}
-                tone="brand-soft"
-              />
-            ) : (!job || job.canStart) ? (
-              <DetailActionButton
-                icon={Bot}
-                label={t('bookDetail.startAnalysis')}
-                onClick={() => runAnalysisAction('start')}
-                loading={analysisAction === 'start'}
-                disabled={analysisAction !== null}
-                tone="brand-soft"
-              />
-            ) : null}
+              {job?.status === 'running' ? (
+                <DetailActionButton
+                  icon={Pause}
+                  label={t('bookDetail.pauseAnalysis')}
+                  onClick={() => runAnalysisAction('pause')}
+                  loading={analysisAction === 'pause'}
+                  disabled={analysisAction !== null}
+                  tone="warning"
+                />
+              ) : job?.status === 'pausing' || job?.canResume ? (
+                <DetailActionButton
+                  icon={Play}
+                  label={t('bookDetail.resumeAnalysis')}
+                  onClick={() => runAnalysisAction('resume')}
+                  loading={analysisAction === 'resume'}
+                  disabled={job?.status === 'pausing' || analysisAction !== null}
+                  tone="brand-soft"
+                />
+              ) : (!job || job.canStart) ? (
+                <DetailActionButton
+                  icon={Bot}
+                  label={t('bookDetail.startAnalysis')}
+                  onClick={() => runAnalysisAction('start')}
+                  loading={analysisAction === 'start'}
+                  disabled={analysisAction !== null}
+                  tone="brand-soft"
+                />
+              ) : null}
 
-            {job?.canRestart && (
+              {job?.canRestart && (
               <DetailActionButton
                 icon={RefreshCw}
                 label={t('bookDetail.restartAnalysis')}
@@ -291,110 +291,110 @@ export default function BookDetailPage() {
                 disabled={analysisAction !== null}
                 tone="brand-soft"
               />
-            )}
+              )}
 
-            <button
-              type="button"
-              onClick={() => setIsDeleteModalOpen(true)}
-              className="mt-1 inline-flex w-fit items-center gap-2 self-center rounded-full px-3 py-1.5 text-xs text-text-secondary/80 transition-colors hover:bg-red-500/6 hover:text-red-400"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-              {t('bookDetail.deleteBook')}
-            </button>
+              <button
+                type="button"
+                onClick={() => setIsDeleteModalOpen(true)}
+                className="mt-1 inline-flex w-fit items-center gap-2 self-center rounded-full px-3 py-1.5 text-xs text-text-secondary/80 transition-colors hover:bg-red-500/6 hover:text-red-400"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                {t('bookDetail.deleteBook')}
+              </button>
+            </div>
           </div>
-        </div>
 
-        <div className="flex-1 flex flex-col min-w-0">
-          <div className="mb-6">
-            <h1 className="text-3xl md:text-4xl font-bold text-text-primary tracking-tight mb-2">{novel.title}</h1>
-            {novel.author && (
+          <div className="flex-1 flex flex-col min-w-0">
+            <div className="mb-6">
+              <h1 className="text-3xl md:text-4xl font-bold text-text-primary tracking-tight mb-2">{novel.title}</h1>
+              {novel.author && (
               <p className="text-xl text-text-secondary">
                 {t('bookDetail.byAuthor', { author: novel.author })}
               </p>
-            )}
-          </div>
-
-          <div className="flex flex-wrap items-center gap-4 mb-8">
-            <span className="inline-flex flex-col bg-muted-bg px-4 py-2 rounded-lg border border-border-color/20">
-              <span className="text-xs text-text-secondary uppercase tracking-wider font-semibold mb-1 flex items-center gap-1">
-                <FileText className="w-3 h-3" /> {t('bookDetail.format')}
-              </span>
-              <span className="font-semibold text-text-primary">{novel.fileType.toUpperCase()}</span>
-            </span>
-            <span className="inline-flex flex-col bg-muted-bg px-4 py-2 rounded-lg border border-border-color/20">
-              <span className="text-xs text-text-secondary uppercase tracking-wider font-semibold mb-1 flex items-center gap-1">
-                <Hash className="w-3 h-3" /> {t('bookDetail.chapters')}
-              </span>
-              <span className="font-semibold text-text-primary">{novel.chapterCount || 0}</span>
-            </span>
-            <span className="inline-flex flex-col bg-muted-bg px-4 py-2 rounded-lg border border-border-color/20">
-              <span className="text-xs text-text-secondary uppercase tracking-wider font-semibold mb-1 flex items-center gap-1">
-                <FileText className="w-3 h-3" /> {t('bookDetail.wordCount')}
-              </span>
-              <span className="font-semibold text-text-primary">{(novel.totalWords / 1000).toFixed(1)}k</span>
-            </span>
-          </div>
-
-          <div className="flex-1 flex flex-col gap-6">
-            <div className="rounded-2xl border border-border-color/20 bg-muted-bg/35 p-5">
-              <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-wider">{t('bookDetail.description')}</h3>
-              {introText ? (
-                <div className="mt-4 space-y-3">
-                  <div className="prose prose-sm prose-invert max-w-none text-text-primary/90 leading-relaxed">
-                    {introText.split('\n').map((para, index) => (
-                      <p key={index} className="mb-2">{para}</p>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <p className="mt-4 text-text-secondary italic">{t('bookDetail.descriptionEmpty')}</p>
               )}
-
-              <div className="mt-6 border-t border-border-color/20 pt-4">
-                <p className="text-sm font-semibold text-text-secondary uppercase tracking-wider">{t('bookDetail.analysisThemesTitle')}</p>
-                {overview?.themes.length ? (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {overview.themes.map((theme) => (
-                      <span key={theme} className="px-3 py-1.5 rounded-full bg-accent/10 text-accent text-sm border border-accent/20">
-                        {theme}
-                      </span>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="mt-3 text-text-secondary text-sm">{t('bookDetail.analysisThemesEmpty')}</p>
-                )}
-              </div>
             </div>
 
-            <div>
-              <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-wider mb-3">{t('bookDetail.aiAnalysisData')}</h3>
-              <div className="rounded-2xl border border-border-color/20 bg-muted-bg/40 p-5 space-y-5">
-                {isAnalysisLoading ? (
-                  <div className="py-10 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-accent" /></div>
+            <div className="flex flex-wrap items-center gap-4 mb-8">
+              <span className="inline-flex flex-col bg-muted-bg px-4 py-2 rounded-lg border border-border-color/20">
+                <span className="text-xs text-text-secondary uppercase tracking-wider font-semibold mb-1 flex items-center gap-1">
+                  <FileText className="w-3 h-3" /> {t('bookDetail.format')}
+                </span>
+                <span className="font-semibold text-text-primary">{novel.fileType.toUpperCase()}</span>
+              </span>
+              <span className="inline-flex flex-col bg-muted-bg px-4 py-2 rounded-lg border border-border-color/20">
+                <span className="text-xs text-text-secondary uppercase tracking-wider font-semibold mb-1 flex items-center gap-1">
+                  <Hash className="w-3 h-3" /> {t('bookDetail.chapters')}
+                </span>
+                <span className="font-semibold text-text-primary">{novel.chapterCount || 0}</span>
+              </span>
+              <span className="inline-flex flex-col bg-muted-bg px-4 py-2 rounded-lg border border-border-color/20">
+                <span className="text-xs text-text-secondary uppercase tracking-wider font-semibold mb-1 flex items-center gap-1">
+                  <FileText className="w-3 h-3" /> {t('bookDetail.wordCount')}
+                </span>
+                <span className="font-semibold text-text-primary">{(novel.totalWords / 1000).toFixed(1)}k</span>
+              </span>
+            </div>
+
+            <div className="flex-1 flex flex-col gap-6">
+              <div className="rounded-2xl border border-border-color/20 bg-muted-bg/35 p-5">
+                <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-wider">{t('bookDetail.description')}</h3>
+                {introText ? (
+                  <div className="mt-4 space-y-3">
+                    <div className="prose prose-sm prose-invert max-w-none text-text-primary/90 leading-relaxed">
+                      {introText.split('\n').map((para, index) => (
+                        <p key={index} className="mb-2">{para}</p>
+                      ))}
+                    </div>
+                  </div>
                 ) : (
-                  <>
-                    {analysisMessage && (
+                  <p className="mt-4 text-text-secondary italic">{t('bookDetail.descriptionEmpty')}</p>
+                )}
+
+                <div className="mt-6 border-t border-border-color/20 pt-4">
+                  <p className="text-sm font-semibold text-text-secondary uppercase tracking-wider">{t('bookDetail.analysisThemesTitle')}</p>
+                  {overview?.themes.length ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {overview.themes.map((theme) => (
+                        <span key={theme} className="px-3 py-1.5 rounded-full bg-accent/10 text-accent text-sm border border-accent/20">
+                          {theme}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="mt-3 text-text-secondary text-sm">{t('bookDetail.analysisThemesEmpty')}</p>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-wider mb-3">{t('bookDetail.aiAnalysisData')}</h3>
+                <div className="rounded-2xl border border-border-color/20 bg-muted-bg/40 p-5 space-y-5">
+                  {isAnalysisLoading ? (
+                    <div className="py-10 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-accent" /></div>
+                  ) : (
+                    <>
+                      {analysisMessage && (
                       <div className="rounded-xl border border-border-color/20 bg-black/10 px-4 py-3 text-sm text-text-secondary leading-6">
                         {analysisMessage}
                       </div>
-                    )}
-                    {analysisError && (
+                      )}
+                      {analysisError && (
                       <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300 leading-6">
                         {translateAppError(analysisError, t, 'bookDetail.analysisActionFailed')}
                       </div>
-                    )}
+                      )}
 
-                    {job ? (
-                      <>
-                        <div className="flex flex-wrap items-start justify-between gap-4">
-                          <div>
+                      {job ? (
+                        <>
+                          <div className="flex flex-wrap items-start justify-between gap-4">
+                            <div>
                             <div className="flex items-center gap-2 text-text-primary font-semibold">
                               <Bot className="w-4 h-4 text-accent" />
                               {t('bookDetail.analysisStatusLabel')}
                               <span>{jobStatusLabel}</span>
                             </div>
                           </div>
-                          {job.totalChunks > 0 && (
+                            {job.totalChunks > 0 && (
                             <div className="text-sm text-text-secondary">
                               {t('bookDetail.analysisChunksSummary', {
                                 completedChunks: job.completedChunks,
@@ -404,9 +404,9 @@ export default function BookDetailPage() {
                               })}
                             </div>
                           )}
-                        </div>
+                          </div>
 
-                        {isJobRunning && job.totalChunks > 0 && (
+                          {isJobRunning && job.totalChunks > 0 && (
                           <div className="space-y-3">
                             <div className="h-2 rounded-full bg-black/20 overflow-hidden">
                               <div className="h-full bg-accent transition-all duration-300" style={{ width: `${job.progressPercent}%` }} />
@@ -421,47 +421,47 @@ export default function BookDetailPage() {
                               {job.lastHeartbeat && <span>{t('bookDetail.analysisLastHeartbeat', { time: new Date(job.lastHeartbeat).toLocaleString() })}</span>}
                             </div>
                           </div>
-                        )}
+                          )}
 
-                        {job.lastError && (
+                          {job.lastError && (
                           <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300 flex gap-3">
                             <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
                             <span>{t(`errors.${job.lastError}`, { defaultValue: job.lastError })}</span>
                           </div>
-                        )}
-                      </>
-                    ) : (
-                      <p className="text-text-secondary">{t('bookDetail.analysisNoJob')}</p>
-                    )}
+                          )}
+                        </>
+                      ) : (
+                        <p className="text-text-secondary">{t('bookDetail.analysisNoJob')}</p>
+                      )}
 
-                    {overview ? (
-                      <div className="rounded-2xl border border-border-color/20 bg-card-bg/40 p-5">
-                        <p className="text-sm font-semibold text-text-secondary uppercase tracking-wider">{t('bookDetail.analysisOverviewTitle')}</p>
-                        <p className="mt-4 text-text-primary leading-7 whitespace-pre-line">{overview.globalSummary || t('bookDetail.analysisOverviewEmpty')}</p>
+                      {overview ? (
+                        <div className="rounded-2xl border border-border-color/20 bg-card-bg/40 p-5">
+                          <p className="text-sm font-semibold text-text-secondary uppercase tracking-wider">{t('bookDetail.analysisOverviewTitle')}</p>
+                          <p className="mt-4 text-text-primary leading-7 whitespace-pre-line">{overview.globalSummary || t('bookDetail.analysisOverviewEmpty')}</p>
 
-                        <div className="mt-6 border-t border-border-color/20 pt-5">
-                          <p className="text-sm font-semibold text-text-secondary uppercase tracking-wider">{t('bookDetail.analysisCharactersTitle')}</p>
-                          <div className="mt-4">
+                          <div className="mt-6 border-t border-border-color/20 pt-5">
+                            <p className="text-sm font-semibold text-text-secondary uppercase tracking-wider">{t('bookDetail.analysisCharactersTitle')}</p>
+                            <div className="mt-4">
                             <CharacterShareChart
                               characters={characterChartData}
                               emptyLabel={t('bookDetail.analysisCharactersEmpty')}
                               roleFallback={t('bookDetail.analysisCharacterRoleFallback')}
                             />
                           </div>
+                          </div>
                         </div>
-                      </div>
-                    ) : (
-                      <div className="p-4 rounded-xl border border-dashed border-border-color/30 bg-muted-bg/50 text-text-secondary text-sm flex items-center justify-center min-h-[120px]">
-                        {t('bookDetail.analysisNoOverview')}
-                      </div>
-                    )}
-                  </>
-                )}
+                      ) : (
+                        <div className="p-4 rounded-xl border border-dashed border-border-color/30 bg-muted-bg/50 text-text-secondary text-sm flex items-center justify-center min-h-[120px]">
+                          {t('bookDetail.analysisNoOverview')}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
       </div>
 
       <Modal

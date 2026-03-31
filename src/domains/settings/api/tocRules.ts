@@ -114,7 +114,7 @@ export const tocRulesApi = {
     }
 
     const existing = await db.tocRules.toArray();
-    const existingRules = new Set(existing.map(rule => rule.rule));
+    const existingRules = new Set(existing.map((rule) => rule.rule));
     const now = new Date().toISOString();
     let added = 0;
     for (let index = 0; index < rules.length; index += 1) {

@@ -47,8 +47,7 @@ function setupHook(opts: {
       dismissBlockedInteraction,
       wheelDeltaRef,
       pageTurnLockedRef,
-    )
-  );
+    ));
 
   return {
     result,
@@ -160,8 +159,7 @@ describe('useReaderInput', () => {
           dismissBlockedInteraction,
           wheelDeltaRef,
           pageTurnLockedRef,
-        )
-      );
+        ));
 
       expect(result.current.stopContinuousScroll).toBeDefined();
 

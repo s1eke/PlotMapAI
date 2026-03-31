@@ -11,7 +11,7 @@ describe('Toggle', () => {
   });
 
   it('renders with correct aria-checked when checked', () => {
-    render(<Toggle checked={true} onChange={() => {}} />);
+    render(<Toggle checked onChange={() => {}} />);
     const toggle = screen.getByRole('switch');
     expect(toggle).toHaveAttribute('aria-checked', 'true');
   });
@@ -26,7 +26,7 @@ describe('Toggle', () => {
 
   it('calls onChange with false when already checked', async () => {
     const handleChange = vi.fn();
-    render(<Toggle checked={true} onChange={handleChange} />);
+    render(<Toggle checked onChange={handleChange} />);
     const user = userEvent.setup();
     await user.click(screen.getByRole('switch'));
     expect(handleChange).toHaveBeenCalledWith(false);

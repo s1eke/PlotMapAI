@@ -25,7 +25,7 @@ describe('ThemeContext', () => {
   });
 
   it('provides default light theme if no preference', () => {
-    window.matchMedia = vi.fn().mockImplementation(query => ({
+    window.matchMedia = vi.fn().mockImplementation((query) => ({
       matches: false,
       media: query,
     }));
@@ -33,13 +33,13 @@ describe('ThemeContext', () => {
     render(
       <ThemeProvider>
         <TestComponent />
-      </ThemeProvider>
+      </ThemeProvider>,
     );
     expect(screen.getByTestId('theme-value').textContent).toBe('light');
   });
 
   it('toggles theme and updates localStorage/document', () => {
-    window.matchMedia = vi.fn().mockImplementation(query => ({
+    window.matchMedia = vi.fn().mockImplementation((query) => ({
       matches: false,
       media: query,
     }));
@@ -47,7 +47,7 @@ describe('ThemeContext', () => {
     render(
       <ThemeProvider>
         <TestComponent />
-      </ThemeProvider>
+      </ThemeProvider>,
     );
 
     const button = screen.getByText('Toggle');
@@ -59,7 +59,7 @@ describe('ThemeContext', () => {
   });
 
   it('hydrates theme from primary storage', async () => {
-    window.matchMedia = vi.fn().mockImplementation(query => ({
+    window.matchMedia = vi.fn().mockImplementation((query) => ({
       matches: false,
       media: query,
     }));

@@ -54,11 +54,10 @@ export async function parseEpubCore(
 
   const orderedItems = opfPackage.spineIds.length > 0
     ? opfPackage.spineIds
-        .map((id) => opfPackage.manifest.get(id))
-        .filter((item): item is ManifestItem => Boolean(item))
+      .map((id) => opfPackage.manifest.get(id))
+      .filter((item): item is ManifestItem => Boolean(item))
     : Array.from(opfPackage.manifest.values()).filter((item) =>
-        item.mediaType.includes('xhtml') || item.mediaType.includes('html'),
-      );
+      item.mediaType.includes('xhtml') || item.mediaType.includes('html'));
 
   const totalItems = Math.max(orderedItems.length, 1);
   for (let index = 0; index < orderedItems.length; index += 1) {

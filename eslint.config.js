@@ -1,9 +1,9 @@
-import { react as aliReact } from 'eslint-config-ali'
-import reactRefresh from 'eslint-plugin-react-refresh'
-import { defineConfig, globalIgnores } from 'eslint/config'
+import { react as aliReact } from 'eslint-config-ali';
+import reactRefresh from 'eslint-plugin-react-refresh';
+import { defineConfig, globalIgnores } from 'eslint/config';
 
 export default defineConfig([
-  globalIgnores(['dist','coverage']),
+  globalIgnores(['dist', 'coverage']),
   ...aliReact,
   reactRefresh.configs.vite,
   {
@@ -83,4 +83,4 @@ export default defineConfig([
       ],
     },
   },
-])
+]);

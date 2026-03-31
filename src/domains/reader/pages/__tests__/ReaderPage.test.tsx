@@ -172,7 +172,7 @@ function renderPage() {
       <Routes>
         <Route path="/novel/:id/read" element={<ReaderPage />} />
       </Routes>
-    </MemoryRouter>
+    </MemoryRouter>,
   );
 }
 
@@ -185,7 +185,7 @@ function createDeferred<T>() {
   return { promise, resolve };
 }
 
-function enablePagedTestLayout(scrollWidth: number = 400) {
+function enablePagedTestLayout(scrollWidth = 400) {
   setPrototypeNumberGetter('clientWidth', 600);
   setPrototypeNumberGetter('clientHeight', 800);
   setPrototypeNumberGetter('scrollWidth', scrollWidth);
@@ -238,8 +238,8 @@ function createPagedChapterContent(index: number, totalChapters: number, minPage
 
   for (let paragraphCount = 12; paragraphCount <= 240; paragraphCount += 6) {
     const content = Array.from({ length: paragraphCount }, (_, paragraphIndex) => (
-      `${title} paragraph ${paragraphIndex + 1} `
-      + 'alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu '.repeat(6)
+      `${title} paragraph ${paragraphIndex + 1} ${
+        'alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu '.repeat(6)}`
     )).join('\n');
     const chapter = {
       index,
@@ -266,8 +266,8 @@ function createPagedChapterContent(index: number, totalChapters: number, minPage
 function createLongScrollChapter(index: number, totalChapters: number, paragraphCount: number) {
   const title = `Chapter ${index + 1}`;
   const content = Array.from({ length: paragraphCount }, (_, paragraphIndex) => (
-    `Paragraph ${paragraphIndex + 1} marker `
-    + 'alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu '.repeat(6)
+    `Paragraph ${paragraphIndex + 1} marker ${
+      'alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu '.repeat(6)}`
   )).join('\n');
 
   return {

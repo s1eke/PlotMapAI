@@ -176,7 +176,8 @@ export default function CharacterGraphStage({
                       isComplete
                         ? 'border-[#d6dde5] bg-[#eef1f4] text-[#34527a]'
                         : 'border-[#ffd6a5] bg-[#fff5e8] text-[#a06528]'
-                    }`}>
+                    }`}
+                    >
                       {isComplete ? t('characterGraph.metaComplete') : t('characterGraph.metaPartial')}
                     </span>
                   </div>
@@ -290,7 +291,8 @@ export default function CharacterGraphStage({
                       isComplete
                         ? 'border-[#d6dde5] bg-[#eef1f4] text-[#34527a]'
                         : 'border-[#ffd6a5] bg-[#fff5e8] text-[#a06528]'
-                    }`}>
+                    }`}
+                    >
                       {isComplete ? t('characterGraph.metaComplete') : t('characterGraph.metaPartial')}
                     </span>
                   </div>

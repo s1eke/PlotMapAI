@@ -75,8 +75,7 @@ function setupHook(opts: {
       setScrollModeChapters,
       opts.contentVersion ?? 0,
       onReadingAnchorChange,
-    )
-  );
+    ));
 
   return {
     result,
@@ -228,8 +227,8 @@ describe('useScrollModeChapters', () => {
           scrollModeChapters: [0],
           fetchChapterContent: fetchFn,
           contentElement: makeMockElement({
-          clientHeight: 600,
-          scrollHeight: 300,
+            clientHeight: 600,
+            scrollHeight: 300,
           }),
         });
 
@@ -402,8 +401,7 @@ describe('useScrollModeChapters', () => {
       // still testing that .finally() clears the pending set.
       const fetchFn = vi.fn()
         .mockImplementationOnce(() =>
-          Promise.reject(new Error('Network error')).catch(() => undefined as unknown as ChapterContent)
-        )
+          Promise.reject(new Error('Network error')).catch(() => undefined as unknown as ChapterContent))
         .mockResolvedValueOnce(makeChapterContent(1));
 
       const { result, contentRef } = setupHook({
@@ -421,7 +419,7 @@ describe('useScrollModeChapters', () => {
       });
 
       // Let .finally() clear the pending set
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
 
       // Now try again - pending should be cleared by .finally()
       vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 200);
@@ -437,7 +435,7 @@ describe('useScrollModeChapters', () => {
   describe('duplicate fetch prevention', () => {
     it('does not fetch if already pending', () => {
       const fetchFn = vi.fn().mockImplementation(
-        () => new Promise(() => {}) // never resolves
+        () => new Promise(() => {}), // never resolves
       );
       const { result, contentRef } = setupHook({
         scrollModeChapters: [0],

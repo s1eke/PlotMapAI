@@ -32,7 +32,7 @@ function isStandaloneMode(): boolean {
 }
 
 function isIosLikeDevice(): boolean {
-  const userAgent = navigator.userAgent;
+  const { userAgent } = navigator;
 
   return /iPad|iPhone|iPod/.test(userAgent) || (userAgent.includes('Mac') && 'ontouchend' in document);
 }

@@ -33,7 +33,7 @@ describe('READER_SLIDER_CONFIG', () => {
   });
 
   it('covers expected slider keys', () => {
-    const keys = READER_SLIDER_CONFIG.map(c => c.key);
+    const keys = READER_SLIDER_CONFIG.map((c) => c.key);
     expect(keys).toContain('fontSize');
     expect(keys).toContain('lineSpacing');
     expect(keys).toContain('paragraphSpacing');
@@ -52,7 +52,7 @@ describe('OVERFLOW_SLIDER_KEYS', () => {
   });
 
   it('does not overlap with MOBILE_SLIDER_KEYS', () => {
-    const overlap = OVERFLOW_SLIDER_KEYS.filter(k => MOBILE_SLIDER_KEYS.includes(k));
+    const overlap = OVERFLOW_SLIDER_KEYS.filter((k) => MOBILE_SLIDER_KEYS.includes(k));
     expect(overlap).toHaveLength(0);
   });
 });
@@ -74,7 +74,7 @@ describe('READER_THEME_DISPLAY', () => {
   });
 
   it('has no duplicate ids', () => {
-    const ids = READER_THEME_DISPLAY.map(c => c.id);
+    const ids = READER_THEME_DISPLAY.map((c) => c.id);
     expect(new Set(ids).size).toBe(ids.length);
   });
 });
@@ -98,7 +98,7 @@ describe('READER_THEMES', () => {
   });
 
   it('theme display ids match reader theme keys', () => {
-    const displayIds = READER_THEME_DISPLAY.map(c => c.id);
+    const displayIds = READER_THEME_DISPLAY.map((c) => c.id);
     const themeKeys = Object.keys(READER_THEMES);
     for (const id of displayIds) {
       expect(themeKeys).toContain(id);

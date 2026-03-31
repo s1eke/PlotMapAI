@@ -33,7 +33,7 @@ describe('Layout component', () => {
             <div>Page Content</div>
           </Layout>
         </ThemeProvider>
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     expect(screen.getByRole('link', { name: 'common.appName' })).toHaveAttribute('href', '/');
@@ -62,7 +62,7 @@ describe('Layout component', () => {
             <div>Reader Content</div>
           </Layout>
         </ThemeProvider>
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     expect(screen.queryByRole('link', { name: 'common.appName' })).not.toBeInTheDocument();
@@ -90,7 +90,7 @@ describe('Layout component', () => {
             <div>Reader Content</div>
           </Layout>
         </ThemeProvider>
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     await waitFor(() => {

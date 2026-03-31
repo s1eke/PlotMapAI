@@ -193,9 +193,9 @@ function sanitizeLocator(raw: unknown): ReaderLocator | undefined {
       && typeof endCursor.segmentIndex === 'number'
       && typeof endCursor.graphemeIndex === 'number'
       ? {
-          graphemeIndex: endCursor.graphemeIndex,
-          segmentIndex: endCursor.segmentIndex,
-        }
+        graphemeIndex: endCursor.graphemeIndex,
+        segmentIndex: endCursor.segmentIndex,
+      }
       : undefined,
     kind: parsed.kind,
     lineIndex: typeof parsed.lineIndex === 'number' ? parsed.lineIndex : undefined,
@@ -203,9 +203,9 @@ function sanitizeLocator(raw: unknown): ReaderLocator | undefined {
       && typeof startCursor.segmentIndex === 'number'
       && typeof startCursor.graphemeIndex === 'number'
       ? {
-          graphemeIndex: startCursor.graphemeIndex,
-          segmentIndex: startCursor.segmentIndex,
-        }
+        graphemeIndex: startCursor.graphemeIndex,
+        segmentIndex: startCursor.segmentIndex,
+      }
       : undefined,
   };
 }
@@ -868,7 +868,7 @@ export function persistStoredReaderState(nextState: StoredReaderState, options?:
 }
 
 export async function flushPersistence(): Promise<void> {
-  const novelId = state.novelId;
+  const { novelId } = state;
   const progress = toRemoteProgress(state);
   await flushPreferencePersistence();
   if (syncTimerId !== null && isBrowser()) {

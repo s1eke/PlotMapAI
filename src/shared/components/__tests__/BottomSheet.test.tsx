@@ -68,7 +68,7 @@ describe('BottomSheet', () => {
   it('respects the backdrop close setting', () => {
     const onClose = vi.fn();
     const { container, rerender } = render(
-      <BottomSheet isOpen={true} onClose={onClose} title="Panel title" closeOnBackdrop={false}>
+      <BottomSheet isOpen onClose={onClose} title="Panel title" closeOnBackdrop={false}>
         Panel content
       </BottomSheet>,
     );
@@ -77,7 +77,7 @@ describe('BottomSheet', () => {
     expect(onClose).not.toHaveBeenCalled();
 
     rerender(
-      <BottomSheet isOpen={true} onClose={onClose} title="Panel title" closeOnBackdrop={true}>
+      <BottomSheet isOpen onClose={onClose} title="Panel title" closeOnBackdrop>
         Panel content
       </BottomSheet>,
     );
@@ -90,7 +90,7 @@ describe('BottomSheet', () => {
     const onClose = vi.fn();
 
     render(
-      <BottomSheet isOpen={true} onClose={onClose} title="Panel title">
+      <BottomSheet isOpen onClose={onClose} title="Panel title">
         Panel content
       </BottomSheet>,
     );
@@ -103,7 +103,7 @@ describe('BottomSheet', () => {
   it('tracks drag progress and rebounds when the gesture stays below threshold', async () => {
     const onClose = vi.fn();
     const { container } = render(
-      <BottomSheet isOpen={true} onClose={onClose} title="Panel title">
+      <BottomSheet isOpen onClose={onClose} title="Panel title">
         Panel content
       </BottomSheet>,
     );
@@ -130,7 +130,7 @@ describe('BottomSheet', () => {
   it('closes when the downward drag distance crosses the close threshold', async () => {
     const onClose = vi.fn();
     const { container } = render(
-      <BottomSheet isOpen={true} onClose={onClose} title="Panel title">
+      <BottomSheet isOpen onClose={onClose} title="Panel title">
         Panel content
       </BottomSheet>,
     );
@@ -149,7 +149,7 @@ describe('BottomSheet', () => {
   it('applies custom class names to the container, panel, and content slots', () => {
     const { container } = render(
       <BottomSheet
-        isOpen={true}
+        isOpen
         onClose={vi.fn()}
         title="Panel title"
         containerClassName="sheet-root-test"

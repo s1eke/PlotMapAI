@@ -117,7 +117,7 @@ describe('useChapterAnalysis', () => {
   it('sets isAnalyzingChapter during analyzeChapter call', async () => {
     let resolveAnalyze: (value: { analysis: ChapterAnalysisResult | null }) => void;
     mockedApi.analyzeChapter.mockImplementation(
-      () => new Promise(resolve => { resolveAnalyze = resolve; })
+      () => new Promise((resolve) => { resolveAnalyze = resolve; }),
     );
 
     const { result } = renderHook(() => useChapterAnalysis(1, 0));
@@ -200,7 +200,7 @@ describe('useChapterAnalysis', () => {
   it('re-fetches when chapterIndex changes', async () => {
     const { rerender } = renderHook(
       ({ idx }) => useChapterAnalysis(1, idx),
-      { initialProps: { idx: 0 } }
+      { initialProps: { idx: 0 } },
     );
 
     await waitFor(() => {

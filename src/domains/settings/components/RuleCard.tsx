@@ -29,7 +29,7 @@ export default function RuleCard({
   onToggle,
   onEdit,
   onDelete,
-  isCustom = true
+  isCustom = true,
 }: RuleCardProps) {
   const { t } = useTranslation();
   return (
@@ -52,7 +52,7 @@ export default function RuleCard({
             )}
             {priority !== undefined && (type || scopes?.length || group) && <span>•</span>}
             {type && <span className="uppercase tracking-wider">{type === 'regex' ? t('settings.purification.useRegex') : 'TEXT'}</span>}
-            {scopes && scopes.map(s => (
+            {scopes && scopes.map((s) => (
               <span key={s} className="px-1.5 py-0.5 rounded bg-white/5">{s}</span>
             ))}
           </div>
@@ -62,7 +62,7 @@ export default function RuleCard({
           onChange={onToggle}
         />
       </div>
-      
+
       <code className="text-xs text-accent font-mono bg-muted-bg px-2 py-1.5 rounded block w-fit max-w-full overflow-hidden text-ellipsis whitespace-nowrap border border-border-color/20" title={pattern}>
         {pattern}
       </code>

@@ -112,7 +112,7 @@ function renderPage(initialEntry: string) {
         <Route path="/" element={<div>bookshelf-home</div>} />
         <Route path="/novel/:id/graph" element={<CharacterGraphPage />} />
       </Routes>
-    </MemoryRouter>
+    </MemoryRouter>,
   );
 }
 

@@ -107,15 +107,15 @@ describe('buildSpaciousLayout', () => {
 
   it('computes degree from edges', () => {
     const layout = buildSpaciousLayout(nodes, edges);
-    const heroNode = layout.find(n => n.id === 'hero');
+    const heroNode = layout.find((n) => n.id === 'hero');
     expect(heroNode?.degree).toBe(2);
-    const friendNode = layout.find(n => n.id === 'friend');
+    const friendNode = layout.find((n) => n.id === 'friend');
     expect(friendNode?.degree).toBe(1);
   });
 
   it('computes score from sharePercent when positive', () => {
     const layout = buildSpaciousLayout(nodes, edges);
-    const heroNode = layout.find(n => n.id === 'hero');
+    const heroNode = layout.find((n) => n.id === 'hero');
     expect(heroNode?.score).toBe(70);
   });
 
@@ -339,7 +339,7 @@ describe('getNodeLabelLayout', () => {
 
   it('trims whitespace from name', () => {
     const labelLayout = getNodeLabelLayout('  Alice  ', 50);
-    expect(labelLayout.lines.some(l => l.includes('Alice'))).toBe(true);
+    expect(labelLayout.lines.some((l) => l.includes('Alice'))).toBe(true);
   });
 
   it('returns finite values', () => {

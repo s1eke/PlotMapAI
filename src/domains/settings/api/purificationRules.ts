@@ -159,7 +159,7 @@ export const purificationRulesApi = {
     }
     debugLog('Settings', `parsed ${parsed.length} rules`);
     const existing = await db.purificationRules.toArray();
-    const existingKeys = new Set(existing.map(rule => `${rule.pattern}\u0000${rule.isRegex}`));
+    const existingKeys = new Set(existing.map((rule) => `${rule.pattern}\u0000${rule.isRegex}`));
     const now = new Date().toISOString();
     let added = 0;
     for (let index = 0; index < parsed.length; index += 1) {
@@ -203,7 +203,7 @@ export const purificationRulesApi = {
 
   exportPurificationRulesYaml: async (): Promise<string> => {
     const rules = await db.purificationRules.orderBy('order').toArray();
-    const exportData = rules.map(rule => ({
+    const exportData = rules.map((rule) => ({
       name: rule.name,
       group: rule.group || 'Purification',
       pattern: rule.pattern,

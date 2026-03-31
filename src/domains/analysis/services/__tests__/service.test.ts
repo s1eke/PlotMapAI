@@ -209,35 +209,51 @@ describe('isChapterAnalysisComplete', () => {
 
   it('returns false for empty summary', () => {
     const row = {
-      id: 1, novelId: 1, chapterIndex: 0, chapterTitle: 'Ch1',
-      summary: '', keyPoints: [], characters: [], relationships: [],
-      tags: [], chunkIndex: 0, updatedAt: '',
+      id: 1,
+      novelId: 1,
+      chapterIndex: 0,
+      chapterTitle: 'Ch1',
+      summary: '',
+      keyPoints: [],
+      characters: [],
+      relationships: [],
+      tags: [],
+      chunkIndex: 0,
+      updatedAt: '',
     } as ChapterAnalysis;
     expect(isChapterAnalysisComplete(row)).toBe(false);
   });
 
   it('returns true for valid complete analysis', () => {
     const row = {
-      id: 1, novelId: 1, chapterIndex: 0, chapterTitle: 'Ch1',
+      id: 1,
+      novelId: 1,
+      chapterIndex: 0,
+      chapterTitle: 'Ch1',
       summary: 'A valid summary',
       keyPoints: ['point1'],
       characters: [{ name: 'Hero', role: '', description: '', weight: 80 }],
       relationships: [],
       tags: ['action'],
-      chunkIndex: 0, updatedAt: '',
+      chunkIndex: 0,
+      updatedAt: '',
     } as ChapterAnalysis;
     expect(isChapterAnalysisComplete(row)).toBe(true);
   });
 
   it('returns true for analysis with all arrays present (even empty)', () => {
     const row = {
-      id: 1, novelId: 1, chapterIndex: 0, chapterTitle: 'Ch1',
+      id: 1,
+      novelId: 1,
+      chapterIndex: 0,
+      chapterTitle: 'Ch1',
       summary: 'Valid',
       keyPoints: [],
       characters: [],
       relationships: [],
       tags: [],
-      chunkIndex: 0, updatedAt: '',
+      chunkIndex: 0,
+      updatedAt: '',
     } as ChapterAnalysis;
     expect(isChapterAnalysisComplete(row)).toBe(true);
   });
@@ -255,22 +271,31 @@ describe('isOverviewComplete', () => {
 
   it('returns false for empty bookIntro', () => {
     const overview = {
-      id: 1, novelId: 1, bookIntro: '', globalSummary: 'Summary',
-      themes: [], characterStats: [], relationshipGraph: [],
-      totalChapters: 10, analyzedChapters: 10, updatedAt: '',
+      id: 1,
+      novelId: 1,
+      bookIntro: '',
+      globalSummary: 'Summary',
+      themes: [],
+      characterStats: [],
+      relationshipGraph: [],
+      totalChapters: 10,
+      analyzedChapters: 10,
+      updatedAt: '',
     } as AnalysisOverview;
     expect(isOverviewComplete(overview, 10)).toBe(false);
   });
 
   it('returns true for valid complete overview', () => {
     const overview = {
-      id: 1, novelId: 1,
+      id: 1,
+      novelId: 1,
       bookIntro: 'A book about adventure and mystery in a faraway land.',
       globalSummary: 'The story follows multiple characters through a series of events that test their resolve and bring them together.',
       themes: ['adventure', 'mystery'],
       characterStats: [{ name: 'Hero', role: 'protagonist', description: 'The hero', weight: 80, sharePercent: 100, chapters: [0], chapterCount: 1 }],
       relationshipGraph: [],
-      totalChapters: 10, analyzedChapters: 10,
+      totalChapters: 10,
+      analyzedChapters: 10,
       updatedAt: '',
     } as AnalysisOverview;
     expect(isOverviewComplete(overview, 10)).toBe(true);
@@ -284,12 +309,15 @@ describe('serializeOverview', () => {
 
   it('serializes with native array fields', () => {
     const overview = {
-      id: 1, novelId: 1,
-      bookIntro: 'Intro', globalSummary: 'Summary',
+      id: 1,
+      novelId: 1,
+      bookIntro: 'Intro',
+      globalSummary: 'Summary',
       themes: ['theme1'],
       characterStats: [{ name: 'A', role: 'supporting', description: 'desc', weight: 80, sharePercent: 100, chapters: [0], chapterCount: 1 }],
       relationshipGraph: [],
-      totalChapters: 5, analyzedChapters: 5,
+      totalChapters: 5,
+      analyzedChapters: 5,
       updatedAt: '2024-01-01',
     } as AnalysisOverview;
     const result = serializeOverview(overview);
@@ -307,9 +335,17 @@ describe('serializeChapterAnalysis', () => {
 
   it('serializes with native array fields', () => {
     const row = {
-      id: 1, novelId: 1, chapterIndex: 0, chapterTitle: 'Ch1',
-      summary: 'Summary', keyPoints: ['p1'], characters: [],
-      relationships: [], tags: ['t1'], chunkIndex: 0, updatedAt: '',
+      id: 1,
+      novelId: 1,
+      chapterIndex: 0,
+      chapterTitle: 'Ch1',
+      summary: 'Summary',
+      keyPoints: ['p1'],
+      characters: [],
+      relationships: [],
+      tags: ['t1'],
+      chunkIndex: 0,
+      updatedAt: '',
     } as ChapterAnalysis;
     const result = serializeChapterAnalysis(row);
     expect(result).not.toBeNull();
@@ -332,7 +368,10 @@ describe('buildCharacterGraphPayload', () => {
       { id: 1, novelId: 1, title: 'Ch1', content: 'content', chapterIndex: 0, wordCount: 100 },
     ];
     const analyses: ChapterAnalysis[] = [{
-      id: 1, novelId: 1, chapterIndex: 0, chapterTitle: 'Ch1',
+      id: 1,
+      novelId: 1,
+      chapterIndex: 0,
+      chapterTitle: 'Ch1',
       summary: 'Summary',
       keyPoints: ['point'],
       characters: [{ name: 'Alice', role: 'protagonist', description: 'Hero', weight: 80 }],

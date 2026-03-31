@@ -39,7 +39,7 @@ vi.mock('../executor', () => ({
 
 function createDeferred(): { promise: Promise<void>; resolve: () => void } {
   let resolve: () => void = () => {};
-  const promise = new Promise<void>(done => {
+  const promise = new Promise<void>((done) => {
     resolve = done;
   });
   return { promise, resolve };
@@ -80,14 +80,14 @@ function createChunkPayload(index: number, chapterIndices: number[]) {
     startChapterIndex: chapterIndices[0],
     endChapterIndex: chapterIndices[chapterIndices.length - 1],
     contentLength: 100,
-    chapters: chapterIndices.map(chapterIndex => ({
+    chapters: chapterIndices.map((chapterIndex) => ({
       chapterIndex,
       title: `Chapter ${chapterIndex + 1}`,
       content: `content ${chapterIndex + 1}`,
       text: `content ${chapterIndex + 1}`,
       length: 100,
     })),
-    text: chapterIndices.map(chapterIndex => `content ${chapterIndex + 1}`).join('\n'),
+    text: chapterIndices.map((chapterIndex) => `content ${chapterIndex + 1}`).join('\n'),
   };
 }
 
@@ -180,7 +180,7 @@ describe('analysis runtime orchestrator', () => {
     await currentDb.chapters.bulkAdd(chapters);
     mockLoadAndPurifyChapters.mockResolvedValue(chapters);
     mockBuildAnalysisChunks.mockReturnValue(
-      chapters.map(chapter => createChunkPayload(chapter.chapterIndex, [chapter.chapterIndex])),
+      chapters.map((chapter) => createChunkPayload(chapter.chapterIndex, [chapter.chapterIndex])),
     );
     return chapters;
   }
@@ -263,7 +263,7 @@ describe('analysis runtime orchestrator', () => {
 
     expect(result.job.status).toBe('running');
     expect(result.job.currentChunkIndex).toBe(1);
-    expect(chunks.map(chunk => chunk.status)).toEqual(['completed', 'pending', 'pending', 'pending']);
+    expect(chunks.map((chunk) => chunk.status)).toEqual(['completed', 'pending', 'pending', 'pending']);
     expect(mockRunAnalysisExecution).toHaveBeenCalledTimes(1);
   });
 
@@ -298,7 +298,7 @@ describe('analysis runtime orchestrator', () => {
     expect(result.job.status).toBe('running');
     expect(await currentDb.chapterAnalyses.count()).toBe(0);
     expect(await currentDb.analysisOverviews.count()).toBe(0);
-    expect((await currentDb.analysisChunks.where('novelId').equals(1).sortBy('chunkIndex')).map(chunk => chunk.status)).toEqual(['pending', 'pending']);
+    expect((await currentDb.analysisChunks.where('novelId').equals(1).sortBy('chunkIndex')).map((chunk) => chunk.status)).toEqual(['pending', 'pending']);
   });
 
   it('refreshOverview clears only the overview and reuses completed chunk results', async () => {
@@ -336,7 +336,7 @@ describe('analysis runtime orchestrator', () => {
     expect(result.job.status).toBe('running');
     expect(result.job.currentStage).toBe('overview');
     expect(await currentDb.analysisOverviews.count()).toBe(0);
-    expect(chunks.map(chunk => chunk.status)).toEqual(['completed', 'completed']);
+    expect(chunks.map((chunk) => chunk.status)).toEqual(['completed', 'completed']);
     expect(mockRunAnalysisExecution).toHaveBeenCalledTimes(1);
   });
 
@@ -387,9 +387,9 @@ describe('analysis runtime orchestrator', () => {
     const jobs = await currentDb.analysisJobs.orderBy('novelId').toArray();
     const chunks = await currentDb.analysisChunks.orderBy('novelId').toArray();
 
-    expect(jobs.map(job => job.status)).toEqual(['paused', 'paused']);
-    expect(jobs.map(job => job.lastError)).toEqual([AnalysisErrorCode.APP_RESTARTED, AnalysisErrorCode.APP_RESTARTED]);
-    expect(chunks.map(chunk => chunk.status)).toEqual(['pending', 'pending']);
+    expect(jobs.map((job) => job.status)).toEqual(['paused', 'paused']);
+    expect(jobs.map((job) => job.lastError)).toEqual([AnalysisErrorCode.APP_RESTARTED, AnalysisErrorCode.APP_RESTARTED]);
+    expect(chunks.map((chunk) => chunk.status)).toEqual(['pending', 'pending']);
   });
 
   it('does not let an old runner finally remove a newer resumed runner', async () => {

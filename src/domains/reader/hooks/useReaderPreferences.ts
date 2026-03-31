@@ -24,11 +24,11 @@ export function useReaderPreferences() {
     void ensureSessionPreferencesHydrated();
   }, []);
 
-  const fontSize = useReaderSessionSelector(state => state.fontSize);
-  const readerTheme = useReaderSessionSelector(state => state.readerTheme);
-  const pageTurnMode = useReaderSessionSelector(state => state.pageTurnMode);
-  const lineSpacing = useReaderSessionSelector(state => state.lineSpacing);
-  const paragraphSpacing = useReaderSessionSelector(state => state.paragraphSpacing);
+  const fontSize = useReaderSessionSelector((state) => state.fontSize);
+  const readerTheme = useReaderSessionSelector((state) => state.readerTheme);
+  const pageTurnMode = useReaderSessionSelector((state) => state.pageTurnMode);
+  const lineSpacing = useReaderSessionSelector((state) => state.lineSpacing);
+  const paragraphSpacing = useReaderSessionSelector((state) => state.paragraphSpacing);
   const preferences = useMemo(() => ({
     fontSize,
     readerTheme,

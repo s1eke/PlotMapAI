@@ -25,8 +25,8 @@ export interface ParseContext {
 }
 
 export interface BookParser {
-  canHandle(file: File): boolean;
-  parse(file: File, context: ParseContext): Promise<ParsedBook>;
+  canHandle: (file: File) => boolean;
+  parse: (file: File, context: ParseContext) => Promise<ParsedBook>;
 }
 
 const parsers: BookParser[] = [
@@ -75,7 +75,7 @@ export async function parseBook(
   if (options.onProgress) {
     context.onProgress = options.onProgress;
   }
-  const parser = parsers.find(p => p.canHandle(file));
+  const parser = parsers.find((p) => p.canHandle(file));
   if (!parser) {
     const ext = file.name.toLowerCase().split('.').pop();
     throw new Error(`Unsupported file type: .${ext}`);

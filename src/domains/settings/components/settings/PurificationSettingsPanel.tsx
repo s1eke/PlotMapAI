@@ -57,11 +57,11 @@ export default function PurificationSettingsPanel({ manager }: PurificationSetti
           },
           ...(manager.rules.length > 0
             ? [{
-                label: t('settings.purification.clearAll'),
-                icon: <Trash2 className="w-4 h-4" />,
-                onClick: manager.requestClearAll,
-                variant: 'danger' as const,
-              }]
+              label: t('settings.purification.clearAll'),
+              icon: <Trash2 className="w-4 h-4" />,
+              onClick: manager.requestClearAll,
+              variant: 'danger' as const,
+            }]
             : []),
         ]}
       />

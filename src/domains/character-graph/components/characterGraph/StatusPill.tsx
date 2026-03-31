@@ -9,7 +9,8 @@ export default function StatusPill({ text, accent = false }: StatusPillProps) {
       accent
         ? 'border-[#d6dde5] bg-[#eef1f4] text-[#34527a]'
         : 'border-[#ddd7cc] bg-[#fffdfa]/94 text-[#5f6b79]'
-    }`}>
+    }`}
+    >
       {text}
     </span>
   );

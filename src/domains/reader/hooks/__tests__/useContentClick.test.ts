@@ -6,8 +6,7 @@ describe('useContentClick', () => {
   describe('scroll mode (non-paged)', () => {
     it('toggles isChromeVisible on click', () => {
       const { result } = renderHook(() =>
-        useContentClick(false, vi.fn(), vi.fn())
-      );
+        useContentClick(false, vi.fn(), vi.fn()));
 
       expect(result.current.isChromeVisible).toBe(false);
 
@@ -33,8 +32,7 @@ describe('useContentClick', () => {
       const handlePrev = vi.fn();
       const handleNext = vi.fn();
       const { result } = renderHook(() =>
-        useContentClick(false, handlePrev, handleNext)
-      );
+        useContentClick(false, handlePrev, handleNext));
 
       const target = document.createElement('div');
       Object.defineProperty(target, 'getBoundingClientRect', {
@@ -58,8 +56,7 @@ describe('useContentClick', () => {
       const handlePrev = vi.fn();
       const handleNext = vi.fn();
       const { result } = renderHook(() =>
-        useContentClick(true, handlePrev, handleNext)
-      );
+        useContentClick(true, handlePrev, handleNext));
 
       const target = document.createElement('div');
       Object.defineProperty(target, 'getBoundingClientRect', {
@@ -81,8 +78,7 @@ describe('useContentClick', () => {
       const handlePrev = vi.fn();
       const handleNext = vi.fn();
       const { result } = renderHook(() =>
-        useContentClick(true, handlePrev, handleNext)
-      );
+        useContentClick(true, handlePrev, handleNext));
 
       const target = document.createElement('div');
       Object.defineProperty(target, 'getBoundingClientRect', {
@@ -104,8 +100,7 @@ describe('useContentClick', () => {
       const handlePrev = vi.fn();
       const handleNext = vi.fn();
       const { result } = renderHook(() =>
-        useContentClick(true, handlePrev, handleNext)
-      );
+        useContentClick(true, handlePrev, handleNext));
 
       const target = document.createElement('div');
       Object.defineProperty(target, 'getBoundingClientRect', {
@@ -128,8 +123,7 @@ describe('useContentClick', () => {
       const handlePrev = vi.fn();
       const handleNext = vi.fn();
       const { result } = renderHook(() =>
-        useContentClick(true, handlePrev, handleNext)
-      );
+        useContentClick(true, handlePrev, handleNext));
 
       const target = document.createElement('div');
       Object.defineProperty(target, 'getBoundingClientRect', {
@@ -156,8 +150,7 @@ describe('useContentClick', () => {
       const handlePrev = vi.fn();
       const handleNext = vi.fn();
       const { result } = renderHook(() =>
-        useContentClick(true, handlePrev, handleNext)
-      );
+        useContentClick(true, handlePrev, handleNext));
 
       const target = document.createElement('div');
       Object.defineProperty(target, 'getBoundingClientRect', {
@@ -179,8 +172,7 @@ describe('useContentClick', () => {
   describe('setIsChromeVisible', () => {
     it('allows external control', () => {
       const { result } = renderHook(() =>
-        useContentClick(true, vi.fn(), vi.fn())
-      );
+        useContentClick(true, vi.fn(), vi.fn()));
 
       expect(result.current.isChromeVisible).toBe(false);
       act(() => { result.current.setIsChromeVisible(true); });

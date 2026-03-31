@@ -1,6 +1,6 @@
 
 
-export default function TxtCover({ title, width = '100%', height = '100%' }: { title: string, width?: string, height?: string }) {
+export default function TxtCover({ title, width = '100%', height = '100%' }: { title: string; width?: string; height?: string }) {
   // Generate a deterministically varying background based on title string hash
   let hash = 0;
   for (let i = 0; i < title.length; i++) {

@@ -216,7 +216,7 @@ export function htmlToText(html: string): string {
     .replace(/[^\S\n]+/gu, ' ')
     .replace(/ *\n */gu, '\n');
   const lines = text.split('\n');
-  const filtered = lines.filter(line => {
+  const filtered = lines.filter((line) => {
     const trimmed = line.trim();
     return !trimmed || !NAV_LINE_PATTERN.test(trimmed);
   });

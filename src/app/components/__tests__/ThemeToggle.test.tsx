@@ -19,7 +19,7 @@ describe('ThemeToggle', () => {
     render(
       <ThemeProvider>
         <ThemeToggle />
-      </ThemeProvider>
+      </ThemeProvider>,
     );
 
     const button = screen.getByRole('button');
@@ -40,7 +40,7 @@ describe('ThemeToggle', () => {
     render(
       <ThemeProvider>
         <ThemeToggle />
-      </ThemeProvider>
+      </ThemeProvider>,
     );
 
     const button = screen.getByRole('button');

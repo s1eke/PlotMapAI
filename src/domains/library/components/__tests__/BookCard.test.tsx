@@ -45,7 +45,7 @@ describe('BookCard', () => {
     render(
       <MemoryRouter>
         <BookCard novel={novel} />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     expect(await screen.findByRole('img', { name: 'Test Novel' })).toHaveAttribute('src', 'blob:cover');
@@ -58,7 +58,7 @@ describe('BookCard', () => {
     render(
       <MemoryRouter>
         <BookCard novel={novel} />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     expect(screen.getByTestId('txt-cover')).toHaveTextContent('Test Novel');
@@ -70,7 +70,7 @@ describe('BookCard', () => {
     render(
       <MemoryRouter>
         <BookCard novel={mockNovel} />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     expect(screen.getByRole('link')).toHaveAttribute('href', '/novel/1');
@@ -80,7 +80,7 @@ describe('BookCard', () => {
     render(
       <MemoryRouter>
         <BookCard novel={mockNovel} />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     const link = screen.getByRole('link');

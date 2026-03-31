@@ -121,7 +121,7 @@ describe('ReaderToolbar', () => {
         {...defaultProps}
         onToggleSidebar={onToggleSidebar}
         onCloseSidebar={onCloseSidebar}
-        isSidebarOpen={true}
+        isSidebarOpen
       />,
     );
 
@@ -156,7 +156,7 @@ describe('ReaderToolbar', () => {
     render(
       <ReaderToolbar
         {...defaultProps}
-        isSidebarOpen={true}
+        isSidebarOpen
         onCloseSidebar={onCloseSidebar}
       />,
     );

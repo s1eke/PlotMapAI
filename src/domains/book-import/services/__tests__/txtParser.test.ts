@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock crypto.subtle.digest
 const mockDigest = vi.fn().mockResolvedValue(
-  new ArrayBuffer(32) // SHA-256 produces 32 bytes
+  new ArrayBuffer(32), // SHA-256 produces 32 bytes
 );
 
 Object.defineProperty(globalThis, 'crypto', {

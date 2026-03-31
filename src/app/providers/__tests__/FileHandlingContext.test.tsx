@@ -67,7 +67,7 @@ describe('FileHandlingContext', () => {
             <Route path="/novel/:id" element={<Probe />} />
           </Routes>
         </FileHandlingProvider>
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     expect(launchQueueMock.setConsumer).toHaveBeenCalledTimes(1);

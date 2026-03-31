@@ -15,8 +15,8 @@ describe('ChapterAnalysisPanel', () => {
   it('shows loading state when isLoading is true', () => {
     const { container } = render(
       <MemoryRouter>
-        <ChapterAnalysisPanel novelId={1} analysis={null} job={null} isLoading={true} />
-      </MemoryRouter>
+        <ChapterAnalysisPanel novelId={1} analysis={null} job={null} isLoading />
+      </MemoryRouter>,
     );
     expect(container.querySelector('.animate-spin')).toBeInTheDocument();
   });
@@ -37,7 +37,7 @@ describe('ChapterAnalysisPanel', () => {
     render(
       <MemoryRouter>
         <ChapterAnalysisPanel novelId={1} analysis={analysis} job={null} isLoading={false} />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     expect(screen.getByText('Test Chapter')).toBeInTheDocument();
@@ -83,7 +83,7 @@ describe('ChapterAnalysisPanel', () => {
     render(
       <MemoryRouter>
         <ChapterAnalysisPanel novelId={1} analysis={null} job={job} isLoading={false} />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     expect(screen.getByText('reader.analysisPanel.statusQueued')).toBeInTheDocument();

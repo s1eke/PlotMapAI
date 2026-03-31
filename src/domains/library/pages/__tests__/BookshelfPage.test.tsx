@@ -73,7 +73,7 @@ describe('BookshelfPage', () => {
     const { container } = render(
       <MemoryRouter>
         <BookshelfPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     expect(libraryApi.list).toHaveBeenCalledTimes(1);
@@ -85,7 +85,7 @@ describe('BookshelfPage', () => {
     render(
       <MemoryRouter>
         <BookshelfPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     expect(await screen.findByText('bookshelf.noBooks')).toBeInTheDocument();
@@ -98,7 +98,7 @@ describe('BookshelfPage', () => {
     render(
       <MemoryRouter>
         <BookshelfPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     expect(await screen.findByText('bookshelf.noBooks')).toBeInTheDocument();
@@ -132,7 +132,7 @@ describe('BookshelfPage', () => {
     render(
       <MemoryRouter>
         <BookshelfPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     await screen.findByTestId('book-card');
@@ -149,7 +149,7 @@ describe('BookshelfPage', () => {
     render(
       <MemoryRouter>
         <BookshelfPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     expect(await screen.findByText('bookshelf.loadError')).toBeInTheDocument();
@@ -169,7 +169,7 @@ describe('BookshelfPage', () => {
     render(
       <MemoryRouter>
         <BookshelfPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     expect(await screen.findByText('bookshelf.noBooks')).toBeInTheDocument();
@@ -210,7 +210,7 @@ describe('BookshelfPage', () => {
     render(
       <MemoryRouter>
         <BookshelfPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     expect(await screen.findByTestId('upload-modal')).toBeInTheDocument();

@@ -9,7 +9,7 @@ export function buildChunkPrompt(
   chunk: AnalysisChunkPayload,
   totalChunks: number,
 ): string {
-  const chapterList = chunk.chapters.map(chapter => `${chapter.chapterIndex}:${chapter.title || '未命名章节'}`).join(', ');
+  const chapterList = chunk.chapters.map((chapter) => `${chapter.chapterIndex}:${chapter.title || '未命名章节'}`).join(', ');
   return `请分析小说《${novelTitle}》的以下章节块。当前是第 ${chunk.chunkIndex + 1}/${totalChunks} 个块。
 
 分析目标：

@@ -18,12 +18,12 @@ export function useScrollModeChapters(
   contentVersion: number,
   onReadingAnchorChange?: (anchor: ScrollModeAnchor) => void,
 ): {
-  scrollChapterElementsRef: React.MutableRefObject<Map<number, HTMLDivElement>>;
-  handleScroll: () => void;
-  getCurrentAnchor: () => ScrollModeAnchor | null;
-  scrollViewportTop: number;
-  syncViewportState: (options?: { force?: boolean }) => void;
-} {
+    scrollChapterElementsRef: React.MutableRefObject<Map<number, HTMLDivElement>>;
+    handleScroll: () => void;
+    getCurrentAnchor: () => ScrollModeAnchor | null;
+    scrollViewportTop: number;
+    syncViewportState: (options?: { force?: boolean }) => void;
+  } {
   const scrollChapterElementsRef = useRef<Map<number, HTMLDivElement>>(new Map());
   const scrollThrottleRef = useRef(0);
   const pendingScrollFetchesRef = useRef<Set<number>>(new Set());
@@ -63,7 +63,7 @@ export function useScrollModeChapters(
     pendingScrollFetchesRef.current.add(nextIdx);
     void fetchChapterContent(nextIdx)
       .then(() => {
-        setScrollModeChapters(prev => {
+        setScrollModeChapters((prev) => {
           if (prev.includes(nextIdx)) return prev;
           return [...prev, nextIdx];
         });
@@ -88,7 +88,7 @@ export function useScrollModeChapters(
       .then(() => {
         const container = contentRef.current;
         const prevHeight = container?.scrollHeight ?? 0;
-        setScrollModeChapters(prev => {
+        setScrollModeChapters((prev) => {
           if (prev.includes(prevIdx)) return prev;
           return [prevIdx, ...prev];
         });
@@ -154,7 +154,7 @@ export function useScrollModeChapters(
     scrollThrottleRef.current = now;
 
     const el = contentRef.current;
-    const scrollTop = el.scrollTop;
+    const { scrollTop } = el;
     const anchor = getCurrentAnchor();
     if (anchor) {
       onReadingAnchorChange?.(anchor);

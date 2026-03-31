@@ -109,7 +109,7 @@ export async function resumeAnalysis(novelId: number): Promise<AnalysisStatusRes
   await repository.resetChunksForResume(novelId);
   const chunks = await repository.loadChunks(novelId);
   const snapshot = await repository.getSnapshot(novelId);
-  const nextPending = chunks.find(chunk => chunk.status !== 'completed');
+  const nextPending = chunks.find((chunk) => chunk.status !== 'completed');
   await repository.saveJobPatch(
     novelId,
     deriveJobPatchForResume({
@@ -173,7 +173,7 @@ export async function analyzeSingleChapter(
     repository.loadNovel(novelId),
     loadAndPurifyChapters(novelId),
   ]);
-  const chapter = chapters.find(item => item.chapterIndex === chapterIndex);
+  const chapter = chapters.find((item) => item.chapterIndex === chapterIndex);
   if (!chapter) throw new AnalysisJobStateError(AnalysisErrorCode.CHAPTER_NOT_FOUND);
   const result = await runSingleChapterAnalysis(runtimeConfig, novel.title, chapter);
   return repository.saveSingleChapterAnalysis(

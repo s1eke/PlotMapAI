@@ -43,8 +43,8 @@ type JsFunction = (match: string) => string;
 const JS_FUNCTION_MAP: Record<string, JsFunction> = {
   fullwidth: jsFullwidthToHalfwidth,
   halfwidth: jsHalfwidthToFullwidth,
-  '全角': jsFullwidthToHalfwidth,
-  '半角': jsHalfwidthToFullwidth,
+  全角: jsFullwidthToHalfwidth,
+  半角: jsHalfwidthToFullwidth,
   strip: jsStripSpaces,
   normalize: jsNormalizeUnicode,
 };

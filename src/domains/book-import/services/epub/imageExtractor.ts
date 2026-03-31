@@ -133,13 +133,13 @@ export async function extractChapterImages(
 
 export async function extractCoverBlob(opfPackage: OpfPackage): Promise<Blob | null> {
   const { manifest, metadata, opfDir, zip } = opfPackage;
-  const imageItems = Array.from(manifest.values()).filter(item => item.mediaType.startsWith('image/'));
+  const imageItems = Array.from(manifest.values()).filter((item) => item.mediaType.startsWith('image/'));
   let coverItem = undefined as (typeof imageItems)[number] | undefined;
 
   if (metadata.coverId) coverItem = manifest.get(metadata.coverId);
 
   if (!coverItem) {
-    coverItem = imageItems.find(item => {
+    coverItem = imageItems.find((item) => {
       const href = item.href.toLowerCase();
       const id = item.id.toLowerCase();
       return href.includes('cover') || id.includes('cover');

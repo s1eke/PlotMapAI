@@ -18,15 +18,15 @@ export interface AnalysisProviderRequest {
 }
 
 export interface AnalysisProviderAdapter {
-  generateText(
+  generateText: (
     config: AnalysisProviderConfig,
     request: AnalysisProviderRequest,
     signal?: AbortSignal,
-  ): Promise<string>;
-  testConnection(
+  ) => Promise<string>;
+  testConnection: (
     config: AnalysisProviderConfig,
     signal?: AbortSignal,
-  ): Promise<string>;
+  ) => Promise<string>;
 }
 
 export function isAnalysisProviderId(value: unknown): value is AnalysisProviderId {

@@ -35,12 +35,12 @@ export interface PurifyChaptersPayload {
   bookTitle: string;
 }
 
-export type TextProcessingTaskMap = {
+export interface TextProcessingTaskMap {
   'parse-txt': WorkerTaskSpec<ParseTxtPayload, ParsedTextDocument, TextProcessingProgress>;
   'purify-chapter': WorkerTaskSpec<PurifyChapterPayload, PurifiedChapter, TextProcessingProgress>;
   'purify-chapters': WorkerTaskSpec<PurifyChaptersPayload, PurifiedChapter[], TextProcessingProgress>;
   'purify-titles': WorkerTaskSpec<PurifyTitlesPayload, PurifiedTitle[], TextProcessingProgress>;
-};
+}
 
 export type TextProcessingTaskPayloadMap = {
   [Task in keyof TextProcessingTaskMap]: WorkerTaskPayload<TextProcessingTaskMap, Task>;

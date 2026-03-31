@@ -100,7 +100,7 @@ describe('purificationRulesApi', () => {
 `], 'purification.yaml', { type: 'text/yaml' });
 
     const rules = await purificationRulesApi.uploadPurificationRulesYaml(file);
-    expect(rules.map(rule => rule.pattern)).toEqual(['foo', 'bar']);
+    expect(rules.map((rule) => rule.pattern)).toEqual(['foo', 'bar']);
     expect(rules.find((rule) => rule.pattern === 'bar')?.exclusiveGroup).toBe('formatting');
   });
 

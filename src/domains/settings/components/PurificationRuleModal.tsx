@@ -75,7 +75,7 @@ export default function PurificationRuleModal({ isOpen, onClose, onSave, rule }:
               type="text"
               required
               value={formData.name ?? ''}
-              onChange={e => setFormData({ ...formData, name: e.target.value })}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               className="w-full bg-muted-bg border border-white/10 rounded-xl px-4 py-2.5 text-text-primary focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-all"
               placeholder={t('settings.purification.namePlaceholder')}
             />
@@ -86,7 +86,7 @@ export default function PurificationRuleModal({ isOpen, onClose, onSave, rule }:
               type="text"
               required
               value={formData.group ?? ''}
-              onChange={e => setFormData({ ...formData, group: e.target.value })}
+              onChange={(e) => setFormData({ ...formData, group: e.target.value })}
               className="w-full bg-muted-bg border border-white/10 rounded-xl px-4 py-2.5 text-text-primary focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-all"
               placeholder={t('settings.purification.groupPlaceholder')}
             />
@@ -99,7 +99,7 @@ export default function PurificationRuleModal({ isOpen, onClose, onSave, rule }:
           <textarea
             required
             value={formData.pattern ?? ''}
-            onChange={e => setFormData({ ...formData, pattern: e.target.value })}
+            onChange={(e) => setFormData({ ...formData, pattern: e.target.value })}
             className="w-full bg-muted-bg border border-white/10 rounded-xl px-4 py-2.5 text-text-primary focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-all font-mono text-sm h-24 resize-none"
             placeholder={t('settings.purification.patternPlaceholder')}
           />
@@ -117,7 +117,7 @@ export default function PurificationRuleModal({ isOpen, onClose, onSave, rule }:
           </div>
           <textarea
             value={formData.replacement ?? ''}
-            onChange={e => setFormData({ ...formData, replacement: e.target.value })}
+            onChange={(e) => setFormData({ ...formData, replacement: e.target.value })}
             className="w-full bg-muted-bg border border-white/10 rounded-xl px-4 py-2.5 text-text-primary focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-all font-mono text-sm h-24 resize-none"
             placeholder={t('settings.purification.replacementPlaceholder')}
           />
@@ -130,11 +130,11 @@ export default function PurificationRuleModal({ isOpen, onClose, onSave, rule }:
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-muted-bg/50 p-4 rounded-xl border border-white/5">
           <div className="flex items-center justify-between">
             <span className="text-sm text-text-primary">{t('settings.purification.useRegex')}</span>
-            <Toggle checked={formData.isRegex ?? false} onChange={checked => setFormData({ ...formData, isRegex: checked })} />
+            <Toggle checked={formData.isRegex ?? false} onChange={(checked) => setFormData({ ...formData, isRegex: checked })} />
           </div>
           <div className="flex items-center justify-between">
             <span className="text-sm text-text-primary">{t('settings.purification.isEnabled')}</span>
-            <Toggle checked={formData.isEnabled ?? false} onChange={checked => setFormData({ ...formData, isEnabled: checked })} />
+            <Toggle checked={formData.isEnabled ?? false} onChange={(checked) => setFormData({ ...formData, isEnabled: checked })} />
           </div>
         </div>
 
@@ -146,7 +146,7 @@ export default function PurificationRuleModal({ isOpen, onClose, onSave, rule }:
               <input
                 type="checkbox"
                 checked={formData.scopeTitle ?? true}
-                onChange={e => setFormData({ ...formData, scopeTitle: e.target.checked })}
+                onChange={(e) => setFormData({ ...formData, scopeTitle: e.target.checked })}
                 className="w-4 h-4 rounded border-white/20 bg-white/5 text-accent focus:ring-accent focus:ring-offset-0"
               />
               <span className="text-sm text-text-secondary group-hover:text-text-primary transition-colors">{t('settings.purification.scopeTitle')}</span>
@@ -155,7 +155,7 @@ export default function PurificationRuleModal({ isOpen, onClose, onSave, rule }:
               <input
                 type="checkbox"
                 checked={formData.scopeContent ?? true}
-                onChange={e => setFormData({ ...formData, scopeContent: e.target.checked })}
+                onChange={(e) => setFormData({ ...formData, scopeContent: e.target.checked })}
                 className="w-4 h-4 rounded border-white/20 bg-white/5 text-accent focus:ring-accent focus:ring-offset-0"
               />
               <span className="text-sm text-text-secondary group-hover:text-text-primary transition-colors">{t('settings.purification.scopeContent')}</span>
@@ -170,7 +170,7 @@ export default function PurificationRuleModal({ isOpen, onClose, onSave, rule }:
             <input
               type="text"
               value={formData.bookScope ?? ''}
-              onChange={e => setFormData({ ...formData, bookScope: e.target.value })}
+              onChange={(e) => setFormData({ ...formData, bookScope: e.target.value })}
               className="w-full bg-muted-bg border border-white/10 rounded-xl px-4 py-2.5 text-text-primary focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-all"
               placeholder={t('settings.purification.bookScopePlaceholder')}
             />
@@ -180,7 +180,7 @@ export default function PurificationRuleModal({ isOpen, onClose, onSave, rule }:
             <input
               type="text"
               value={formData.excludeBookScope ?? ''}
-              onChange={e => setFormData({ ...formData, excludeBookScope: e.target.value })}
+              onChange={(e) => setFormData({ ...formData, excludeBookScope: e.target.value })}
               className="w-full bg-muted-bg border border-white/10 rounded-xl px-4 py-2.5 text-text-primary focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-all"
               placeholder={t('settings.purification.excludeBookScopePlaceholder')}
             />
@@ -196,7 +196,7 @@ export default function PurificationRuleModal({ isOpen, onClose, onSave, rule }:
               min="1"
               max="20"
               value={formData.order ?? 10}
-              onChange={e => setFormData({ ...formData, order: Number.parseInt(e.target.value, 10) || 0 })}
+              onChange={(e) => setFormData({ ...formData, order: Number.parseInt(e.target.value, 10) || 0 })}
               className="w-full bg-muted-bg border border-white/10 rounded-xl px-4 py-2.5 text-text-primary focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-all"
             />
           </div>
@@ -205,7 +205,7 @@ export default function PurificationRuleModal({ isOpen, onClose, onSave, rule }:
             <input
               type="number"
               value={formData.timeoutMs ?? 3000}
-              onChange={e => setFormData({ ...formData, timeoutMs: Number.parseInt(e.target.value, 10) || 0 })}
+              onChange={(e) => setFormData({ ...formData, timeoutMs: Number.parseInt(e.target.value, 10) || 0 })}
               className="w-full bg-muted-bg border border-white/10 rounded-xl px-4 py-2.5 text-text-primary focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-all"
             />
           </div>

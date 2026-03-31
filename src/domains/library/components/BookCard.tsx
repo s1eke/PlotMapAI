@@ -18,7 +18,7 @@ export default function BookCard({ novel }: BookCardProps) {
   useEffect(() => {
     if (!novel.hasCover) return;
     let revoked = false;
-    libraryApi.getCoverUrl(novel.id).then(url => {
+    libraryApi.getCoverUrl(novel.id).then((url) => {
       if (!revoked) setCoverUrl(url);
     });
     return () => { revoked = true; };

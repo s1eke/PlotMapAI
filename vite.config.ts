@@ -1,21 +1,21 @@
-import { execSync } from 'child_process'
-import { readFileSync } from 'fs'
-import { resolve } from 'path'
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-import tailwindcss from '@tailwindcss/vite'
-import { VitePWA } from 'vite-plugin-pwa'
+import { execSync } from 'child_process';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
+import { VitePWA } from 'vite-plugin-pwa';
 
-const pkg = JSON.parse(readFileSync('./package.json', 'utf-8'))
-let shortHash = 'unknown'
+const pkg = JSON.parse(readFileSync('./package.json', 'utf-8'));
+let shortHash = 'unknown';
 try {
-  shortHash = execSync('git rev-parse --short HEAD').toString().trim()
+  shortHash = execSync('git rev-parse --short HEAD').toString().trim();
 } catch {
   // git not available (e.g. shallow clone, npm publish, Docker build)
 }
 
-const base = process.env.VITE_BASE || '/'
-const PWA_DEFAULT_SURFACE_COLOR = '#f8fafc'
+const base = process.env.VITE_BASE || '/';
+const PWA_DEFAULT_SURFACE_COLOR = '#f8fafc';
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -125,4 +125,4 @@ export default defineConfig({
       },
     }),
   ],
-})
+});

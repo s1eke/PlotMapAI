@@ -43,8 +43,8 @@ export interface ReaderTextProcessingOptions {
 }
 
 async function getPurifyRules(): Promise<PurifyRule[]> {
-  const rules = await db.purificationRules.filter(r => r.isEnabled).sortBy('order');
-  return rules.map(r => ({
+  const rules = await db.purificationRules.filter((r) => r.isEnabled).sortBy('order');
+  return rules.map((r) => ({
     name: r.name,
     pattern: r.pattern,
     replacement: r.replacement,
@@ -113,7 +113,7 @@ export const readerApi = {
     const rawChapters = await db.chapters.where('novelId').equals(novelId).sortBy('chapterIndex');
     const rules = await getPurifyRules();
     if (rules.length === 0) {
-      return rawChapters.map(ch => ({ index: ch.chapterIndex, title: ch.title, wordCount: ch.wordCount }));
+      return rawChapters.map((ch) => ({ index: ch.chapterIndex, title: ch.title, wordCount: ch.wordCount }));
     }
 
     const titles = await runPurifyTitlesTask(

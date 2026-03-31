@@ -263,7 +263,7 @@ export const aiConfigApi = {
       });
     }
 
-    const decode64 = (value: string) => Uint8Array.from(atob(value), c => c.charCodeAt(0));
+    const decode64 = (value: string) => Uint8Array.from(atob(value), (c) => c.charCodeAt(0));
     const salt = decode64(envelope.salt);
     const iv = decode64(envelope.iv);
     const ciphertext = decode64(envelope.data);

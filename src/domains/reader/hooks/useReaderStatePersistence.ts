@@ -61,18 +61,18 @@ export function useReaderStatePersistence(novelId: number): {
   loadPersistedReaderState: () => Promise<StoredReaderState>;
   initialStoredState: StoredReaderState | null;
 } {
-  const sessionNovelId = useReaderSessionSelector(state => state.novelId);
-  const restoreStatus = useReaderSessionSelector(state => state.restoreStatus);
-  const hasUserInteracted = useReaderSessionSelector(state => state.hasUserInteracted);
-  const chapterIndex = useReaderSessionSelector(state => state.chapterIndex);
-  const mode = useReaderSessionSelector(state => state.mode);
-  const viewMode = useReaderSessionSelector(state => state.viewMode);
-  const isTwoColumn = useReaderSessionSelector(state => state.isTwoColumn);
-  const chapterProgress = useReaderSessionSelector(state => state.chapterProgress);
-  const scrollPosition = useReaderSessionSelector(state => state.scrollPosition);
-  const lastContentMode = useReaderSessionSelector(state => state.lastContentMode);
-  const locatorVersion = useReaderSessionSelector(state => state.locatorVersion);
-  const locator = useReaderSessionSelector(state => state.locator);
+  const sessionNovelId = useReaderSessionSelector((state) => state.novelId);
+  const restoreStatus = useReaderSessionSelector((state) => state.restoreStatus);
+  const hasUserInteracted = useReaderSessionSelector((state) => state.hasUserInteracted);
+  const chapterIndex = useReaderSessionSelector((state) => state.chapterIndex);
+  const mode = useReaderSessionSelector((state) => state.mode);
+  const viewMode = useReaderSessionSelector((state) => state.viewMode);
+  const isTwoColumn = useReaderSessionSelector((state) => state.isTwoColumn);
+  const chapterProgress = useReaderSessionSelector((state) => state.chapterProgress);
+  const scrollPosition = useReaderSessionSelector((state) => state.scrollPosition);
+  const lastContentMode = useReaderSessionSelector((state) => state.lastContentMode);
+  const locatorVersion = useReaderSessionSelector((state) => state.locatorVersion);
+  const locator = useReaderSessionSelector((state) => state.locator);
   const storedState = useMemo<StoredReaderState>(() => ({
     chapterIndex,
     mode,

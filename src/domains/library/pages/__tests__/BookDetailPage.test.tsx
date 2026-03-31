@@ -94,13 +94,13 @@ function createStatusResponse(
   };
 }
 
-function renderPage(initialEntry: string = '/novel/1') {
+function renderPage(initialEntry = '/novel/1') {
   return render(
     <MemoryRouter initialEntries={[initialEntry]}>
       <Routes>
         <Route path="/novel/:id" element={<BookDetailPage />} />
       </Routes>
-    </MemoryRouter>
+    </MemoryRouter>,
   );
 }
 

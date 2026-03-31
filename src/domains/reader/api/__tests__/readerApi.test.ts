@@ -176,14 +176,25 @@ describe('loadAndPurifyChapters', () => {
     await db.novels.add({
       id: undefined as unknown as number,
       title: 'Purify Novel',
-      author: '', description: '', tags: [],
-      fileType: 'txt', fileHash: 'ph', coverPath: '', originalFilename: 'p.txt',
-      originalEncoding: 'utf-8', totalWords: 100, createdAt: new Date().toISOString(),
+      author: '',
+      description: '',
+      tags: [],
+      fileType: 'txt',
+      fileHash: 'ph',
+      coverPath: '',
+      originalFilename: 'p.txt',
+      originalEncoding: 'utf-8',
+      totalWords: 100,
+      createdAt: new Date().toISOString(),
     });
     const novel = await db.novels.orderBy('id').last();
     await db.chapters.add({
       id: undefined as unknown as number,
-      novelId: novel!.id, title: 'Chapter One', content: 'Hello world', chapterIndex: 0, wordCount: 11,
+      novelId: novel!.id,
+      title: 'Chapter One',
+      content: 'Hello world',
+      chapterIndex: 0,
+      wordCount: 11,
     });
   });
 

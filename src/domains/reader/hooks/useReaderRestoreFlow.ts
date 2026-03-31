@@ -101,8 +101,8 @@ export function useReaderRestoreFlow({
   isChapterAnalysisLoading,
 }: UseReaderRestoreFlowParams): UseReaderRestoreFlowResult {
   const chapterChangeSourceRef = useRef<ChapterChangeSource>(null);
-  const pendingRestoreState = useReaderSessionSelector(state => state.pendingRestoreState);
-  const restoreStatus = useReaderSessionSelector(state => state.restoreStatus);
+  const pendingRestoreState = useReaderSessionSelector((state) => state.pendingRestoreState);
+  const restoreStatus = useReaderSessionSelector((state) => state.restoreStatus);
   const pendingRestoreStateRef = useRef<StoredReaderState | null>(pendingRestoreState);
   const originalViewStateRef = useRef<StoredReaderState | null>(null);
   const summaryViewStateRef = useRef<StoredReaderState | null>(null);
@@ -330,17 +330,17 @@ export function useReaderRestoreFlow({
       && matchingSnapshot.chapterIndex === currentReaderState.chapterIndex;
     const targetRestoreState: StoredReaderState = canReuseSnapshot
       ? {
-          ...currentReaderState,
-          ...matchingSnapshot,
-          viewMode: nextViewMode,
-          isTwoColumn: currentReaderState.isTwoColumn,
-        }
+        ...currentReaderState,
+        ...matchingSnapshot,
+        viewMode: nextViewMode,
+        isTwoColumn: currentReaderState.isTwoColumn,
+      }
       : {
-          ...currentReaderState,
-          viewMode: nextViewMode,
-          chapterProgress: 0,
-          scrollPosition: undefined,
-        };
+        ...currentReaderState,
+        viewMode: nextViewMode,
+        chapterProgress: 0,
+        scrollPosition: undefined,
+      };
 
     markUserInteracted();
     if (typeof targetRestoreState.chapterIndex === 'number') {

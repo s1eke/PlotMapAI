@@ -88,7 +88,7 @@ describe('ReloadPrompt', () => {
 
   it('switches to the updating label while refreshing', async () => {
     const updateServiceWorker = vi.fn().mockImplementation(async () => {
-      await new Promise(resolve => setTimeout(resolve, 20));
+      await new Promise((resolve) => setTimeout(resolve, 20));
     });
 
     __setRegisterSwState({

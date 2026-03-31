@@ -147,7 +147,7 @@ export function collectAnalysisAggregates(chapterRows: ChapterAnalysis[]): Analy
 
   const totalWeight = Array.from(characterMap.values()).reduce((sum, item) => sum + item.weight, 0) || 1;
   const allCharacterStats = Array.from(characterMap.values())
-    .map(item => {
+    .map((item) => {
       const topRole = [...item.roles.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0];
       return {
         name: item.name,
@@ -163,11 +163,11 @@ export function collectAnalysisAggregates(chapterRows: ChapterAnalysis[]): Analy
     .sort((a, b) => b.weight - a.weight || a.name.localeCompare(b.name));
 
   const relationshipGraph = Array.from(relationshipMap.values())
-    .map(item => {
+    .map((item) => {
       const topTypes = [...item.relationTypes.entries()]
         .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
         .slice(0, 6)
-        .map(entry => entry[0]);
+        .map((entry) => entry[0]);
       return {
         source: item.source,
         target: item.target,
@@ -185,7 +185,7 @@ export function collectAnalysisAggregates(chapterRows: ChapterAnalysis[]): Analy
 
   return {
     chapters: chaptersPayload,
-    themes: [...themeCounter.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12).map(entry => entry[0]),
+    themes: [...themeCounter.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12).map((entry) => entry[0]),
     characterStats: allCharacterStats.slice(0, 20),
     allCharacterStats,
     allRelationshipGraph: relationshipGraph,
@@ -219,7 +219,7 @@ export function buildCharacterGraphPayload(
     if (name) overviewCharacterMap.set(name, item);
   }
 
-  const relationshipGraph = (aggregates.relationshipGraph as unknown as Array<Record<string, unknown>>).filter(item => typeof item === 'object');
+  const relationshipGraph = (aggregates.relationshipGraph as unknown as Array<Record<string, unknown>>).filter((item) => typeof item === 'object');
   const localRelationshipMap = buildLocalRelationshipGraphMap(relationshipGraph);
   const overviewRelationshipMap = buildOverviewRelationshipMap(overviewRelationshipGraph);
 
@@ -234,7 +234,7 @@ export function buildCharacterGraphPayload(
   const mergedPairs: Array<[string, string]> = [];
   for (const edge of graphSeedEdges) {
     const pair = normalizeCharacterPair(edge.source, edge.target);
-    if (!pair || mergedPairs.some(item => item[0] === pair[0] && item[1] === pair[1])) continue;
+    if (!pair || mergedPairs.some((item) => item[0] === pair[0] && item[1] === pair[1])) continue;
     mergedPairs.push(pair);
   }
 
@@ -273,7 +273,7 @@ export function buildCharacterGraphPayload(
     relatedEdgeMap.get(edge.target)?.push(edge);
   }
 
-  const nodes = selectedNames.map(name => {
+  const nodes = selectedNames.map((name) => {
     const aggregateItem = aggregateCharacterMap.get(name) || {};
     const overviewItem = overviewCharacterMap.get(name) || {};
     const role = cleanText(overviewItem.role, 80) || cleanText(aggregateItem.role, 80);

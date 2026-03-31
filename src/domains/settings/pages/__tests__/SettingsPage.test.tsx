@@ -11,7 +11,7 @@ import { tocRulesApi } from '../../api/tocRules';
 
 const i18nMock = vi.hoisted(() => ({
   t: (key: string, options?: { version?: string }) =>
-    options?.version ? `${key} ${options.version}` : key,
+    (options?.version ? `${key} ${options.version}` : key),
 }));
 
 vi.mock('react-i18next', () => ({

@@ -50,8 +50,8 @@ export default function DebugPanel() {
   const autoScrollRef = useRef(true);
 
   useEffect(() => {
-    return debugSubscribe(entry => {
-      setLogs(prev => {
+    return debugSubscribe((entry) => {
+      setLogs((prev) => {
         const next = [...prev, entry];
         if (next.length > MAX_LOGS) next.splice(0, next.length - MAX_LOGS);
         return next;
@@ -98,8 +98,8 @@ export default function DebugPanel() {
       <button
         onClick={() => setIsOpen(true)}
         className={cn(
-          "fixed bottom-4 right-4 z-[70] w-10 h-10 rounded-full flex items-center justify-center shadow-lg border border-border-color transition-colors",
-          "bg-bg-secondary/90 dark:bg-brand-800/90 backdrop-blur-sm hover:bg-bg-secondary dark:hover:bg-brand-800"
+          'fixed bottom-4 right-4 z-[70] w-10 h-10 rounded-full flex items-center justify-center shadow-lg border border-border-color transition-colors',
+          'bg-bg-secondary/90 dark:bg-brand-800/90 backdrop-blur-sm hover:bg-bg-secondary dark:hover:bg-brand-800',
         )}
         title="Debug Panel"
       >
@@ -219,7 +219,7 @@ export default function DebugPanel() {
           <div key={i} className="rounded-lg border border-white/5 bg-black/10 px-2 py-1.5">
             <div className="flex gap-1.5">
               <span className="text-text-secondary/60 shrink-0">{formatTime(entry.time)}</span>
-              <span className={cn("shrink-0 font-semibold", CATEGORY_COLORS[entry.category] || 'text-text-secondary')}>
+              <span className={cn('shrink-0 font-semibold', CATEGORY_COLORS[entry.category] || 'text-text-secondary')}>
                 [{entry.category}]
               </span>
               <span className={cn(

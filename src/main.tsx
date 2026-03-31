@@ -1,9 +1,9 @@
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import './index.css'
-import './i18n/config'
-import App from '@app/App'
-import { initializeAppSafely } from '@app/bootstrap/startup'
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import './index.css';
+import './i18n/config';
+import App from '@app/App';
+import { initializeAppSafely } from '@app/bootstrap/startup';
 
 function findNearestScrollableAncestor(target: EventTarget | null): HTMLElement | null {
   if (!(target instanceof HTMLElement)) {
@@ -58,12 +58,12 @@ if (window.matchMedia('(display-mode: standalone)').matches) {
   }, { passive: false });
 }
 
-console.log(`PlotMapAI v${__APP_VERSION__}`)
+console.log(`PlotMapAI v${__APP_VERSION__}`);
 
-const startupError = await initializeAppSafely()
+const startupError = await initializeAppSafely();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App startupError={startupError} />
   </StrictMode>,
-)
+);

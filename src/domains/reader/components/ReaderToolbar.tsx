@@ -167,7 +167,7 @@ export default function ReaderToolbar({
   } = getReaderChromeThemeClasses(readerTheme);
 
   const toggleSlider = useCallback((key: SliderKey) => {
-    setActiveSlider(prev => prev === key ? null : key);
+    setActiveSlider((prev) => (prev === key ? null : key));
   }, []);
 
   useEffect(() => {
@@ -180,7 +180,7 @@ export default function ReaderToolbar({
       if (overflowBtnRef.current?.contains(target)) return;
       if (pageTurnModeBtnRef.current?.contains(target)) return;
       const mode = isDesktopViewport ? 'desktop' : 'mobile';
-      const btn = activeSlider ? buttonRefs.current[mode + '-' + activeSlider] : null;
+      const btn = activeSlider ? buttonRefs.current[`${mode}-${activeSlider}`] : null;
       if (btn?.contains(target)) return;
       setActiveSlider(null);
       setOverflowOpen(false);
@@ -191,7 +191,7 @@ export default function ReaderToolbar({
   }, [activeSlider, isDesktopViewport, overflowOpen, pageTurnModeOpen]);
 
   const resolvedSliders: ResolvedSlider[] = useMemo(() =>
-    READER_SLIDER_CONFIG.map(cfg => ({
+    READER_SLIDER_CONFIG.map((cfg) => ({
       key: cfg.key,
       icon: cfg.icon,
       label: t(cfg.labelKey),
@@ -202,17 +202,15 @@ export default function ReaderToolbar({
       step: cfg.step,
       onChange: sliders[SETTERS[cfg.key]] as (v: number) => void,
     })),
-    [sliders, t],
-  );
+  [sliders, t]);
 
   const desktopSliders = resolvedSliders;
-  const mobileSliders = resolvedSliders.filter(s => MOBILE_SLIDER_KEYS.includes(s.key));
-  const overflowSliders = resolvedSliders.filter(s => OVERFLOW_SLIDER_KEYS.includes(s.key));
+  const mobileSliders = resolvedSliders.filter((s) => MOBILE_SLIDER_KEYS.includes(s.key));
+  const overflowSliders = resolvedSliders.filter((s) => OVERFLOW_SLIDER_KEYS.includes(s.key));
 
   const themes = useMemo(() =>
-    READER_THEME_DISPLAY.map(td => ({ ...td, label: t(td.labelKey) })),
-    [t],
-  );
+    READER_THEME_DISPLAY.map((td) => ({ ...td, label: t(td.labelKey) })),
+  [t]);
 
   const pageTurnModes = useMemo(() => ([
     { id: 'scroll', label: t('reader.pageTurnModes.scroll') },
@@ -264,7 +262,7 @@ export default function ReaderToolbar({
     runMobileAction(() => {
       setOverflowOpen(false);
       setActiveSlider(null);
-      setPageTurnModeOpen(prev => !prev);
+      setPageTurnModeOpen((prev) => !prev);
     });
   }, [runMobileAction]);
 
@@ -272,7 +270,7 @@ export default function ReaderToolbar({
     runMobileAction(() => {
       setPageTurnModeOpen(false);
       setActiveSlider(null);
-      setOverflowOpen(prev => !prev);
+      setOverflowOpen((prev) => !prev);
     });
   }, [runMobileAction]);
 
@@ -283,7 +281,7 @@ export default function ReaderToolbar({
     return (
       <div key={`${mode}-${s.key}`} className="relative">
         <button
-          ref={el => { buttonRefs.current[mode + '-' + s.key] = el; }}
+          ref={(el) => { buttonRefs.current[`${mode}-${s.key}`] = el; }}
           type="button"
           onClick={() => {
             if (isMobile) {
@@ -327,7 +325,7 @@ export default function ReaderToolbar({
                 max={s.max}
                 step={s.step}
                 value={s.value}
-                onChange={e => s.onChange(Number(e.target.value))}
+                onChange={(e) => s.onChange(Number(e.target.value))}
                 className="flex-1 accent-accent h-1.5 cursor-pointer"
               />
               <span className="text-sm font-mono text-text-primary min-w-[3.5ch] text-right">{s.display}</span>
@@ -351,14 +349,14 @@ export default function ReaderToolbar({
           max={s.max}
           step={s.step}
           value={s.value}
-          onChange={e => s.onChange(Number(e.target.value))}
+          onChange={(e) => s.onChange(Number(e.target.value))}
           className="w-full accent-accent h-1.5 cursor-pointer"
         />
       </div>
     );
   }
 
-  const currentPageTurnMode = pageTurnModes.find(mode => mode.id === pageTurnMode);
+  const currentPageTurnMode = pageTurnModes.find((mode) => mode.id === pageTurnMode);
 
   return (
     <>
@@ -393,7 +391,7 @@ export default function ReaderToolbar({
         </div>
 
         <div className="relative flex items-center gap-1 border-r border-border-color/50 pr-5">
-          {desktopSliders.map(s => renderSliderButton(s, 'desktop'))}
+          {desktopSliders.map((s) => renderSliderButton(s, 'desktop'))}
         </div>
 
         <div className="flex items-center gap-2 border-r border-border-color/50 pr-5">
@@ -422,7 +420,7 @@ export default function ReaderToolbar({
         </div>
 
         <div className="flex items-center gap-2">
-          {themes.map(theme => (
+          {themes.map((theme) => (
             <button
               key={theme.id}
               type="button"
@@ -504,7 +502,7 @@ export default function ReaderToolbar({
                 >
                   <div className="px-2 pb-2 pt-1 text-xs text-text-secondary">{t('reader.pageTurnMode')}</div>
                   <div className="space-y-1">
-                    {pageTurnModes.map(mode => (
+                    {pageTurnModes.map((mode) => (
                       <button
                         key={mode.id}
                         type="button"
@@ -563,7 +561,7 @@ export default function ReaderToolbar({
                   <div className={cn('space-y-2 border-t pt-2', dividerClassName)}>
                     <span className="text-xs text-text-secondary">{t('reader.background')}</span>
                     <div className="flex items-center gap-3">
-                      {themes.map(theme => (
+                      {themes.map((theme) => (
                         <button
                           key={theme.id}
                           type="button"

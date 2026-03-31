@@ -53,7 +53,7 @@ describe('detectChapters', () => {
     ].join('\n');
 
     const chapters = detectChapters(text, [{ rule: '^第\\d+章' }]);
-    const preface = chapters.find(c => c.title === '前言');
+    const preface = chapters.find((c) => c.title === '前言');
     expect(preface).toBeDefined();
   });
 

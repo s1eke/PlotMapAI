@@ -8,12 +8,12 @@ import { registerWorkerTaskHandlers } from '../server';
 
 interface FakeWorkerContext {
   onmessage: ((event: MessageEvent<WorkerTaskMessage<unknown>>) => void) | null;
-  postedMessages: WorkerTaskResponse<unknown, unknown>[];
+  postedMessages: Array<WorkerTaskResponse<unknown, unknown>>;
   postMessage: (message: WorkerTaskResponse<unknown, unknown>) => void;
 }
 
 function createWorkerContext(): FakeWorkerContext {
-  const postedMessages: WorkerTaskResponse<unknown, unknown>[] = [];
+  const postedMessages: Array<WorkerTaskResponse<unknown, unknown>> = [];
 
   return {
     onmessage: null,

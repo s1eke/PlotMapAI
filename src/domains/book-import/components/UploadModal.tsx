@@ -85,10 +85,10 @@ export default function UploadModal({
   const currentFileLabel = batchState
     ? batchState.totalFiles > 1
       ? t('bookshelf.batchProgressFile', {
-          current: batchState.currentFileIndex + 1,
-          total: batchState.totalFiles,
-          name: batchState.currentFileName,
-        })
+        current: batchState.currentFileIndex + 1,
+        total: batchState.totalFiles,
+        name: batchState.currentFileName,
+      })
       : batchState.currentFileName
     : null;
 
@@ -230,32 +230,32 @@ export default function UploadModal({
           </div>
         )}
 
-        <div 
+        <div
           className={cn(
-            "border-2 border-dashed rounded-xl p-8 transition-colors text-center cursor-pointer flex flex-col items-center gap-4",
-            isDragging 
-              ? "border-accent bg-accent/5" 
-              : "border-border-color hover:border-accent/50 hover:bg-white/5",
-            isUploading && "opacity-50 pointer-events-none"
+            'border-2 border-dashed rounded-xl p-8 transition-colors text-center cursor-pointer flex flex-col items-center gap-4',
+            isDragging
+              ? 'border-accent bg-accent/5'
+              : 'border-border-color hover:border-accent/50 hover:bg-white/5',
+            isUploading && 'opacity-50 pointer-events-none',
           )}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
           onClick={() => fileInputRef.current?.click()}
         >
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            className="hidden" 
+          <input
+            type="file"
+            ref={fileInputRef}
+            className="hidden"
             accept=".txt,.epub"
             multiple
             onChange={handleFileChange}
           />
-          
+
           <div className="w-16 h-16 rounded-full bg-brand-800 flex items-center justify-center text-accent shadow-inner">
             {isUploading ? <Loader2 className="w-8 h-8 animate-spin" /> : <UploadCloud className="w-8 h-8" />}
           </div>
-          
+
           <div>
             <p className="text-lg font-medium text-text-primary">
               {isUploading ? t('bookshelf.uploadAndProcessing') : t('bookshelf.clickOrDrag')}

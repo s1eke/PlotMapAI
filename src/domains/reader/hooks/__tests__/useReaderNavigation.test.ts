@@ -77,8 +77,7 @@ function setupHook(overrides: {
       props.isChapterNavigationReady,
       beforeChapterChange,
     ),
-    { initialProps },
-  );
+  { initialProps });
 
   return {
     result,

@@ -66,7 +66,7 @@ export function debugLog(category: string, message: string, ...args: unknown[]):
     kind: 'log',
     time: Date.now(),
     category,
-    message: args.length > 0 ? `${message} ${args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' ')}` : message,
+    message: args.length > 0 ? `${message} ${args.map((a) => (typeof a === 'string' ? a : JSON.stringify(a))).join(' ')}` : message,
   };
   pushEntry(entry);
   console.log(`[PlotMapAI][${category}]`, message, ...args);

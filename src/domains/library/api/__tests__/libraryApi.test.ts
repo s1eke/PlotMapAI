@@ -18,15 +18,31 @@ describe('libraryApi', () => {
   it('list returns novels sorted by createdAt descending', async () => {
     await db.novels.add({
       id: undefined as unknown as number,
-      title: 'First', author: '', description: '', tags: [],
-      fileType: 'txt', fileHash: 'h1', coverPath: '', originalFilename: 'f.txt',
-      originalEncoding: 'utf-8', totalWords: 100, createdAt: '2024-01-01T00:00:00Z',
+      title: 'First',
+      author: '',
+      description: '',
+      tags: [],
+      fileType: 'txt',
+      fileHash: 'h1',
+      coverPath: '',
+      originalFilename: 'f.txt',
+      originalEncoding: 'utf-8',
+      totalWords: 100,
+      createdAt: '2024-01-01T00:00:00Z',
     });
     await db.novels.add({
       id: undefined as unknown as number,
-      title: 'Second', author: '', description: '', tags: [],
-      fileType: 'txt', fileHash: 'h2', coverPath: '', originalFilename: 's.txt',
-      originalEncoding: 'utf-8', totalWords: 200, createdAt: '2024-02-01T00:00:00Z',
+      title: 'Second',
+      author: '',
+      description: '',
+      tags: [],
+      fileType: 'txt',
+      fileHash: 'h2',
+      coverPath: '',
+      originalFilename: 's.txt',
+      originalEncoding: 'utf-8',
+      totalWords: 200,
+      createdAt: '2024-02-01T00:00:00Z',
     });
     const result = await libraryApi.list();
     expect(result.length).toBe(2);
@@ -36,9 +52,17 @@ describe('libraryApi', () => {
   it('get returns a novel by id', async () => {
     const id = await db.novels.add({
       id: undefined as unknown as number,
-      title: 'Get Test', author: 'Auth', description: 'Desc', tags: ['tag1'],
-      fileType: 'txt', fileHash: 'h', coverPath: '', originalFilename: 'g.txt',
-      originalEncoding: 'utf-8', totalWords: 500, createdAt: new Date().toISOString(),
+      title: 'Get Test',
+      author: 'Auth',
+      description: 'Desc',
+      tags: ['tag1'],
+      fileType: 'txt',
+      fileHash: 'h',
+      coverPath: '',
+      originalFilename: 'g.txt',
+      originalEncoding: 'utf-8',
+      totalWords: 500,
+      createdAt: new Date().toISOString(),
     });
     const novel = await libraryApi.get(id as number);
     expect(novel.title).toBe('Get Test');
@@ -52,13 +76,25 @@ describe('libraryApi', () => {
   it('delete removes novel and related data', async () => {
     const id = await db.novels.add({
       id: undefined as unknown as number,
-      title: 'Delete Me', author: '', description: '', tags: [],
-      fileType: 'txt', fileHash: 'dh', coverPath: '', originalFilename: 'd.txt',
-      originalEncoding: 'utf-8', totalWords: 100, createdAt: new Date().toISOString(),
+      title: 'Delete Me',
+      author: '',
+      description: '',
+      tags: [],
+      fileType: 'txt',
+      fileHash: 'dh',
+      coverPath: '',
+      originalFilename: 'd.txt',
+      originalEncoding: 'utf-8',
+      totalWords: 100,
+      createdAt: new Date().toISOString(),
     });
     await db.chapters.add({
       id: undefined as unknown as number,
-      novelId: id as number, title: 'Ch', content: 'c', chapterIndex: 0, wordCount: 1,
+      novelId: id as number,
+      title: 'Ch',
+      content: 'c',
+      chapterIndex: 0,
+      wordCount: 1,
     });
     await db.readingProgress.add({
       id: undefined as unknown as number,
@@ -103,9 +139,17 @@ describe('libraryApi', () => {
   it('novelToApi converts tags from JSON string to array', async () => {
     await db.novels.add({
       id: undefined as unknown as number,
-      title: 'Tagged', author: '', description: '', tags: ['a','b','c'],
-      fileType: 'txt', fileHash: 'th', coverPath: '', originalFilename: 't.txt',
-      originalEncoding: 'utf-8', totalWords: 100, createdAt: new Date().toISOString(),
+      title: 'Tagged',
+      author: '',
+      description: '',
+      tags: ['a', 'b', 'c'],
+      fileType: 'txt',
+      fileHash: 'th',
+      coverPath: '',
+      originalFilename: 't.txt',
+      originalEncoding: 'utf-8',
+      totalWords: 100,
+      createdAt: new Date().toISOString(),
     });
     const novels = await libraryApi.list();
     expect(novels[0].tags).toEqual(['a', 'b', 'c']);

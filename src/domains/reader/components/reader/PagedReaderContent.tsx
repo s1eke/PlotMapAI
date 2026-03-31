@@ -527,9 +527,9 @@ export default function PagedReaderContent({
       setPendingCommittedPageOverride(
         commitPreviewTarget.chapter.index !== currentPreviewTarget.chapter.index
           ? {
-              chapterIndex: commitPreviewTarget.chapter.index,
-              pageIndex: commitPreviewTarget.pageIndex,
-            }
+            chapterIndex: commitPreviewTarget.chapter.index,
+            pageIndex: commitPreviewTarget.pageIndex,
+          }
           : null,
       );
       setCommittedDragTransition({
@@ -583,23 +583,21 @@ export default function PagedReaderContent({
     : dragDirection === 'next'
       ? nextPreviewTarget
       : null;
-  const activeDragTransition = committedDragTransition
-    ? committedDragTransition
-    : dragDirection && livePreviewTarget && (pageTurnMode === 'cover' || pageTurnMode === 'slide') && currentPreviewTarget
-      ? {
-          current: currentPreviewTarget,
-          direction: dragDirection,
-          mode: pageTurnMode,
-          preview: livePreviewTarget,
-        }
-      : null;
+  const activeDragTransition = committedDragTransition || (dragDirection && livePreviewTarget && (pageTurnMode === 'cover' || pageTurnMode === 'slide') && currentPreviewTarget
+    ? {
+      current: currentPreviewTarget,
+      direction: dragDirection,
+      mode: pageTurnMode,
+      preview: livePreviewTarget,
+    }
+    : null);
   const dragLayerOffsets = activeDragTransition
     ? getPagedDragLayerOffsets(
-        activeDragTransition.mode,
-        activeDragTransition.direction,
-        0,
-        resolvedViewportWidth,
-      )
+      activeDragTransition.mode,
+      activeDragTransition.direction,
+      0,
+      resolvedViewportWidth,
+    )
     : null;
 
   if (!currentPreviewTarget) {

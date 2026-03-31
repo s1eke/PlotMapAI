@@ -26,7 +26,7 @@ describe('UploadModal', () => {
 
   it('rejects unsupported file types before calling upload', async () => {
     const user = userEvent.setup({ applyAccept: false });
-    render(<UploadModal isOpen={true} onClose={() => {}} onSuccess={() => {}} />);
+    render(<UploadModal isOpen onClose={() => {}} onSuccess={() => {}} />);
 
     await user.upload(getFileInput(), new File(['data'], 'novel.pdf', { type: 'application/pdf' }));
 
@@ -36,7 +36,7 @@ describe('UploadModal', () => {
 
   it('rejects files larger than the configured size limit', async () => {
     const user = userEvent.setup();
-    render(<UploadModal isOpen={true} onClose={() => {}} onSuccess={() => {}} />);
+    render(<UploadModal isOpen onClose={() => {}} onSuccess={() => {}} />);
     const file = new File(['small'], 'novel.txt', { type: 'text/plain' });
 
     Object.defineProperty(file, 'size', { value: 101 * 1024 * 1024 });
@@ -50,7 +50,7 @@ describe('UploadModal', () => {
     const onClose = vi.fn();
     const onSuccess = vi.fn();
     const user = userEvent.setup();
-    render(<UploadModal isOpen={true} onClose={onClose} onSuccess={onSuccess} />);
+    render(<UploadModal isOpen onClose={onClose} onSuccess={onSuccess} />);
     const file = new File(['chapter 1'], 'novel.txt', { type: 'text/plain' });
 
     await user.upload(getFileInput(), file);
@@ -72,7 +72,7 @@ describe('UploadModal', () => {
     const onClose = vi.fn();
     const onSuccess = vi.fn();
     const user = userEvent.setup();
-    render(<UploadModal isOpen={true} onClose={onClose} onSuccess={onSuccess} />);
+    render(<UploadModal isOpen onClose={onClose} onSuccess={onSuccess} />);
     const firstFile = new File(['chapter 1'], 'first.txt', { type: 'text/plain' });
     const secondFile = new File(['chapter 2'], 'second.epub', { type: 'application/epub+zip' });
     const input = getFileInput();
@@ -109,7 +109,7 @@ describe('UploadModal', () => {
     const onClose = vi.fn();
     const onSuccess = vi.fn();
     const user = userEvent.setup();
-    render(<UploadModal isOpen={true} onClose={onClose} onSuccess={onSuccess} />);
+    render(<UploadModal isOpen onClose={onClose} onSuccess={onSuccess} />);
 
     await user.upload(getFileInput(), new File(['chapter 1'], 'novel.txt', { type: 'text/plain' }));
 
@@ -126,12 +126,12 @@ describe('UploadModal', () => {
 
     render(
       <UploadModal
-        isOpen={true}
+        isOpen
         onClose={onClose}
         onSuccess={onSuccess}
         initialFiles={[initialFile]}
         onInitialFilesHandled={onInitialFilesHandled}
-      />
+      />,
     );
 
     await waitFor(() => {

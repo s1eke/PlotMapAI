@@ -17,7 +17,7 @@ describe('PurificationRuleModal', () => {
     const onClose = vi.fn();
     const onSave = vi.fn().mockResolvedValue(undefined);
     const user = userEvent.setup();
-    render(<PurificationRuleModal isOpen={true} onClose={onClose} onSave={onSave} rule={null} />);
+    render(<PurificationRuleModal isOpen onClose={onClose} onSave={onSave} rule={null} />);
 
     await user.type(screen.getByPlaceholderText('settings.purification.namePlaceholder'), 'Rule A');
     await user.clear(screen.getByPlaceholderText('settings.purification.groupPlaceholder'));
@@ -45,7 +45,7 @@ describe('PurificationRuleModal', () => {
     const onClose = vi.fn();
     const onSave = vi.fn().mockRejectedValue(new Error('save failed'));
     const user = userEvent.setup();
-    render(<PurificationRuleModal isOpen={true} onClose={onClose} onSave={onSave} rule={null} />);
+    render(<PurificationRuleModal isOpen onClose={onClose} onSave={onSave} rule={null} />);
 
     await user.type(screen.getByPlaceholderText('settings.purification.namePlaceholder'), 'Rule');
     await user.type(screen.getByPlaceholderText('settings.purification.patternPlaceholder'), 'foo');
@@ -56,7 +56,7 @@ describe('PurificationRuleModal', () => {
   });
 
   it('shows a security notice for whitelisted @js replacements', async () => {
-    render(<PurificationRuleModal isOpen={true} onClose={() => {}} onSave={() => Promise.resolve()} rule={null} />);
+    render(<PurificationRuleModal isOpen onClose={() => {}} onSave={() => Promise.resolve()} rule={null} />);
     const user = userEvent.setup();
 
     await user.type(screen.getByPlaceholderText('settings.purification.replacementPlaceholder'), '@js:fullwidth');
@@ -67,7 +67,7 @@ describe('PurificationRuleModal', () => {
   it('keeps optional inputs controlled when editing a sparse rule', () => {
     render(
       <PurificationRuleModal
-        isOpen={true}
+        isOpen
         onClose={() => {}}
         onSave={() => Promise.resolve()}
         rule={{

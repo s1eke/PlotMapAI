@@ -10,7 +10,7 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const theme = useReaderSessionSelector(state => state.appTheme);
+  const theme = useReaderSessionSelector((state) => state.appTheme);
 
   useEffect(() => {
     void ensureSessionPreferencesHydrated();

@@ -127,7 +127,7 @@ export default function ReloadPrompt() {
 
     if (debugNeedRefresh && !needRefresh) {
       debugLog('PWA', 'debug update refresh simulated');
-      await new Promise(resolve => window.setTimeout(resolve, 900));
+      await new Promise((resolve) => window.setTimeout(resolve, 900));
       setDebugNeedRefresh(false);
       setDismissed(true);
       setIsUpdating(false);

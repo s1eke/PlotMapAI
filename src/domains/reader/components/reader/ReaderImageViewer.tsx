@@ -515,13 +515,13 @@ function ReaderImageViewerSurface({
     const nextTranslate = nextScale === 1
       ? { x: 0, y: 0 }
       : applyScaleAroundPoint({
-          nextScale,
-          point: { x: event.clientX, y: event.clientY },
-          scale: currentScale,
-          targetRect,
-          translateX: viewerStateRef.current.translateX,
-          translateY: viewerStateRef.current.translateY,
-        });
+        nextScale,
+        point: { x: event.clientX, y: event.clientY },
+        scale: currentScale,
+        targetRect,
+        translateX: viewerStateRef.current.translateX,
+        translateY: viewerStateRef.current.translateY,
+      });
     const clampedTranslate = clampTranslate(targetRect, nextScale, nextTranslate.x, nextTranslate.y);
     animateTransformTo(nextScale, clampedTranslate.x, clampedTranslate.y);
   }, [animateTransformTo, cancelPendingClose, maxScale, naturalImageSize, targetRect]);
@@ -537,13 +537,13 @@ function ReaderImageViewerSurface({
     const nextTranslate = nextScale === 1
       ? { x: 0, y: 0 }
       : applyScaleAroundPoint({
-          nextScale,
-          point,
-          scale: currentScale,
-          targetRect,
-          translateX: viewerStateRef.current.translateX,
-          translateY: viewerStateRef.current.translateY,
-        });
+        nextScale,
+        point,
+        scale: currentScale,
+        targetRect,
+        translateX: viewerStateRef.current.translateX,
+        translateY: viewerStateRef.current.translateY,
+      });
     const clampedTranslate = clampTranslate(targetRect, nextScale, nextTranslate.x, nextTranslate.y);
     animateTransformTo(nextScale, clampedTranslate.x, clampedTranslate.y);
     return true;
@@ -611,14 +611,14 @@ function ReaderImageViewerSurface({
       const gesture = gestureRef.current?.type === 'pinch'
         ? gestureRef.current
         : {
-            startCenter: midpoint,
-            startDistance: Math.max(1, getDistance(firstPointer, secondPointer)),
-            startPoint: midpoint,
-            startScale: viewerStateRef.current.scale,
-            startTranslateX: viewerStateRef.current.translateX,
-            startTranslateY: viewerStateRef.current.translateY,
-            type: 'pinch' as const,
-          };
+          startCenter: midpoint,
+          startDistance: Math.max(1, getDistance(firstPointer, secondPointer)),
+          startPoint: midpoint,
+          startScale: viewerStateRef.current.scale,
+          startTranslateX: viewerStateRef.current.translateX,
+          startTranslateY: viewerStateRef.current.translateY,
+          type: 'pinch' as const,
+        };
       gestureRef.current = gesture;
 
       const pinchDistance = Math.max(1, getDistance(firstPointer, secondPointer));
@@ -885,13 +885,13 @@ function ReaderImageViewerSurface({
         exit={entryTransitionMode === 'anchor'
           ? buildAnchoredTransform(getOriginRect(activeEntry), targetRect)
           : {
-              opacity: 1,
-              scale: 1,
-              scaleX: 1,
-              scaleY: 1,
-              x: 0,
-              y: 0,
-            }}
+            opacity: 1,
+            scale: 1,
+            scaleX: 1,
+            scaleY: 1,
+            x: 0,
+            y: 0,
+          }}
         transition={{
           duration: 0.24,
           ease: [0.22, 1, 0.36, 1],
@@ -977,15 +977,15 @@ export default function ReaderImageViewer({
       && activeEntryId !== null
       && surfaceTransition.targetEntryId === activeEntryId
       ? {
-          ...surfaceTransition,
-          slideOffset: imageSwitchOffset,
-        }
+        ...surfaceTransition,
+        slideOffset: imageSwitchOffset,
+      }
       : {
-          direction: 0,
-          kind: 'idle',
-          slideOffset: imageSwitchOffset,
-          targetEntryId: activeEntryId,
-        }
+        direction: 0,
+        kind: 'idle',
+        slideOffset: imageSwitchOffset,
+        targetEntryId: activeEntryId,
+      }
   ), [activeEntryId, imageSwitchOffset, surfaceTransition]);
 
   const suppressDeferredStageClick = useCallback(() => {
@@ -997,11 +997,11 @@ export default function ReaderImageViewer({
       previousTransition.kind === 'idle'
         ? previousTransition
         : {
-            direction: 0,
-            kind: 'idle',
-            slideOffset: previousTransition.slideOffset,
-            targetEntryId: null,
-          }
+          direction: 0,
+          kind: 'idle',
+          slideOffset: previousTransition.slideOffset,
+          targetEntryId: null,
+        }
     ));
   }, []);
 
@@ -1162,11 +1162,11 @@ export default function ReaderImageViewer({
             <div className="rounded-full bg-black/45 px-4 py-2 text-xs font-medium tracking-wide text-white/85 backdrop-blur-sm">
               {isIndexResolved || !isIndexLoading
                 ? (
-                    <>
-                      {Math.max(activeIndex + 1, 1)} / {Math.max(entries.length, activeIndex + 1, 1)}
-                      {isIndexLoading ? ` · ${t('reader.imageViewer.loadingMore')}` : ''}
-                    </>
-                  )
+                  <>
+                    {Math.max(activeIndex + 1, 1)} / {Math.max(entries.length, activeIndex + 1, 1)}
+                    {isIndexLoading ? ` · ${t('reader.imageViewer.loadingMore')}` : ''}
+                  </>
+                )
                 : t('reader.imageViewer.loadingMore')}
             </div>
           </div>

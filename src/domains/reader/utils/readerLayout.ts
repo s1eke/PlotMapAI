@@ -232,7 +232,7 @@ export function createReaderViewportMetrics(
   scrollViewportHeight: number,
   pagedViewportWidth: number,
   pagedViewportHeight: number,
-  bodyFontSize: number = 18,
+  bodyFontSize = 18,
 ): ReaderViewportMetrics {
   const scrollHorizontalPadding = scrollViewportWidth >= 768
     ? 48
@@ -314,7 +314,7 @@ export function serializeReaderLayoutSignature(signature: ReaderLayoutSignature)
     signature.lineSpacing,
     signature.paragraphSpacing,
   ]
-    .map((value) => Number.isFinite(value) ? value.toFixed(3) : '0')
+    .map((value) => (Number.isFinite(value) ? value.toFixed(3) : '0'))
     .join('|');
 }
 
@@ -617,7 +617,7 @@ export function composePaginatedChapterLayout(
         remainingHeight = safeColumnHeight;
       }
 
-      let marginAfter = metric.marginAfter;
+      let { marginAfter } = metric;
       const nextMinimumHeight = nextMeaningfulMetric
         ? getMinimumRenderableHeight(nextMeaningfulMetric, safeColumnHeight)
         : null;
@@ -987,14 +987,14 @@ export function findLocatorForLayoutOffset(
   const lineIndex = matchedMetric.lines.length === 0
     ? 0
     : Math.max(
-        0,
-        Math.min(
-          matchedMetric.lines.length - 1,
-          Math.floor(
-            Math.max(0, clampedOffset - matchedMetric.top - matchedMetric.marginBefore) / matchedMetric.lineHeightPx,
-          ),
+      0,
+      Math.min(
+        matchedMetric.lines.length - 1,
+        Math.floor(
+          Math.max(0, clampedOffset - matchedMetric.top - matchedMetric.marginBefore) / matchedMetric.lineHeightPx,
         ),
-      );
+      ),
+    );
   const line = matchedMetric.lines[lineIndex];
   return {
     blockIndex: matchedMetric.block.blockIndex,
@@ -1426,9 +1426,9 @@ function resolveConstrainedImageSize(
   aspectRatio: number,
   constraints?: ReaderImageLayoutConstraints,
 ): {
-  height: number;
-  width: number;
-} {
+    height: number;
+    width: number;
+  } {
   let displayWidth = Math.max(1, baseDisplayWidth);
   let displayHeight = Math.max(1, displayWidth / aspectRatio);
 
@@ -1529,7 +1529,7 @@ function estimatePaginatedManifestPageCount(
         remainingHeight = safeColumnHeight;
       }
 
-      let marginAfter = metric.marginAfter;
+      let { marginAfter } = metric;
       const nextMinimumHeight = nextMeaningfulMetric
         ? getEstimatedMinimumRenderableHeight(nextMeaningfulMetric, safeColumnHeight)
         : null;

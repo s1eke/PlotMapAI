@@ -438,7 +438,7 @@ function estimateCharacterUnits(char: string): number {
   if (/[a-z0-9]/.test(char)) {
     return 0.58;
   }
-  // eslint-disable-next-line no-control-regex
+
   if (/[^\u0000-\u00ff]/.test(char)) {
     return 1;
   }

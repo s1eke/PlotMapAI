@@ -63,26 +63,26 @@ const renderCacheMock = vi.hoisted(() => {
     }) => {
       const tree = params.variantFamily === 'original-paged'
         ? {
-            chapterIndex: params.chapter.index,
-            columnCount: 1,
-            columnGap: 0,
-            columnWidth: 400,
-            pageHeight: 400,
-            pageSlices: [],
-          }
+          chapterIndex: params.chapter.index,
+          columnCount: 1,
+          columnGap: 0,
+          columnWidth: 400,
+          pageHeight: 400,
+          pageSlices: [],
+        }
         : params.variantFamily === 'original-scroll'
           ? {
-              blockCount: 0,
-              chapterIndex: params.chapter.index,
-              metrics: [],
-              textWidth: 400,
-              totalHeight: 0,
-            }
+            blockCount: 0,
+            chapterIndex: params.chapter.index,
+            metrics: [],
+            textWidth: 400,
+            totalHeight: 0,
+          }
           : {
-              chapterIndex: params.chapter.index,
-              title: params.chapter.title,
-              variant: 'summary-shell',
-            };
+            chapterIndex: params.chapter.index,
+            title: params.chapter.title,
+            variant: 'summary-shell',
+          };
 
       return {
         chapterIndex: params.chapter.index,
@@ -184,7 +184,7 @@ function createChapter(index: number, totalChapters: number): ChapterContent {
   };
 }
 
-function createViewport(width: number = 600, height: number = 800): HTMLDivElement {
+function createViewport(width = 600, height = 800): HTMLDivElement {
   const viewport = document.createElement('div');
   Object.defineProperty(viewport, 'clientWidth', {
     configurable: true,

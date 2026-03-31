@@ -12,7 +12,7 @@ export function normalizeChunkResult(
     throw new AnalysisExecutionError('AI 返回缺少 chapterAnalyses 数组。');
   }
 
-  const expectedIndices = new Set(chunk.chapters.map(chapter => chapter.chapterIndex));
+  const expectedIndices = new Set(chunk.chapters.map((chapter) => chapter.chapterIndex));
   const rawMap = new Map<number, Record<string, unknown>>();
   for (const item of rawItems) {
     if (typeof item !== 'object' || item === null) {
@@ -95,7 +95,7 @@ export function normalizeOverviewResult(
   const seenNames = new Set<string>();
   const rawSharePercents: number[] = [];
 
-  for (const item of (raw.characterStats as Array<unknown>).slice(0, 8)) {
+  for (const item of (raw.characterStats as unknown[]).slice(0, 8)) {
     if (typeof item !== 'object' || item === null) {
       throw new AnalysisExecutionError('AI 返回的 characterStats 项不是对象。');
     }
@@ -131,12 +131,11 @@ export function normalizeOverviewResult(
   characterStats.sort((a, b) =>
     b.sharePercent - a.sharePercent ||
     b.weight - a.weight ||
-    a.name.localeCompare(b.name),
-  );
+    a.name.localeCompare(b.name));
 
   const relationshipGraph: OverviewRelationship[] = [];
   const seenPairs = new Set<string>();
-  for (const item of (raw.relationshipGraph as Array<unknown>).slice(0, 24)) {
+  for (const item of (raw.relationshipGraph as unknown[]).slice(0, 24)) {
     if (typeof item !== 'object' || item === null) {
       throw new AnalysisExecutionError('AI 返回的 relationshipGraph 项不是对象。');
     }
@@ -146,7 +145,7 @@ export function normalizeOverviewResult(
     const pairKey = `${pair[0]}::${pair[1]}`;
     if (seenPairs.has(pairKey)) continue;
     const [source, target] = pair;
-    const missingNames = [source, target].filter(name => !localCharacterMap.has(name));
+    const missingNames = [source, target].filter((name) => !localCharacterMap.has(name));
     if (missingNames.length > 0) continue;
     const localEdge = localRelationshipMap.get(pairKey) || {};
     let relationTags = normalizeRelationTags(obj.relationTags, obj.type);
@@ -204,8 +203,8 @@ function normalizeCharacterList(value: unknown): AnalysisCharacter[] {
   if (!Array.isArray(value)) return [];
   return value
     .slice(0, 20)
-    .filter(item => typeof item === 'object' && item !== null)
-    .map(item => {
+    .filter((item) => typeof item === 'object' && item !== null)
+    .map((item) => {
       const obj = item as Record<string, unknown>;
       const name = cleanText(obj.name, 80);
       if (!name) return null;
@@ -223,8 +222,8 @@ function normalizeRelationshipList(value: unknown): AnalysisRelationship[] {
   if (!Array.isArray(value)) return [];
   return value
     .slice(0, 20)
-    .filter(item => typeof item === 'object' && item !== null)
-    .map(item => {
+    .filter((item) => typeof item === 'object' && item !== null)
+    .map((item) => {
       const obj = item as Record<string, unknown>;
       const source = cleanText(obj.source, 80);
       const target = cleanText(obj.target, 80);
@@ -252,12 +251,12 @@ function normalizeStringList(value: unknown, limit: number, maxLength: number): 
 
 function normalizeSharePercentValues(values: number[]): number[] {
   if (!values.length) return [];
-  const sanitized = values.map(value => Math.max(0, Math.min(value, 100)));
+  const sanitized = values.map((value) => Math.max(0, Math.min(value, 100)));
   const total = sanitized.reduce((sum, value) => sum + value, 0);
   if (total <= 0) return sanitized.map(() => 0);
-  if (total <= 100) return sanitized.map(value => Math.round(value * 100) / 100);
+  if (total <= 100) return sanitized.map((value) => Math.round(value * 100) / 100);
   const scale = 100 / total;
-  const normalized = sanitized.map(value => Math.round(value * scale * 100) / 100);
+  const normalized = sanitized.map((value) => Math.round(value * scale * 100) / 100);
   const diff = Math.round((100 - normalized.reduce((sum, value) => sum + value, 0)) * 100) / 100;
   if (normalized.length > 0 && diff !== 0) {
     normalized[0] = Math.round(Math.max(0, Math.min(100, normalized[0] + diff)) * 100) / 100;

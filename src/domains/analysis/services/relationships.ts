@@ -37,7 +37,7 @@ export function normalizeRelationTags(...values: unknown[]): string[] | null {
     for (const item of candidates) {
       const rawTag = cleanText(item, 80);
       if (!rawTag) continue;
-      const fragments = rawTag.split(/[\\/|｜；;，,、]+/).map(fragment => cleanText(fragment, 80)).filter(Boolean);
+      const fragments = rawTag.split(/[\\/|｜；;，,、]+/).map((fragment) => cleanText(fragment, 80)).filter(Boolean);
       for (const candidate of fragments) {
         const tag = canonicalizeRelationTag(candidate);
         if (tag && !results.includes(tag)) results.push(tag);
@@ -92,7 +92,7 @@ function canonicalizeRelationTag(tag: string): string {
   const compact = cleaned.replace(/\s+/g, '');
   if (!compact) return '';
   for (const [canonical, patterns] of RELATION_TAG_CANONICAL_PATTERNS) {
-    if (patterns.some(pattern => compact.includes(pattern))) return canonical;
+    if (patterns.some((pattern) => compact.includes(pattern))) return canonical;
   }
   return compact;
 }

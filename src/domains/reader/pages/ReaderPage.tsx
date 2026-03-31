@@ -158,9 +158,9 @@ export default function ReaderPage() {
   const closeSidebar = useCallback(() => {
     sidebar.setIsSidebarOpen(false);
   }, [sidebar]);
-  const chapterIndex = useReaderSessionSelector(state => state.chapterIndex);
-  const restoreStatus = useReaderSessionSelector(state => state.restoreStatus);
-  const viewMode = useReaderSessionSelector(state => state.viewMode);
+  const chapterIndex = useReaderSessionSelector((state) => state.chapterIndex);
+  const restoreStatus = useReaderSessionSelector((state) => state.restoreStatus);
+  const viewMode = useReaderSessionSelector((state) => state.viewMode);
   const analysis = useChapterAnalysis(novelId, viewMode === 'summary' ? chapterIndex : -1);
   const isTwoColumn = isPagedPageTurnMode(preferences.pageTurnMode);
   const isPagedMode = isTwoColumn && viewMode === 'original';
@@ -266,7 +266,7 @@ export default function ReaderPage() {
       novelId,
       snapshot: new Map(chapterCacheRef.current),
     });
-    setScrollContentVersion(prev => prev + 1);
+    setScrollContentVersion((prev) => prev + 1);
   }, [novelId]);
 
   const chapterData = useReaderChapterData({
@@ -311,9 +311,9 @@ export default function ReaderPage() {
       previousState.isIndexLoading === isIndexLoading
         ? previousState
         : {
-            ...previousState,
-            isIndexLoading,
-          }
+          ...previousState,
+          isIndexLoading,
+        }
     ));
   }, []);
 
@@ -851,8 +851,8 @@ export default function ReaderPage() {
     syncViewportState();
     handleRestoreContentScroll();
   }, [handleRestoreContentScroll, syncViewportState]);
-  const toolbarHasPrev = navigation.toolbarHasPrev;
-  const toolbarHasNext = navigation.toolbarHasNext;
+  const { toolbarHasPrev } = navigation;
+  const { toolbarHasNext } = navigation;
 
   const handleSelectChapter = useCallback((index: number) => {
     navigation.goToChapter(index, 'start');
@@ -1037,12 +1037,12 @@ export default function ReaderPage() {
             isImageGalleryIndexResolved
             && activeImageEntry
             && activeImageIndex >= 0
-            && activeImageIndex < imageGalleryEntries.length - 1
+            && activeImageIndex < imageGalleryEntries.length - 1,
           )}
           canNavigatePrev={Boolean(
             isImageGalleryIndexResolved
             && activeImageEntry
-            && activeImageIndex > 0
+            && activeImageIndex > 0,
           )}
           entries={imageGalleryEntries}
           getOriginRect={getImageOriginRect}

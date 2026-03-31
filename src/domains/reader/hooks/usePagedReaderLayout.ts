@@ -154,12 +154,12 @@ export function usePagedReaderLayout({
 
     const updateViewportSize = () => {
       const nextViewportSize = getPagedViewportSize(viewport);
-      setPagedViewportSize((previous) => (
+      setPagedViewportSize((previous) => ((
         Math.abs(previous.width - nextViewportSize.width) < 0.01
         && Math.abs(previous.height - nextViewportSize.height) < 0.01
       )
         ? previous
-        : nextViewportSize);
+        : nextViewportSize));
     };
 
     const frameId = requestAnimationFrame(updateViewportSize);
@@ -199,15 +199,15 @@ export function usePagedReaderLayout({
         : resolvePagedTargetPage(pageTargetRef.current, pageIndex, nextPageCount);
 
       setPageCount(nextPageCount);
-      setResolvedPageTurnStep((previous) => (
+      setResolvedPageTurnStep((previous) => ((
         previous.viewportWidth === pagedViewportSize.width
         && Math.abs(previous.step - nextPageTurnStep) < 0.01
       )
         ? previous
         : {
-            step: nextPageTurnStep,
-            viewportWidth: pagedViewportSize.width,
-          });
+          step: nextPageTurnStep,
+          viewportWidth: pagedViewportSize.width,
+        }));
       setPageIndex(targetPage);
       pageTargetRef.current = null;
       setResolvedLayoutChapterIndex(chapterIndex);

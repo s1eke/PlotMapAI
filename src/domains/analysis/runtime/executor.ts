@@ -94,7 +94,7 @@ export async function runAnalysisExecution({
   repository: AnalysisRuntimeRepository;
 }): Promise<void> {
   const totalChapters = chapters.length;
-  const chapterMap = new Map(chapters.map(chapter => [chapter.chapterIndex, chapter]));
+  const chapterMap = new Map(chapters.map((chapter) => [chapter.chapterIndex, chapter]));
   try {
     let chunks = await repository.loadChunks(novelId);
     if (!chunks.length) {
@@ -150,7 +150,7 @@ export async function runAnalysisExecution({
       const chapterRows = await repository.loadChapterAnalyses(novelId);
       if (
         chapterRows.length < totalChapters ||
-        chapterRows.some(row => !isChapterAnalysisComplete(row))
+        chapterRows.some((row) => !isChapterAnalysisComplete(row))
       ) {
         await failJob(
           repository,

@@ -18,7 +18,7 @@ export default function TocRuleModal({ isOpen, onClose, onSave, rule }: TocRuleM
     rule: '',
     example: '',
     priority: 10,
-    isEnabled: true
+    isEnabled: true,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -29,7 +29,7 @@ export default function TocRuleModal({ isOpen, onClose, onSave, rule }: TocRuleM
         rule: rule.rule,
         example: rule.example,
         priority: rule.priority,
-        isEnabled: rule.isEnabled
+        isEnabled: rule.isEnabled,
       });
     } else {
       setFormData({
@@ -37,7 +37,7 @@ export default function TocRuleModal({ isOpen, onClose, onSave, rule }: TocRuleM
         rule: '',
         example: '',
         priority: 10,
-        isEnabled: true
+        isEnabled: true,
       });
     }
   }, [rule, isOpen]);
@@ -68,7 +68,7 @@ export default function TocRuleModal({ isOpen, onClose, onSave, rule }: TocRuleM
             type="text"
             required
             value={formData.name}
-            onChange={e => setFormData({ ...formData, name: e.target.value })}
+            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             className="w-full bg-muted-bg border border-white/10 rounded-xl px-4 py-2.5 text-text-primary focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-all"
             placeholder={t('settings.toc.namePlaceholder')}
           />
@@ -79,7 +79,7 @@ export default function TocRuleModal({ isOpen, onClose, onSave, rule }: TocRuleM
           <textarea
             required
             value={formData.rule}
-            onChange={e => setFormData({ ...formData, rule: e.target.value })}
+            onChange={(e) => setFormData({ ...formData, rule: e.target.value })}
             className="w-full bg-muted-bg border border-white/10 rounded-xl px-4 py-2.5 text-text-primary focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-all font-mono text-sm h-24 resize-none"
             placeholder={t('settings.toc.regexPlaceholder')}
           />
@@ -93,7 +93,7 @@ export default function TocRuleModal({ isOpen, onClose, onSave, rule }: TocRuleM
               min="0"
               max="100"
               value={formData.priority}
-              onChange={e => setFormData({ ...formData, priority: parseInt(e.target.value) || 0 })}
+              onChange={(e) => setFormData({ ...formData, priority: parseInt(e.target.value) || 0 })}
               className="w-full bg-muted-bg border border-white/10 rounded-xl px-4 py-2.5 text-text-primary focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-all"
             />
           </div>
@@ -101,7 +101,7 @@ export default function TocRuleModal({ isOpen, onClose, onSave, rule }: TocRuleM
             <label className="text-sm font-medium text-text-primary px-1">{t('settings.toc.status')}</label>
             <select
               value={formData.isEnabled ? 'true' : 'false'}
-              onChange={e => setFormData({ ...formData, isEnabled: e.target.value === 'true' })}
+              onChange={(e) => setFormData({ ...formData, isEnabled: e.target.value === 'true' })}
               className="w-full bg-muted-bg border border-white/10 rounded-xl px-4 py-2.5 text-text-primary focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-all"
             >
               <option value="true">{t('settings.common.enabled')}</option>
@@ -115,7 +115,7 @@ export default function TocRuleModal({ isOpen, onClose, onSave, rule }: TocRuleM
           <input
             type="text"
             value={formData.example}
-            onChange={e => setFormData({ ...formData, example: e.target.value })}
+            onChange={(e) => setFormData({ ...formData, example: e.target.value })}
             className="w-full bg-muted-bg border border-white/10 rounded-xl px-4 py-2.5 text-text-primary focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-all"
             placeholder={t('settings.toc.examplePlaceholder')}
           />
