@@ -102,7 +102,9 @@ function getProviderField(
   return input[field];
 }
 
-export function buildRuntimeAnalysisConfig(input: RuntimeAnalysisConfigInput | null | undefined): RuntimeAnalysisConfig {
+export function buildRuntimeAnalysisConfig(
+  input: RuntimeAnalysisConfigInput | null | undefined,
+): RuntimeAnalysisConfig {
   if (!input) {
     throw new AnalysisConfigError('请先在设置中完成 AI 接口配置。', {
       code: AppErrorCode.ANALYSIS_CONFIG_INVALID,

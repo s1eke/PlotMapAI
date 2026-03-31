@@ -158,7 +158,9 @@ export function useReaderLayoutEngine({
       return;
     }
 
-    const missingImageKeys = imageKeys.filter((imageKey) => !peekReaderImageDimensions(novelId, imageKey));
+    const missingImageKeys = imageKeys.filter((imageKey) => (
+      !peekReaderImageDimensions(novelId, imageKey)
+    ));
     if (missingImageKeys.length === 0) {
       return;
     }
@@ -182,7 +184,7 @@ export function useReaderLayoutEngine({
       dimensions.set(imageKey, peekReaderImageDimensions(novelId, imageKey));
     }
     return dimensions;
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- imageRevision triggers re-computation after image preloading
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh after image preload
   }, [imageKeys, imageRevision, novelId]);
 
   const scrollImageLayoutConstraints = useMemo(() => createScrollImageLayoutConstraints(
@@ -213,7 +215,13 @@ export function useReaderLayoutEngine({
     }
 
     return layouts;
-  }, [imageDimensionsByKey, scrollChapters, scrollImageLayoutConstraints, typography, viewportMetrics.scrollTextWidth]);
+  }, [
+    imageDimensionsByKey,
+    scrollChapters,
+    scrollImageLayoutConstraints,
+    typography,
+    viewportMetrics.scrollTextWidth,
+  ]);
 
   const pagedLayouts = useMemo(() => {
     const layouts = new Map<number, PaginatedChapterLayout>();

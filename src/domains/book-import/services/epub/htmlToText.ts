@@ -161,11 +161,15 @@ function decodeHtmlEntities(input: string): string {
     .replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/giu, (match, entity: string) => {
       if (entity.startsWith('#x')) {
         const codePoint = Number.parseInt(entity.slice(2), 16);
-        return Number.isNaN(codePoint) || codePoint < 0 || codePoint > 0x10FFFF ? match : String.fromCodePoint(codePoint);
+        return Number.isNaN(codePoint) || codePoint < 0 || codePoint > 0x10FFFF
+          ? match
+          : String.fromCodePoint(codePoint);
       }
       if (entity.startsWith('#')) {
         const codePoint = Number.parseInt(entity.slice(1), 10);
-        return Number.isNaN(codePoint) || codePoint < 0 || codePoint > 0x10FFFF ? match : String.fromCodePoint(codePoint);
+        return Number.isNaN(codePoint) || codePoint < 0 || codePoint > 0x10FFFF
+          ? match
+          : String.fromCodePoint(codePoint);
       }
       return namedEntities[entity.toLowerCase()] ?? match;
     })

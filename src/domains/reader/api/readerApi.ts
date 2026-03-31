@@ -110,10 +110,17 @@ export const readerApi = {
     options: ReaderTextProcessingOptions = {},
   ): Promise<Chapter[]> => {
     const novelTitle = await getNovelTitle(novelId);
-    const rawChapters = await db.chapters.where('novelId').equals(novelId).sortBy('chapterIndex');
+    const rawChapters = await db.chapters
+      .where('novelId')
+      .equals(novelId)
+      .sortBy('chapterIndex');
     const rules = await getPurifyRules();
     if (rules.length === 0) {
-      return rawChapters.map((ch) => ({ index: ch.chapterIndex, title: ch.title, wordCount: ch.wordCount }));
+      return rawChapters.map((ch) => ({
+        index: ch.chapterIndex,
+        title: ch.title,
+        wordCount: ch.wordCount,
+      }));
     }
 
     const titles = await runPurifyTitlesTask(
@@ -210,7 +217,10 @@ export const readerApi = {
     };
   },
 
-  saveProgress: async (novelId: number, data: Partial<ReadingProgress>): Promise<{ message: string }> => {
+  saveProgress: async (
+    novelId: number,
+    data: Partial<ReadingProgress>,
+  ): Promise<{ message: string }> => {
     const existing = await db.readingProgress.where('novelId').equals(novelId).first();
     const now = new Date().toISOString();
     if (existing) {

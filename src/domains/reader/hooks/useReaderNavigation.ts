@@ -41,7 +41,10 @@ export function useReaderNavigation(
   const replayDirectionalNavigationRef = useRef<
     (direction: NavigationDirection, shouldAnimate: boolean) => void
       >(() => {});
-  const [pageTurnState, setPageTurnState] = useState<{ direction: NavigationDirection; token: number }>({
+  const [pageTurnState, setPageTurnState] = useState<{
+    direction: NavigationDirection;
+    token: number;
+  }>({
     direction: 'next',
     token: 0,
   });

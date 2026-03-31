@@ -67,7 +67,9 @@ export async function ensureDefaultPurificationRules(): Promise<void> {
   const createdAt = new Date().toISOString();
   for (const rule of defaultRules) {
     if (existingExternalIds.has(rule.externalId)) {
-      const existingRule = existingRules.find((candidate) => candidate.externalId === rule.externalId);
+      const existingRule = existingRules.find(
+        (candidate) => candidate.externalId === rule.externalId,
+      );
       if (existingRule) {
         await db.purificationRules.update(existingRule.id, {
           isDefault: true,

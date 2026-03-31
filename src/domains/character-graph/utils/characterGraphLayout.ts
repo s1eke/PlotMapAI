@@ -258,8 +258,20 @@ export function getAnchorPosition(index: number, total: number): { x: number; y:
   }
 
   return {
-    x: Number((STAGE_WIDTH / 2 + Math.cos(angle) * radiusX + Math.sin(index * 1.21) * jitter).toFixed(2)),
-    y: Number((STAGE_HEIGHT / 2 + Math.sin(angle) * radiusY + Math.cos(index * 1.37) * jitter).toFixed(2)),
+    x: Number(
+      (
+        STAGE_WIDTH / 2 +
+        Math.cos(angle) * radiusX +
+        Math.sin(index * 1.21) * jitter
+      ).toFixed(2),
+    ),
+    y: Number(
+      (
+        STAGE_HEIGHT / 2 +
+        Math.sin(angle) * radiusY +
+        Math.cos(index * 1.37) * jitter
+      ).toFixed(2),
+    ),
   };
 }
 
@@ -396,21 +408,32 @@ export function estimateTextUnits(value: string): number {
   return Array.from(value).reduce((total, char) => total + estimateCharacterUnits(char), 0);
 }
 
-export function viewportPointToGraphPoint(point: { x: number; y: number }, zoomState: ZoomState): { x: number; y: number } {
+export function viewportPointToGraphPoint(
+  point: { x: number; y: number },
+  zoomState: ZoomState,
+): { x: number; y: number } {
   return {
     x: (point.x - zoomState.offsetX) / zoomState.scale,
     y: (point.y - zoomState.offsetY) / zoomState.scale,
   };
 }
 
-export function clampZoomOffset(scale: number, offsetX: number, offsetY: number): { offsetX: number; offsetY: number } {
+export function clampZoomOffset(
+  scale: number,
+  offsetX: number,
+  offsetY: number,
+): { offsetX: number; offsetY: number } {
   const slackX = CANVAS_PADDING * 0.6;
   const slackY = CANVAS_PADDING * 0.6;
 
   if (scale >= 1) {
     return {
-      offsetX: Number(clamp(offsetX, STAGE_WIDTH - STAGE_WIDTH * scale - slackX, slackX).toFixed(2)),
-      offsetY: Number(clamp(offsetY, STAGE_HEIGHT - STAGE_HEIGHT * scale - slackY, slackY).toFixed(2)),
+      offsetX: Number(
+        clamp(offsetX, STAGE_WIDTH - STAGE_WIDTH * scale - slackX, slackX).toFixed(2),
+      ),
+      offsetY: Number(
+        clamp(offsetY, STAGE_HEIGHT - STAGE_HEIGHT * scale - slackY, slackY).toFixed(2),
+      ),
     };
   }
 
@@ -430,7 +453,11 @@ function getNodeDisplayName(name: string): string {
   return name.trim().replace(/\s+/g, ' ');
 }
 
-function splitLabelIntoLines(name: string, maxUnitsPerLine: number, maxLines: number): string[] | null {
+function splitLabelIntoLines(
+  name: string,
+  maxUnitsPerLine: number,
+  maxLines: number,
+): string[] | null {
   const lines = splitLabelByUnits(name, maxUnitsPerLine, maxLines);
   if (lines.length > maxLines) {
     return null;

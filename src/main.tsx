@@ -11,7 +11,10 @@ function findNearestScrollableAncestor(target: EventTarget | null): HTMLElement 
   }
 
   const declaredScrollContainer = target.closest<HTMLElement>('[data-scroll-container="true"]');
-  if (declaredScrollContainer && declaredScrollContainer.scrollHeight > declaredScrollContainer.clientHeight) {
+  if (
+    declaredScrollContainer
+    && declaredScrollContainer.scrollHeight > declaredScrollContainer.clientHeight
+  ) {
     return declaredScrollContainer;
   }
 

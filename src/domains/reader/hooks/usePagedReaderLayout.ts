@@ -54,7 +54,11 @@ export function getPagedViewportSize(viewport: HTMLDivElement): PagedViewportSiz
   };
 }
 
-export function getPagedPageCount(scrollWidth: number, viewportWidth: number, pageTurnStep: number): number {
+export function getPagedPageCount(
+  scrollWidth: number,
+  viewportWidth: number,
+  pageTurnStep: number,
+): number {
   if (viewportWidth <= 0 || pageTurnStep <= 0) {
     return 1;
   }
@@ -64,10 +68,17 @@ export function getPagedPageCount(scrollWidth: number, viewportWidth: number, pa
     return 1;
   }
 
-  return Math.max(2, Math.floor(Math.max(0, overflowWidth - PAGE_COUNT_EPSILON) / pageTurnStep) + 2);
+  return Math.max(
+    2,
+    Math.floor(Math.max(0, overflowWidth - PAGE_COUNT_EPSILON) / pageTurnStep) + 2,
+  );
 }
 
-export function getPagedScrollLeft(pageIndex: number, pageTurnStep: number, maxScrollLeft: number): number {
+export function getPagedScrollLeft(
+  pageIndex: number,
+  pageTurnStep: number,
+  maxScrollLeft: number,
+): number {
   if (pageTurnStep <= 0 || maxScrollLeft <= 0) {
     return 0;
   }
@@ -144,9 +155,11 @@ export function usePagedReaderLayout({
   const idealPageTurnStep = pagedViewportSize.width
     ? pagedViewportSize.width + (fitsTwoColumns ? TWO_COLUMN_GAP : 0)
     : 0;
-  const pageTurnStep = resolvedPageTurnStep.viewportWidth === pagedViewportSize.width && resolvedPageTurnStep.step > 0
-    ? resolvedPageTurnStep.step
-    : idealPageTurnStep;
+  const pageTurnStep =
+    resolvedPageTurnStep.viewportWidth === pagedViewportSize.width &&
+    resolvedPageTurnStep.step > 0
+      ? resolvedPageTurnStep.step
+      : idealPageTurnStep;
 
   useEffect(() => {
     if (!isPagedMode || isLoading || !currentChapter) return;
@@ -174,7 +187,13 @@ export function usePagedReaderLayout({
   }, [currentChapter, isLoading, isPagedMode, pagedViewportRef]);
 
   useEffect(() => {
-    if (isLoading || !isPagedMode || !pagedViewportSize.width || !pagedViewportSize.height || !currentChapter) {
+    if (
+      isLoading ||
+      !isPagedMode ||
+      !pagedViewportSize.width ||
+      !pagedViewportSize.height ||
+      !currentChapter
+    ) {
       setPageCount(1);
       return;
     }
@@ -192,7 +211,11 @@ export function usePagedReaderLayout({
         parseCssLength(contentStyles.columnGap),
       );
 
-      const nextPageCount = getPagedPageCount(content.scrollWidth, pagedViewportSize.width, nextPageTurnStep);
+      const nextPageCount = getPagedPageCount(
+        content.scrollWidth,
+        pagedViewportSize.width,
+        nextPageTurnStep,
+      );
       const pendingRestoreState = pendingRestoreStateRef.current;
       const hasRestorablePage = pendingRestoreState?.chapterIndex === chapterIndex
         && typeof pendingRestoreState.chapterProgress === 'number';
@@ -257,8 +280,19 @@ export function usePagedReaderLayout({
     if (!content) return;
 
     const maxScrollLeft = Math.max(0, content.scrollWidth - pagedViewportSize.width);
-    pagedViewportRef.current.scrollLeft = getPagedScrollLeft(pageIndex, pageTurnStep, maxScrollLeft);
-  }, [isPagedMode, pageIndex, pageTurnStep, pagedContentRef, pagedViewportRef, pagedViewportSize.width]);
+    pagedViewportRef.current.scrollLeft = getPagedScrollLeft(
+      pageIndex,
+      pageTurnStep,
+      maxScrollLeft,
+    );
+  }, [
+    isPagedMode,
+    pageIndex,
+    pageTurnStep,
+    pagedContentRef,
+    pagedViewportRef,
+    pagedViewportSize.width,
+  ]);
 
   return {
     pagedViewportRef,

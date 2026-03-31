@@ -117,7 +117,9 @@ export async function resumeAnalysis(novelId: number): Promise<AnalysisStatusRes
       totalChunks: chunks.length,
       completedChunks: snapshot.completedChunks,
       analyzedChapters: snapshot.analyzedChapters,
-      currentChunkIndex: nextPending ? nextPending.chunkIndex : chunks[chunks.length - 1].chunkIndex,
+      currentChunkIndex: nextPending
+        ? nextPending.chunkIndex
+        : chunks[chunks.length - 1].chunkIndex,
     }),
     { lastHeartbeat: nowISO() },
   );

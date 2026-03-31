@@ -134,14 +134,17 @@ describe('usePagedReaderLayout', () => {
     const setPageCount = vi.fn();
     const setPageIndex = vi.fn();
 
-    const { rerender } = renderHook((props: ReturnType<typeof createHookProps>) => usePagedReaderLayout(props), {
-      initialProps: createHookProps({
-        pagedViewportRef: { current: viewport },
-        pagedContentRef: { current: content },
-        setPageCount,
-        setPageIndex,
-      }),
-    });
+    const { rerender } = renderHook(
+      (props: ReturnType<typeof createHookProps>) => usePagedReaderLayout(props),
+      {
+        initialProps: createHookProps({
+          pagedViewportRef: { current: viewport },
+          pagedContentRef: { current: content },
+          setPageCount,
+          setPageIndex,
+        }),
+      },
+    );
 
     await animationFrames.flushAnimationFrames();
 
@@ -193,14 +196,17 @@ describe('usePagedReaderLayout', () => {
       return style;
     });
 
-    const { result, rerender } = renderHook((props: ReturnType<typeof createHookProps>) => usePagedReaderLayout(props), {
-      initialProps: createHookProps({
-        pagedViewportRef: { current: viewport },
-        pagedContentRef: { current: content },
-        setPageCount,
-        setPageIndex,
-      }),
-    });
+    const { result, rerender } = renderHook(
+      (props: ReturnType<typeof createHookProps>) => usePagedReaderLayout(props),
+      {
+        initialProps: createHookProps({
+          pagedViewportRef: { current: viewport },
+          pagedContentRef: { current: content },
+          setPageCount,
+          setPageIndex,
+        }),
+      },
+    );
 
     await animationFrames.flushAnimationFrames();
     expect(result.current.pageTurnStep).toBe(648);
@@ -230,15 +236,18 @@ describe('usePagedReaderLayout', () => {
     const setPageCount = vi.fn();
     const setPageIndex = vi.fn();
 
-    const { rerender } = renderHook((props: ReturnType<typeof createHookProps>) => usePagedReaderLayout(props), {
-      initialProps: createHookProps({
-        pagedViewportRef: { current: viewport },
-        pagedContentRef: { current: content },
-        paragraphSpacing: 16,
-        setPageCount,
-        setPageIndex,
-      }),
-    });
+    const { rerender } = renderHook(
+      (props: ReturnType<typeof createHookProps>) => usePagedReaderLayout(props),
+      {
+        initialProps: createHookProps({
+          pagedViewportRef: { current: viewport },
+          pagedContentRef: { current: content },
+          paragraphSpacing: 16,
+          setPageCount,
+          setPageIndex,
+        }),
+      },
+    );
 
     await animationFrames.flushAnimationFrames();
     expect(setPageCount).toHaveBeenLastCalledWith(2);

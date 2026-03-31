@@ -102,7 +102,11 @@ describe('readerApi', () => {
   it('saveProgress updates existing progress', async () => {
     const novelId = await getNovelId();
     await readerApi.saveProgress(novelId, { chapterIndex: 1 });
-    await readerApi.saveProgress(novelId, { chapterIndex: 2, scrollPosition: 100, chapterProgress: 0.25 });
+    await readerApi.saveProgress(novelId, {
+      chapterIndex: 2,
+      scrollPosition: 100,
+      chapterProgress: 0.25,
+    });
     const progress = await readerApi.getProgress(novelId);
     expect(progress.chapterIndex).toBe(2);
     expect(progress.scrollPosition).toBe(100);

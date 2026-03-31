@@ -199,7 +199,12 @@ export default function CharacterGraphStage({
                   </div>
                 </div>
 
-                {(generatedAtText || actionMessage || !isComplete || (isLayoutComputing && layoutMessage)) && (
+                {(
+                  generatedAtText ||
+                  actionMessage ||
+                  !isComplete ||
+                  (isLayoutComputing && layoutMessage)
+                ) && (
                   <div className="flex flex-wrap gap-2">
                     {generatedAtText && (
                       <div className="min-w-0 flex-1 rounded-[18px] border border-[#ddd7cc] bg-[#fffdfa]/94 px-4 py-2 text-xs text-[#5f6b79] shadow-[0_10px_24px_rgba(28,35,45,0.04)] backdrop-blur">

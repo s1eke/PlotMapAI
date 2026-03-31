@@ -165,7 +165,10 @@ async function decodeImage(url: string): Promise<ReaderImageDimensions | null> {
   });
 }
 
-export async function acquireReaderImageResource(novelId: number, imageKey: string): Promise<string | null> {
+export async function acquireReaderImageResource(
+  novelId: number,
+  imageKey: string,
+): Promise<string | null> {
   const entry = getOrCreateEntry(novelId, imageKey);
   entry.refCount += 1;
 
@@ -193,15 +196,24 @@ export function releaseReaderImageResource(novelId: number, imageKey: string): v
   }
 }
 
-export function peekReaderImageResource(novelId: number, imageKey: string): string | null | undefined {
+export function peekReaderImageResource(
+  novelId: number,
+  imageKey: string,
+): string | null | undefined {
   return imageResourceCache.get(getCacheKey(novelId, imageKey))?.url;
 }
 
-export function peekReaderImageDimensions(novelId: number, imageKey: string): ReaderImageDimensions | null | undefined {
+export function peekReaderImageDimensions(
+  novelId: number,
+  imageKey: string,
+): ReaderImageDimensions | null | undefined {
   return imageResourceCache.get(getCacheKey(novelId, imageKey))?.dimensions;
 }
 
-export function areReaderImageResourcesReady(novelId: number, imageKeys: Iterable<string>): boolean {
+export function areReaderImageResourcesReady(
+  novelId: number,
+  imageKeys: Iterable<string>,
+): boolean {
   const uniqueImageKeys = new Set(imageKeys);
 
   for (const imageKey of uniqueImageKeys) {
@@ -214,7 +226,10 @@ export function areReaderImageResourcesReady(novelId: number, imageKeys: Iterabl
   return true;
 }
 
-export function preloadReaderImageResources(novelId: number, imageKeys: Iterable<string>): Promise<void> {
+export function preloadReaderImageResources(
+  novelId: number,
+  imageKeys: Iterable<string>,
+): Promise<void> {
   const uniqueImageKeys = Array.from(new Set(imageKeys));
 
   return Promise.all(uniqueImageKeys.map(async (imageKey) => {
@@ -250,7 +265,12 @@ export function preloadReaderImageResources(novelId: number, imageKeys: Iterable
       await entry.preloadPromise;
     } finally {
       entry.refCount = Math.max(0, entry.refCount - 1);
-      if (!entry.isDisposed && entry.refCount === 0 && !entry.loadPromise && !entry.preloadPromise) {
+      if (
+        !entry.isDisposed &&
+        entry.refCount === 0 &&
+        !entry.loadPromise &&
+        !entry.preloadPromise
+      ) {
         scheduleRelease(cacheKey, entry);
       }
     }

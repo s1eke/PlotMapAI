@@ -140,7 +140,9 @@ export const aiConfigApi = {
     };
   },
 
-  updateAiProviderSettings: async (payload: AiProviderSettingsPayload): Promise<AiProviderSettings> => {
+  updateAiProviderSettings: async (
+    payload: AiProviderSettingsPayload,
+  ): Promise<AiProviderSettings> => {
     const existing = await getAiConfig();
     const keepExisting = payload.keepExistingApiKey !== false;
     let apiKey = payload.apiKey || '';
@@ -164,7 +166,9 @@ export const aiConfigApi = {
     return aiConfigApi.getAiProviderSettings();
   },
 
-  testAiProviderSettings: async (payload: Partial<AiProviderSettingsPayload>): Promise<{ message: string; preview: string }> => {
+  testAiProviderSettings: async (
+    payload: Partial<AiProviderSettingsPayload>,
+  ): Promise<{ message: string; preview: string }> => {
     const existing = await getAiConfig();
     const keepExisting = payload.keepExistingApiKey !== false;
     let apiKey = payload.apiKey ?? '';

@@ -219,7 +219,11 @@ describe('ReaderViewport', () => {
       onBlockedInteraction,
     });
 
-    fireEvent.pointerMove(container.firstChild as HTMLElement, { buttons: 1, clientX: 160, clientY: 40 });
+    fireEvent.pointerMove(container.firstChild as HTMLElement, {
+      buttons: 1,
+      clientX: 160,
+      clientY: 40,
+    });
 
     expect(onBlockedInteraction).toHaveBeenCalledTimes(1);
   });

@@ -26,7 +26,9 @@ vi.mock('../../../utils/readerImageResourceCache', async (importOriginal) => {
   };
 });
 
-function renderPagedContent(overrides: Partial<React.ComponentProps<typeof PagedReaderContent>> = {}) {
+function renderPagedContent(
+  overrides: Partial<React.ComponentProps<typeof PagedReaderContent>> = {},
+) {
   const chapter = overrides.chapter ?? {
     index: 0,
     title: 'Chapter 1',
@@ -38,7 +40,12 @@ function renderPagedContent(overrides: Partial<React.ComponentProps<typeof Paged
   };
   const viewportMetrics = createReaderViewportMetrics(720, 1200, 720, 1200, 18);
   const typography = createReaderTypographyMetrics(18, 1.8, 24, viewportMetrics.pagedViewportWidth);
-  const measuredLayout = measureReaderChapterLayout(chapter, viewportMetrics.pagedColumnWidth, typography, new Map());
+  const measuredLayout = measureReaderChapterLayout(
+    chapter,
+    viewportMetrics.pagedColumnWidth,
+    typography,
+    new Map(),
+  );
   const defaultLayout = composePaginatedChapterLayout(
     measuredLayout,
     getPagedContentHeight(viewportMetrics.pagedViewportHeight),
@@ -83,7 +90,12 @@ function buildMultiPageLayout() {
   };
   const viewportMetrics = createReaderViewportMetrics(720, 1200, 720, 1200, 18);
   const typography = createReaderTypographyMetrics(18, 1.8, 24, viewportMetrics.pagedViewportWidth);
-  const measuredLayout = measureReaderChapterLayout(chapter, viewportMetrics.pagedColumnWidth, typography, new Map());
+  const measuredLayout = measureReaderChapterLayout(
+    chapter,
+    viewportMetrics.pagedColumnWidth,
+    typography,
+    new Map(),
+  );
   const currentLayout = composePaginatedChapterLayout(
     measuredLayout,
     getPagedContentHeight(viewportMetrics.pagedViewportHeight),
@@ -117,14 +129,25 @@ function buildPagedLayoutForTypography(
     paragraphSpacing: number;
   },
 ) {
-  const viewportMetrics = createReaderViewportMetrics(720, 1200, 720, 1200, typographyOptions.fontSize);
+  const viewportMetrics = createReaderViewportMetrics(
+    720,
+    1200,
+    720,
+    1200,
+    typographyOptions.fontSize,
+  );
   const typography = createReaderTypographyMetrics(
     typographyOptions.fontSize,
     typographyOptions.lineSpacing,
     typographyOptions.paragraphSpacing,
     viewportMetrics.pagedViewportWidth,
   );
-  const measuredLayout = measureReaderChapterLayout(chapter, viewportMetrics.pagedColumnWidth, typography, new Map());
+  const measuredLayout = measureReaderChapterLayout(
+    chapter,
+    viewportMetrics.pagedColumnWidth,
+    typography,
+    new Map(),
+  );
 
   return composePaginatedChapterLayout(
     measuredLayout,
@@ -228,8 +251,18 @@ describe('PagedReaderContent', () => {
       hasNext: false,
     };
     const viewportMetrics = createReaderViewportMetrics(720, 1200, 720, 1200, 18);
-    const typography = createReaderTypographyMetrics(18, 1.8, 24, viewportMetrics.pagedViewportWidth);
-    const measuredLayout = measureReaderChapterLayout(chapter, viewportMetrics.pagedColumnWidth, typography, new Map());
+    const typography = createReaderTypographyMetrics(
+      18,
+      1.8,
+      24,
+      viewportMetrics.pagedViewportWidth,
+    );
+    const measuredLayout = measureReaderChapterLayout(
+      chapter,
+      viewportMetrics.pagedColumnWidth,
+      typography,
+      new Map(),
+    );
     const currentLayout = composePaginatedChapterLayout(
       measuredLayout,
       getPagedContentHeight(viewportMetrics.pagedViewportHeight),
@@ -274,14 +307,17 @@ describe('PagedReaderContent', () => {
   it('renders one compact text node per paged fragment instead of one node per line', () => {
     const { chapter, currentLayout } = buildMultiPageLayout();
     const firstPage = currentLayout.pageSlices[0];
-    const expectedFragmentCount = firstPage?.columns.flatMap((column) => column.items).filter((item) => (
-      item.kind === 'heading' || item.kind === 'text'
-    )).length ?? 0;
-    const expectedLineCount = firstPage?.columns.flatMap((column) => column.items).reduce((total, item) => (
-      item.kind === 'heading' || item.kind === 'text'
-        ? total + item.lines.length
-        : total
-    ), 0) ?? 0;
+    const flattenedItems = firstPage?.columns.flatMap((column) => column.items) ?? [];
+    const expectedFragmentCount = flattenedItems.filter(
+      (item) => item.kind === 'heading' || item.kind === 'text',
+    ).length;
+    const expectedLineCount = flattenedItems.reduce(
+      (total, item) =>
+        (item.kind === 'heading' || item.kind === 'text'
+          ? total + item.lines.length
+          : total),
+      0,
+    );
 
     expect(expectedLineCount).toBeGreaterThan(expectedFragmentCount);
 

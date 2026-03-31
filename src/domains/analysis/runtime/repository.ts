@@ -29,19 +29,39 @@ export interface AnalysisRuntimeRepository {
   loadOverview: (novelId: number) => Promise<AnalysisOverview | undefined>;
   getSnapshot: (novelId: number) => Promise<RuntimeSnapshot>;
   buildStatusResponse: (novelId: number) => Promise<AnalysisStatusResponse>;
-  resetAnalysisPlan: (novelId: number, totalChapters: number, chunks: AnalysisChunkPayload[]) => Promise<void>;
-  saveJobPatch: (novelId: number, patch: Partial<AnalysisJob>, extra?: Partial<AnalysisJob>) => Promise<AnalysisJob>;
+  resetAnalysisPlan: (
+    novelId: number,
+    totalChapters: number,
+    chunks: AnalysisChunkPayload[],
+  ) => Promise<void>;
+  saveJobPatch: (
+    novelId: number,
+    patch: Partial<AnalysisJob>,
+    extra?: Partial<AnalysisJob>,
+  ) => Promise<AnalysisJob>;
   refreshJobProgress: (novelId: number, totalChapters: number) => Promise<RuntimeSnapshot>;
   resetIncompleteCompletedChunks: (novelId: number) => Promise<void>;
   resetChunksForResume: (novelId: number) => Promise<void>;
   clearOverview: (novelId: number) => Promise<void>;
   markChunkRunning: (novelId: number, chunkIndex: number) => Promise<void>;
   markChunkFailed: (novelId: number, chunkIndex: number, errorMessage: string) => Promise<void>;
-  saveChunkAnalysisResult: (novelId: number, chunkIndex: number, result: ChunkAnalysisResult) => Promise<void>;
+  saveChunkAnalysisResult: (
+    novelId: number,
+    chunkIndex: number,
+    result: ChunkAnalysisResult,
+  ) => Promise<void>;
   saveOverviewAnalysisResult: (novelId: number, result: OverviewAnalysisResult) => Promise<void>;
   recoverInterruptedJobs: () => Promise<void>;
-  saveSingleChapterAnalysis: (novelId: number, chapterIndex: number, chapterTitle: string, result: ChunkAnalysisResult) => Promise<ChapterAnalysisResult | null>;
-  getChapterAnalysis: (novelId: number, chapterIndex: number) => Promise<{ analysis: ChapterAnalysisResult | null }>;
+  saveSingleChapterAnalysis: (
+    novelId: number,
+    chapterIndex: number,
+    chapterTitle: string,
+    result: ChunkAnalysisResult,
+  ) => Promise<ChapterAnalysisResult | null>;
+  getChapterAnalysis: (
+    novelId: number,
+    chapterIndex: number,
+  ) => Promise<{ analysis: ChapterAnalysisResult | null }>;
   getOverview: (novelId: number) => Promise<{ overview: ApiAnalysisOverview | null }>;
   getCharacterGraph: (novelId: number, chapters: Chapter[]) => Promise<CharacterGraphResponse>;
 }
@@ -160,7 +180,10 @@ export function createDexieAnalysisRuntimeRepository(): AnalysisRuntimeRepositor
     );
   }
 
-  async function refreshJobProgress(novelId: number, totalChapters: number): Promise<RuntimeSnapshot> {
+  async function refreshJobProgress(
+    novelId: number,
+    totalChapters: number,
+  ): Promise<RuntimeSnapshot> {
     const job = await ensureJob(novelId);
     const chunks = await loadChunks(novelId);
     const chapterRows = await loadChapterAnalyses(novelId);
@@ -175,7 +198,11 @@ export function createDexieAnalysisRuntimeRepository(): AnalysisRuntimeRepositor
     return readRuntimeSnapshot(novelId);
   }
 
-  async function saveChunkStatus(novelId: number, chunkIndex: number, patch: Partial<AnalysisChunk>): Promise<void> {
+  async function saveChunkStatus(
+    novelId: number,
+    chunkIndex: number,
+    patch: Partial<AnalysisChunk>,
+  ): Promise<void> {
     const chunk = await db.analysisChunks.where('[novelId+chunkIndex]').equals([novelId, chunkIndex]).first();
     if (!chunk) return;
     Object.assign(chunk, patch, { updatedAt: nowISO() });
@@ -203,7 +230,10 @@ export function createDexieAnalysisRuntimeRepository(): AnalysisRuntimeRepositor
       }
     },
     resetChunksForResume: async (novelId) => {
-      const incompleteChunkIndices = await findIncompleteChunkIndices(novelId, await loadChunks(novelId));
+      const incompleteChunkIndices = await findIncompleteChunkIndices(
+        novelId,
+        await loadChunks(novelId),
+      );
       for (const chunk of await loadChunks(novelId)) {
         if (
           incompleteChunkIndices.has(chunk.chunkIndex) ||
@@ -250,7 +280,12 @@ export function createDexieAnalysisRuntimeRepository(): AnalysisRuntimeRepositor
     },
     saveOverviewAnalysisResult: async (novelId, result) => {
       const existing = await loadOverview(novelId);
-      const record: AnalysisOverview = { id: existing?.id ?? (undefined as unknown as number), novelId, ...result, updatedAt: nowISO() };
+      const record: AnalysisOverview = {
+        id: existing?.id ?? (undefined as unknown as number),
+        novelId,
+        ...result,
+        updatedAt: nowISO(),
+      };
       if (existing) {
         await db.analysisOverviews.put({ ...record, id: existing.id });
       } else {
@@ -261,7 +296,9 @@ export function createDexieAnalysisRuntimeRepository(): AnalysisRuntimeRepositor
       const timestamp = nowISO();
       for (const job of await db.analysisJobs.filter((row) => ['running', 'pausing'].includes(row.status)).toArray()) {
         const snapshot = await readRuntimeSnapshot(job.novelId);
-        await saveJobPatch(job.novelId, deriveJobPatchForRecovery(snapshot), { updatedAt: timestamp });
+        await saveJobPatch(job.novelId, deriveJobPatchForRecovery(snapshot), {
+          updatedAt: timestamp,
+        });
       }
       await db.analysisChunks.filter((chunk) => chunk.status === 'running').modify({ status: 'pending', errorMessage: '', updatedAt: timestamp });
     },
@@ -294,6 +331,11 @@ export function createDexieAnalysisRuntimeRepository(): AnalysisRuntimeRepositor
       return { analysis: serializeChapter(row) };
     },
     getOverview: async (novelId) => ({ overview: serializeOverview(await loadOverview(novelId)) }),
-    getCharacterGraph: async (novelId, chapters) => buildCharacterGraphPayload(chapters, await loadChapterAnalyses(novelId), await loadOverview(novelId)),
+    getCharacterGraph: async (novelId, chapters) =>
+      buildCharacterGraphPayload(
+        chapters,
+        await loadChapterAnalyses(novelId),
+        await loadOverview(novelId),
+      ),
   };
 }

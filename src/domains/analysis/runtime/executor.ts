@@ -37,7 +37,10 @@ function normalizeRuntimeError(error: unknown, details?: Record<string, unknown>
   });
 }
 
-function hydrateChunkPayload(chunk: AnalysisChunk, chapterMap: Map<number, Chapter>): AnalysisChunkPayload {
+function hydrateChunkPayload(
+  chunk: AnalysisChunk,
+  chapterMap: Map<number, Chapter>,
+): AnalysisChunkPayload {
   const chapters: Chapter[] = [];
   for (const chapterIndex of chunk.chapterIndices) {
     const chapter = chapterMap.get(chapterIndex);
@@ -47,7 +50,10 @@ function hydrateChunkPayload(chunk: AnalysisChunk, chapterMap: Map<number, Chapt
   return buildChunkFromChapters(chunk.chunkIndex, chapters);
 }
 
-async function commitPause(repository: AnalysisRuntimeRepository, novelId: number): Promise<boolean> {
+async function commitPause(
+  repository: AnalysisRuntimeRepository,
+  novelId: number,
+): Promise<boolean> {
   const job = await repository.loadJob(novelId);
   if (!job) return true;
   await repository.saveJobPatch(novelId, deriveJobPatchForPauseCommit(), {
@@ -120,7 +126,13 @@ export async function runAnalysisExecution({
       });
 
       try {
-        const result = await runChunkAnalysis(runtimeConfig, novelTitle, payload, chunks.length, signal);
+        const result = await runChunkAnalysis(
+          runtimeConfig,
+          novelTitle,
+          payload,
+          chunks.length,
+          signal,
+        );
         await repository.saveChunkAnalysisResult(novelId, payload.chunkIndex, result);
         const snapshot = await repository.refreshJobProgress(novelId, totalChapters);
         if (snapshot.pauseRequested) {
@@ -140,13 +152,22 @@ export async function runAnalysisExecution({
         reportAppError(normalized);
         const message = `Chunk ${chunk.chunkIndex + 1} failed: ${normalized.debugMessage}`;
         await repository.markChunkFailed(novelId, payload.chunkIndex, message);
-        await failJob(repository, novelId, totalChapters, deriveJobPatchForChunkFailure(normalized.code));
+        await failJob(
+          repository,
+          novelId,
+          totalChapters,
+          deriveJobPatchForChunkFailure(normalized.code),
+        );
         return;
       }
     }
 
     const snapshot = await repository.refreshJobProgress(novelId, totalChapters);
-    if (snapshot.completedChunks >= snapshot.totalChunks && snapshot.totalChunks > 0 && !snapshot.overviewComplete) {
+    if (
+      snapshot.completedChunks >= snapshot.totalChunks &&
+      snapshot.totalChunks > 0 &&
+      !snapshot.overviewComplete
+    ) {
       const chapterRows = await repository.loadChapterAnalyses(novelId);
       if (
         chapterRows.length < totalChapters ||
@@ -166,7 +187,13 @@ export async function runAnalysisExecution({
         lastHeartbeat: nowISO(),
       });
       try {
-        const result = await runOverviewAnalysis(runtimeConfig, novelTitle, chapterRows, totalChapters, signal);
+        const result = await runOverviewAnalysis(
+          runtimeConfig,
+          novelTitle,
+          chapterRows,
+          totalChapters,
+          signal,
+        );
         await repository.saveOverviewAnalysisResult(novelId, result);
         await repository.refreshJobProgress(novelId, totalChapters);
         await repository.saveJobPatch(novelId, deriveJobPatchForOverviewSuccess(), {
@@ -181,12 +208,21 @@ export async function runAnalysisExecution({
           stage: 'overview',
         });
         reportAppError(normalized);
-        await failJob(repository, novelId, totalChapters, deriveJobPatchForOverviewFailure(normalized.code));
+        await failJob(
+          repository,
+          novelId,
+          totalChapters,
+          deriveJobPatchForOverviewFailure(normalized.code),
+        );
         return;
       }
     }
 
-    if (snapshot.completedChunks >= snapshot.totalChunks && snapshot.totalChunks > 0 && snapshot.overviewComplete) {
+    if (
+      snapshot.completedChunks >= snapshot.totalChunks &&
+      snapshot.totalChunks > 0 &&
+      snapshot.overviewComplete
+    ) {
       const job = await repository.ensureJob(novelId);
       await repository.saveJobPatch(novelId, deriveJobPatchForOverviewSuccess(), {
         completedAt: job.completedAt || nowISO(),

@@ -104,7 +104,13 @@ describe('ReaderToolbar', () => {
 
   it('renders mobile TOC button when onToggleSidebar is provided', () => {
     const onToggleSidebar = vi.fn();
-    render(<ReaderToolbar {...defaultProps} onToggleSidebar={onToggleSidebar} isSidebarOpen={false} />);
+    render(
+      <ReaderToolbar
+        {...defaultProps}
+        onToggleSidebar={onToggleSidebar}
+        isSidebarOpen={false}
+      />,
+    );
 
     const tocButton = screen.getByTitle('reader.contents');
     fireEvent.click(tocButton);

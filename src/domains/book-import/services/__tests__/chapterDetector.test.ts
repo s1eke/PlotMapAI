@@ -123,7 +123,10 @@ describe('detectChapters', () => {
 
   it('detects arabic-delimited weak headings when the structure looks chapter-like', () => {
     const headings = ['1. 开始', '2. 继续', '3. 转折'];
-    const chapters = detectChapters(buildWeakHeadingBook(headings), [{ rule: ARABIC_DELIMITED_RULE }]);
+    const chapters = detectChapters(
+      buildWeakHeadingBook(headings),
+      [{ rule: ARABIC_DELIMITED_RULE }],
+    );
 
     expect(chapters.map((chapter) => chapter.title)).toEqual(headings);
   });
@@ -137,7 +140,10 @@ describe('detectChapters', () => {
 
   it('detects bracketed-number weak headings when the structure looks chapter-like', () => {
     const headings = ['(1) 开始', '(2) 继续', '(3) 转折'];
-    const chapters = detectChapters(buildWeakHeadingBook(headings), [{ rule: BRACKETED_NUMBER_RULE }]);
+    const chapters = detectChapters(
+      buildWeakHeadingBook(headings),
+      [{ rule: BRACKETED_NUMBER_RULE }],
+    );
 
     expect(chapters.map((chapter) => chapter.title)).toEqual(headings);
   });
@@ -173,7 +179,10 @@ describe('detectChapters', () => {
 
   it('rejects weak headings when numbering is not consistently increasing', () => {
     const headings = ['1. 开始', '3. 偏移', '2. 回跳'];
-    const chapters = detectChapters(buildWeakHeadingBook(headings), [{ rule: ARABIC_DELIMITED_RULE }]);
+    const chapters = detectChapters(
+      buildWeakHeadingBook(headings),
+      [{ rule: ARABIC_DELIMITED_RULE }],
+    );
 
     expect(chapters).toEqual([]);
   });

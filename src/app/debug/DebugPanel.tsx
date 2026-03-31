@@ -235,13 +235,17 @@ export default function DebugPanel() {
             {entry.kind === 'error' && (
               <details className="mt-2 rounded bg-black/15 p-2 text-[10px] text-text-secondary">
                 <summary className="cursor-pointer select-none font-semibold text-text-primary/85">
-                  {entry.error.code} · {entry.error.kind} · retryable={String(entry.error.retryable)}
+                  {entry.error.code} · {entry.error.kind}
+                  {' · '}
+                  retryable={String(entry.error.retryable)}
                 </summary>
                 <div className="mt-2 space-y-1 break-all">
                   <div>source: {entry.error.source}</div>
                   <div>userVisible: {String(entry.error.userVisible)}</div>
                   <div>debugVisible: {String(entry.error.debugVisible)}</div>
-                  {entry.error.userMessageKey && <div>messageKey: {entry.error.userMessageKey}</div>}
+                  {entry.error.userMessageKey && (
+                    <div>messageKey: {entry.error.userMessageKey}</div>
+                  )}
                   {entry.error.details && (
                     <pre className="whitespace-pre-wrap text-[10px] text-text-secondary/90">
                       {JSON.stringify(entry.error.details, null, 2)}

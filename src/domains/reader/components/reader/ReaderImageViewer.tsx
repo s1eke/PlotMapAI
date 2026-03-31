@@ -209,7 +209,12 @@ function getTranslateBounds(targetRect: DOMRect, scale: number): Point {
   };
 }
 
-function clampTranslate(targetRect: DOMRect, scale: number, translateX: number, translateY: number): Point {
+function clampTranslate(
+  targetRect: DOMRect,
+  scale: number,
+  translateX: number,
+  translateY: number,
+): Point {
   const bounds = getTranslateBounds(targetRect, scale);
   return {
     x: clamp(translateX, -bounds.x, bounds.x),
@@ -372,7 +377,14 @@ function ReaderImageViewerSurface({
     scale: transformState.scale,
     translateX: transformState.translateX,
     translateY: transformState.translateY,
-  }), [activeEntry, isIndexLoading, originRect, transformState.scale, transformState.translateX, transformState.translateY]);
+  }), [
+    activeEntry,
+    isIndexLoading,
+    originRect,
+    transformState.scale,
+    transformState.translateX,
+    transformState.translateY,
+  ]);
   const viewerStateRef = useRef(viewerState);
 
   useEffect(() => {
@@ -411,23 +423,26 @@ function ReaderImageViewerSurface({
     setTransformState(nextState);
   }, []);
 
-  const animateTransformTo = useCallback((nextScale: number, nextTranslateX: number, nextTranslateY: number) => {
-    if (animationTimeoutRef.current !== null) {
-      window.clearTimeout(animationTimeoutRef.current);
-    }
+  const animateTransformTo = useCallback(
+    (nextScale: number, nextTranslateX: number, nextTranslateY: number) => {
+      if (animationTimeoutRef.current !== null) {
+        window.clearTimeout(animationTimeoutRef.current);
+      }
 
-    setIsTransformAnimating(true);
-    setTransform({
-      scale: nextScale,
-      translateX: nextTranslateX,
-      translateY: nextTranslateY,
-    });
+      setIsTransformAnimating(true);
+      setTransform({
+        scale: nextScale,
+        translateX: nextTranslateX,
+        translateY: nextTranslateY,
+      });
 
-    animationTimeoutRef.current = window.setTimeout(() => {
-      setIsTransformAnimating(false);
-      animationTimeoutRef.current = null;
-    }, TRANSFORM_ANIMATION_MS);
-  }, [setTransform]);
+      animationTimeoutRef.current = window.setTimeout(() => {
+        setIsTransformAnimating(false);
+        animationTimeoutRef.current = null;
+      }, TRANSFORM_ANIMATION_MS);
+    },
+    [setTransform],
+  );
 
   const handleImageLoad = useCallback((event: SyntheticEvent<HTMLImageElement>) => {
     const target = event.currentTarget;
@@ -492,7 +507,12 @@ function ReaderImageViewerSurface({
       translateX: viewerStateRef.current.translateX,
       translateY: viewerStateRef.current.translateY,
     });
-    const clampedTranslate = clampTranslate(targetRect, nextScale, nextTranslate.x, nextTranslate.y);
+    const clampedTranslate = clampTranslate(
+      targetRect,
+      nextScale,
+      nextTranslate.x,
+      nextTranslate.y,
+    );
     setIsTransformAnimating(false);
     setTransform({
       scale: nextScale,
@@ -522,7 +542,12 @@ function ReaderImageViewerSurface({
         translateX: viewerStateRef.current.translateX,
         translateY: viewerStateRef.current.translateY,
       });
-    const clampedTranslate = clampTranslate(targetRect, nextScale, nextTranslate.x, nextTranslate.y);
+    const clampedTranslate = clampTranslate(
+      targetRect,
+      nextScale,
+      nextTranslate.x,
+      nextTranslate.y,
+    );
     animateTransformTo(nextScale, clampedTranslate.x, clampedTranslate.y);
   }, [animateTransformTo, cancelPendingClose, maxScale, naturalImageSize, targetRect]);
 
@@ -544,7 +569,12 @@ function ReaderImageViewerSurface({
         translateX: viewerStateRef.current.translateX,
         translateY: viewerStateRef.current.translateY,
       });
-    const clampedTranslate = clampTranslate(targetRect, nextScale, nextTranslate.x, nextTranslate.y);
+    const clampedTranslate = clampTranslate(
+      targetRect,
+      nextScale,
+      nextTranslate.x,
+      nextTranslate.y,
+    );
     animateTransformTo(nextScale, clampedTranslate.x, clampedTranslate.y);
     return true;
   }, [animateTransformTo, cancelPendingClose, maxScale, naturalImageSize, targetRect]);
@@ -622,7 +652,8 @@ function ReaderImageViewerSurface({
       gestureRef.current = gesture;
 
       const pinchDistance = Math.max(1, getDistance(firstPointer, secondPointer));
-      const rawScale = gesture.startScale * (pinchDistance / (gesture.startDistance ?? pinchDistance));
+      const rawScale =
+        gesture.startScale * (pinchDistance / (gesture.startDistance ?? pinchDistance));
       const nextScale = clamp(rawScale, 0.82, maxScale);
       const anchoredTranslate = applyScaleAroundPoint({
         nextScale,
@@ -826,7 +857,13 @@ function ReaderImageViewerSurface({
     if (gesture?.type === 'pan') {
       await finalizeSinglePointerGesture(gesture, pointerPosition);
     }
-  }, [animateTransformTo, finalizeSinglePointerGesture, onRequestClose, targetRect, toggleZoomAtPoint]);
+  }, [
+    animateTransformTo,
+    finalizeSinglePointerGesture,
+    onRequestClose,
+    targetRect,
+    toggleZoomAtPoint,
+  ]);
 
   const handlePointerCancel = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     activePointersRef.current.delete(event.pointerId);

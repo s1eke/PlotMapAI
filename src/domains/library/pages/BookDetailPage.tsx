@@ -115,7 +115,10 @@ export default function BookDetailPage() {
 
   const job = analysisStatus?.job ?? null;
   const overview = analysisStatus?.overview ?? null;
-  const characterChartData = useMemo(() => (overview?.characterStats ?? []).slice(0, 5), [overview]);
+  const characterChartData = useMemo(
+    () => (overview?.characterStats ?? []).slice(0, 5),
+    [overview],
+  );
   const isJobRunning = job?.status === 'running' || job?.status === 'pausing';
   const introText = overview?.bookIntro || novel?.description || '';
   const jobStatusLabel = (() => {
@@ -621,7 +624,10 @@ function CharacterShareChart({
   const maxShare = Math.max(...characters.map((character) => character.sharePercent));
   const step = getShareChartStep(maxShare);
   const axisMax = Math.max(step * 3, Math.ceil(maxShare / step) * step);
-  const tickValues = Array.from({ length: Math.floor(axisMax / step) + 1 }, (_, index) => index * step);
+  const tickValues = Array.from(
+    { length: Math.floor(axisMax / step) + 1 },
+    (_, index) => index * step,
+  );
   const groupWidth = plotWidth / characters.length;
   const barWidth = Math.min(72, groupWidth * 0.5);
 

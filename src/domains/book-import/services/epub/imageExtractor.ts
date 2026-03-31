@@ -119,7 +119,10 @@ export async function extractChapterImages(
     try {
       const buffer = await file.async('arraybuffer');
       const key = generateImageKey();
-      images.push({ imageKey: key, blob: new Blob([buffer], { type: getImageMimeType(fullPath) }) });
+      images.push({
+        imageKey: key,
+        blob: new Blob([buffer], { type: getImageMimeType(fullPath) }),
+      });
       transformedHtml += `[IMG:${key}]`;
     } catch {
       transformedHtml += originalTag;

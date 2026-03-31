@@ -53,7 +53,9 @@ export function registerWorkerTaskHandlers(handlers: WorkerTaskHandlers): void {
       return;
     }
 
-    const registration = taskRegistrations.find((taskRegistration) => taskRegistration.taskName === message.task);
+    const registration = taskRegistrations.find(
+      (taskRegistration) => taskRegistration.taskName === message.task,
+    );
     if (!registration) {
       workerContext.postMessage({
         kind: 'error',

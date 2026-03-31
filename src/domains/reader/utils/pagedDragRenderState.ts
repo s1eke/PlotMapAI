@@ -13,7 +13,13 @@ export function getEffectivePagedRenderPageIndex(params: {
   pendingPageTarget?: 'start' | 'end' | null;
   pendingOverride: PendingCommittedPageOverride | null;
 }): number {
-  const { currentChapterIndex, currentLayout, pageIndex, pendingOverride, pendingPageTarget } = params;
+  const {
+    currentChapterIndex,
+    currentLayout,
+    pageIndex,
+    pendingOverride,
+    pendingPageTarget,
+  } = params;
   if (!currentLayout) {
     return pageIndex;
   }
@@ -42,5 +48,8 @@ export function shouldClearPendingCommittedPageOverride(params: {
     return false;
   }
 
-  return currentChapterIndex === pendingOverride.chapterIndex && pageIndex === pendingOverride.pageIndex;
+  return (
+    currentChapterIndex === pendingOverride.chapterIndex &&
+    pageIndex === pendingOverride.pageIndex
+  );
 }

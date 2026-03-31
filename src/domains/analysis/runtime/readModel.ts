@@ -147,7 +147,9 @@ export async function readRuntimeSnapshot(novelId: number): Promise<RuntimeSnaps
   return toSnapshot(await readStatusState(novelId));
 }
 
-export async function buildAnalysisStatusResponse(novelId: number): Promise<AnalysisStatusResponse> {
+export async function buildAnalysisStatusResponse(
+  novelId: number,
+): Promise<AnalysisStatusResponse> {
   const state = await readStatusState(novelId);
   const snapshot = toSnapshot(state);
   const currentStage = deriveCurrentStage(snapshot);

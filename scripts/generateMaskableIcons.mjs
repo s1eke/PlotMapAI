@@ -65,10 +65,12 @@ function fillPixel(buffer, size, x, y, [r, g, b, a]) {
   const incomingRed = r / 255;
   const incomingGreen = g / 255;
   const incomingBlue = b / 255;
+  const retainedSourceAlpha = existingAlpha * (1 - incomingAlpha);
 
-  const outRed = (incomingRed * incomingAlpha + existingRed * existingAlpha * (1 - incomingAlpha)) / outAlpha;
-  const outGreen = (incomingGreen * incomingAlpha + existingGreen * existingAlpha * (1 - incomingAlpha)) / outAlpha;
-  const outBlue = (incomingBlue * incomingAlpha + existingBlue * existingAlpha * (1 - incomingAlpha)) / outAlpha;
+  const outRed = (incomingRed * incomingAlpha + existingRed * retainedSourceAlpha) / outAlpha;
+  const outGreen =
+    (incomingGreen * incomingAlpha + existingGreen * retainedSourceAlpha) / outAlpha;
+  const outBlue = (incomingBlue * incomingAlpha + existingBlue * retainedSourceAlpha) / outAlpha;
 
   buffer[index] = Math.round(outRed * 255);
   buffer[index + 1] = Math.round(outGreen * 255);
@@ -201,7 +203,8 @@ function encodePng(size, rgbaBuffer) {
     const rowStart = y * (stride + 1);
     scanlines[rowStart] = 0;
     const sourceOffset = y * stride;
-    Buffer.from(rgbaBuffer.subarray(sourceOffset, sourceOffset + stride)).copy(scanlines, rowStart + 1);
+    Buffer.from(rgbaBuffer.subarray(sourceOffset, sourceOffset + stride))
+      .copy(scanlines, rowStart + 1);
   }
 
   const ihdr = Buffer.alloc(13);

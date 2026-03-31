@@ -180,7 +180,11 @@ function buildNonEmptyLinePrefixCounts(lines: string[]): number[] {
   return prefixCounts;
 }
 
-function countNonEmptyLinesBetween(startLineIndex: number, endLineIndex: number, prefixCounts: number[]): number {
+function countNonEmptyLinesBetween(
+  startLineIndex: number,
+  endLineIndex: number,
+  prefixCounts: number[],
+): number {
   if (endLineIndex <= startLineIndex + 1) {
     return 0;
   }
@@ -294,7 +298,10 @@ function classifyWeakHeading(title: string): WeakHeadingMatch | null {
   return null;
 }
 
-function selectMatchingRule(lineText: string, compiledRules: CompiledChapterRule[]): CompiledChapterRule | null {
+function selectMatchingRule(
+  lineText: string,
+  compiledRules: CompiledChapterRule[],
+): CompiledChapterRule | null {
   let matchedDefaultRule: CompiledChapterRule | null = null;
 
   for (const compiledRule of compiledRules) {
@@ -353,7 +360,9 @@ function collectHeadingCandidates(
   return candidates;
 }
 
-function groupWeakCandidatesByKind(candidates: DetectedHeadingCandidate[]): Map<WeakHeadingKind, DetectedHeadingCandidate[]> {
+function groupWeakCandidatesByKind(
+  candidates: DetectedHeadingCandidate[],
+): Map<WeakHeadingKind, DetectedHeadingCandidate[]> {
   const groups = new Map<WeakHeadingKind, DetectedHeadingCandidate[]>();
 
   for (const candidate of candidates) {
@@ -449,7 +458,11 @@ function isSuppressedInsideStructuralChapter(
     ? nextCandidate.charStart - candidate.charStart
     : textLength - candidate.charStart;
   const nonEmptyLineSpan = nextCandidate
-    ? countNonEmptyLinesBetween(candidate.lineIndex, nextCandidate.lineIndex, nonEmptyLinePrefixCounts)
+    ? countNonEmptyLinesBetween(
+      candidate.lineIndex,
+      nextCandidate.lineIndex,
+      nonEmptyLinePrefixCounts,
+    )
     : 0;
 
   return charSpan < MIN_STRONG_SECTION_CHAR_SPAN
@@ -467,7 +480,9 @@ function selectAcceptedWeakCandidates(
   const groups = groupWeakCandidatesByKind(defaultCandidates);
 
   for (const groupCandidates of groups.values()) {
-    const sortedGroup = [...groupCandidates].sort((left, right) => left.lineIndex - right.lineIndex);
+    const sortedGroup = [...groupCandidates].sort(
+      (left, right) => left.lineIndex - right.lineIndex,
+    );
     if (!hasConsistentOrdinalProgression(sortedGroup)) {
       continue;
     }
@@ -489,7 +504,10 @@ function selectAcceptedWeakCandidates(
   return accepted;
 }
 
-function buildDetectedChapters(lines: string[], candidates: DetectedHeadingCandidate[]): DetectedChapter[] {
+function buildDetectedChapters(
+  lines: string[],
+  candidates: DetectedHeadingCandidate[],
+): DetectedChapter[] {
   if (candidates.length === 0) {
     return [];
   }

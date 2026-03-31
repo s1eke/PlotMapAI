@@ -29,7 +29,10 @@ export interface AiSettingsManager {
   exportDialogFeedback: SettingsFeedbackState | null;
   importDialogFeedback: SettingsFeedbackState | null;
   clearFeedback: () => void;
-  updateField: <K extends keyof AiProviderSettingsPayload>(key: K, value: AiProviderSettingsPayload[K]) => void;
+  updateField: <K extends keyof AiProviderSettingsPayload>(
+    key: K,
+    value: AiProviderSettingsPayload[K],
+  ) => void;
   saveSettings: () => Promise<void>;
   testSettings: () => Promise<void>;
   openExportModal: () => void;
@@ -66,8 +69,10 @@ export function useAiSettingsManager(): AiSettingsManager {
   const [importPassword, setImportPassword] = useState('');
   const [pendingImportFile, setPendingImportFile] = useState<File | null>(null);
   const [feedback, setFeedback] = useState<SettingsFeedbackState | null>(null);
-  const [exportDialogFeedback, setExportDialogFeedback] = useState<SettingsFeedbackState | null>(null);
-  const [importDialogFeedback, setImportDialogFeedback] = useState<SettingsFeedbackState | null>(null);
+  const [exportDialogFeedback, setExportDialogFeedback] =
+    useState<SettingsFeedbackState | null>(null);
+  const [importDialogFeedback, setImportDialogFeedback] =
+    useState<SettingsFeedbackState | null>(null);
 
   const clearFeedback = useCallback(() => {
     setFeedback(null);

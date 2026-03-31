@@ -18,7 +18,9 @@ interface PersistReaderStateOptions {
 
 export type { PageTarget, StoredReaderState } from './sessionStore';
 
-function buildNovelScopedInitialState(initialStoredState: StoredReaderState | null): StoredReaderState {
+function buildNovelScopedInitialState(
+  initialStoredState: StoredReaderState | null,
+): StoredReaderState {
   function resolveInitialMode(): StoredReaderState['mode'] {
     if (initialStoredState?.mode) return initialStoredState.mode;
     if (initialStoredState?.viewMode === 'summary') return 'summary';
@@ -110,7 +112,8 @@ export function useReaderStatePersistence(novelId: number): {
     [initialStoredState],
   );
   const isSessionNovelAligned = !novelId || snapshot.novelId === novelId;
-  const canPersistForCurrentNovel = !novelId || snapshot.novelId === novelId || snapshot.novelId === 0;
+  const canPersistForCurrentNovel =
+    !novelId || snapshot.novelId === novelId || snapshot.novelId === 0;
   const latestReaderStateRef = useRef<StoredReaderState>(
     isSessionNovelAligned ? snapshot.storedState : novelScopedInitialState,
   );
@@ -134,44 +137,55 @@ export function useReaderStatePersistence(novelId: number): {
     hasUserInteractedRef.current = false;
   }, [novelId]);
 
-  const handleSetHasHydratedReaderState = useCallback((nextState: React.SetStateAction<boolean>) => {
-    const currentSnapshot = getReaderSessionSnapshot();
-    const currentValue = currentSnapshot.novelId === novelId
-      && currentSnapshot.restoreStatus !== 'hydrating';
-    const resolved = typeof nextState === 'function'
-      ? nextState(currentValue)
-      : nextState;
-    setHasHydratedReaderState(resolved);
-  }, [novelId]);
+  const handleSetHasHydratedReaderState = useCallback(
+    (nextState: React.SetStateAction<boolean>) => {
+      const currentSnapshot = getReaderSessionSnapshot();
+      const currentValue =
+        currentSnapshot.novelId === novelId &&
+        currentSnapshot.restoreStatus !== 'hydrating';
+      const resolved = typeof nextState === 'function'
+        ? nextState(currentValue)
+        : nextState;
+      setHasHydratedReaderState(resolved);
+    },
+    [novelId],
+  );
 
-  const persistReaderState = useCallback((nextState: StoredReaderState, options?: PersistReaderStateOptions) => {
-    if (!canPersistForCurrentNovel) {
-      return;
-    }
+  const persistReaderState = useCallback(
+    (nextState: StoredReaderState, options?: PersistReaderStateOptions) => {
+      if (!canPersistForCurrentNovel) {
+        return;
+      }
 
-    if (novelId) {
-      setSessionNovelId(novelId);
-    }
-    let inferredMode: StoredReaderState['mode'] | undefined;
-    if (nextState.viewMode === 'summary') {
-      inferredMode = 'summary';
-    } else if (nextState.isTwoColumn === true) {
-      inferredMode = 'paged';
-    } else if (nextState.viewMode === 'original' || nextState.isTwoColumn === false) {
-      inferredMode = 'scroll';
-    }
-    const shouldRecomputeMode = inferredMode !== undefined && nextState.mode !== inferredMode;
-    const mergedState: StoredReaderState = {
-      ...latestReaderStateRef.current,
-      ...nextState,
-      ...(shouldRecomputeMode ? { mode: undefined } : {}),
-    };
-    latestReaderStateRef.current = mergedState;
-    persistStoredReaderState(
-      mergedState,
-      { flush: options?.flush },
-    );
-  }, [canPersistForCurrentNovel, novelId]);
+      if (novelId) {
+        setSessionNovelId(novelId);
+      }
+      let inferredMode: StoredReaderState['mode'] | undefined;
+      if (nextState.viewMode === 'summary') {
+        inferredMode = 'summary';
+      } else if (nextState.isTwoColumn === true) {
+        inferredMode = 'paged';
+      } else if (
+        nextState.viewMode === 'original' ||
+        nextState.isTwoColumn === false
+      ) {
+        inferredMode = 'scroll';
+      }
+      const shouldRecomputeMode =
+        inferredMode !== undefined && nextState.mode !== inferredMode;
+      const mergedState: StoredReaderState = {
+        ...latestReaderStateRef.current,
+        ...nextState,
+        ...(shouldRecomputeMode ? { mode: undefined } : {}),
+      };
+      latestReaderStateRef.current = mergedState;
+      persistStoredReaderState(
+        mergedState,
+        { flush: options?.flush },
+      );
+    },
+    [canPersistForCurrentNovel, novelId],
+  );
 
   const loadPersistedReaderState = useCallback(async (): Promise<StoredReaderState> => {
     return hydrateSession(novelId);

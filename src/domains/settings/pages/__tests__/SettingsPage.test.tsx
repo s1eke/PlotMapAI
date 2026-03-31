@@ -115,7 +115,8 @@ describe('SettingsPage', () => {
     vi.mocked(purificationRulesApi.updatePurificationRule).mockResolvedValue(purificationRules[0]);
     vi.mocked(purificationRulesApi.deletePurificationRule).mockResolvedValue({ message: 'deleted' });
     vi.mocked(purificationRulesApi.exportPurificationRulesYaml).mockResolvedValue('name: Cleanup');
-    vi.mocked(purificationRulesApi.uploadPurificationRulesYaml).mockResolvedValue(purificationRules);
+    vi.mocked(purificationRulesApi.uploadPurificationRulesYaml)
+      .mockResolvedValue(purificationRules);
     vi.mocked(purificationRulesApi.clearAllPurificationRules).mockResolvedValue({ message: 'cleared' });
     vi.mocked(aiConfigApi.getAiProviderSettings).mockResolvedValue(aiSettings);
     vi.mocked(aiConfigApi.updateAiProviderSettings).mockResolvedValue(aiSettings);

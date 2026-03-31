@@ -162,7 +162,10 @@ function cancelIdleTask(handle: number): void {
   window.clearTimeout(handle);
 }
 
-function buildChapterImageDimensionsMap(novelId: number, chapter: ChapterContent): Map<string, ReturnType<typeof peekReaderImageDimensions>> {
+function buildChapterImageDimensionsMap(
+  novelId: number,
+  chapter: ChapterContent,
+): Map<string, ReturnType<typeof peekReaderImageDimensions>> {
   const dimensions = new Map<string, ReturnType<typeof peekReaderImageDimensions>>();
   for (const imageKey of extractImageKeysFromText(chapter.content)) {
     dimensions.set(imageKey, peekReaderImageDimensions(novelId, imageKey));
@@ -211,7 +214,9 @@ function countPageItems(tree: StaticPagedChapterTree): number {
   ), 0);
 }
 
-function summarizeCacheSources(sources: Iterable<ReaderRenderCacheSource>): Record<ReaderRenderCacheSource, number> {
+function summarizeCacheSources(
+  sources: Iterable<ReaderRenderCacheSource>,
+): Record<ReaderRenderCacheSource, number> {
   const counts = { ...EMPTY_CACHE_SOURCE_COUNTS };
   for (const source of sources) {
     counts[source] += 1;
@@ -486,7 +491,7 @@ export function useReaderRenderCache({
       });
     }
     return targets;
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- imageRevision forces visible keys to refresh after async image metadata loads
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh keys after image preload
   }, [
     currentChapter,
     isPagedMode,
@@ -540,13 +545,21 @@ export function useReaderRenderCache({
         variantFamily: target.variantFamily,
       };
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- visibleResultsRevisionKey forces visible trees to refresh after cache/image updates
-  }, [novelId, typography, variantSignatures, visibleResultsRevisionKey, visibleTargets]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh trees after cache/image updates
+  }, [
+    novelId,
+    typography,
+    variantSignatures,
+    visibleResultsRevisionKey,
+    visibleTargets,
+  ]);
   const visibleLayoutMetrics = useMemo(() => {
     let scrollBlockCount = 0;
     let currentPagedPageCount = 0;
     let currentPagedPageItemCount = 0;
-    const visibleCacheSources = summarizeCacheSources(visibleResults.map((result) => result.source));
+    const visibleCacheSources = summarizeCacheSources(
+      visibleResults.map((result) => result.source),
+    );
 
     for (const result of visibleResults) {
       if (result.variantFamily === 'original-scroll') {

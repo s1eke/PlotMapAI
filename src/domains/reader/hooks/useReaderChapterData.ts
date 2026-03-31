@@ -40,7 +40,10 @@ interface UseReaderChapterDataParams {
   chapterChangeSourceRef: React.MutableRefObject<ChapterChangeSource>;
   loadPersistedReaderState: () => Promise<StoredReaderState>;
   setHasHydratedReaderState: React.Dispatch<React.SetStateAction<boolean>>;
-  setPendingRestoreState: (nextState: StoredReaderState | null, options?: { force?: boolean }) => void;
+  setPendingRestoreState: (
+    nextState: StoredReaderState | null,
+    options?: { force?: boolean },
+  ) => void;
   clearPendingRestoreState: () => void;
   suppressScrollSyncTemporarily: () => void;
   startRestoreMaskForState: (state: StoredReaderState | null | undefined) => void;
@@ -171,7 +174,9 @@ export function useReaderChapterData({
     let delay = 50;
     for (const adjacentIndex of toPreload) {
       const timeoutId = window.setTimeout(() => {
-        preloadTimeoutIdsRef.current = preloadTimeoutIdsRef.current.filter((id) => id !== timeoutId);
+        preloadTimeoutIdsRef.current = preloadTimeoutIdsRef.current.filter(
+          (id) => id !== timeoutId,
+        );
         if (chapterCacheRef.current.has(adjacentIndex)) return;
         const controller = new AbortController();
         preloadControllersRef.current.push(controller);

@@ -5,7 +5,9 @@ import DebugPanel from '../DebugPanel';
 
 const debugTest = vi.hoisted(() => {
   let logs: Array<{ time: number; category: string; message: string }> = [];
-  let subscriber: ((entry: { time: number; category: string; message: string }) => void) | null = null;
+  let subscriber:
+    | ((entry: { time: number; category: string; message: string }) => void)
+    | null = null;
   let featureFlags = {
     readerTelemetry: false,
   };

@@ -33,7 +33,11 @@ export function useScrollModeChapters(
 
   const syncViewportState = useCallback((options?: { force?: boolean }) => {
     const nextScrollTop = contentRef.current?.scrollTop ?? 0;
-    if (!options?.force && pendingViewportTopRef.current === nextScrollTop && viewportSyncFrameRef.current !== null) {
+    if (
+      !options?.force &&
+      pendingViewportTopRef.current === nextScrollTop &&
+      viewportSyncFrameRef.current !== null
+    ) {
       return;
     }
 
@@ -72,7 +76,13 @@ export function useScrollModeChapters(
       .finally(() => {
         pendingScrollFetchesRef.current.delete(nextIdx);
       });
-  }, [chapters.length, fetchChapterContent, preloadAdjacent, scrollModeChapters, setScrollModeChapters]);
+  }, [
+    chapters.length,
+    fetchChapterContent,
+    preloadAdjacent,
+    scrollModeChapters,
+    setScrollModeChapters,
+  ]);
 
   const prependPrevChapter = useCallback((prevIdx: number) => {
     if (
@@ -103,7 +113,14 @@ export function useScrollModeChapters(
       .finally(() => {
         pendingScrollFetchesRef.current.delete(prevIdx);
       });
-  }, [contentRef, fetchChapterContent, preloadAdjacent, scrollModeChapters, setScrollModeChapters, syncViewportState]);
+  }, [
+    contentRef,
+    fetchChapterContent,
+    preloadAdjacent,
+    scrollModeChapters,
+    setScrollModeChapters,
+    syncViewportState,
+  ]);
 
   const getCurrentAnchor = useCallback((): ScrollModeAnchor | null => {
     if (isPagedMode || !contentRef.current || viewMode !== 'original' || scrollModeChapters.length === 0) {

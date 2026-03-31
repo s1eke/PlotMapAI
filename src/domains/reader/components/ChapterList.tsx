@@ -10,7 +10,13 @@ interface ChapterListProps {
   isSidebarOpen?: boolean;
 }
 
-export default function ChapterList({ chapters, currentIndex, onSelect, contentTextColor, isSidebarOpen }: ChapterListProps) {
+export default function ChapterList({
+  chapters,
+  currentIndex,
+  onSelect,
+  contentTextColor,
+  isSidebarOpen,
+}: ChapterListProps) {
   const listRef = useRef<HTMLDivElement>(null);
   const hasMountedRef = useRef(false);
   const previousCurrentIndexRef = useRef(currentIndex);
@@ -24,9 +30,10 @@ export default function ChapterList({ chapters, currentIndex, onSelect, contentT
       if (activeEl) {
         const didOpenSidebar = Boolean(isSidebarOpen) && !previousSidebarOpenRef.current;
         const didChangeChapter = currentIndex !== previousCurrentIndexRef.current;
-        const behavior: ScrollBehavior = !hasMountedRef.current || didOpenSidebar || !didChangeChapter
-          ? 'auto'
-          : 'smooth';
+        const behavior: ScrollBehavior =
+          !hasMountedRef.current || didOpenSidebar || !didChangeChapter
+            ? 'auto'
+            : 'smooth';
 
         activeEl.scrollIntoView({ block: 'center', behavior });
       }

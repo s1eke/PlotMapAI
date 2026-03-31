@@ -227,7 +227,11 @@ export default function AiSettingsPanel({ manager }: AiSettingsPanelProps) {
             <button
               type="button"
               onClick={() => manager.confirmImport()}
-              disabled={!manager.pendingImportFile || manager.importPassword.length < 4 || manager.isImporting}
+              disabled={
+                !manager.pendingImportFile ||
+                manager.importPassword.length < 4 ||
+                manager.isImporting
+              }
               className="px-4 py-2 rounded-lg font-medium bg-accent hover:bg-accent-hover text-white transition-colors disabled:opacity-50 flex items-center gap-2"
             >
               {manager.isImporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}

@@ -16,7 +16,11 @@ export interface GraphLayoutProgress {
   stage: 'layout';
 }
 
-const runGraphLayoutWorkerTask = createWorkerTaskRunner<GraphLayoutPayload, LayoutNode[], GraphLayoutProgress>({
+const runGraphLayoutWorkerTask = createWorkerTaskRunner<
+  GraphLayoutPayload,
+  LayoutNode[],
+  GraphLayoutProgress
+>({
   createWorker: () => new Worker(new URL('./layout.worker.ts', import.meta.url), { type: 'module' }),
   task: 'graph-layout',
   fallback: ({ nodes, edges }, options) => {

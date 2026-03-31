@@ -21,7 +21,10 @@ export function getContainerProgress(element: HTMLDivElement | null): number {
 
 export function getPageIndexFromProgress(progress: number | undefined, totalPages: number): number {
   if (totalPages <= 1) return 0;
-  return Math.max(0, Math.min(totalPages - 1, Math.round(clampProgress(progress) * (totalPages - 1))));
+  return Math.max(
+    0,
+    Math.min(totalPages - 1, Math.round(clampProgress(progress) * (totalPages - 1))),
+  );
 }
 
 export function resolvePagedTargetPage(
@@ -44,7 +47,9 @@ export function resolvePagedTargetPage(
   return Math.max(0, Math.min(totalPages - 1, pageIndex));
 }
 
-export function shouldMaskReaderPositionRestore(state: StoredReaderState | null | undefined): boolean {
+export function shouldMaskReaderPositionRestore(
+  state: StoredReaderState | null | undefined,
+): boolean {
   if (!state) return false;
 
   return (state.chapterIndex ?? 0) > 0
@@ -58,9 +63,10 @@ export function shouldMaskReaderPositionRestore(state: StoredReaderState | null 
 export function buildChapterRenderData(content: string, title: string): ChapterRenderData {
   const paragraphs = content.split('\n');
   const firstNonEmptyIndex = paragraphs.findIndex((paragraph) => paragraph.trim().length > 0);
-  const skipLineIndex = firstNonEmptyIndex !== -1 && paragraphs[firstNonEmptyIndex].trim() === title.trim()
-    ? firstNonEmptyIndex
-    : -1;
+  const skipLineIndex =
+    firstNonEmptyIndex !== -1 && paragraphs[firstNonEmptyIndex].trim() === title.trim()
+      ? firstNonEmptyIndex
+      : -1;
 
   return {
     paragraphs,

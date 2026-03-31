@@ -19,7 +19,10 @@ interface UsePagedChapterTransitionParams {
 
 interface UsePagedChapterTransitionResult {
   requestChapterNavigation: (targetIndex: number, pageTarget?: PageTarget) => void;
-  requestDirectionalNavigation: (direction: NavigationDirection, shouldAnimate?: boolean) => boolean;
+  requestDirectionalNavigation: (
+    direction: NavigationDirection,
+    shouldAnimate?: boolean,
+  ) => boolean;
 }
 
 export function usePagedChapterTransition({
@@ -43,7 +46,10 @@ export function usePagedChapterTransition({
     queuedIntentRef.current = intent;
   }, []);
 
-  const requestChapterNavigation = useCallback((targetIndex: number, pageTarget: PageTarget = 'start') => {
+  const requestChapterNavigation = useCallback((
+    targetIndex: number,
+    pageTarget: PageTarget = 'start',
+  ) => {
     if (!isPagedMode) {
       onCommitChapterNavigation(targetIndex, pageTarget);
       return;
@@ -61,7 +67,10 @@ export function usePagedChapterTransition({
     }
   }, [isPagedMode, onCommitChapterNavigation, queueIntent]);
 
-  const requestDirectionalNavigation = useCallback((direction: NavigationDirection, shouldAnimate = false) => {
+  const requestDirectionalNavigation = useCallback((
+    direction: NavigationDirection,
+    shouldAnimate = false,
+  ) => {
     if (!isPagedMode) {
       return true;
     }

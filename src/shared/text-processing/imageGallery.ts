@@ -8,7 +8,9 @@ export interface ChapterImageGalleryEntry {
   imageKey: string;
   order: number;
 }
-export function buildChapterImageGalleryEntries(chapter: ChapterBlockSource): ChapterImageGalleryEntry[] {
+export function buildChapterImageGalleryEntries(
+  chapter: ChapterBlockSource,
+): ChapterImageGalleryEntry[] {
   return buildChapterBlockSequence(chapter)
     .filter((block) => block.kind === 'image')
     .map((block, order) => ({

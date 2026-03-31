@@ -83,7 +83,9 @@ function createDebugInstallPromptEvent(): BeforeInstallPromptEvent {
 export default function InstallPrompt() {
   const { t } = useTranslation();
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
-  const [showIosHint, setShowIosHint] = useState(() => !isStandaloneMode() && isIosLikeDevice() && !isInstallPromptDismissed());
+  const [showIosHint, setShowIosHint] = useState(
+    () => !isStandaloneMode() && isIosLikeDevice() && !isInstallPromptDismissed(),
+  );
   const [dismissed, setDismissed] = useState(() => isInstallPromptDismissed());
 
   useEffect(() => {

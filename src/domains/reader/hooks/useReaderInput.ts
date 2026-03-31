@@ -125,7 +125,15 @@ export function useReaderInput(
         }
       }
     }
-  }, [chapterIndex, currentChapter, goToChapter, goToNextPage, goToPrevPage, isLoading, isPagedMode]);
+  }, [
+    chapterIndex,
+    currentChapter,
+    goToChapter,
+    goToNextPage,
+    goToPrevPage,
+    isLoading,
+    isPagedMode,
+  ]);
 
   const handleKeyUp = useCallback((e: KeyboardEvent) => {
     if (!isPagedMode && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {

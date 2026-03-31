@@ -57,7 +57,8 @@ function setupHook(opts: {
   onReadingAnchorChange?: Mock;
 } = {}) {
   const contentRef = { current: opts.contentElement ?? makeMockElement() };
-  const fetchChapterContent = opts.fetchChapterContent ?? vi.fn().mockResolvedValue(makeChapterContent(0));
+  const fetchChapterContent =
+    opts.fetchChapterContent ?? vi.fn().mockResolvedValue(makeChapterContent(0));
   const preloadAdjacent = opts.preloadAdjacent ?? vi.fn();
   const onReadingAnchorChange = opts.onReadingAnchorChange ?? vi.fn();
   const scrollModeChapters = opts.scrollModeChapters ?? [0];

@@ -35,6 +35,8 @@ export function createReaderImageEntryId(entry: Pick<ReaderImageGalleryEntry, 'b
   return `${entry.chapterIndex}:${entry.blockIndex}:${entry.imageKey}`;
 }
 
-export function sortReaderImageGalleryEntries(entries: ReaderImageGalleryEntry[]): ReaderImageGalleryEntry[] {
+export function sortReaderImageGalleryEntries(
+  entries: ReaderImageGalleryEntry[],
+): ReaderImageGalleryEntry[] {
   return sortChapterImageGalleryEntries(entries);
 }

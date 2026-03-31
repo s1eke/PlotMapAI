@@ -197,8 +197,12 @@ function clampZoomOffsetForStage(
   if (scale >= 1) {
     return {
       scale,
-      offsetX: Number(clamp(offsetX, stageSize.width - stageSize.width * scale - slackX, slackX).toFixed(2)),
-      offsetY: Number(clamp(offsetY, stageSize.height - stageSize.height * scale - slackY, slackY).toFixed(2)),
+      offsetX: Number(
+        clamp(offsetX, stageSize.width - stageSize.width * scale - slackX, slackX).toFixed(2),
+      ),
+      offsetY: Number(
+        clamp(offsetY, stageSize.height - stageSize.height * scale - slackY, slackY).toFixed(2),
+      ),
     };
   }
 
@@ -218,11 +222,26 @@ function clampNodeToVisibleViewport(
   stageSize: StageSize,
 ): { x: number; y: number } {
   const visibleTopLeft = viewportPointToGraphPoint({ x: 0, y: 0 }, zoomState);
-  const visibleBottomRight = viewportPointToGraphPoint({ x: stageSize.width, y: stageSize.height }, zoomState);
-  const minX = Math.max(CANVAS_PADDING * 0.35 + radius, Math.min(visibleTopLeft.x, visibleBottomRight.x) + radius);
-  const maxX = Math.min(STAGE_WIDTH - CANVAS_PADDING * 0.35 - radius, Math.max(visibleTopLeft.x, visibleBottomRight.x) - radius);
-  const minY = Math.max(CANVAS_PADDING * 0.35 + radius, Math.min(visibleTopLeft.y, visibleBottomRight.y) + radius);
-  const maxY = Math.min(stageSize.height - CANVAS_PADDING * 0.35 - radius, Math.max(visibleTopLeft.y, visibleBottomRight.y) - radius);
+  const visibleBottomRight = viewportPointToGraphPoint(
+    { x: stageSize.width, y: stageSize.height },
+    zoomState,
+  );
+  const minX = Math.max(
+    CANVAS_PADDING * 0.35 + radius,
+    Math.min(visibleTopLeft.x, visibleBottomRight.x) + radius,
+  );
+  const maxX = Math.min(
+    STAGE_WIDTH - CANVAS_PADDING * 0.35 - radius,
+    Math.max(visibleTopLeft.x, visibleBottomRight.x) - radius,
+  );
+  const minY = Math.max(
+    CANVAS_PADDING * 0.35 + radius,
+    Math.min(visibleTopLeft.y, visibleBottomRight.y) + radius,
+  );
+  const maxY = Math.min(
+    stageSize.height - CANVAS_PADDING * 0.35 - radius,
+    Math.max(visibleTopLeft.y, visibleBottomRight.y) - radius,
+  );
 
   return {
     x: clamp(point.x, Math.min(minX, maxX), Math.max(minX, maxX)),
@@ -250,8 +269,17 @@ export function useCharacterGraphCanvas({
 
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
-  const [nodePositionState, setNodePositionState] = useState<NodePositionState>({ graph: null, stageHeight: STAGE_HEIGHT, positions: {} });
-  const [viewportState, setViewportState] = useState<ViewportState>({ graph: null, isMobile: false, stageHeight: STAGE_HEIGHT, zoom: null });
+  const [nodePositionState, setNodePositionState] = useState<NodePositionState>({
+    graph: null,
+    stageHeight: STAGE_HEIGHT,
+    positions: {},
+  });
+  const [viewportState, setViewportState] = useState<ViewportState>({
+    graph: null,
+    isMobile: false,
+    stageHeight: STAGE_HEIGHT,
+    zoom: null,
+  });
   const [isGestureInteracting, setIsGestureInteracting] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
   const [layoutRevision, setLayoutRevision] = useState(0);
@@ -360,8 +388,17 @@ export function useCharacterGraphCanvas({
   );
   const defaultZoomState = isMobile ? mobileFitZoomState : DEFAULT_ZOOM_STATE;
   const nodePositions = useMemo(
-    () => (nodePositionState.graph === graph && nodePositionState.stageHeight === stageHeight ? nodePositionState.positions : {}),
-    [graph, nodePositionState.graph, nodePositionState.positions, nodePositionState.stageHeight, stageHeight],
+    () =>
+      (nodePositionState.graph === graph && nodePositionState.stageHeight === stageHeight
+        ? nodePositionState.positions
+        : {}),
+    [
+      graph,
+      nodePositionState.graph,
+      nodePositionState.positions,
+      nodePositionState.stageHeight,
+      stageHeight,
+    ],
   );
   const zoomState = viewportState.graph === graph
     && viewportState.isMobile === isMobile
@@ -411,12 +448,14 @@ export function useCharacterGraphCanvas({
     };
   }, [graph, isMobile]);
 
-  const resolvedSelectedNodeId = selectedNodeId && graph?.nodes.some((node) => node.id === selectedNodeId)
-    ? selectedNodeId
-    : null;
-  const resolvedHoveredNodeId = hoveredNodeId && graph?.nodes.some((node) => node.id === hoveredNodeId)
-    ? hoveredNodeId
-    : null;
+  const resolvedSelectedNodeId =
+    selectedNodeId && graph?.nodes.some((node) => node.id === selectedNodeId)
+      ? selectedNodeId
+      : null;
+  const resolvedHoveredNodeId =
+    hoveredNodeId && graph?.nodes.some((node) => node.id === hoveredNodeId)
+      ? hoveredNodeId
+      : null;
 
   const layoutNodes = useMemo(
     () => scaledBaseNodes.map((node) => ({
@@ -591,7 +630,9 @@ export function useCharacterGraphCanvas({
       return false;
     }
 
-    const [firstPointer, secondPointer] = Array.from(activePointersRef.current.entries()).slice(0, 2);
+    const [firstPointer, secondPointer] = Array.from(
+      activePointersRef.current.entries(),
+    ).slice(0, 2);
     if (!firstPointer || !secondPointer) {
       return false;
     }
@@ -786,42 +827,44 @@ export function useCharacterGraphCanvas({
     };
   }, [getViewportPoint, graph, isMobile, queueNodePosition, queueViewportZoom, stageSize]);
 
-  const handleNodePointerDown = useCallback((event: ReactPointerEvent<SVGGElement>, node: LayoutNode) => {
-    const viewportPoint = getViewportPoint(event.clientX, event.clientY);
-    const point = viewportPointToGraphPoint({
-      x: viewportPoint?.x ?? 0,
-      y: viewportPoint?.y ?? 0,
-    }, zoomStateRef.current);
-    if (!viewportPoint) return;
+  const handleNodePointerDown = useCallback(
+    (event: ReactPointerEvent<SVGGElement>, node: LayoutNode) => {
+      const viewportPoint = getViewportPoint(event.clientX, event.clientY);
+      const point = viewportPointToGraphPoint({
+        x: viewportPoint?.x ?? 0,
+        y: viewportPoint?.y ?? 0,
+      }, zoomStateRef.current);
+      if (!viewportPoint) return;
 
-    activePointersRef.current.set(event.pointerId, {
-      clientX: event.clientX,
-      clientY: event.clientY,
-      viewportX: viewportPoint.x,
-      viewportY: viewportPoint.y,
-    });
-    if (maybeStartPinchGesture()) {
-      event.preventDefault();
+      activePointersRef.current.set(event.pointerId, {
+        clientX: event.clientX,
+        clientY: event.clientY,
+        viewportX: viewportPoint.x,
+        viewportY: viewportPoint.y,
+      });
+      if (maybeStartPinchGesture()) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+
+      gestureStateRef.current = {
+        kind: 'nodePending',
+        pointerId: event.pointerId,
+        drag: {
+          nodeId: node.id,
+          offsetX: point.x - node.x,
+          offsetY: point.y - node.y,
+          radius: node.radius,
+          startX: event.clientX,
+          startY: event.clientY,
+        },
+      };
+      setHoveredNodeId(node.id);
       event.stopPropagation();
-      return;
-    }
-
-    gestureStateRef.current = {
-      kind: 'nodePending',
-      pointerId: event.pointerId,
-      drag: {
-        nodeId: node.id,
-        offsetX: point.x - node.x,
-        offsetY: point.y - node.y,
-        radius: node.radius,
-        startX: event.clientX,
-        startY: event.clientY,
-      },
-    };
-    setHoveredNodeId(node.id);
-    event.stopPropagation();
-    event.preventDefault();
-  }, [getViewportPoint, maybeStartPinchGesture]);
+      event.preventDefault();
+    }, [getViewportPoint, maybeStartPinchGesture],
+  );
 
   const handleWheel = useCallback((event: WheelEvent) => {
     const viewportPoint = getViewportPoint(event.clientX, event.clientY);

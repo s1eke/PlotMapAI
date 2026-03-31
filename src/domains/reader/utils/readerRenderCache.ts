@@ -44,8 +44,9 @@ interface ReaderRenderCacheRecordBase {
   variantFamily: ReaderRenderVariant;
 }
 
-export interface ReaderRenderCacheEntry<TTree extends StaticChapterRenderTree = StaticChapterRenderTree>
-  extends ReaderRenderCacheRecordBase {
+export interface ReaderRenderCacheEntry<
+  TTree extends StaticChapterRenderTree = StaticChapterRenderTree,
+> extends ReaderRenderCacheRecordBase {
   storageKind: 'render-tree';
   tree: TTree;
 }
@@ -55,7 +56,9 @@ export interface ReaderRenderCacheManifestEntry extends ReaderRenderCacheRecordB
   tree: null;
 }
 
-export type ReaderRenderCacheRecord<TTree extends StaticChapterRenderTree = StaticChapterRenderTree> =
+export type ReaderRenderCacheRecord<
+  TTree extends StaticChapterRenderTree = StaticChapterRenderTree,
+> =
   | ReaderRenderCacheEntry<TTree>
   | ReaderRenderCacheManifestEntry;
 

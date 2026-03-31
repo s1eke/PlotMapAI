@@ -12,7 +12,10 @@ interface PurificationRuleModalProps {
   rule: PurificationRule | null;
 }
 
-function createInitialFormData(defaultGroup: string, rule?: PurificationRule | null): Partial<PurificationRule> {
+function createInitialFormData(
+  defaultGroup: string,
+  rule?: PurificationRule | null,
+): Partial<PurificationRule> {
   return {
     id: rule?.id,
     externalId: rule?.externalId,
@@ -34,7 +37,12 @@ function createInitialFormData(defaultGroup: string, rule?: PurificationRule | n
   };
 }
 
-export default function PurificationRuleModal({ isOpen, onClose, onSave, rule }: PurificationRuleModalProps) {
+export default function PurificationRuleModal({
+  isOpen,
+  onClose,
+  onSave,
+  rule,
+}: PurificationRuleModalProps) {
   const { t } = useTranslation();
   const defaultGroup = t('settings.purification.defaultGroup');
   const [formData, setFormData] = useState<Partial<PurificationRule>>(
@@ -133,11 +141,17 @@ export default function PurificationRuleModal({ isOpen, onClose, onSave, rule }:
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-muted-bg/50 p-4 rounded-xl border border-white/5">
           <div className="flex items-center justify-between">
             <span className="text-sm text-text-primary">{t('settings.purification.useRegex')}</span>
-            <Toggle checked={formData.isRegex ?? false} onChange={(checked) => setFormData({ ...formData, isRegex: checked })} />
+            <Toggle
+              checked={formData.isRegex ?? false}
+              onChange={(checked) => setFormData({ ...formData, isRegex: checked })}
+            />
           </div>
           <div className="flex items-center justify-between">
             <span className="text-sm text-text-primary">{t('settings.purification.isEnabled')}</span>
-            <Toggle checked={formData.isEnabled ?? false} onChange={(checked) => setFormData({ ...formData, isEnabled: checked })} />
+            <Toggle
+              checked={formData.isEnabled ?? false}
+              onChange={(checked) => setFormData({ ...formData, isEnabled: checked })}
+            />
           </div>
         </div>
 
@@ -199,7 +213,12 @@ export default function PurificationRuleModal({ isOpen, onClose, onSave, rule }:
               min="1"
               max="20"
               value={formData.order ?? 10}
-              onChange={(e) => setFormData({ ...formData, order: Number.parseInt(e.target.value, 10) || 0 })}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  order: Number.parseInt(e.target.value, 10) || 0,
+                })
+              }
               className="w-full bg-muted-bg border border-white/10 rounded-xl px-4 py-2.5 text-text-primary focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-all"
             />
           </div>
@@ -208,7 +227,12 @@ export default function PurificationRuleModal({ isOpen, onClose, onSave, rule }:
             <input
               type="number"
               value={formData.timeoutMs ?? 3000}
-              onChange={(e) => setFormData({ ...formData, timeoutMs: Number.parseInt(e.target.value, 10) || 0 })}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  timeoutMs: Number.parseInt(e.target.value, 10) || 0,
+                })
+              }
               className="w-full bg-muted-bg border border-white/10 rounded-xl px-4 py-2.5 text-text-primary focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-all"
             />
           </div>

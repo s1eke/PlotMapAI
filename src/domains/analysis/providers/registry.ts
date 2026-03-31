@@ -8,7 +8,9 @@ const ANALYSIS_PROVIDER_REGISTRY: Record<AnalysisProviderId, AnalysisProviderAda
   [DEFAULT_ANALYSIS_PROVIDER_ID]: openAiCompatibleAnalysisProvider,
 };
 
-export function resolveAnalysisProviderAdapter(providerId: AnalysisProviderId): AnalysisProviderAdapter {
+export function resolveAnalysisProviderAdapter(
+  providerId: AnalysisProviderId,
+): AnalysisProviderAdapter {
   const adapter = ANALYSIS_PROVIDER_REGISTRY[providerId];
   if (!adapter) {
     throw new AnalysisConfigError(`不支持的 AI Provider：${providerId}`, {

@@ -24,7 +24,9 @@ function createTextProcessingTaskRunner<TTask extends TextProcessingTaskName>(
   fallback: (
     payload: WorkerTaskPayload<TextProcessingTaskMap, TTask>,
     options: WorkerTaskOptions<WorkerTaskProgress<TextProcessingTaskMap, TTask>>,
-  ) => Promise<WorkerTaskResult<TextProcessingTaskMap, TTask>> | WorkerTaskResult<TextProcessingTaskMap, TTask>,
+  ) =>
+    | Promise<WorkerTaskResult<TextProcessingTaskMap, TTask>>
+    | WorkerTaskResult<TextProcessingTaskMap, TTask>,
 ) {
   return createWorkerTaskRunner<TextProcessingTaskMap, TTask>({
     createWorker: () => new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' }),

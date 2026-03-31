@@ -20,16 +20,20 @@ function setupHook(overrides: {
     isChapterNavigationReady: overrides.isChapterNavigationReady ?? false,
   };
 
-  const { result, rerender } = renderHook((props: typeof initialProps) => usePagedChapterTransition({
-    isPagedMode: props.isPagedMode,
-    chapterIndex: props.chapterIndex,
-    isChapterNavigationReady: props.isChapterNavigationReady,
-    chapterChangeSourceRef,
-    onCommitChapterNavigation,
-    onReplayDirectionalNavigation,
-  }), {
-    initialProps,
-  });
+  const { result, rerender } = renderHook(
+    (props: typeof initialProps) =>
+      usePagedChapterTransition({
+        isPagedMode: props.isPagedMode,
+        chapterIndex: props.chapterIndex,
+        isChapterNavigationReady: props.isChapterNavigationReady,
+        chapterChangeSourceRef,
+        onCommitChapterNavigation,
+        onReplayDirectionalNavigation,
+      }),
+    {
+      initialProps,
+    },
+  );
 
   return {
     result,
@@ -43,7 +47,13 @@ function setupHook(overrides: {
 
 describe('usePagedChapterTransition', () => {
   it('replays only the last queued directional intent after the target chapter becomes ready', () => {
-    const { result, rerender, onCommitChapterNavigation, onReplayDirectionalNavigation, baseProps } = setupHook();
+    const {
+      result,
+      rerender,
+      onCommitChapterNavigation,
+      onReplayDirectionalNavigation,
+      baseProps,
+    } = setupHook();
 
     act(() => {
       result.current.requestChapterNavigation(1, 'start');
@@ -68,7 +78,13 @@ describe('usePagedChapterTransition', () => {
   });
 
   it('lets a chapter intent overwrite a queued directional intent', () => {
-    const { result, rerender, onCommitChapterNavigation, onReplayDirectionalNavigation, baseProps } = setupHook();
+    const {
+      result,
+      rerender,
+      onCommitChapterNavigation,
+      onReplayDirectionalNavigation,
+      baseProps,
+    } = setupHook();
 
     act(() => {
       result.current.requestChapterNavigation(1, 'start');
@@ -90,7 +106,13 @@ describe('usePagedChapterTransition', () => {
   });
 
   it('clears queued state when chapter changes come from scroll', () => {
-    const { result, rerender, chapterChangeSourceRef, onReplayDirectionalNavigation, baseProps } = setupHook();
+    const {
+      result,
+      rerender,
+      chapterChangeSourceRef,
+      onReplayDirectionalNavigation,
+      baseProps,
+    } = setupHook();
 
     act(() => {
       result.current.requestChapterNavigation(1, 'start');

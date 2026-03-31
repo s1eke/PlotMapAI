@@ -14,7 +14,9 @@ export default function LanguageSwitcher() {
     { code: 'en', name: 'English' },
   ];
 
-  const currentLanguage = languages.find((lang) => i18n.language.startsWith(lang.code)) || languages[1];
+  const currentLanguage = languages.find((lang) => (
+    i18n.language.startsWith(lang.code)
+  )) || languages[1];
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {

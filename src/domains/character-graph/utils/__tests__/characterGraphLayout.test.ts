@@ -409,9 +409,15 @@ describe('clampZoomOffset', () => {
     const epsilon = 0.01;
 
     expect(zoomedIn.offsetX).toBeLessThanOrEqual(CANVAS_PADDING * 0.6 + epsilon);
-    expect(zoomedIn.offsetY).toBeGreaterThanOrEqual(STAGE_HEIGHT - STAGE_HEIGHT * 1.8 - CANVAS_PADDING * 0.6 - epsilon);
-    expect(zoomedOut.offsetX).toBeGreaterThanOrEqual((STAGE_WIDTH - STAGE_WIDTH * 0.8) / 2 - CANVAS_PADDING * 0.6 - epsilon);
-    expect(zoomedOut.offsetY).toBeLessThanOrEqual((STAGE_HEIGHT - STAGE_HEIGHT * 0.8) / 2 + CANVAS_PADDING * 0.6 + epsilon);
+    expect(zoomedIn.offsetY).toBeGreaterThanOrEqual(
+      STAGE_HEIGHT - STAGE_HEIGHT * 1.8 - CANVAS_PADDING * 0.6 - epsilon,
+    );
+    expect(zoomedOut.offsetX).toBeGreaterThanOrEqual(
+      (STAGE_WIDTH - STAGE_WIDTH * 0.8) / 2 - CANVAS_PADDING * 0.6 - epsilon,
+    );
+    expect(zoomedOut.offsetY).toBeLessThanOrEqual(
+      (STAGE_HEIGHT - STAGE_HEIGHT * 0.8) / 2 + CANVAS_PADDING * 0.6 + epsilon,
+    );
   });
 
   it('returns finite numbers for various inputs', () => {

@@ -59,7 +59,10 @@ export function normalizeSingleChapterResult(
     throw new AnalysisExecutionError('AI 返回的 chapterAnalyses 项不是对象。');
   }
   const itemRecord = item as Record<string, unknown>;
-  const normalizedChapterIndex = normalizeSingleChapterIndex(itemRecord.chapterIndex, chapter.chapterIndex);
+  const normalizedChapterIndex = normalizeSingleChapterIndex(
+    itemRecord.chapterIndex,
+    chapter.chapterIndex,
+  );
   if (normalizedChapterIndex === null) {
     throw new AnalysisExecutionError(`AI 返回的 chapterIndex (${itemRecord.chapterIndex}) 与请求的 (${chapter.chapterIndex}) 不一致。`);
   }

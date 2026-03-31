@@ -110,7 +110,9 @@ export default function UploadModal({
       return;
     }
 
-    const validationError = files.map(validateImportFile).find((candidate) => candidate !== null) ?? null;
+    const validationError = files
+      .map(validateImportFile)
+      .find((candidate) => candidate !== null) ?? null;
     if (validationError) {
       setError(validationError);
       return;

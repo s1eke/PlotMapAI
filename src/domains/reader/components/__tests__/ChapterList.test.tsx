@@ -18,7 +18,9 @@ describe('ChapterList', () => {
   ];
 
   it('scrolls the active chapter into view when the current chapter changes', () => {
-    const { rerender } = render(<ChapterList chapters={chapters} currentIndex={0} onSelect={() => {}} />);
+    const { rerender } = render(
+      <ChapterList chapters={chapters} currentIndex={0} onSelect={() => {}} />,
+    );
 
     scrollIntoViewMock.mockClear();
     rerender(<ChapterList chapters={chapters} currentIndex={2} onSelect={() => {}} />);
@@ -29,10 +31,19 @@ describe('ChapterList', () => {
   });
 
   it('jumps directly to the active chapter when the sidebar opens', () => {
-    const { rerender } = render(<ChapterList chapters={chapters} currentIndex={2} onSelect={() => {}} isSidebarOpen={false} />);
+    const { rerender } = render(
+      <ChapterList
+        chapters={chapters}
+        currentIndex={2}
+        onSelect={() => {}}
+        isSidebarOpen={false}
+      />,
+    );
 
     scrollIntoViewMock.mockClear();
-    rerender(<ChapterList chapters={chapters} currentIndex={2} onSelect={() => {}} isSidebarOpen />);
+    rerender(
+      <ChapterList chapters={chapters} currentIndex={2} onSelect={() => {}} isSidebarOpen />,
+    );
 
     expect(scrollIntoViewMock).toHaveBeenCalledWith({ block: 'center', behavior: 'auto' });
   });

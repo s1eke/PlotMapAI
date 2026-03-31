@@ -78,7 +78,14 @@ describe('TocRuleModal', () => {
     expect(screen.getByPlaceholderText('settings.toc.namePlaceholder')).toHaveValue('Existing');
     expect(screen.getByPlaceholderText('settings.toc.examplePlaceholder')).toHaveValue('Existing');
 
-    rerender(<TocRuleModal isOpen onClose={() => {}} onSave={() => Promise.resolve()} rule={null} />);
+    rerender(
+      <TocRuleModal
+        isOpen
+        onClose={() => {}}
+        onSave={() => Promise.resolve()}
+        rule={null}
+      />,
+    );
 
     expect(screen.getByPlaceholderText('settings.toc.namePlaceholder')).toHaveValue('');
     expect(screen.getByRole('spinbutton')).toHaveValue(10);

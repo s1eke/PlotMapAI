@@ -40,6 +40,16 @@ const imageCacheMock = vi.hoisted(() => ({
   preloadReaderImageResources: vi.fn().mockResolvedValue(undefined),
 }));
 
+interface VariantEntry {
+  tree: unknown;
+  variantFamily: string;
+}
+
+interface MaterializedEntry {
+  storageKind?: string;
+  tree?: unknown;
+}
+
 const renderCacheMock = vi.hoisted(() => {
   const memory = new Map<string, unknown>();
   const buildKey = (params: {
@@ -128,13 +138,13 @@ const renderCacheMock = vi.hoisted(() => {
         }
       }
     }),
-    coercePagedTree: vi.fn((entry: { tree: unknown; variantFamily: string } | null | undefined) => (
+    coercePagedTree: vi.fn((entry: VariantEntry | null | undefined) => (
       entry?.variantFamily === 'original-paged' ? entry.tree : null
     )),
-    coerceScrollTree: vi.fn((entry: { tree: unknown; variantFamily: string } | null | undefined) => (
+    coerceScrollTree: vi.fn((entry: VariantEntry | null | undefined) => (
       entry?.variantFamily === 'original-scroll' ? entry.tree : null
     )),
-    coerceSummaryShellTree: vi.fn((entry: { tree: unknown; variantFamily: string } | null | undefined) => (
+    coerceSummaryShellTree: vi.fn((entry: VariantEntry | null | undefined) => (
       entry?.variantFamily === 'summary-shell' ? entry.tree : null
     )),
     getReaderRenderCacheRecordFromDexie: vi.fn().mockResolvedValue(null),
@@ -145,7 +155,7 @@ const renderCacheMock = vi.hoisted(() => {
       novelId: number;
       variantFamily: string;
     }) => memory.get(buildKey(params)) ?? null),
-    isMaterializedReaderRenderCacheEntry: vi.fn((entry: { storageKind?: string; tree?: unknown } | null | undefined) => (
+    isMaterializedReaderRenderCacheEntry: vi.fn((entry: MaterializedEntry | null | undefined) => (
       entry?.storageKind === 'render-tree' && Boolean(entry.tree)
     )),
     persistReaderRenderCacheEntry: vi.fn().mockResolvedValue(undefined),
@@ -227,7 +237,10 @@ function createDeferred<T>() {
 function renderReaderRenderCacheHook(options?: {
   chapters?: Chapter[];
   currentChapter?: ChapterContent | null;
-  fetchChapterContent?: (index: number, options?: { signal?: AbortSignal }) => Promise<ChapterContent>;
+  fetchChapterContent?: (
+    index: number,
+    options?: { signal?: AbortSignal },
+  ) => Promise<ChapterContent>;
   isPagedMode?: boolean;
   novelId?: number;
   pagedChapters?: ChapterContent[];
@@ -241,7 +254,8 @@ function renderReaderRenderCacheHook(options?: {
   const currentChapter = options?.currentChapter ?? createChapter(0, chapters.length);
   const viewport = createViewport();
   const contentRef = { current: viewport };
-  const fetchChapterContent = options?.fetchChapterContent ?? (async (index: number) => createChapter(index, chapters.length));
+  const fetchChapterContent = options?.fetchChapterContent
+    ?? (async (index: number) => createChapter(index, chapters.length));
 
   return renderHook(() => useReaderRenderCache({
     chapters,
@@ -383,8 +397,16 @@ describe('useReaderRenderCache', () => {
     });
 
     const getVisibleScrollBuildCalls = () => renderCacheMock.buildStaticRenderTree.mock.calls
-      .map(([params]) => params as { chapter: { index: number }; layoutKey?: string; variantFamily: string })
-      .filter((params) => params.variantFamily === 'original-scroll' && params.chapter.index === 0);
+      .map(([params]) => (
+        params as {
+          chapter: { index: number };
+          layoutKey?: string;
+          variantFamily: string;
+        }
+      ))
+      .filter((params) => (
+        params.variantFamily === 'original-scroll' && params.chapter.index === 0
+      ));
 
     await waitFor(() => {
       expect(getVisibleScrollBuildCalls()).not.toHaveLength(0);
@@ -405,12 +427,14 @@ describe('useReaderRenderCache', () => {
     expect(rebuiltWithDimensions).toBeDefined();
     expect(rebuiltWithDimensions?.layoutKey).toContain('cover:1200x240');
     expect(rebuiltWithDimensions?.layoutKey).not.toBe(initialBuild.layoutKey);
-    expect(renderCacheMock.persistReaderRenderCacheEntry).toHaveBeenCalledWith(expect.objectContaining({
-      chapterIndex: 0,
-      layoutKey: expect.stringContaining('cover:1200x240'),
-      storageKind: 'render-tree',
-      variantFamily: 'original-scroll',
-    }));
+    expect(renderCacheMock.persistReaderRenderCacheEntry).toHaveBeenCalledWith(
+      expect.objectContaining({
+        chapterIndex: 0,
+        layoutKey: expect.stringContaining('cover:1200x240'),
+        storageKind: 'render-tree',
+        variantFamily: 'original-scroll',
+      }),
+    );
   });
 
   it('logs reader layout snapshots with visible counts and cache source breakdowns', async () => {
@@ -532,23 +556,29 @@ describe('useReaderRenderCache', () => {
     });
 
     await waitFor(() => {
-      expect(renderCacheMock.persistReaderRenderCacheEntry).toHaveBeenCalledWith(expect.objectContaining({
-        chapterIndex: 2,
-        storageKind: 'manifest',
-        tree: null,
-        variantFamily: 'original-scroll',
-      }));
+      expect(renderCacheMock.persistReaderRenderCacheEntry).toHaveBeenCalledWith(
+        expect.objectContaining({
+          chapterIndex: 2,
+          storageKind: 'manifest',
+          tree: null,
+          variantFamily: 'original-scroll',
+        }),
+      );
     });
 
-    expect(renderCacheMock.persistReaderRenderCacheEntry).not.toHaveBeenCalledWith(expect.objectContaining({
-      chapterIndex: 1,
-      variantFamily: 'original-paged',
-    }));
+    expect(renderCacheMock.persistReaderRenderCacheEntry).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        chapterIndex: 1,
+        variantFamily: 'original-paged',
+      }),
+    );
     expect(renderCacheMock.buildStaticRenderManifest).toHaveBeenCalled();
-    expect(renderCacheMock.buildStaticRenderTree).not.toHaveBeenCalledWith(expect.objectContaining({
-      chapter: expect.objectContaining({ index: 2 }),
-      variantFamily: 'original-scroll',
-    }));
+    expect(renderCacheMock.buildStaticRenderTree).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        chapter: expect.objectContaining({ index: 2 }),
+        variantFamily: 'original-scroll',
+      }),
+    );
   });
 
   it('upgrades manifest-only dexie hits to full render trees for near render targets', async () => {
@@ -577,17 +607,21 @@ describe('useReaderRenderCache', () => {
     renderReaderRenderCacheHook();
 
     await waitFor(() => {
-      expect(renderCacheMock.buildStaticRenderTree).toHaveBeenCalledWith(expect.objectContaining({
-        chapter: expect.objectContaining({ index: 0 }),
-        variantFamily: 'original-paged',
-      }));
+      expect(renderCacheMock.buildStaticRenderTree).toHaveBeenCalledWith(
+        expect.objectContaining({
+          chapter: expect.objectContaining({ index: 0 }),
+          variantFamily: 'original-paged',
+        }),
+      );
     });
 
-    expect(renderCacheMock.persistReaderRenderCacheEntry).toHaveBeenCalledWith(expect.objectContaining({
-      chapterIndex: 0,
-      storageKind: 'render-tree',
-      variantFamily: 'original-paged',
-    }));
+    expect(renderCacheMock.persistReaderRenderCacheEntry).toHaveBeenCalledWith(
+      expect.objectContaining({
+        chapterIndex: 0,
+        storageKind: 'render-tree',
+        variantFamily: 'original-paged',
+      }),
+    );
   });
 
   it('keeps verbose reader telemetry disabled by default', async () => {

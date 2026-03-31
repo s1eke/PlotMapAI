@@ -5,11 +5,17 @@ export interface ReaderChromeThemeClasses {
   segmentedControlClassName: string;
 }
 
-export function getReaderChromeThemeClasses(readerTheme: string): ReaderChromeThemeClasses {
+export function getReaderChromeThemeClasses(
+  readerTheme: string,
+): ReaderChromeThemeClasses {
   const isNightTheme = readerTheme === 'night';
   const isAutoTheme = readerTheme === 'auto';
 
-  function resolveThemeClass(autoClassName: string, nightClassName: string, defaultClassName: string): string {
+  function resolveThemeClass(
+    autoClassName: string,
+    nightClassName: string,
+    defaultClassName: string,
+  ): string {
     if (isAutoTheme) return autoClassName;
     if (isNightTheme) return nightClassName;
     return defaultClassName;

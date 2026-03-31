@@ -80,7 +80,9 @@ export default function CharacterGraphPage() {
 
   useEffect(() => {
     const handleFullscreenChange = () => {
-      setIsFullscreen(Boolean(fullscreenRef.current && document.fullscreenElement === fullscreenRef.current));
+      setIsFullscreen(Boolean(
+        fullscreenRef.current && document.fullscreenElement === fullscreenRef.current,
+      ));
     };
 
     document.addEventListener('fullscreenchange', handleFullscreenChange);
@@ -89,7 +91,9 @@ export default function CharacterGraphPage() {
   }, []);
 
   useEffect(() => {
-    setIsFullscreen(Boolean(fullscreenRef.current && document.fullscreenElement === fullscreenRef.current));
+    setIsFullscreen(Boolean(
+      fullscreenRef.current && document.fullscreenElement === fullscreenRef.current,
+    ));
   }, [isLoading]);
 
   useEffect(() => {

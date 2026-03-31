@@ -176,7 +176,10 @@ describe('analysis runtime orchestrator', () => {
 
   async function seedNovelAndChapters(novelId = 1, chapterCount = 2) {
     await currentDb.novels.add(createNovel(novelId));
-    const chapters = Array.from({ length: chapterCount }, (_, index) => createChapter(novelId, index));
+    const chapters = Array.from(
+      { length: chapterCount },
+      (_, index) => createChapter(novelId, index),
+    );
     await currentDb.chapters.bulkAdd(chapters);
     mockLoadAndPurifyChapters.mockResolvedValue(chapters);
     mockBuildAnalysisChunks.mockReturnValue(
@@ -388,7 +391,10 @@ describe('analysis runtime orchestrator', () => {
     const chunks = await currentDb.analysisChunks.orderBy('novelId').toArray();
 
     expect(jobs.map((job) => job.status)).toEqual(['paused', 'paused']);
-    expect(jobs.map((job) => job.lastError)).toEqual([AnalysisErrorCode.APP_RESTARTED, AnalysisErrorCode.APP_RESTARTED]);
+    expect(jobs.map((job) => job.lastError)).toEqual([
+      AnalysisErrorCode.APP_RESTARTED,
+      AnalysisErrorCode.APP_RESTARTED,
+    ]);
     expect(chunks.map((chunk) => chunk.status)).toEqual(['pending', 'pending']);
   });
 

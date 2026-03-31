@@ -96,7 +96,9 @@ describe('validateAnalysisConfig', () => {
   });
 
   it('throws for missing config', () => {
-    expect(() => validateAnalysisConfig(null as unknown as RuntimeAnalysisConfig)).toThrow(AnalysisConfigError);
+    expect(() => (
+      validateAnalysisConfig(null as unknown as RuntimeAnalysisConfig)
+    )).toThrow(AnalysisConfigError);
   });
 
   it('throws for empty apiBaseUrl', () => {
@@ -121,7 +123,9 @@ describe('validateAnalysisConfig', () => {
   });
 
   it('throws for small contextSize', () => {
-    expect(() => validateAnalysisConfig({ ...validConfig, contextSize: 1000 })).toThrow(AnalysisConfigError);
+    expect(() => (
+      validateAnalysisConfig({ ...validConfig, contextSize: 1000 })
+    )).toThrow(AnalysisConfigError);
   });
 });
 

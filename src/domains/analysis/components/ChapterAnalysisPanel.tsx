@@ -13,7 +13,14 @@ interface ChapterAnalysisPanelProps {
   isAnalyzingChapter?: boolean;
 }
 
-export default function ChapterAnalysisPanel({ novelId, analysis, job, isLoading, onAnalyzeChapter, isAnalyzingChapter }: ChapterAnalysisPanelProps) {
+export default function ChapterAnalysisPanel({
+  novelId,
+  analysis,
+  job,
+  isLoading,
+  onAnalyzeChapter,
+  isAnalyzingChapter,
+}: ChapterAnalysisPanelProps) {
   const { t } = useTranslation();
 
   if (isLoading) {

@@ -296,7 +296,9 @@ describe('ReaderPage', () => {
       chapterProgress: 0,
       isTwoColumn: false,
     });
-    vi.mocked(readerApi.getChapterContent).mockImplementation(async (_novelId, chapterIndex) => chapterContent[chapterIndex]);
+    vi.mocked(readerApi.getChapterContent).mockImplementation(
+      async (_novelId, chapterIndex) => chapterContent[chapterIndex],
+    );
     vi.mocked(readerApi.saveProgress).mockResolvedValue({ message: 'Progress saved' });
     vi.mocked(readerApi.getImageBlob).mockResolvedValue(null);
     vi.mocked(readerApi.getImageGalleryEntries).mockResolvedValue([]);
@@ -331,7 +333,9 @@ describe('ReaderPage', () => {
       viewMode: 'summary',
       isTwoColumn: false,
     }));
-    vi.mocked(analysisApi.getChapterAnalysis).mockResolvedValueOnce({ analysis: completedAnalysis });
+    vi.mocked(analysisApi.getChapterAnalysis).mockResolvedValueOnce({
+      analysis: completedAnalysis,
+    });
     useChapterAnalysisMock.mockReturnValue({
       analysisStatus: null,
       chapterAnalysis: completedAnalysis,
@@ -459,7 +463,9 @@ describe('ReaderPage', () => {
     }));
 
     vi.mocked(readerApi.getChapters).mockResolvedValueOnce(shortChapters);
-    vi.mocked(readerApi.getChapterContent).mockImplementation(async (_novelId, chapterIndex) => shortChapterContent[chapterIndex]);
+    vi.mocked(readerApi.getChapterContent).mockImplementation(
+      async (_novelId, chapterIndex) => shortChapterContent[chapterIndex],
+    );
 
     renderPage();
 
@@ -656,7 +662,9 @@ describe('ReaderPage', () => {
       'Chapter 12': 880,
     });
     vi.mocked(readerApi.getChapters).mockResolvedValueOnce(longChapters);
-    vi.mocked(readerApi.getChapterContent).mockImplementation(async (_novelId, chapterIndex) => longChapterContent[chapterIndex]);
+    vi.mocked(readerApi.getChapterContent).mockImplementation(
+      async (_novelId, chapterIndex) => longChapterContent[chapterIndex],
+    );
 
     const { container } = renderPage();
 
@@ -930,7 +938,8 @@ describe('ReaderPage', () => {
       title: `Chapter ${index + 1}`,
       wordCount: 100 + index,
     }));
-    const pagedChapterContent = pagedChapters.map((_, index) => createPagedChapterContent(index, pagedChapters.length, 2));
+    const pagedChapterContent = pagedChapters.map((_, index) =>
+      createPagedChapterContent(index, pagedChapters.length, 2));
     const deferredSecondChapter = createDeferred<(typeof pagedChapterContent)[number]['chapter']>();
     const firstChapterPageLabel = `${pagedChapterContent[0].layout.pageSlices.length} / ${pagedChapterContent[0].layout.pageSlices.length}`;
 
@@ -990,7 +999,8 @@ describe('ReaderPage', () => {
       title: `Chapter ${index + 1}`,
       wordCount: 100 + index,
     }));
-    const pagedChapterContent = pagedChapters.map((_, index) => createPagedChapterContent(index, pagedChapters.length, 2));
+    const pagedChapterContent = pagedChapters.map((_, index) =>
+      createPagedChapterContent(index, pagedChapters.length, 2));
     const firstChapterPageLabel = `${pagedChapterContent[0].layout.pageSlices.length} / ${pagedChapterContent[0].layout.pageSlices.length}`;
 
     enablePagedTestLayout(900);
@@ -1001,7 +1011,9 @@ describe('ReaderPage', () => {
       chapterProgress: 1,
     }));
     vi.mocked(readerApi.getChapters).mockResolvedValueOnce(pagedChapters);
-    vi.mocked(readerApi.getChapterContent).mockImplementation(async (_novelId, chapterIndex) => pagedChapterContent[chapterIndex].chapter);
+    vi.mocked(readerApi.getChapterContent).mockImplementation(
+      async (_novelId, chapterIndex) => pagedChapterContent[chapterIndex].chapter,
+    );
 
     const { container } = renderPage();
 
@@ -1035,7 +1047,9 @@ describe('ReaderPage', () => {
 
   it('shows the unified loading state while chapter content is loading in scroll mode', async () => {
     const deferredChapter = createDeferred<(typeof chapterContent)[number]>();
-    vi.mocked(readerApi.getChapterContent).mockImplementationOnce(async () => deferredChapter.promise);
+    vi.mocked(readerApi.getChapterContent).mockImplementationOnce(
+      async () => deferredChapter.promise,
+    );
 
     renderPage();
 

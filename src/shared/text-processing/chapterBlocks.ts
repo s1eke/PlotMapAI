@@ -72,12 +72,15 @@ export function parseParagraphSegments(text: string): ChapterTextSegment[] {
     : [{ type: 'text', value: text }];
 }
 
-export function buildChapterBlockSequence(chapter: ChapterBlockSource): ChapterBlockSequenceEntry[] {
+export function buildChapterBlockSequence(
+  chapter: ChapterBlockSource,
+): ChapterBlockSequenceEntry[] {
   const lines = chapter.content.split('\n');
   const firstNonEmptyIndex = lines.findIndex((line) => line.trim().length > 0);
-  const skipLineIndex = firstNonEmptyIndex !== -1 && lines[firstNonEmptyIndex].trim() === chapter.title.trim()
-    ? firstNonEmptyIndex
-    : -1;
+  const skipLineIndex =
+    firstNonEmptyIndex !== -1 && lines[firstNonEmptyIndex].trim() === chapter.title.trim()
+      ? firstNonEmptyIndex
+      : -1;
   let nextBlockIndex = 1;
   const blocks: ChapterBlockSequenceEntry[] = [];
 
@@ -122,10 +125,12 @@ export function buildChapterBlockSequence(chapter: ChapterBlockSource): ChapterB
       return;
     }
 
-    const hasImmediateBlankAfter = paragraphIndex < lines.length - 1 && !lines[paragraphIndex + 1]?.trim();
+    const hasImmediateBlankAfter =
+      paragraphIndex < lines.length - 1 && !lines[paragraphIndex + 1]?.trim();
 
     segments.forEach((segment, segmentIndex) => {
-      const hasParagraphSpacingAfter = segmentIndex === segments.length - 1 && !hasImmediateBlankAfter;
+      const hasParagraphSpacingAfter =
+        segmentIndex === segments.length - 1 && !hasImmediateBlankAfter;
       if (segment.type === 'image') {
         blocks.push({
           blockIndex: nextBlockIndex,

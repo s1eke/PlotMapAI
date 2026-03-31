@@ -99,12 +99,15 @@ export function useTocSettingsManager(): TocSettingsManager {
   }, [editingRule, loadRules, t]);
 
   const toggleRule = useCallback(async (id: number, isEnabled: boolean) => {
-    setRules((previous) => previous.map((rule) => (rule.id === id ? { ...rule, isEnabled } : rule)));
+    setRules((previous) =>
+      previous.map((rule) => (rule.id === id ? { ...rule, isEnabled } : rule)));
 
     try {
       await tocRulesApi.updateTocRule(id, { isEnabled });
     } catch (error) {
-      setRules((previous) => previous.map((rule) => (rule.id === id ? { ...rule, isEnabled: !isEnabled } : rule)));
+      setRules((previous) =>
+        previous.map((rule) =>
+          (rule.id === id ? { ...rule, isEnabled: !isEnabled } : rule)));
       setFeedback({
         type: 'error',
         message: buildActionErrorMessage(t('settings.common.updateFailed'), error, t, 'settings.common.updateFailed'),

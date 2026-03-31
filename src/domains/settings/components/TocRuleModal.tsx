@@ -98,7 +98,12 @@ export default function TocRuleModal({ isOpen, onClose, onSave, rule }: TocRuleM
               min="0"
               max="100"
               value={formData.priority}
-              onChange={(e) => setFormData({ ...formData, priority: parseInt(e.target.value, 10) || 0 })}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  priority: parseInt(e.target.value, 10) || 0,
+                })
+              }
               className="w-full bg-muted-bg border border-white/10 rounded-xl px-4 py-2.5 text-text-primary focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-all"
             />
           </div>

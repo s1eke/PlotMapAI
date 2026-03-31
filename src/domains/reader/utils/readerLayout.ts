@@ -250,7 +250,8 @@ export function createReaderViewportMetrics(
     MIN_TWO_COLUMN_WIDTH_PX,
     bodyFontSize * TWO_COLUMN_TARGET_CHARS_PER_LINE,
   );
-  const isPortraitPagedViewport = pagedViewportHeight > pagedViewportWidth * PORTRAIT_PAGED_RATIO_THRESHOLD;
+  const isPortraitPagedViewport =
+    pagedViewportHeight > pagedViewportWidth * PORTRAIT_PAGED_RATIO_THRESHOLD;
   const pagedFitsTwoColumns = !isPortraitPagedViewport
     && pagedViewportWidth >= minComfortableColumnWidth * 2 + pagedColumnGap;
   const pagedColumnCount = pagedFitsTwoColumns ? 2 : 1;
@@ -342,7 +343,10 @@ export function createReaderTypographyMetrics(
   };
 }
 
-export function buildReaderBlocks(chapter: ChapterContent, paragraphSpacing: number): ReaderBlock[] {
+export function buildReaderBlocks(
+  chapter: ChapterContent,
+  paragraphSpacing: number,
+): ReaderBlock[] {
   const blocks: ReaderBlock[] = [{
     chapterIndex: chapter.index,
     blockIndex: 0,
@@ -375,7 +379,9 @@ export function buildReaderBlocks(chapter: ChapterContent, paragraphSpacing: num
         key: `${chapter.index}:image:${block.blockIndex}`,
         kind: 'image',
         marginBefore: IMAGE_BLOCK_MARGIN_PX,
-        marginAfter: IMAGE_BLOCK_MARGIN_PX + (block.hasParagraphSpacingAfter ? paragraphSpacing : 0),
+        marginAfter:
+          IMAGE_BLOCK_MARGIN_PX +
+          (block.hasParagraphSpacingAfter ? paragraphSpacing : 0),
         paragraphIndex: block.paragraphIndex,
       };
     }
@@ -567,7 +573,10 @@ export function composePaginatedChapterLayout(
 
   for (let metricIndex = 0; metricIndex < measuredLayout.metrics.length; metricIndex += 1) {
     const metric = measuredLayout.metrics[metricIndex];
-    const nextMeaningfulMetric = findNextMeaningfulMetricAfter(measuredLayout.metrics, metricIndex + 1);
+    const nextMeaningfulMetric = findNextMeaningfulMetricAfter(
+      measuredLayout.metrics,
+      metricIndex + 1,
+    );
 
     if (metric.block.kind === 'blank') {
       const remainingHeight = safeColumnHeight - currentColumnHeight;
@@ -779,7 +788,10 @@ export function estimateReaderRenderQueryManifest(params: {
 
   const blocks = buildReaderBlocks(params.chapter, params.typography.paragraphSpacing);
   const scrollImageLayoutConstraints = params.variantFamily === 'original-scroll'
-    ? createScrollImageLayoutConstraints(params.layoutSignature.textWidth, params.layoutSignature.pageHeight)
+    ? createScrollImageLayoutConstraints(
+      params.layoutSignature.textWidth,
+      params.layoutSignature.pageHeight,
+    )
     : undefined;
   const estimatedMetrics = blocks.map((block) => estimateReaderBlockMetric(
     block,
@@ -796,23 +808,31 @@ export function estimateReaderRenderQueryManifest(params: {
     const totalHeight = estimatedMetrics.reduce((total, metric) => total + metric.height, 0);
     return {
       blockCount: blocks.length,
-      endLocator: lastMeaningfulMetric ? createEstimatedMetricEndLocator(lastMeaningfulMetric) : null,
+      endLocator: lastMeaningfulMetric
+        ? createEstimatedMetricEndLocator(lastMeaningfulMetric)
+        : null,
       lineCount,
-      startLocator: firstMeaningfulMetric ? createEstimatedMetricStartLocator(firstMeaningfulMetric) : null,
+      startLocator: firstMeaningfulMetric
+        ? createEstimatedMetricStartLocator(firstMeaningfulMetric)
+        : null,
       totalHeight,
     };
   }
 
   return {
     blockCount: blocks.length,
-    endLocator: lastMeaningfulMetric ? createEstimatedMetricEndLocator(lastMeaningfulMetric) : null,
+    endLocator: lastMeaningfulMetric
+      ? createEstimatedMetricEndLocator(lastMeaningfulMetric)
+      : null,
     lineCount,
     pageCount: estimatePaginatedManifestPageCount(
       estimatedMetrics,
       params.layoutSignature.pageHeight,
       params.layoutSignature.columnCount,
     ),
-    startLocator: firstMeaningfulMetric ? createEstimatedMetricStartLocator(firstMeaningfulMetric) : null,
+    startLocator: firstMeaningfulMetric
+      ? createEstimatedMetricStartLocator(firstMeaningfulMetric)
+      : null,
   };
 }
 
@@ -965,7 +985,10 @@ export function findLocatorForLayoutOffset(
   }
 
   if (matchedMetric.block.kind === 'blank') {
-    const meaningfulMetric = findNearestMeaningfulMetric(layout.metrics, matchedMetric.block.blockIndex);
+    const meaningfulMetric = findNearestMeaningfulMetric(
+      layout.metrics,
+      matchedMetric.block.blockIndex,
+    );
     if (!meaningfulMetric) {
       return null;
     }
@@ -992,7 +1015,10 @@ export function findLocatorForLayoutOffset(
       Math.min(
         matchedMetric.lines.length - 1,
         Math.floor(
-          Math.max(0, clampedOffset - matchedMetric.top - matchedMetric.marginBefore) / matchedMetric.lineHeightPx,
+          Math.max(
+            0,
+            clampedOffset - matchedMetric.top - matchedMetric.marginBefore,
+          ) / matchedMetric.lineHeightPx,
         ),
       ),
     );
@@ -1015,7 +1041,9 @@ export function getOffsetForLocator(
     return null;
   }
 
-  const metric = layout.metrics.find((candidate) => candidate.block.blockIndex === locator.blockIndex);
+  const metric = layout.metrics.find(
+    (candidate) => candidate.block.blockIndex === locator.blockIndex,
+  );
   if (!metric) {
     return null;
   }
@@ -1028,7 +1056,10 @@ export function getOffsetForLocator(
     return metric.top;
   }
 
-  const lineIndex = Math.max(0, Math.min(locator.lineIndex ?? 0, Math.max(metric.lines.length - 1, 0)));
+  const lineIndex = Math.max(
+    0,
+    Math.min(locator.lineIndex ?? 0, Math.max(metric.lines.length - 1, 0)),
+  );
   return metric.top + metric.marginBefore + lineIndex * metric.lineHeightPx;
 }
 
@@ -1084,7 +1115,10 @@ function finalizePageLocators(page: PageSlice): void {
   page.endLocator = endLocator;
 }
 
-function findFirstVisibleMetricIndex(metrics: VirtualBlockMetrics[], viewportStart: number): number {
+function findFirstVisibleMetricIndex(
+  metrics: VirtualBlockMetrics[],
+  viewportStart: number,
+): number {
   let low = 0;
   let high = metrics.length - 1;
   let result = -1;
@@ -1329,7 +1363,11 @@ function setPreparedTextInCache(key: string, prepared: PreparedTextWithSegments 
   }
 }
 
-function createPreparedTextBlock(text: string, font: string, lineHeightPx: number): PreparedTextBlock {
+function createPreparedTextBlock(
+  text: string,
+  font: string,
+  lineHeightPx: number,
+): PreparedTextBlock {
   const key = `${font}\u0000${text}`;
   let prepared = getPreparedTextFromCache(key);
   if (prepared === undefined) {
@@ -1418,7 +1456,10 @@ function estimateTextLineCount(text: string, maxWidth: number, fontSizePx: numbe
     return 0;
   }
 
-  const maxCharsPerLine = Math.max(1, Math.floor(maxWidth / Math.max(fontSizePx * TEXT_FALLBACK_WIDTH_RATIO, 1)));
+  const maxCharsPerLine = Math.max(
+    1,
+    Math.floor(maxWidth / Math.max(fontSizePx * TEXT_FALLBACK_WIDTH_RATIO, 1)),
+  );
   return Math.max(1, Math.ceil(text.length / maxCharsPerLine));
 }
 
@@ -1608,7 +1649,9 @@ function estimatePaginatedManifestPageCount(
   return pageCount;
 }
 
-function createEstimatedMetricStartLocator(metric: EstimatedReaderBlockMetric): ReaderLocator | null {
+function createEstimatedMetricStartLocator(
+  metric: EstimatedReaderBlockMetric,
+): ReaderLocator | null {
   if (metric.block.kind === 'blank') {
     return null;
   }
@@ -1671,10 +1714,11 @@ function measurePreparedTextBlock(
 
   if (prepared.prepared) {
     try {
-      return layoutWithLines(prepared.prepared, maxWidth, prepared.lineHeightPx).lines.map((line, index) => ({
-        ...line,
-        lineIndex: index,
-      }));
+      return layoutWithLines(prepared.prepared, maxWidth, prepared.lineHeightPx)
+        .lines.map((line, index) => ({
+          ...line,
+          lineIndex: index,
+        }));
     } catch {
       return fallbackLayoutLines(prepared.text, maxWidth, fontSizePx);
     }
@@ -1683,12 +1727,19 @@ function measurePreparedTextBlock(
   return fallbackLayoutLines(prepared.text, maxWidth, fontSizePx);
 }
 
-function fallbackLayoutLines(text: string, maxWidth: number, fontSizePx: number): ReaderMeasuredLine[] {
+function fallbackLayoutLines(
+  text: string,
+  maxWidth: number,
+  fontSizePx: number,
+): ReaderMeasuredLine[] {
   if (!text) {
     return [];
   }
 
-  const maxCharsPerLine = Math.max(1, Math.floor(maxWidth / Math.max(fontSizePx * TEXT_FALLBACK_WIDTH_RATIO, 1)));
+  const maxCharsPerLine = Math.max(
+    1,
+    Math.floor(maxWidth / Math.max(fontSizePx * TEXT_FALLBACK_WIDTH_RATIO, 1)),
+  );
   const chunks: string[] = [];
   let cursor = 0;
   while (cursor < text.length) {

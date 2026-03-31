@@ -75,7 +75,10 @@ export const purificationRulesApi = {
     return purRuleToApi(rule!);
   },
 
-  updatePurificationRule: async (id: number, data: Partial<PurificationRule>): Promise<PurificationRule> => {
+  updatePurificationRule: async (
+    id: number,
+    data: Partial<PurificationRule>,
+  ): Promise<PurificationRule> => {
     const updates: Record<string, unknown> = {};
     const fields = [
       'name',

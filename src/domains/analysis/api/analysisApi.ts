@@ -176,11 +176,17 @@ export const analysisApi = {
     return getOverviewService(novelId);
   },
 
-  getChapterAnalysis: async (novelId: number, chapterIndex: number): Promise<{ analysis: ChapterAnalysisResult | null }> => {
+  getChapterAnalysis: async (
+    novelId: number,
+    chapterIndex: number,
+  ): Promise<{ analysis: ChapterAnalysisResult | null }> => {
     return getChapterAnalysisService(novelId, chapterIndex);
   },
 
-  analyzeChapter: async (novelId: number, chapterIndex: number): Promise<{ analysis: ChapterAnalysisResult | null }> => {
+  analyzeChapter: async (
+    novelId: number,
+    chapterIndex: number,
+  ): Promise<{ analysis: ChapterAnalysisResult | null }> => {
     const analysis = await analyzeSingleChapter(novelId, chapterIndex);
     return { analysis };
   },

@@ -84,7 +84,9 @@ const INITIAL_IMAGE_VIEWER_STATE: ReaderImageViewerState = {
   translateY: 0,
 };
 
-function createClosedImageViewerState(previousState: ReaderImageViewerState): ReaderImageViewerState {
+function createClosedImageViewerState(
+  previousState: ReaderImageViewerState,
+): ReaderImageViewerState {
   return {
     ...previousState,
     isIndexLoading: false,
@@ -118,8 +120,11 @@ export default function ReaderPage() {
   const [pageCount, setPageCount] = useState(1);
   const [pendingPagedPageTarget, setPendingPagedPageTarget] = useState<PageTarget | null>(null);
   const [scrollModeChapters, setScrollModeChapters] = useState<number[]>([]);
-  const [scrollReaderChapters, setScrollReaderChapters] = useState<Array<{ index: number; chapter: ChapterContent }>>([]);
-  const [visibleScrollBlockRangeByChapter, setVisibleScrollBlockRangeByChapter] = useState<Map<number, ReturnType<typeof findVisibleBlockRange>>>(new Map());
+  const [scrollReaderChapters, setScrollReaderChapters] = useState<
+    Array<{ index: number; chapter: ChapterContent }>
+  >([]);
+  const [visibleScrollBlockRangeByChapter, setVisibleScrollBlockRangeByChapter] =
+    useState<Map<number, ReturnType<typeof findVisibleBlockRange>>>(new Map());
   const [chapterCacheSnapshotState, setChapterCacheSnapshotState] = useState<{
     novelId: number;
     snapshot: Map<number, ChapterContent>;
@@ -131,7 +136,9 @@ export default function ReaderPage() {
   const [pagedViewportElement, setPagedViewportElement] = useState<HTMLDivElement | null>(null);
   const [imageGalleryEntries, setImageGalleryEntries] = useState<ReaderImageGalleryEntry[]>([]);
   const [isImageGalleryIndexResolved, setIsImageGalleryIndexResolved] = useState(false);
-  const [imageViewerState, setImageViewerState] = useState<ReaderImageViewerState>(INITIAL_IMAGE_VIEWER_STATE);
+  const [imageViewerState, setImageViewerState] = useState<ReaderImageViewerState>(
+    INITIAL_IMAGE_VIEWER_STATE,
+  );
 
   const contentRef = useRef<HTMLDivElement>(null);
   const pagedViewportRef = useRef<HTMLDivElement>(null);
@@ -149,7 +156,9 @@ export default function ReaderPage() {
   const getCurrentAnchorRef = useRef<() => ScrollModeAnchor | null>(() => null);
   const getCurrentOriginalLocatorRef = useRef<() => ReaderLocator | null>(() => null);
   const getCurrentPagedLocatorRef = useRef<() => ReaderLocator | null>(() => null);
-  const resolveScrollLocatorOffsetRef = useRef<(locator: ReaderLocator) => number | null>(() => null);
+  const resolveScrollLocatorOffsetRef = useRef<
+    (locator: ReaderLocator) => number | null
+      >(() => null);
   const handleScrollModeScrollRef = useRef<() => void>(() => {});
   const readingAnchorHandlerRef = useRef<(anchor: ScrollModeAnchor) => void>(() => {});
 
@@ -363,18 +372,21 @@ export default function ReaderPage() {
     ensureImageGalleryEntriesLoaded();
   }, [ensureImageGalleryEntriesLoaded]);
 
-  const getImageOriginRect = useCallback((entry: ReaderImageGalleryEntry | null): DOMRect | null => {
-    if (!entry) {
-      return null;
-    }
+  const getImageOriginRect = useCallback(
+    (entry: ReaderImageGalleryEntry | null): DOMRect | null => {
+      if (!entry) {
+        return null;
+      }
 
-    const element = imageElementRegistryRef.current.get(createReaderImageEntryId(entry));
-    if (!element || !element.isConnected) {
-      return null;
-    }
+      const element = imageElementRegistryRef.current.get(createReaderImageEntryId(entry));
+      if (!element || !element.isConnected) {
+        return null;
+      }
 
-    return element.getBoundingClientRect();
-  }, []);
+      return element.getBoundingClientRect();
+    },
+    [],
+  );
 
   const handleRegisterImageElement = useCallback((
     entry: Pick<ReaderImageGalleryEntry, 'blockIndex' | 'chapterIndex' | 'imageKey'>,
@@ -487,7 +499,9 @@ export default function ReaderPage() {
     : null;
   const activeImageIndex = useMemo(() => (
     activeImageEntryId
-      ? imageGalleryEntries.findIndex((entry) => createReaderImageEntryId(entry) === activeImageEntryId)
+      ? imageGalleryEntries.findIndex(
+        (entry) => createReaderImageEntryId(entry) === activeImageEntryId,
+      )
       : -1
   ), [activeImageEntryId, imageGalleryEntries]);
   const activeImageEntry = activeImageIndex >= 0
@@ -505,23 +519,35 @@ export default function ReaderPage() {
     : null;
 
   const getCurrentScrollLocator = useCallback((): ReaderLocator | null => {
-    if (isPagedMode || viewMode !== 'original' || !contentRef.current || scrollReaderChapters.length === 0) {
+    if (
+      isPagedMode ||
+      viewMode !== 'original' ||
+      !contentRef.current ||
+      scrollReaderChapters.length === 0
+    ) {
       return null;
     }
 
     const container = contentRef.current;
     const visibleMarker = container.scrollTop + container.clientHeight * 0.3;
-    let currentLayout = renderCache.scrollLayouts.get(scrollReaderChapters[0]?.index ?? chapterIndex) ?? null;
-    let currentBodyElement = scrollChapterBodyElementsBridgeRef.current.get(scrollReaderChapters[0]?.index ?? chapterIndex) ?? null;
+    const initialChapterIndex = scrollReaderChapters[0]?.index ?? chapterIndex;
+    let currentLayout = renderCache.scrollLayouts.get(initialChapterIndex) ?? null;
+    let currentBodyElement =
+      scrollChapterBodyElementsBridgeRef.current.get(initialChapterIndex) ?? null;
     let currentTop = Number.NEGATIVE_INFINITY;
 
     for (const renderableChapter of scrollReaderChapters) {
-      const chapterBodyElement = scrollChapterBodyElementsBridgeRef.current.get(renderableChapter.index);
+      const chapterBodyElement = scrollChapterBodyElementsBridgeRef.current.get(
+        renderableChapter.index,
+      );
       const chapterLayout = renderCache.scrollLayouts.get(renderableChapter.index);
       if (!chapterBodyElement || !chapterLayout) {
         continue;
       }
-      if (chapterBodyElement.offsetTop <= visibleMarker && chapterBodyElement.offsetTop > currentTop) {
+      if (
+        chapterBodyElement.offsetTop <= visibleMarker &&
+        chapterBodyElement.offsetTop > currentTop
+      ) {
         currentBodyElement = chapterBodyElement;
         currentLayout = chapterLayout;
         currentTop = chapterBodyElement.offsetTop;
@@ -533,7 +559,14 @@ export default function ReaderPage() {
     }
 
     return findLocatorForLayoutOffset(currentLayout, visibleMarker - currentBodyElement.offsetTop);
-  }, [chapterIndex, contentRef, isPagedMode, renderCache.scrollLayouts, scrollReaderChapters, viewMode]);
+  }, [
+    chapterIndex,
+    contentRef,
+    isPagedMode,
+    renderCache.scrollLayouts,
+    scrollReaderChapters,
+    viewMode,
+  ]);
 
   const getCurrentPagedLocator = useCallback((): ReaderLocator | null => {
     if (!isPagedMode || viewMode !== 'original' || !currentPagedLayout) {
@@ -650,7 +683,9 @@ export default function ReaderPage() {
       const overscanPx = Math.max(240, Math.round(viewportHeight * 0.75));
       const fallbackViewportTop = scrollViewportTop;
       for (const renderableChapter of renderableScrollLayouts) {
-        const chapterBodyElement = scrollChapterBodyElementsBridgeRef.current.get(renderableChapter.index);
+        const chapterBodyElement = scrollChapterBodyElementsBridgeRef.current.get(
+          renderableChapter.index,
+        );
         if (!chapterBodyElement) {
           continue;
         }
@@ -715,7 +750,8 @@ export default function ReaderPage() {
     setIsChromeVisible,
     handleContentClick,
   } = useContentClick(isPagedMode, navigation.handlePrev, navigation.handleNext);
-  const isContentInteractionLocked = isChromeVisible || sidebar.isSidebarOpen || imageViewerState.isOpen;
+  const isContentInteractionLocked =
+    isChromeVisible || sidebar.isSidebarOpen || imageViewerState.isOpen;
   const dismissBlockedInteraction = useCallback(() => {
     if (sidebar.isSidebarOpen) {
       closeSidebar();
@@ -786,7 +822,9 @@ export default function ReaderPage() {
     }
 
     const currentEntryId = createReaderImageEntryId(currentEntry);
-    let currentIndex = imageGalleryEntriesRef.current.findIndex((entry) => createReaderImageEntryId(entry) === currentEntryId);
+    let currentIndex = imageGalleryEntriesRef.current.findIndex(
+      (entry) => createReaderImageEntryId(entry) === currentEntryId,
+    );
     if (currentIndex === -1) {
       currentIndex = activeImageIndex;
     }
@@ -805,7 +843,12 @@ export default function ReaderPage() {
     }
 
     return false;
-  }, [activeImageEntry, activeImageIndex, ensureImageGalleryEntriesLoaded, isImageGalleryIndexResolved]);
+  }, [
+    activeImageEntry,
+    activeImageIndex,
+    ensureImageGalleryEntriesLoaded,
+    isImageGalleryIndexResolved,
+  ]);
 
   useReaderInput(
     contentRef,
@@ -862,24 +905,30 @@ export default function ReaderPage() {
     sidebar.setIsSidebarOpen(false);
   }, [navigation, sidebar]);
 
-  const handleScrollChapterElement = useCallback((index: number, element: HTMLDivElement | null) => {
-    if (element) {
-      scrollChapterElementsRef.current.set(index, element);
-      scrollChapterElementsBridgeRef.current.set(index, element);
-      return;
-    }
+  const handleScrollChapterElement = useCallback(
+    (index: number, element: HTMLDivElement | null) => {
+      if (element) {
+        scrollChapterElementsRef.current.set(index, element);
+        scrollChapterElementsBridgeRef.current.set(index, element);
+        return;
+      }
 
-    scrollChapterElementsRef.current.delete(index);
-    scrollChapterElementsBridgeRef.current.delete(index);
-  }, [scrollChapterElementsRef]);
+      scrollChapterElementsRef.current.delete(index);
+      scrollChapterElementsBridgeRef.current.delete(index);
+    },
+    [scrollChapterElementsRef],
+  );
 
-  const handleScrollChapterBodyElement = useCallback((index: number, element: HTMLDivElement | null) => {
-    if (element) {
-      scrollChapterBodyElementsBridgeRef.current.set(index, element);
-      return;
-    }
-    scrollChapterBodyElementsBridgeRef.current.delete(index);
-  }, []);
+  const handleScrollChapterBodyElement = useCallback(
+    (index: number, element: HTMLDivElement | null) => {
+      if (element) {
+        scrollChapterBodyElementsBridgeRef.current.set(index, element);
+        return;
+      }
+      scrollChapterBodyElementsBridgeRef.current.delete(index);
+    },
+    [],
+  );
 
   const renderableChapter = !isLoading ? currentChapter : null;
   const showLoadingOverlay = isLoading

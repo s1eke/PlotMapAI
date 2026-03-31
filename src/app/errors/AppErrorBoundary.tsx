@@ -69,7 +69,10 @@ function AppErrorFallback({ error }: AppErrorFallbackProps) {
   );
 }
 
-export default class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorBoundaryState> {
+export default class AppErrorBoundary extends Component<
+  AppErrorBoundaryProps,
+  AppErrorBoundaryState
+> {
   static getDerivedStateFromError(error: Error): AppErrorBoundaryState {
     return {
       error: toAppError(error, {

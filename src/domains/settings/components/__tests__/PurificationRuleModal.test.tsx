@@ -56,7 +56,14 @@ describe('PurificationRuleModal', () => {
   });
 
   it('shows a security notice for whitelisted @js replacements', async () => {
-    render(<PurificationRuleModal isOpen onClose={() => {}} onSave={() => Promise.resolve()} rule={null} />);
+    render(
+      <PurificationRuleModal
+        isOpen
+        onClose={() => {}}
+        onSave={() => Promise.resolve()}
+        rule={null}
+      />,
+    );
     const user = userEvent.setup();
 
     await user.type(screen.getByPlaceholderText('settings.purification.replacementPlaceholder'), '@js:fullwidth');

@@ -27,16 +27,27 @@ export function isChapterAnalysisComplete(row: ChapterAnalysis | undefined): boo
   return [row.keyPoints, row.characters, row.relationships, row.tags].every(Array.isArray);
 }
 
-export function isOverviewComplete(overview: AnalysisOverview | undefined, totalChapters: number): boolean {
+export function isOverviewComplete(
+  overview: AnalysisOverview | undefined,
+  totalChapters: number,
+): boolean {
   if (!overview) return false;
   if (totalChapters <= 0) return false;
   if (!cleanText(overview.bookIntro, 400)) return false;
   if (!cleanText(overview.globalSummary, 2000)) return false;
-  if (overview.analyzedChapters < totalChapters || overview.totalChapters < totalChapters) return false;
-  return [overview.themes, overview.characterStats, overview.relationshipGraph].every(Array.isArray);
+  if (
+    overview.analyzedChapters < totalChapters ||
+    overview.totalChapters < totalChapters
+  ) {
+    return false;
+  }
+  return [overview.themes, overview.characterStats, overview.relationshipGraph]
+    .every(Array.isArray);
 }
 
-export function serializeOverview(overview: AnalysisOverview | undefined): SerializedOverview | null {
+export function serializeOverview(
+  overview: AnalysisOverview | undefined,
+): SerializedOverview | null {
   if (!overview) return null;
   return {
     bookIntro: overview.bookIntro,
@@ -50,7 +61,9 @@ export function serializeOverview(overview: AnalysisOverview | undefined): Seria
   };
 }
 
-export function serializeChapterAnalysis(row: ChapterAnalysis | undefined): SerializedChapterAnalysis | null {
+export function serializeChapterAnalysis(
+  row: ChapterAnalysis | undefined,
+): SerializedChapterAnalysis | null {
   if (!row) return null;
   return {
     chapterIndex: row.chapterIndex,
@@ -97,7 +110,13 @@ export function collectAnalysisAggregates(chapterRows: ChapterAnalysis[]): Analy
       const description = cleanText(item.description, 200);
       let target = characterMap.get(name);
       if (!target) {
-        target = { name, weight: 0, chapters: new Set<number>(), roles: new Map<string, number>(), descriptions: [] };
+        target = {
+          name,
+          weight: 0,
+          chapters: new Set<number>(),
+          roles: new Map<string, number>(),
+          descriptions: [],
+        };
         characterMap.set(name, target);
       }
       target.weight += weight;
@@ -105,7 +124,11 @@ export function collectAnalysisAggregates(chapterRows: ChapterAnalysis[]): Analy
       if (role) {
         target.roles.set(role, (target.roles.get(role) || 0) + Math.max(weight, 1));
       }
-      if (description && !target.descriptions.includes(description) && target.descriptions.length < 6) {
+      if (
+        description &&
+        !target.descriptions.includes(description) &&
+        target.descriptions.length < 6
+      ) {
         target.descriptions.push(description);
       }
     }
@@ -136,7 +159,10 @@ export function collectAnalysisAggregates(chapterRows: ChapterAnalysis[]): Analy
       edge.mentionCount += 1;
       edge.chapters.add(row.chapterIndex);
       for (const tag of relationTags) {
-        edge.relationTypes.set(tag, (edge.relationTypes.get(tag) || 0) + Math.max(relationWeight, 1));
+        edge.relationTypes.set(
+          tag,
+          (edge.relationTypes.get(tag) || 0) + Math.max(relationWeight, 1),
+        );
       }
       const description = cleanText(item.description, 160);
       if (description && !edge.descriptions.includes(description) && edge.descriptions.length < 6) {
@@ -145,10 +171,12 @@ export function collectAnalysisAggregates(chapterRows: ChapterAnalysis[]): Analy
     }
   }
 
-  const totalWeight = Array.from(characterMap.values()).reduce((sum, item) => sum + item.weight, 0) || 1;
+  const totalWeight =
+    Array.from(characterMap.values()).reduce((sum, item) => sum + item.weight, 0) || 1;
   const allCharacterStats = Array.from(characterMap.values())
     .map((item) => {
-      const topRole = [...item.roles.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0];
+      const topRole = [...item.roles.entries()]
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0];
       return {
         name: item.name,
         role: topRole?.[0] || '',
@@ -181,11 +209,19 @@ export function collectAnalysisAggregates(chapterRows: ChapterAnalysis[]): Analy
         descriptionFragments: item.descriptions.slice(0, 4),
       };
     })
-    .sort((a, b) => b.weight - a.weight || a.source.localeCompare(b.source) || a.target.localeCompare(b.target));
+    .sort(
+      (a, b) =>
+        b.weight - a.weight ||
+        a.source.localeCompare(b.source) ||
+        a.target.localeCompare(b.target),
+    );
 
   return {
     chapters: chaptersPayload,
-    themes: [...themeCounter.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12).map((entry) => entry[0]),
+    themes: [...themeCounter.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 12)
+      .map((entry) => entry[0]),
     characterStats: allCharacterStats.slice(0, 20),
     allCharacterStats,
     allRelationshipGraph: relationshipGraph,
@@ -216,8 +252,11 @@ export function buildCharacterGraphPayload(
     if (name) aggregateCharacterMap.set(name, item as unknown as Record<string, unknown>);
   }
 
-  const overviewCharacterStats = (overviewPayload?.characterStats as unknown as Array<Record<string, unknown>>) || [];
-  const overviewRelationshipGraph = (overviewPayload?.relationshipGraph as unknown as Array<Record<string, unknown>>) || [];
+  const overviewCharacterStats =
+    (overviewPayload?.characterStats as unknown as Array<Record<string, unknown>>) || [];
+  const overviewRelationshipGraph =
+    (overviewPayload?.relationshipGraph as unknown as Array<Record<string, unknown>>) ||
+    [];
   const overviewCharacterMap = new Map<string, Record<string, unknown>>();
   for (const item of overviewCharacterStats) {
     const name = cleanText(item.name, 80);
@@ -262,7 +301,13 @@ export function buildCharacterGraphPayload(
         type: relationTags[0],
         relationTags,
         description: cleanText(overviewEdge.description, 280)
-          || buildCharacterGraphEdgeDescription(source, target, relationTags, chapterCount, mentionCount),
+          || buildCharacterGraphEdgeDescription(
+            source,
+            target,
+            relationTags,
+            chapterCount,
+            mentionCount,
+          ),
         weight: Math.round((Number(localEdge.weight) || 0) * 100) / 100,
         mentionCount,
         chapterCount,
@@ -282,7 +327,10 @@ export function buildCharacterGraphPayload(
     const aggregateItem = aggregateCharacterMap.get(name) || {};
     const overviewItem = overviewCharacterMap.get(name) || {};
     const role = cleanText(overviewItem.role, 80) || cleanText(aggregateItem.role, 80);
-    const sharePercent = Math.round((Number(overviewItem.sharePercent || aggregateItem.sharePercent) || 0) * 100) / 100;
+    const sharePercent =
+      Math.round(
+        (Number(overviewItem.sharePercent || aggregateItem.sharePercent) || 0) * 100,
+      ) / 100;
     const chapterCount = Number(aggregateItem.chapterCount) || 0;
     let description = cleanText(overviewItem.description, 220);
     if (!description) {
@@ -369,10 +417,16 @@ function buildCharacterGraphNodeDescription(
 ): string {
   const counterpartNames: string[] = [];
   const relationTags: string[] = [];
-  for (const edge of relatedEdges.sort((a, b) => (Number(b.weight) || 0) - (Number(a.weight) || 0))) {
+  for (const edge of relatedEdges.sort(
+    (a, b) => (Number(b.weight) || 0) - (Number(a.weight) || 0),
+  )) {
     const counterpart = edge.source === name ? edge.target : edge.source;
     const counterpartName = cleanText(counterpart, 80);
-    if (counterpartName && !counterpartNames.includes(counterpartName) && counterpartNames.length < 3) {
+    if (
+      counterpartName &&
+      !counterpartNames.includes(counterpartName) &&
+      counterpartNames.length < 3
+    ) {
       counterpartNames.push(counterpartName);
     }
     for (const tag of normalizeRelationTags(edge.relationTags, edge.type) || []) {

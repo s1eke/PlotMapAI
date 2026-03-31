@@ -108,7 +108,10 @@ function getFallbackViewportWidth(
     : defaultColumnWidth;
 }
 
-function assignPagedViewportRef(ref: React.Ref<HTMLDivElement> | undefined, element: HTMLDivElement | null): void {
+function assignPagedViewportRef(
+  ref: React.Ref<HTMLDivElement> | undefined,
+  element: HTMLDivElement | null,
+): void {
   if (!ref) {
     return;
   }
@@ -266,8 +269,10 @@ export default function PagedReaderContent({
   const [viewportSize, setViewportSize] = useState<ViewportSize>(EMPTY_VIEWPORT_SIZE);
   const [viewportElement, setViewportElement] = useState<HTMLDivElement | null>(null);
   const [dragDirection, setDragDirection] = useState<PageTurnDirection | null>(null);
-  const [committedDragTransition, setCommittedDragTransition] = useState<CommittedDragTransition | null>(null);
-  const [pendingCommittedPageOverride, setPendingCommittedPageOverride] = useState<PendingCommittedPageOverride | null>(null);
+  const [committedDragTransition, setCommittedDragTransition] =
+    useState<CommittedDragTransition | null>(null);
+  const [pendingCommittedPageOverride, setPendingCommittedPageOverride] =
+    useState<PendingCommittedPageOverride | null>(null);
   const dragAnimationRef = useRef<AnimationPlaybackControls | null>(null);
   const suppressNextClickRef = useRef(false);
   const dragOffset = useMotionValue(0);
@@ -513,7 +518,11 @@ export default function PagedReaderContent({
       return;
     }
 
-    const shouldCommit = shouldCommitPageTurnDrag(nextOffset, info.velocity.x, resolvedViewportWidth);
+    const shouldCommit = shouldCommitPageTurnDrag(
+      nextOffset,
+      info.velocity.x,
+      resolvedViewportWidth,
+    );
     const commitPreviewTarget = nextDirection === 'prev' ? previousPreviewTarget : nextPreviewTarget;
     if (!commitPreviewTarget || !currentPreviewTarget) {
       suppressNextClickRef.current = false;
@@ -521,7 +530,11 @@ export default function PagedReaderContent({
       return;
     }
 
-    const targetOffset = resolveDragCommitOffset(shouldCommit, nextDirection, resolvedViewportWidth);
+    const targetOffset = resolveDragCommitOffset(
+      shouldCommit,
+      nextDirection,
+      resolvedViewportWidth,
+    );
     const animation = getPageTurnAnimation(pageTurnMode);
     const settleDuration = getPageTurnSettleDuration(
       pageTurnMode,
@@ -595,7 +608,8 @@ export default function PagedReaderContent({
   const pageTurnAnimation = getPageTurnAnimation(animationMode);
   const variants: Variants = {
     enter: (custom: PageTurnDirection) => pageTurnAnimation.initial({ direction: custom }) as never,
-    center: (custom: PageTurnDirection) => pageTurnAnimation.animate({ direction: custom }) as never,
+    center: (custom: PageTurnDirection) =>
+      pageTurnAnimation.animate({ direction: custom }) as never,
     exit: (custom: PageTurnDirection) => pageTurnAnimation.exit({ direction: custom }) as never,
   };
   let livePreviewTarget = null;

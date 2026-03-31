@@ -97,7 +97,10 @@ describe('useReaderInput', () => {
     });
 
     it('ArrowRight calls goToChapter with next index', () => {
-      const { goToChapter } = setupHook({ isPagedMode: true, chapter: makeChapter({ hasNext: true }) });
+      const { goToChapter } = setupHook({
+        isPagedMode: true,
+        chapter: makeChapter({ hasNext: true }),
+      });
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }));
       expect(goToChapter).toHaveBeenCalledWith(1, 'start');
     });
@@ -120,7 +123,10 @@ describe('useReaderInput', () => {
     });
 
     it('ArrowRight still navigates chapters in scroll mode', () => {
-      const { goToChapter } = setupHook({ isPagedMode: false, chapter: makeChapter({ hasNext: true }) });
+      const { goToChapter } = setupHook({
+        isPagedMode: false,
+        chapter: makeChapter({ hasNext: true }),
+      });
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }));
       expect(goToChapter).toHaveBeenCalledWith(1, 'start');
     });
@@ -229,7 +235,10 @@ describe('useReaderInput', () => {
     });
 
     it('does not turn pages while interaction is locked', () => {
-      const { contentRef, goToNextPage, dismissBlockedInteraction } = setupHook({ isPagedMode: true, interactionLocked: true });
+      const { contentRef, goToNextPage, dismissBlockedInteraction } = setupHook({
+        isPagedMode: true,
+        interactionLocked: true,
+      });
       const event = new WheelEvent('wheel', { deltaY: 100, bubbles: true, cancelable: true });
       Object.defineProperty(event, 'deltaX', { value: 0 });
       contentRef.current.dispatchEvent(event);
@@ -240,7 +249,10 @@ describe('useReaderInput', () => {
 
   describe('interaction lock', () => {
     it('ignores keyboard navigation while interaction is locked', () => {
-      const { goToNextPage, goToChapter, dismissBlockedInteraction } = setupHook({ isPagedMode: true, interactionLocked: true });
+      const { goToNextPage, goToChapter, dismissBlockedInteraction } = setupHook({
+        isPagedMode: true,
+        interactionLocked: true,
+      });
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown' }));
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }));
       expect(goToNextPage).not.toHaveBeenCalled();

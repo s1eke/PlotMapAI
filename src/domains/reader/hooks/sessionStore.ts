@@ -324,7 +324,9 @@ function mergeStoredReaderState(
       : overrideState?.chapterProgress ?? baseState?.chapterProgress,
     scrollPosition: overrideState?.scrollPosition ?? baseState?.scrollPosition,
     lastContentMode: overrideState?.lastContentMode ?? baseState?.lastContentMode,
-    locatorVersion: shouldResetLocator ? undefined : overrideState?.locatorVersion ?? baseState?.locatorVersion,
+    locatorVersion: shouldResetLocator
+      ? undefined
+      : overrideState?.locatorVersion ?? baseState?.locatorVersion,
     locator: shouldResetLocator ? undefined : overrideState?.locator ?? baseState?.locator,
   });
 }
@@ -356,7 +358,9 @@ function getRemoteProgressSnapshot(progress: ReadingProgress): string {
   });
 }
 
-function getSessionPreferences(currentState: ReaderSessionInternalState): SessionPreferenceSnapshot {
+function getSessionPreferences(
+  currentState: ReaderSessionInternalState,
+): SessionPreferenceSnapshot {
   return {
     readerTheme: currentState.readerTheme,
     pageTurnMode: currentState.pageTurnMode,
@@ -411,14 +415,24 @@ async function persistPreferenceSettings(preferences: SessionPreferenceSnapshot)
     storage.primary.settings.set(APP_SETTING_KEYS.readerPageTurnMode, preferences.pageTurnMode),
     storage.primary.settings.set(APP_SETTING_KEYS.readerFontSize, preferences.fontSize),
     storage.primary.settings.set(APP_SETTING_KEYS.readerLineSpacing, preferences.lineSpacing),
-    storage.primary.settings.set(APP_SETTING_KEYS.readerParagraphSpacing, preferences.paragraphSpacing),
+    storage.primary.settings.set(
+      APP_SETTING_KEYS.readerParagraphSpacing,
+      preferences.paragraphSpacing,
+    ),
   ]);
 }
 
 async function loadPrimaryPreferenceState(): Promise<SessionPreferenceSnapshot> {
   const cached = readCachedPreferenceState();
   try {
-    const [appTheme, readerTheme, pageTurnMode, fontSize, lineSpacing, paragraphSpacing] = await Promise.all([
+    const [
+      appTheme,
+      readerTheme,
+      pageTurnMode,
+      fontSize,
+      lineSpacing,
+      paragraphSpacing,
+    ] = await Promise.all([
       storage.primary.settings.get<AppTheme>(APP_SETTING_KEYS.appTheme),
       storage.primary.settings.get<string>(APP_SETTING_KEYS.readerTheme),
       storage.primary.settings.get<ReaderPageTurnMode>(APP_SETTING_KEYS.readerPageTurnMode),
@@ -427,7 +441,8 @@ async function loadPrimaryPreferenceState(): Promise<SessionPreferenceSnapshot> 
       storage.primary.settings.get<number>(APP_SETTING_KEYS.readerParagraphSpacing),
     ]);
 
-    hasConfiguredPageTurnModePreference = pageTurnMode !== null || readStringCache(CACHE_KEYS.readerPageTurnMode) !== null;
+    hasConfiguredPageTurnModePreference =
+      pageTurnMode !== null || readStringCache(CACHE_KEYS.readerPageTurnMode) !== null;
 
     const resolved: SessionPreferenceSnapshot = {
       appTheme: appTheme === 'light' || appTheme === 'dark' ? appTheme : cached.appTheme,
@@ -581,7 +596,10 @@ function setState(partial: Partial<ReaderSessionInternalState>): void {
   emit();
 }
 
-function enqueueRemotePersistence(progress: ReadingProgress, novelId = state.novelId): Promise<void> {
+function enqueueRemotePersistence(
+  progress: ReadingProgress,
+  novelId = state.novelId,
+): Promise<void> {
   if (!novelId) return Promise.resolve();
   const snapshot = getRemoteProgressSnapshot(progress);
   if (snapshot === lastSyncedRemoteSnapshot) return syncQueue;
@@ -606,7 +624,10 @@ function scheduleRemotePersistence(): void {
   }, READER_STATE_SYNC_DELAY_MS);
 }
 
-function resolveLastContentMode(mode: ReaderMode, fallbackMode: ReaderContentMode): ReaderContentMode {
+function resolveLastContentMode(
+  mode: ReaderMode,
+  fallbackMode: ReaderContentMode,
+): ReaderContentMode {
   if (mode === 'summary') return fallbackMode;
   if (mode === 'paged') return 'paged';
   return 'scroll';
@@ -657,7 +678,8 @@ export async function hydrateSession(novelId: number): Promise<StoredReaderState
   const epochAtStart = storeEpoch;
   const localState = readLocalSessionState(novelId);
   const cachedPreferences = readCachedPreferenceState();
-  const hadConfiguredPageTurnModePreference = hasConfiguredPageTurnModePreference || localState?.pageTurnMode !== undefined;
+  const hadConfiguredPageTurnModePreference =
+    hasConfiguredPageTurnModePreference || localState?.pageTurnMode !== undefined;
   setState({
     novelId,
     restoreStatus: 'hydrating',
@@ -771,7 +793,10 @@ export function setChapterIndex(chapterIndex: number, options: SessionUpdateOpti
   );
 }
 
-export function setReadingPosition(nextState: StoredReaderState, options: SessionUpdateOptions = {}): void {
+export function setReadingPosition(
+  nextState: StoredReaderState,
+  options: SessionUpdateOptions = {},
+): void {
   updateStoredReaderState(nextState, {
     persistRemote: options.persistRemote ?? true,
     markUserInteracted: options.markUserInteracted,
@@ -864,7 +889,10 @@ export function readInitialStoredReaderState(novelId: number): StoredReaderState
   return localState ? sanitizeStoredReaderState(localState) : null;
 }
 
-export function persistStoredReaderState(nextState: StoredReaderState, options?: { flush?: boolean }): void {
+export function persistStoredReaderState(
+  nextState: StoredReaderState,
+  options?: { flush?: boolean },
+): void {
   updateStoredReaderState(nextState, {
     persistRemote: true,
     flush: options?.flush,

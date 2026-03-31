@@ -160,7 +160,8 @@ export default function CharacterGraphCanvas({
 
       <g transform={`matrix(${zoomState.scale} 0 0 ${zoomState.scale} ${zoomState.offsetX} ${zoomState.offsetY})`}>
         {layoutEdges.map((edge) => {
-          const isHighlighted = !focusNodeId || edge.source === focusNodeId || edge.target === focusNodeId;
+          const isHighlighted =
+            !focusNodeId || edge.source === focusNodeId || edge.target === focusNodeId;
           const opacity = resolveEdgeOpacity(focusNodeId, isHighlighted);
           const strokeWidth = Math.max(1.6, Math.min(5.5, 1.2 + edge.weight / 24));
 
@@ -257,7 +258,10 @@ export default function CharacterGraphCanvas({
                       fontSize={labelLayout.fontSize}
                       fontWeight="700"
                       lengthAdjust="spacingAndGlyphs"
-                      textLength={Math.min(labelLayout.maxTextWidth, estimateTextUnits(line) * labelLayout.fontSize)}
+                      textLength={Math.min(
+                        labelLayout.maxTextWidth,
+                        estimateTextUnits(line) * labelLayout.fontSize,
+                      )}
                       style={{
                         fill: node.isCore ? '#ffffff' : '#18202a',
                         transition: colorTransition,
