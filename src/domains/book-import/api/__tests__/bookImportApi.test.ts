@@ -95,7 +95,6 @@ describe('bookImportApi', () => {
   it('maps enabled toc rules to parseBook with default/custom sources preserved', async () => {
     await db.tocRules.bulkAdd([
       {
-        id: undefined as unknown as number,
         name: 'Default Rule',
         rule: '^第\\d+章',
         example: '第1章 开始',
@@ -105,7 +104,6 @@ describe('bookImportApi', () => {
         createdAt: new Date().toISOString(),
       },
       {
-        id: undefined as unknown as number,
         name: 'Custom Rule',
         rule: '^\\d+[.、:：]\\s*.+$',
         example: '1. 开始',
@@ -115,7 +113,6 @@ describe('bookImportApi', () => {
         createdAt: new Date().toISOString(),
       },
       {
-        id: undefined as unknown as number,
         name: 'Disabled Rule',
         rule: '^Chapter\\s+\\d+',
         example: 'Chapter 1',

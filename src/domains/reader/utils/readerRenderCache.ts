@@ -219,7 +219,6 @@ export async function persistReaderRenderCacheEntry<TTree extends StaticChapterR
       .delete();
 
     await db.readerRenderCache.add({
-      id: undefined as unknown as number,
       novelId: entry.novelId,
       chapterIndex: entry.chapterIndex,
       variantFamily: entry.variantFamily,

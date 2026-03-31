@@ -11,8 +11,6 @@ import {
 } from '@shared/errors';
 export type { WorkerTaskHandler } from './types';
 
-type WorkerTaskHandlers = Record<string, WorkerTaskHandler<unknown, unknown, unknown>>;
-
 interface WorkerTaskRegistration {
   taskName: string;
   handler: WorkerTaskHandler<unknown, unknown, unknown>;
@@ -22,11 +20,17 @@ function isAbortError(error: unknown): boolean {
   return error instanceof Error && error.name === 'AbortError';
 }
 
-function getWorkerTaskRegistrations(handlers: WorkerTaskHandlers): WorkerTaskRegistration[] {
+function isWorkerTaskHandler(
+  handler: unknown,
+): handler is WorkerTaskHandler<unknown, unknown, unknown> {
+  return typeof handler === 'function';
+}
+
+function getWorkerTaskRegistrations(handlers: Record<string, unknown>): WorkerTaskRegistration[] {
   const registrations: WorkerTaskRegistration[] = [];
 
   for (const [taskName, handler] of Object.entries(handlers)) {
-    if (typeof handler === 'function') {
+    if (isWorkerTaskHandler(handler)) {
       registrations.push({ taskName, handler });
     }
   }
@@ -34,11 +38,11 @@ function getWorkerTaskRegistrations(handlers: WorkerTaskHandlers): WorkerTaskReg
   return registrations;
 }
 
-export function registerWorkerTaskHandlers(handlers: WorkerTaskHandlers): void;
 export function registerWorkerTaskHandlers<TMap extends object>(
   handlers: WorkerTaskHandlerMap<TMap>,
 ): void;
-export function registerWorkerTaskHandlers(handlers: WorkerTaskHandlers): void {
+export function registerWorkerTaskHandlers(handlers: Record<string, unknown>): void;
+export function registerWorkerTaskHandlers(handlers: Record<string, unknown>): void {
   const workerContext = self as {
     onmessage: ((event: MessageEvent<WorkerTaskMessage<unknown>>) => void) | null;
     postMessage: (message: WorkerTaskResponse<unknown, unknown>) => void;

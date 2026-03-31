@@ -40,7 +40,6 @@ export async function ensureDefaultTocRules(): Promise<void> {
   const defaultRules = await loadDefaultTocRules();
   for (const rule of defaultRules) {
     await db.tocRules.add({
-      id: undefined as unknown as number,
       ...mapDefaultRule(rule, createdAt),
     });
   }

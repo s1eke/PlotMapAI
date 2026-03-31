@@ -17,7 +17,6 @@ describe('libraryApi', () => {
 
   it('list returns novels sorted by createdAt descending', async () => {
     await db.novels.add({
-      id: undefined as unknown as number,
       title: 'First',
       author: '',
       description: '',
@@ -31,7 +30,6 @@ describe('libraryApi', () => {
       createdAt: '2024-01-01T00:00:00Z',
     });
     await db.novels.add({
-      id: undefined as unknown as number,
       title: 'Second',
       author: '',
       description: '',
@@ -51,7 +49,6 @@ describe('libraryApi', () => {
 
   it('get returns a novel by id', async () => {
     const id = await db.novels.add({
-      id: undefined as unknown as number,
       title: 'Get Test',
       author: 'Auth',
       description: 'Desc',
@@ -75,7 +72,6 @@ describe('libraryApi', () => {
 
   it('delete removes novel and related data', async () => {
     const id = await db.novels.add({
-      id: undefined as unknown as number,
       title: 'Delete Me',
       author: '',
       description: '',
@@ -89,7 +85,6 @@ describe('libraryApi', () => {
       createdAt: new Date().toISOString(),
     });
     await db.chapters.add({
-      id: undefined as unknown as number,
       novelId: id as number,
       title: 'Ch',
       content: 'c',
@@ -97,7 +92,6 @@ describe('libraryApi', () => {
       wordCount: 1,
     });
     await db.readingProgress.add({
-      id: undefined as unknown as number,
       novelId: id as number,
       chapterIndex: 3,
       scrollPosition: 50,
@@ -105,7 +99,6 @@ describe('libraryApi', () => {
       updatedAt: new Date().toISOString(),
     });
     await db.novelImageGalleryEntries.add({
-      id: undefined as unknown as number,
       novelId: id as number,
       chapterIndex: 0,
       blockIndex: 1,
@@ -138,7 +131,6 @@ describe('libraryApi', () => {
 
   it('novelToApi converts tags from JSON string to array', async () => {
     await db.novels.add({
-      id: undefined as unknown as number,
       title: 'Tagged',
       author: '',
       description: '',

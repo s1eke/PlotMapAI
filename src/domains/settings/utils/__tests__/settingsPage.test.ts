@@ -1,5 +1,5 @@
 import { AppErrorCode, createAppError } from '@shared/errors';
-import type { TFunction } from 'i18next';
+import { createInstance, type TFunction } from 'i18next';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import {
   buildActionErrorMessage,
@@ -7,6 +7,23 @@ import {
   getTranslatedErrorMessage,
   groupPurificationRules,
 } from '../settingsPage';
+
+function createIdentityT(): TFunction {
+  const instance = createInstance();
+  instance.init({
+    lng: 'en',
+    fallbackLng: 'en',
+    initImmediate: false,
+    resources: {
+      en: {
+        translation: {},
+      },
+    },
+    returnNull: false,
+    parseMissingKeyHandler: (key) => key,
+  });
+  return instance.t;
+}
 
 describe('settingsPage utilities', () => {
   beforeEach(() => {
@@ -56,7 +73,7 @@ describe('settingsPage utilities', () => {
   });
 
   it('translates structured AppError instances to translated keys', () => {
-    const t = ((key: string) => key) as unknown as TFunction;
+    const t = createIdentityT();
 
     expect(getTranslatedErrorMessage(createAppError({
       code: AppErrorCode.AI_CONFIG_EXPORT_MISSING,
@@ -75,7 +92,7 @@ describe('settingsPage utilities', () => {
   });
 
   it('builds prefixed action error messages', () => {
-    const t = ((key: string) => key) as unknown as TFunction;
+    const t = createIdentityT();
 
     expect(buildActionErrorMessage('Failed', createAppError({
       code: AppErrorCode.RULE_NOT_FOUND,

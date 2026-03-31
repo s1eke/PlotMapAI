@@ -258,8 +258,7 @@ export function createDexieAnalysisRuntimeRepository(): AnalysisRuntimeRepositor
       });
       for (const item of result.chapterAnalyses) {
         const existing = await db.chapterAnalyses.where('[novelId+chapterIndex]').equals([novelId, item.chapterIndex]).first();
-        const record: ChapterAnalysis = {
-          id: existing?.id ?? (undefined as unknown as number),
+        const record: Omit<ChapterAnalysis, 'id'> = {
           novelId,
           chapterIndex: item.chapterIndex,
           chapterTitle: item.title || '',
@@ -280,8 +279,7 @@ export function createDexieAnalysisRuntimeRepository(): AnalysisRuntimeRepositor
     },
     saveOverviewAnalysisResult: async (novelId, result) => {
       const existing = await loadOverview(novelId);
-      const record: AnalysisOverview = {
-        id: existing?.id ?? (undefined as unknown as number),
+      const record: Omit<AnalysisOverview, 'id'> = {
         novelId,
         ...result,
         updatedAt: nowISO(),
@@ -306,8 +304,7 @@ export function createDexieAnalysisRuntimeRepository(): AnalysisRuntimeRepositor
       if (result.chapterAnalyses.length === 0) return null;
       const item = result.chapterAnalyses[0];
       const existing = await db.chapterAnalyses.where('[novelId+chapterIndex]').equals([novelId, chapterIndex]).first();
-      const record: ChapterAnalysis = {
-        id: existing?.id ?? (undefined as unknown as number),
+      const record: Omit<ChapterAnalysis, 'id'> = {
         novelId,
         chapterIndex,
         chapterTitle: item.title || chapterTitle,
@@ -320,11 +317,12 @@ export function createDexieAnalysisRuntimeRepository(): AnalysisRuntimeRepositor
         updatedAt: nowISO(),
       };
       if (existing) {
-        await db.chapterAnalyses.put({ ...record, id: existing.id });
-      } else {
-        await db.chapterAnalyses.add(record);
+        const storedRecord: ChapterAnalysis = { ...record, id: existing.id };
+        await db.chapterAnalyses.put(storedRecord);
+        return serializeChapter(storedRecord);
       }
-      return serializeChapter(record);
+      const id = await db.chapterAnalyses.add(record);
+      return serializeChapter({ ...record, id });
     },
     getChapterAnalysis: async (novelId, chapterIndex) => {
       const row = await db.chapterAnalyses.where('[novelId+chapterIndex]').equals([novelId, chapterIndex]).first();

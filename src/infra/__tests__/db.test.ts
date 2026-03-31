@@ -32,7 +32,6 @@ describe('db', () => {
 
   it('can add and retrieve a novel', async () => {
     const id = await db.novels.add({
-      id: undefined as unknown as number,
       title: 'Test Novel',
       author: 'Author',
       description: 'Desc',
@@ -52,7 +51,6 @@ describe('db', () => {
 
   it('can add and retrieve chapters', async () => {
     const novelId = await db.novels.add({
-      id: undefined as unknown as number,
       title: 'Novel',
       author: '',
       description: '',
@@ -66,7 +64,6 @@ describe('db', () => {
       createdAt: new Date().toISOString(),
     });
     await db.chapters.add({
-      id: undefined as unknown as number,
       novelId: novelId as number,
       title: 'Chapter 1',
       content: 'Content',
@@ -80,7 +77,6 @@ describe('db', () => {
 
   it('can add and retrieve purification rules', async () => {
     await db.purificationRules.add({
-      id: undefined as unknown as number,
       externalId: null,
       name: 'Test Rule',
       group: 'default',
@@ -105,7 +101,6 @@ describe('db', () => {
 
   it('can add and retrieve novel image gallery entries', async () => {
     await db.novelImageGalleryEntries.add({
-      id: undefined as unknown as number,
       novelId: 1,
       chapterIndex: 0,
       blockIndex: 2,
@@ -121,7 +116,6 @@ describe('db', () => {
 
   it('can add and retrieve reading progress', async () => {
     await db.readingProgress.add({
-      id: undefined as unknown as number,
       novelId: 1,
       chapterIndex: 5,
       scrollPosition: 100,
@@ -135,7 +129,6 @@ describe('db', () => {
 
   it('can add analysis jobs', async () => {
     await db.analysisJobs.add({
-      id: undefined as unknown as number,
       novelId: 1,
       status: 'idle',
       totalChapters: 10,

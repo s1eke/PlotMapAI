@@ -85,14 +85,12 @@ export function normalizeOverviewResult(
   if (!Array.isArray(raw.characterStats)) throw new AnalysisExecutionError('AI 返回缺少有效的 characterStats 数组。');
   if (!Array.isArray(raw.relationshipGraph)) throw new AnalysisExecutionError('AI 返回缺少有效的 relationshipGraph 数组。');
 
-  const localCharacterMap = new Map<string, Record<string, unknown>>();
+  const localCharacterMap = new Map<string, AnalysisAggregates['allCharacterStats'][number]>();
   for (const item of aggregates.allCharacterStats) {
-    localCharacterMap.set(item.name, item as unknown as Record<string, unknown>);
+    localCharacterMap.set(item.name, item);
   }
 
-  const localRelationshipMap = buildOverviewRelationshipMap(
-    aggregates.allRelationshipGraph as unknown as Array<Record<string, unknown>>,
-  );
+  const localRelationshipMap = buildOverviewRelationshipMap(aggregates.allRelationshipGraph);
 
   const characterStats: OverviewAnalysisResult['characterStats'] = [];
   const seenNames = new Set<string>();
@@ -150,10 +148,10 @@ export function normalizeOverviewResult(
     const [source, target] = pair;
     const missingNames = [source, target].filter((name) => !localCharacterMap.has(name));
     if (missingNames.length > 0) continue;
-    const localEdge = localRelationshipMap.get(pairKey) || {};
+    const localEdge = localRelationshipMap.get(pairKey);
     let relationTags = normalizeRelationTags(obj.relationTags, obj.type);
     if (!relationTags) {
-      relationTags = normalizeRelationTags(localEdge.relationTags, localEdge.type);
+      relationTags = normalizeRelationTags(localEdge?.relationTags, localEdge?.type);
     }
     if (!relationTags) throw new AnalysisExecutionError(`AI 返回的关系 ${source} / ${target} 缺少有效的 relationTags。`);
     relationshipGraph.push({
@@ -161,7 +159,7 @@ export function normalizeOverviewResult(
       target,
       type: relationTags[0],
       relationTags: relationTags.slice(0, 6),
-      description: cleanText(obj.description, 280) || cleanText(localEdge.description, 280),
+      description: cleanText(obj.description, 280) || cleanText(localEdge?.description, 280),
     });
     seenPairs.add(pairKey);
   }

@@ -17,8 +17,19 @@ export interface WorkerTaskOptions<Progress> {
   onProgress?: (progress: Progress) => void;
 }
 
+interface WorkerAddEventListener {
+  (type: 'message', listener: (event: MessageEvent) => void): void;
+  (type: 'error', listener: (event: ErrorEvent) => void): void;
+}
+
+export interface WorkerLike {
+  addEventListener: WorkerAddEventListener;
+  postMessage: (message: unknown) => void;
+  terminate: () => void;
+}
+
 export interface CreateWorkerTaskRunnerOptions<Payload, Result, Progress> {
-  createWorker: () => Worker;
+  createWorker: () => WorkerLike;
   task: string;
   fallback: (payload: Payload, options: WorkerTaskOptions<Progress>) => Promise<Result> | Result;
 }
@@ -27,7 +38,7 @@ interface CreateMappedWorkerTaskRunnerOptions<
   TMap extends object,
   TTask extends keyof TMap & string,
 > {
-  createWorker: () => Worker;
+  createWorker: () => WorkerLike;
   task: TTask;
   fallback: (
     payload: WorkerTaskPayload<TMap, TTask>,
@@ -83,7 +94,7 @@ export function createWorkerTaskRunner<Payload, Result, Progress>({
   fallback,
 }: CreateWorkerTaskRunnerOptions<Payload, Result, Progress>) {
   const pending = new Map<string, PendingWorkerRequest<Result, Progress>>();
-  let worker: Worker | null = null;
+  let worker: WorkerLike | null = null;
   let workerDisabled = false;
 
   const tearDownWorker = () => {
@@ -102,7 +113,7 @@ export function createWorkerTaskRunner<Payload, Result, Progress>({
     tearDownWorker();
   };
 
-  const ensureWorker = (): Worker | null => {
+  const ensureWorker = (): WorkerLike | null => {
     if (workerDisabled || typeof Worker === 'undefined') {
       return null;
     }

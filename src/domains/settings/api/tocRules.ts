@@ -27,7 +27,6 @@ export const tocRulesApi = {
     const now = new Date().toISOString();
     const last = await db.tocRules.orderBy('serialNumber').last();
     const id = await db.tocRules.add({
-      id: undefined as unknown as number,
       name: data.name,
       rule: data.rule,
       example: data.example || '',
@@ -125,7 +124,6 @@ export const tocRulesApi = {
       if (!ruleText || existingRules.has(ruleText)) continue;
       existingRules.add(ruleText);
       await db.tocRules.add({
-        id: undefined as unknown as number,
         name: (rule.name as string) || `Imported Rule ${index}`,
         rule: ruleText,
         example: (rule.example as string) || '',

@@ -80,7 +80,6 @@ export async function ensureDefaultPurificationRules(): Promise<void> {
     }
 
     await db.purificationRules.add({
-      id: undefined as unknown as number,
       ...mapDefaultPurificationRule(rule, createdAt),
     });
   }

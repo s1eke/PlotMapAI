@@ -3,7 +3,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { AppErrorCode } from '@shared/errors';
 
-import type { WorkerTaskHandler } from '../server';
 import { registerWorkerTaskHandlers } from '../server';
 
 interface FakeWorkerContext {
@@ -46,7 +45,7 @@ describe('registerWorkerTaskHandlers', () => {
     const inheritedHandler = vi.fn();
     const handlers = Object.create({
       inheritedTask: inheritedHandler,
-    }) as Record<string, WorkerTaskHandler<unknown, unknown, unknown>>;
+    });
 
     registerWorkerTaskHandlers(handlers);
     dispatchMessage(context, {
@@ -73,7 +72,7 @@ describe('registerWorkerTaskHandlers', () => {
     vi.stubGlobal('self', context);
     const handlers = {
       invalidTask: 'not-a-function',
-    } as unknown as Record<string, WorkerTaskHandler<unknown, unknown, unknown>>;
+    };
 
     registerWorkerTaskHandlers(handlers);
 

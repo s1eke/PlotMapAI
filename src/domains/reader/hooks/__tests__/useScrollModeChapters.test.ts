@@ -397,12 +397,14 @@ describe('useScrollModeChapters', () => {
 
   describe('error handling', () => {
     it('removes pending fetch on error', async () => {
-      // The hook uses .then().finally() without .catch(), so rejected promises
-      // propagate as unhandled. Wrap the mock to catch the rejection while
-      // still testing that .finally() clears the pending set.
+      // Simulate a failed fetch that skips the success branch but still runs
+      // the cleanup in .finally(), without introducing an unhandled rejection.
       const fetchFn = vi.fn()
-        .mockImplementationOnce(() =>
-          Promise.reject(new Error('Network error')).catch(() => undefined as unknown as ChapterContent))
+        .mockImplementationOnce(() => ({
+          then: () => ({
+            finally: (onFinally: () => void) => Promise.resolve().then(onFinally),
+          }),
+        }))
         .mockResolvedValueOnce(makeChapterContent(1));
 
       const { result, contentRef } = setupHook({

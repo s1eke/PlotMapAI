@@ -414,7 +414,6 @@ db.version(CURRENT_DB_VERSION)
         index: chapter.chapterIndex,
         title: chapter.title,
       }).map((entry) => ({
-        id: undefined as unknown as number,
         novelId: chapter.novelId,
         chapterIndex: entry.chapterIndex,
         blockIndex: entry.blockIndex,

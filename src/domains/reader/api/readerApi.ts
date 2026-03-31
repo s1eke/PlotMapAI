@@ -236,7 +236,6 @@ export const readerApi = {
       });
     } else {
       await db.readingProgress.add({
-        id: undefined as unknown as number,
         novelId,
         chapterIndex: data.chapterIndex ?? 0,
         scrollPosition: data.scrollPosition ?? 0,

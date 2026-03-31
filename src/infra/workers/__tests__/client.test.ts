@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createWorkerTaskRunner } from '../client';
+import { createWorkerTaskRunner, type WorkerLike } from '../client';
 
 interface TestProgress {
   progress: number;
 }
 
-class FakeWorker {
+class FakeWorker implements WorkerLike {
   messages: unknown[] = [];
   private listeners = new Map<string, Set<(event: MessageEvent) => void>>();
 
@@ -50,11 +50,9 @@ class FakeWorker {
   }
 }
 
-const originalWorker = globalThis.Worker;
-
 describe('createWorkerTaskRunner', () => {
   afterEach(() => {
-    globalThis.Worker = originalWorker;
+    vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
 
@@ -75,11 +73,11 @@ describe('createWorkerTaskRunner', () => {
   });
 
   it('streams progress updates and resolves worker results', async () => {
-    globalThis.Worker = FakeWorker as unknown as typeof Worker;
+    vi.stubGlobal('Worker', FakeWorker);
     const worker = new FakeWorker();
     const onProgress = vi.fn();
     const runTask = createWorkerTaskRunner<string, string, TestProgress>({
-      createWorker: () => worker as unknown as Worker,
+      createWorker: () => worker,
       task: 'test-task',
       fallback: vi.fn(),
     });
@@ -90,11 +88,11 @@ describe('createWorkerTaskRunner', () => {
   });
 
   it('sends cancel messages and rejects with AbortError when aborted', async () => {
-    globalThis.Worker = FakeWorker as unknown as typeof Worker;
+    vi.stubGlobal('Worker', FakeWorker);
     const worker = new FakeWorker();
     const controller = new AbortController();
     const runTask = createWorkerTaskRunner<string, string, TestProgress>({
-      createWorker: () => worker as unknown as Worker,
+      createWorker: () => worker,
       task: 'test-task',
       fallback: vi.fn(),
     });

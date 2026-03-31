@@ -96,9 +96,10 @@ describe('validateAnalysisConfig', () => {
   });
 
   it('throws for missing config', () => {
-    expect(() => (
-      validateAnalysisConfig(null as unknown as RuntimeAnalysisConfig)
-    )).toThrow(AnalysisConfigError);
+    expect(() => {
+      // @ts-expect-error intentionally validating runtime guard behavior with invalid input
+      validateAnalysisConfig(null);
+    }).toThrow(AnalysisConfigError);
   });
 
   it('throws for empty apiBaseUrl', () => {

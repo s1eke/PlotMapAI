@@ -1,5 +1,12 @@
 import type { AnalysisOverview, Chapter, ChapterAnalysis } from '@infra/db';
-import type { AnalysisAggregates, CharacterGraphPayload, SerializedChapterAnalysis, SerializedOverview } from './types';
+import type {
+  AggregatedCharacterStat,
+  AggregatedRelationshipGraphEdge,
+  AnalysisAggregates,
+  CharacterGraphPayload,
+  SerializedChapterAnalysis,
+  SerializedOverview,
+} from './types';
 import { cleanText, coerceWeight } from './text';
 import { buildLocalRelationshipGraphMap, buildOverviewRelationshipMap, normalizeCharacterPair, normalizeRelationTags } from './relationships';
 
@@ -53,8 +60,8 @@ export function serializeOverview(
     bookIntro: overview.bookIntro,
     globalSummary: overview.globalSummary,
     themes: overview.themes,
-    characterStats: overview.characterStats as unknown as SerializedOverview['characterStats'],
-    relationshipGraph: overview.relationshipGraph as unknown as SerializedOverview['relationshipGraph'],
+    characterStats: overview.characterStats,
+    relationshipGraph: overview.relationshipGraph,
     totalChapters: overview.totalChapters,
     analyzedChapters: overview.analyzedChapters,
     updatedAt: overview.updatedAt,
@@ -70,8 +77,8 @@ export function serializeChapterAnalysis(
     chapterTitle: row.chapterTitle,
     summary: row.summary,
     keyPoints: row.keyPoints,
-    characters: row.characters as unknown as SerializedChapterAnalysis['characters'],
-    relationships: row.relationships as unknown as SerializedChapterAnalysis['relationships'],
+    characters: row.characters,
+    relationships: row.relationships,
     tags: row.tags,
     chunkIndex: row.chunkIndex,
     updatedAt: row.updatedAt,
@@ -246,30 +253,29 @@ export function buildCharacterGraphPayload(
     ? collectAnalysisAggregates(chapterRows)
     : emptyAggregates;
 
-  const aggregateCharacterMap = new Map<string, Record<string, unknown>>();
+  const aggregateCharacterMap = new Map<string, AggregatedCharacterStat>();
   for (const item of aggregates.allCharacterStats) {
     const name = cleanText(item.name, 80);
-    if (name) aggregateCharacterMap.set(name, item as unknown as Record<string, unknown>);
+    if (name) aggregateCharacterMap.set(name, item);
   }
 
-  const overviewCharacterStats =
-    (overviewPayload?.characterStats as unknown as Array<Record<string, unknown>>) || [];
-  const overviewRelationshipGraph =
-    (overviewPayload?.relationshipGraph as unknown as Array<Record<string, unknown>>) ||
-    [];
-  const overviewCharacterMap = new Map<string, Record<string, unknown>>();
+  const overviewCharacterStats = overviewPayload?.characterStats ?? [];
+  const overviewRelationshipGraph = overviewPayload?.relationshipGraph ?? [];
+  const overviewCharacterMap = new Map<string, SerializedOverview['characterStats'][number]>();
   for (const item of overviewCharacterStats) {
     const name = cleanText(item.name, 80);
     if (name) overviewCharacterMap.set(name, item);
   }
 
-  const relationshipGraph = (aggregates.relationshipGraph as unknown as Array<Record<string, unknown>>).filter((item) => typeof item === 'object');
+  const { relationshipGraph } = aggregates;
   const localRelationshipMap = buildLocalRelationshipGraphMap(relationshipGraph);
   const overviewRelationshipMap = buildOverviewRelationshipMap(overviewRelationshipGraph);
 
-  const graphSeedEdges = [...overviewRelationshipGraph, ...relationshipGraph];
+  const graphSeedEdges: Array<
+    SerializedOverview['relationshipGraph'][number] | AggregatedRelationshipGraphEdge
+  > = [...overviewRelationshipGraph, ...relationshipGraph];
   const selectedNames = selectCharacterGraphNames(
-    (aggregates.allCharacterStats as unknown as Array<Record<string, unknown>>) || [],
+    aggregates.allCharacterStats,
     overviewCharacterStats,
     graphSeedEdges,
   );
@@ -286,21 +292,21 @@ export function buildCharacterGraphPayload(
     .filter(([source, target]) => selectedNameSet.has(source) && selectedNameSet.has(target))
     .map(([source, target]) => {
       const pairKey = `${source}::${target}`;
-      const overviewEdge = overviewRelationshipMap.get(pairKey) || {};
-      const localEdge = localRelationshipMap.get(pairKey) || {};
+      const overviewEdge = overviewRelationshipMap.get(pairKey);
+      const localEdge = localRelationshipMap.get(pairKey);
       const relationTags = normalizeRelationTags(
-        overviewEdge.relationTags, overviewEdge.type,
-        localEdge.relationTags, localEdge.type,
+        overviewEdge?.relationTags, overviewEdge?.type,
+        localEdge?.relationTags, localEdge?.type,
       ) || ['未分类'];
-      const chapterCount = Number(localEdge.chapterCount) || 0;
-      const mentionCount = Number(localEdge.mentionCount) || 0;
+      const chapterCount = Number(localEdge?.chapterCount) || 0;
+      const mentionCount = Number(localEdge?.mentionCount) || 0;
       return {
         id: `${source}::${target}`,
         source,
         target,
         type: relationTags[0],
         relationTags,
-        description: cleanText(overviewEdge.description, 280)
+        description: cleanText(overviewEdge?.description, 280)
           || buildCharacterGraphEdgeDescription(
             source,
             target,
@@ -308,10 +314,10 @@ export function buildCharacterGraphPayload(
             chapterCount,
             mentionCount,
           ),
-        weight: Math.round((Number(localEdge.weight) || 0) * 100) / 100,
+        weight: Math.round((Number(localEdge?.weight) || 0) * 100) / 100,
         mentionCount,
         chapterCount,
-        chapters: (localEdge.chapters as number[]) || [],
+        chapters: localEdge?.chapters || [],
       };
     })
     .sort((a, b) => b.weight - a.weight || b.mentionCount - a.mentionCount);
@@ -324,15 +330,15 @@ export function buildCharacterGraphPayload(
   }
 
   const nodes = selectedNames.map((name) => {
-    const aggregateItem = aggregateCharacterMap.get(name) || {};
-    const overviewItem = overviewCharacterMap.get(name) || {};
-    const role = cleanText(overviewItem.role, 80) || cleanText(aggregateItem.role, 80);
+    const aggregateItem = aggregateCharacterMap.get(name);
+    const overviewItem = overviewCharacterMap.get(name);
+    const role = cleanText(overviewItem?.role, 80) || cleanText(aggregateItem?.role, 80);
     const sharePercent =
       Math.round(
-        (Number(overviewItem.sharePercent || aggregateItem.sharePercent) || 0) * 100,
+        (Number(overviewItem?.sharePercent ?? aggregateItem?.sharePercent) || 0) * 100,
       ) / 100;
-    const chapterCount = Number(aggregateItem.chapterCount) || 0;
-    let description = cleanText(overviewItem.description, 220);
+    const chapterCount = Number(aggregateItem?.chapterCount) || 0;
+    let description = cleanText(overviewItem?.description, 220);
     if (!description) {
       description = buildCharacterGraphNodeDescription(
         name,
@@ -347,10 +353,10 @@ export function buildCharacterGraphPayload(
       name,
       role,
       description,
-      weight: Math.round((Number(aggregateItem.weight) || 0) * 100) / 100,
+      weight: Math.round((Number(aggregateItem?.weight) || 0) * 100) / 100,
       sharePercent,
       chapterCount,
-      chapters: (aggregateItem.chapters as number[]) || [],
+      chapters: aggregateItem?.chapters || [],
       isCore: overviewCharacterMap.has(name),
     };
   });
@@ -380,9 +386,9 @@ export function buildCharacterGraphPayload(
 }
 
 function selectCharacterGraphNames(
-  allCharacterStats: Array<Record<string, unknown>>,
-  overviewCharacterStats: Array<Record<string, unknown>>,
-  relationshipGraph: Array<Record<string, unknown>>,
+  allCharacterStats: ReadonlyArray<Pick<AggregatedCharacterStat, 'name'>>,
+  overviewCharacterStats: ReadonlyArray<Pick<SerializedOverview['characterStats'][number], 'name'>>,
+  relationshipGraph: ReadonlyArray<Pick<AggregatedRelationshipGraphEdge, 'source' | 'target'>>,
   limit = 14,
 ): string[] {
   const orderedNames: string[] = [];
@@ -393,19 +399,26 @@ function selectCharacterGraphNames(
   };
 
   for (const item of overviewCharacterStats.slice(0, 8)) {
-    if (typeof item === 'object' && item !== null) append((item as Record<string, unknown>).name);
+    append(item.name);
   }
   for (const edge of relationshipGraph) {
     if (orderedNames.length >= limit) break;
-    if (typeof edge !== 'object' || edge === null) continue;
-    append((edge as Record<string, unknown>).source);
-    append((edge as Record<string, unknown>).target);
+    append(edge.source);
+    append(edge.target);
   }
   for (const item of allCharacterStats) {
     if (orderedNames.length >= limit) break;
-    if (typeof item === 'object' && item !== null) append((item as Record<string, unknown>).name);
+    append(item.name);
   }
   return orderedNames;
+}
+
+interface RelatedCharacterEdge {
+  relationTags: string[];
+  source: string;
+  target: string;
+  type: string;
+  weight: number;
 }
 
 function buildCharacterGraphNodeDescription(
@@ -413,7 +426,7 @@ function buildCharacterGraphNodeDescription(
   role: string,
   sharePercent: number,
   _chapterCount: number,
-  relatedEdges: Array<Record<string, unknown>>,
+  relatedEdges: RelatedCharacterEdge[],
 ): string {
   const counterpartNames: string[] = [];
   const relationTags: string[] = [];

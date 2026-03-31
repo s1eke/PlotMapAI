@@ -8,7 +8,6 @@ describe('readerApi', () => {
     await db.open();
     // Seed a novel
     await db.novels.add({
-      id: undefined as unknown as number,
       title: 'Reader Novel',
       author: 'Author',
       description: '',
@@ -24,9 +23,9 @@ describe('readerApi', () => {
     const novel = await db.novels.orderBy('id').last();
     const novelId = novel!.id;
     await db.chapters.bulkAdd([
-      { id: undefined as unknown as number, novelId, title: 'Ch1', content: 'Content one', chapterIndex: 0, wordCount: 11 },
-      { id: undefined as unknown as number, novelId, title: 'Ch2', content: 'Content two', chapterIndex: 1, wordCount: 11 },
-      { id: undefined as unknown as number, novelId, title: 'Ch3', content: 'Content three', chapterIndex: 2, wordCount: 13 },
+      { novelId, title: 'Ch1', content: 'Content one', chapterIndex: 0, wordCount: 11 },
+      { novelId, title: 'Ch2', content: 'Content two', chapterIndex: 1, wordCount: 11 },
+      { novelId, title: 'Ch3', content: 'Content three', chapterIndex: 2, wordCount: 13 },
     ]);
   });
 
@@ -123,7 +122,6 @@ describe('readerApi', () => {
     const novelId = await getNovelId();
     const blob = new Blob(['chapter-image'], { type: 'image/png' });
     await db.chapterImages.add({
-      id: undefined as unknown as number,
       novelId,
       imageKey: 'cover',
       blob,
@@ -138,7 +136,6 @@ describe('readerApi', () => {
     const novelId = await getNovelId();
     await db.novelImageGalleryEntries.bulkAdd([
       {
-        id: undefined as unknown as number,
         novelId,
         chapterIndex: 1,
         blockIndex: 5,
@@ -146,7 +143,6 @@ describe('readerApi', () => {
         order: 1,
       },
       {
-        id: undefined as unknown as number,
         novelId,
         chapterIndex: 0,
         blockIndex: 3,
@@ -154,7 +150,6 @@ describe('readerApi', () => {
         order: 0,
       },
       {
-        id: undefined as unknown as number,
         novelId,
         chapterIndex: 1,
         blockIndex: 2,
@@ -178,7 +173,6 @@ describe('loadAndPurifyChapters', () => {
     await db.delete();
     await db.open();
     await db.novels.add({
-      id: undefined as unknown as number,
       title: 'Purify Novel',
       author: '',
       description: '',
@@ -193,7 +187,6 @@ describe('loadAndPurifyChapters', () => {
     });
     const novel = await db.novels.orderBy('id').last();
     await db.chapters.add({
-      id: undefined as unknown as number,
       novelId: novel!.id,
       title: 'Chapter One',
       content: 'Hello world',
@@ -212,7 +205,6 @@ describe('loadAndPurifyChapters', () => {
 
   it('applies purification rules when enabled', async () => {
     await db.purificationRules.add({
-      id: undefined as unknown as number,
       externalId: null,
       name: 'Replace Hello',
       group: 'test',
@@ -236,7 +228,6 @@ describe('loadAndPurifyChapters', () => {
 
   it('does not apply disabled rules', async () => {
     await db.purificationRules.add({
-      id: undefined as unknown as number,
       externalId: null,
       name: 'Disabled Rule',
       group: 'test',
@@ -261,7 +252,6 @@ describe('loadAndPurifyChapters', () => {
   it('respects order precedence for mutually exclusive rules', async () => {
     await db.purificationRules.bulkAdd([
       {
-        id: undefined as unknown as number,
         externalId: null,
         name: 'Indent Two',
         group: 'formatting',
@@ -280,7 +270,6 @@ describe('loadAndPurifyChapters', () => {
         createdAt: new Date().toISOString(),
       },
       {
-        id: undefined as unknown as number,
         externalId: null,
         name: 'Flush Left',
         group: 'formatting',

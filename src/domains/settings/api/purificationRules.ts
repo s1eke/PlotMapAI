@@ -53,7 +53,6 @@ export const purificationRulesApi = {
     }
     const now = new Date().toISOString();
     const id = await db.purificationRules.add({
-      id: undefined as unknown as number,
       externalId: null,
       name: data.name,
       group: data.group || 'Purification',
@@ -180,7 +179,6 @@ export const purificationRulesApi = {
       }
       existingKeys.add(key);
       await db.purificationRules.add({
-        id: undefined as unknown as number,
         externalId: null,
         name,
         group: (rule.group as string) || 'Purification',

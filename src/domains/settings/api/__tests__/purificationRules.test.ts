@@ -52,7 +52,6 @@ describe('purificationRulesApi', () => {
 
   it('deletePurificationRule rejects default rules', async () => {
     const id = await db.purificationRules.add({
-      id: undefined as unknown as number,
       externalId: 1,
       name: 'Default Rule',
       group: 'Purification',

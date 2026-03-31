@@ -93,7 +93,6 @@ export const bookImportApi = {
       ],
       async () => {
         novelId = await db.novels.add({
-          id: undefined as unknown as number,
           title: parsed.title,
           author: parsed.author,
           description: parsed.description,
@@ -108,13 +107,11 @@ export const bookImportApi = {
         });
         if (parsed.coverBlob) {
           await db.coverImages.add({
-            id: undefined as unknown as number,
             novelId,
             blob: parsed.coverBlob,
           });
         }
         await db.chapters.bulkAdd(parsed.chapters.map((chapter, chapterIndex) => ({
-          id: undefined as unknown as number,
           novelId,
           title: chapter.title,
           content: chapter.content,
@@ -123,7 +120,6 @@ export const bookImportApi = {
         })));
         if (parsed.images.length > 0) {
           await db.chapterImages.bulkAdd(parsed.images.map((image) => ({
-            id: undefined as unknown as number,
             novelId,
             imageKey: image.imageKey,
             blob: image.blob,
@@ -131,7 +127,6 @@ export const bookImportApi = {
         }
         if (imageGalleryEntries.length > 0) {
           await db.novelImageGalleryEntries.bulkAdd(imageGalleryEntries.map((entry) => ({
-            id: undefined as unknown as number,
             novelId,
             chapterIndex: entry.chapterIndex,
             blockIndex: entry.blockIndex,

@@ -56,7 +56,6 @@ describe('tocRulesApi', () => {
 
   it('deleteTocRule throws for default rules', async () => {
     await db.tocRules.add({
-      id: undefined as unknown as number,
       name: 'Default',
       rule: '^def',
       example: '',

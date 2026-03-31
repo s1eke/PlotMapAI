@@ -98,7 +98,6 @@ function createChunkRow(
   status: 'pending' | 'running' | 'completed' | 'failed',
 ) {
   return {
-    id: undefined as unknown as number,
     novelId,
     chunkIndex,
     startChapterIndex: chapterIndices[0],
@@ -113,7 +112,6 @@ function createChunkRow(
 
 function createChapterAnalysisRow(novelId: number, chapterIndex: number, chunkIndex: number) {
   return {
-    id: undefined as unknown as number,
     novelId,
     chapterIndex,
     chapterTitle: `Chapter ${chapterIndex + 1}`,
@@ -129,7 +127,6 @@ function createChapterAnalysisRow(novelId: number, chapterIndex: number, chunkIn
 
 function createOverviewRow(novelId: number, totalChapters: number) {
   return {
-    id: undefined as unknown as number,
     novelId,
     bookIntro: 'intro',
     globalSummary: 'summary',
@@ -243,7 +240,6 @@ describe('analysis runtime orchestrator', () => {
   it('resumeAnalysis resets failed, running, and incomplete completed chunks back to pending', async () => {
     await seedNovelAndChapters(1, 4);
     await currentDb.analysisJobs.add({
-      id: undefined as unknown as number,
       novelId: 1,
       status: 'paused',
       totalChapters: 4,
@@ -279,7 +275,6 @@ describe('analysis runtime orchestrator', () => {
   it('restartAnalysis clears previous results and recreates the plan from scratch', async () => {
     await seedNovelAndChapters();
     await currentDb.analysisJobs.add({
-      id: undefined as unknown as number,
       novelId: 1,
       status: 'paused',
       totalChapters: 2,
@@ -313,7 +308,6 @@ describe('analysis runtime orchestrator', () => {
   it('refreshOverview clears only the overview and reuses completed chunk results', async () => {
     await seedNovelAndChapters();
     await currentDb.analysisJobs.add({
-      id: undefined as unknown as number,
       novelId: 1,
       status: 'completed',
       totalChapters: 2,
@@ -353,7 +347,6 @@ describe('analysis runtime orchestrator', () => {
     await seedNovelAndChapters();
     await currentDb.analysisJobs.bulkAdd([
       {
-        id: undefined as unknown as number,
         novelId: 1,
         status: 'running',
         totalChapters: 2,
@@ -369,7 +362,6 @@ describe('analysis runtime orchestrator', () => {
         updatedAt: new Date().toISOString(),
       },
       {
-        id: undefined as unknown as number,
         novelId: 2,
         status: 'pausing',
         totalChapters: 1,

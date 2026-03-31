@@ -20,7 +20,6 @@ vi.mock('../../api/readerApi', () => ({
 describe('readerImageResourceCache', () => {
   const originalCreateObjectURL = URL.createObjectURL;
   const originalRevokeObjectURL = URL.revokeObjectURL;
-  const originalImage = globalThis.Image;
 
   beforeEach(() => {
     vi.useFakeTimers();
@@ -30,22 +29,22 @@ describe('readerImageResourceCache', () => {
     URL.createObjectURL = vi.fn((blob: Blob) => `blob:${blob.size}`) as typeof URL.createObjectURL;
     URL.revokeObjectURL = vi.fn() as typeof URL.revokeObjectURL;
 
-    globalThis.Image = class {
+    vi.stubGlobal('Image', class {
       src = '';
 
       decode() {
         return Promise.resolve();
       }
-    } as unknown as typeof Image;
+    });
   });
 
   afterEach(() => {
     resetReaderImageResourceCacheForTests();
     vi.runOnlyPendingTimers();
     vi.useRealTimers();
+    vi.unstubAllGlobals();
     URL.createObjectURL = originalCreateObjectURL;
     URL.revokeObjectURL = originalRevokeObjectURL;
-    globalThis.Image = originalImage;
   });
 
   it('reuses one object URL for concurrent acquisitions and revokes it after the last release', async () => {
@@ -103,7 +102,7 @@ describe('readerImageResourceCache', () => {
     const decodePromise = new Promise<void>((resolve) => {
       resolveDecode = resolve;
     });
-    globalThis.Image = class {
+    vi.stubGlobal('Image', class {
       naturalWidth = 120;
       naturalHeight = 60;
       src = '';
@@ -111,7 +110,7 @@ describe('readerImageResourceCache', () => {
       decode() {
         return decodePromise;
       }
-    } as unknown as typeof Image;
+    });
 
     const preloadPromise = preloadReaderImageResources(1, ['hero']);
     await Promise.resolve();
@@ -132,7 +131,7 @@ describe('readerImageResourceCache', () => {
     vi.mocked(readerApi.getImageBlob).mockResolvedValue(new Blob(['image-data']));
 
     let srcAssignments = 0;
-    globalThis.Image = class {
+    vi.stubGlobal('Image', class {
       naturalWidth = 200;
       naturalHeight = 100;
       onerror: (() => void) | null = null;
@@ -148,7 +147,7 @@ describe('readerImageResourceCache', () => {
           this.onload?.();
         });
       }
-    } as unknown as typeof Image;
+    });
 
     await preloadReaderImageResources(1, ['hero']);
 
