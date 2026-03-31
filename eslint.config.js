@@ -7,6 +7,16 @@ export default defineConfig([
   ...aliReact,
   reactRefresh.configs.vite,
   {
+    files: ['src/**/__tests__/**/*.{ts,tsx}', 'src/test/**/*.{ts,tsx}', 'vitest.config.ts'],
+    languageOptions: {
+      parserOptions: {
+        project: ['./tsconfig.eslint.json'],
+        projectService: false,
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+  },
+  {
     files: ['src/**/*.{ts,tsx}'],
     ignores: [
       'src/infra/storage/**',
