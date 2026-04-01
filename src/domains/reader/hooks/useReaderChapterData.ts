@@ -10,6 +10,7 @@ import {
   createRestoreTargetFromNavigationIntent,
   createRestoreTargetFromPersistedState,
 } from '../utils/readerPosition';
+import { isPagedReaderMode } from '../utils/readerMode';
 import {
   areReaderImageResourcesReady,
   preloadReaderImageResources,
@@ -17,6 +18,7 @@ import {
 import type { ChapterChangeSource } from './navigationTypes';
 import type {
   ReaderNavigationIntent,
+  ReaderMode,
   ReaderRestoreTarget,
   StoredReaderState,
 } from './useReaderStatePersistence';
@@ -31,9 +33,7 @@ export interface ReaderHydrateDataResult {
 
 export interface ReaderLoadActiveChapterParams {
   chapterIndex: number;
-  isPagedMode: boolean;
-  isTwoColumn: boolean;
-  viewMode: 'original' | 'summary';
+  mode: ReaderMode;
 }
 
 export interface ReaderLoadActiveChapterResult {
@@ -41,13 +41,9 @@ export interface ReaderLoadActiveChapterResult {
 }
 
 interface UseReaderChapterDataParams {
-  isPagedMode: boolean;
-  setCurrentChapterWindow: React.Dispatch<React.SetStateAction<number[]>>;
+  mode: ReaderMode;
   setChapterIndex: React.Dispatch<React.SetStateAction<number>>;
-  setViewMode: React.Dispatch<React.SetStateAction<'original' | 'summary'>>;
-  setIsTwoColumn: React.Dispatch<React.SetStateAction<boolean>>;
-  setPageIndex: React.Dispatch<React.SetStateAction<number>>;
-  setPageCount: React.Dispatch<React.SetStateAction<number>>;
+  setMode: React.Dispatch<React.SetStateAction<ReaderMode>>;
   chapterChangeSourceRef: React.MutableRefObject<ChapterChangeSource>;
   suppressScrollSyncTemporarily: () => void;
   onChapterContentResolved?: (chapterIndex: number) => void;
@@ -74,13 +70,9 @@ export interface UseReaderChapterDataResult {
 }
 
 export function useReaderChapterData({
-  isPagedMode,
-  setCurrentChapterWindow,
+  mode,
   setChapterIndex,
-  setViewMode,
-  setIsTwoColumn,
-  setPageIndex,
-  setPageCount,
+  setMode,
   chapterChangeSourceRef,
   suppressScrollSyncTemporarily,
   onChapterContentResolved,
@@ -127,7 +119,7 @@ export function useReaderChapterData({
   }, []);
 
   const warmChapterImages = useCallback(async (chapter: ChapterContent): Promise<void> => {
-    if (!isPagedMode) {
+    if (!isPagedReaderMode(mode)) {
       return;
     }
 
@@ -137,7 +129,7 @@ export function useReaderChapterData({
     }
 
     await preloadReaderImageResources(novelId, imageKeys);
-  }, [getChapterImageKeys, isPagedMode, novelId]);
+  }, [getChapterImageKeys, mode, novelId]);
 
   const clearScheduledPreloads = useCallback(() => {
     preloadTimeoutIdsRef.current.forEach((timeoutId) => {
@@ -206,7 +198,7 @@ export function useReaderChapterData({
         })
           .then((data) => {
             chapterCacheRef.current.set(adjacentIndex, data);
-            if (!isPagedMode) {
+            if (!isPagedReaderMode(mode)) {
               onChapterContentResolved?.(adjacentIndex);
               return;
             }
@@ -234,24 +226,11 @@ export function useReaderChapterData({
     chapterCacheRef,
     chapters.length,
     clearScheduledPreloads,
-    isPagedMode,
+    mode,
     novelId,
     onChapterContentResolved,
     warmChapterImages,
   ]);
-
-  const updateChapterWindow = useCallback((nextWindow: number[]) => {
-    setCurrentChapterWindow((previousWindow) => {
-      if (
-        previousWindow.length === nextWindow.length
-        && previousWindow.every((index, position) => index === nextWindow[position])
-      ) {
-        return previousWindow;
-      }
-
-      return nextWindow;
-    });
-  }, [setCurrentChapterWindow]);
 
   const resetReaderContent = useCallback(() => {
     abortHydrationRequest();
@@ -266,9 +245,6 @@ export function useReaderChapterData({
     setCurrentChapter(null);
     setReaderError(null);
     setLoadingMessage(null);
-    updateChapterWindow([]);
-    setPageIndex(0);
-    setPageCount(1);
     wheelAccumulatorRef.current = 0;
     pageTurnLockRef.current = false;
   }, [
@@ -279,9 +255,6 @@ export function useReaderChapterData({
     clearScheduledPreloads,
     pageTargetRef,
     pageTurnLockRef,
-    setPageCount,
-    setPageIndex,
-    updateChapterWindow,
     userInteractedRef,
     wheelAccumulatorRef,
   ]);
@@ -301,8 +274,7 @@ export function useReaderChapterData({
 
       const nextStoredState: StoredReaderState = {
         chapterIndex: storedState.chapterIndex ?? 0,
-        viewMode: storedState.viewMode ?? 'original',
-        isTwoColumn: storedState.isTwoColumn ?? false,
+        mode: storedState.mode ?? 'scroll',
         chapterProgress: storedState.chapterProgress,
         scrollPosition: storedState.scrollPosition,
         locatorVersion: storedState.locator ? 1 : undefined,
@@ -310,8 +282,7 @@ export function useReaderChapterData({
       };
 
       latestStoredStateRef.current = nextStoredState;
-      setViewMode(nextStoredState.viewMode ?? 'original');
-      setIsTwoColumn(nextStoredState.isTwoColumn ?? false);
+      setMode(nextStoredState.mode ?? 'scroll');
       setChapterIndex(nextStoredState.chapterIndex ?? 0);
 
       const toc = await readerApi.getChapters(novelId, {
@@ -347,14 +318,13 @@ export function useReaderChapterData({
 
       const fallbackIndex = toc[0]?.index ?? 0;
       const nextChapterIndex = nextStoredState.chapterIndex ?? fallbackIndex;
-      const nextViewMode = nextStoredState.viewMode ?? 'original';
+      const nextMode = nextStoredState.mode ?? 'scroll';
       const hasChapter = toc.some((chapter) => chapter.index === nextChapterIndex);
       const resolvedChapterIndex = hasChapter ? nextChapterIndex : fallbackIndex;
 
       const resolvedState: StoredReaderState = {
         chapterIndex: resolvedChapterIndex,
-        viewMode: nextViewMode,
-        isTwoColumn: nextStoredState.isTwoColumn,
+        mode: nextMode,
         chapterProgress: hasChapter ? nextStoredState.chapterProgress : 0,
         scrollPosition: hasChapter ? nextStoredState.scrollPosition : undefined,
         locatorVersion: hasChapter && nextStoredState.locator ? 1 : undefined,
@@ -362,8 +332,7 @@ export function useReaderChapterData({
       };
 
       latestStoredStateRef.current = resolvedState;
-      setViewMode(nextViewMode);
-      setIsTwoColumn(resolvedState.isTwoColumn ?? false);
+      setMode(nextMode);
       setChapterIndex(resolvedChapterIndex);
       setLoadingMessage(null);
 
@@ -395,8 +364,7 @@ export function useReaderChapterData({
     loadPersistedReaderState,
     novelId,
     setChapterIndex,
-    setIsTwoColumn,
-    setViewMode,
+    setMode,
     t,
     userInteractedRef,
   ]);
@@ -410,8 +378,7 @@ export function useReaderChapterData({
     }
 
     if (
-      !params.isPagedMode &&
-      params.viewMode === 'original' &&
+      params.mode === 'scroll' &&
       chapterSourceRef.current === 'scroll'
     ) {
       chapterSourceRef.current = null;
@@ -422,25 +389,6 @@ export function useReaderChapterData({
     abortActiveChapterRequest();
     const controller = new AbortController();
     activeChapterControllerRef.current = controller;
-
-    const initScrollModeWindow = (activeChapterIndex: number) => {
-      const nextWindow: number[] = [];
-      for (let index = activeChapterIndex - 2; index <= activeChapterIndex + 2; index += 1) {
-        if (index >= 0 && index < chapters.length) {
-          nextWindow.push(index);
-        }
-      }
-      updateChapterWindow(nextWindow);
-      nextWindow.forEach((windowIndex) => {
-        if (!chapterCacheRef.current.has(windowIndex)) {
-          fetchChapterContent(windowIndex)
-            .then((data) => {
-              chapterCacheRef.current.set(windowIndex, data);
-            })
-            .catch(() => {});
-        }
-      });
-    };
 
     const resetViewportPosition = () => {
       suppressScrollSyncTemporarily();
@@ -455,20 +403,13 @@ export function useReaderChapterData({
       }
     };
 
-    const resetChapterInteractionState = () => {
-      setPageIndex(0);
-      setPageCount(1);
-      wheelAccumulatorRef.current = 0;
-      pageTurnLockRef.current = false;
-    };
-
     const shouldRestoreNavigatedChapter = chapterSourceRef.current === 'navigation'
-      && params.viewMode === 'original';
+      && params.mode !== 'summary';
 
     const applyCurrentChapter = async (
       chapter: ChapterContent,
     ): Promise<ReaderLoadActiveChapterResult> => {
-      if (params.isPagedMode) {
+      if (params.mode === 'paged') {
         await warmChapterImages(chapter).catch(() => undefined);
       }
       if (controller.signal.aborted) {
@@ -477,19 +418,14 @@ export function useReaderChapterData({
 
       setCurrentChapter(chapter);
       onChapterContentResolved?.(params.chapterIndex);
-      resetChapterInteractionState();
-      if (params.viewMode === 'original' && !params.isPagedMode) {
-        initScrollModeWindow(params.chapterIndex);
-      }
+      wheelAccumulatorRef.current = 0;
+      pageTurnLockRef.current = false;
 
       const navigationRestoreTarget = shouldRestoreNavigatedChapter
         ? createRestoreTargetFromNavigationIntent({
           chapterIndex: params.chapterIndex,
           pageTarget: pageTargetRef.current === 'end' ? 'end' : 'start',
-        } satisfies ReaderNavigationIntent, {
-          viewMode: params.viewMode,
-          isTwoColumn: params.isTwoColumn,
-        })
+        } satisfies ReaderNavigationIntent, params.mode)
         : null;
 
       resetViewportPosition();
@@ -505,7 +441,7 @@ export function useReaderChapterData({
       if (cached) {
         const cachedImageKeys = getChapterImageKeys(cached);
         if (
-          params.isPagedMode &&
+          params.mode === 'paged' &&
           cachedImageKeys.length > 0 &&
           !areReaderImageResourcesReady(novelId, cachedImageKeys)
         ) {
@@ -550,7 +486,6 @@ export function useReaderChapterData({
     chapterCacheRef,
     chapterSourceRef,
     chapters.length,
-    fetchChapterContent,
     getChapterImageKeys,
     novelId,
     onChapterContentResolved,
@@ -559,11 +494,8 @@ export function useReaderChapterData({
     pageTurnLockRef,
     preloadAdjacent,
     readerContentRef,
-    setPageCount,
-    setPageIndex,
     suppressScrollSyncTemporarily,
     t,
-    updateChapterWindow,
     warmChapterImages,
     wheelAccumulatorRef,
   ]);

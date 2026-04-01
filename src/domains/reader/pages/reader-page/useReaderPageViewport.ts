@@ -348,8 +348,7 @@ export function useReaderPageViewport({
 
   const scrollMode = useScrollModeChapters(
     contentRef,
-    isPagedMode,
-    viewMode,
+    !isPagedMode && viewMode === 'original',
     chapters,
     chapterData.fetchChapterContent,
     chapterData.preloadAdjacent,

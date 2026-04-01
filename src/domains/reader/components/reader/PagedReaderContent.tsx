@@ -55,6 +55,7 @@ interface PagedReaderContentProps {
   pageBgClassName?: string;
   pageIndex: number;
   pendingPageTarget?: PageTarget | null;
+  pagedContentRef?: React.Ref<HTMLDivElement>;
   pagedViewportRef?: React.Ref<HTMLDivElement>;
   pageTurnDirection: PageTurnDirection;
   pageTurnMode: ReaderPageTurnMode;
@@ -157,6 +158,7 @@ function PagedPageFrame({
   pageIndex,
   pageSlice,
   pageCount,
+  pagedContentRef,
   pagedViewportRef,
   readerTheme,
   textClassName,
@@ -171,6 +173,7 @@ function PagedPageFrame({
   pageIndex: number;
   pageSlice: PageSlice;
   pageCount: number;
+  pagedContentRef?: React.Ref<HTMLDivElement>;
   pagedViewportRef?: React.Ref<HTMLDivElement>;
   readerTheme: string;
   textClassName: string;
@@ -205,6 +208,7 @@ function PagedPageFrame({
             style={{ paddingTop: `${PAGED_VIEWPORT_TOP_PADDING_PX}px` }}
           >
             <div
+              ref={pagedContentRef}
               data-testid="paged-reader-content-body"
               className="flex h-full"
               style={{
@@ -260,6 +264,7 @@ export default function PagedReaderContent({
   pageBgClassName,
   pageIndex,
   pendingPageTarget = null,
+  pagedContentRef,
   pagedViewportRef,
   pageTurnDirection,
   pageTurnMode,
@@ -731,6 +736,7 @@ export default function PagedReaderContent({
                 pageCount={currentPreviewTarget.layout.pageSlices.length}
                 pageIndex={effectivePageIndex}
                 pageSlice={currentPreviewTarget.pageSlice}
+                pagedContentRef={pagedContentRef}
                 pagedViewportRef={handlePagedViewportRef}
                 readerTheme={readerTheme}
                 textClassName={textClassName}

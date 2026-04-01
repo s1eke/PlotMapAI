@@ -28,6 +28,10 @@ import {
   createRestoreTargetFromPersistedState,
   shouldKeepReaderRestoreMask,
 } from '../utils/readerPosition';
+import {
+  resolveContentModeFromPageTurnMode,
+  resolveLastContentMode,
+} from '../utils/readerMode';
 import type {
   ReaderMode,
   ReaderRestoreTarget,
@@ -145,10 +149,6 @@ function sanitizeStoredReaderState(raw: unknown): StoredReaderState | null {
   return {
     chapterIndex: typeof parsed.chapterIndex === 'number' ? parsed.chapterIndex : undefined,
     mode,
-    viewMode: parsed.viewMode === 'summary' || parsed.viewMode === 'original'
-      ? parsed.viewMode
-      : undefined,
-    isTwoColumn: typeof parsed.isTwoColumn === 'boolean' ? parsed.isTwoColumn : undefined,
     chapterProgress: clampChapterProgress(typeof parsed.chapterProgress === 'number' ? parsed.chapterProgress : undefined),
     scrollPosition: typeof parsed.scrollPosition === 'number' && Number.isFinite(parsed.scrollPosition)
       ? parsed.scrollPosition
@@ -191,31 +191,17 @@ function readLocalSessionState(novelId: number): LocalReaderSessionSnapshot | nu
 }
 
 function resolveModeFromStoredState(state: StoredReaderState | null | undefined): ReaderMode {
-  if (state?.mode === 'scroll' || state?.mode === 'paged' || state?.mode === 'summary') {
-    return state.mode;
-  }
-  if (state?.viewMode === 'summary') return 'summary';
-  return state?.isTwoColumn ? 'paged' : 'scroll';
+  return state?.mode ?? 'scroll';
 }
 
 function shouldMaskRestore(target: ReaderRestoreTarget | null | undefined): boolean {
   return shouldKeepReaderRestoreMask(target);
 }
 
-function deriveViewState(mode: ReaderMode): Pick<ReaderSessionInternalState, 'mode' | 'viewMode' | 'isTwoColumn'> {
-  return {
-    mode,
-    viewMode: mode === 'summary' ? 'summary' : 'original',
-    isTwoColumn: mode === 'paged',
-  };
-}
-
 function toStoredReaderState(state: ReaderSessionInternalState): StoredReaderState {
   return {
     chapterIndex: state.chapterIndex,
     mode: state.mode,
-    viewMode: state.viewMode,
-    isTwoColumn: state.isTwoColumn,
     chapterProgress: clampChapterProgress(state.chapterProgress),
     scrollPosition: typeof state.scrollPosition === 'number' && Number.isFinite(state.scrollPosition)
       ? state.scrollPosition
@@ -228,12 +214,9 @@ function toStoredReaderState(state: ReaderSessionInternalState): StoredReaderSta
 
 function buildStoredReaderState(state: StoredReaderState | null | undefined): StoredReaderState {
   const mode = resolveModeFromStoredState(state);
-  const viewState = deriveViewState(mode);
   return {
     chapterIndex: state?.chapterIndex ?? 0,
     mode,
-    viewMode: viewState.viewMode,
-    isTwoColumn: viewState.isTwoColumn,
     chapterProgress: clampChapterProgress(state?.chapterProgress),
     scrollPosition: typeof state?.scrollPosition === 'number' && Number.isFinite(state.scrollPosition)
       ? state.scrollPosition
@@ -251,10 +234,7 @@ function mergeStoredReaderState(
   const prefersLegacyScrollPosition = overrideState?.chapterProgress === undefined
     && typeof overrideState?.scrollPosition === 'number'
     && Number.isFinite(overrideState.scrollPosition);
-  const mode = overrideState?.mode
-    ?? (overrideState?.viewMode || overrideState?.isTwoColumn !== undefined
-      ? resolveModeFromStoredState(overrideState)
-      : baseState?.mode ?? resolveModeFromStoredState(baseState));
+  const mode = overrideState?.mode ?? baseState?.mode ?? resolveModeFromStoredState(baseState);
   const shouldResetLocator = overrideState?.locator === undefined && (
     (typeof overrideState?.chapterIndex === 'number' && overrideState.chapterIndex !== baseState?.chapterIndex)
     || overrideState?.chapterProgress !== undefined
@@ -264,8 +244,6 @@ function mergeStoredReaderState(
   return buildStoredReaderState({
     chapterIndex: overrideState?.chapterIndex ?? baseState?.chapterIndex,
     mode,
-    viewMode: overrideState?.viewMode ?? baseState?.viewMode,
-    isTwoColumn: overrideState?.isTwoColumn ?? baseState?.isTwoColumn,
     chapterProgress: prefersLegacyScrollPosition
       ? undefined
       : overrideState?.chapterProgress ?? baseState?.chapterProgress,
@@ -282,9 +260,8 @@ function getRemoteProgressSnapshot(progress: ReadingProgress): string {
   return JSON.stringify({
     chapterIndex: progress.chapterIndex,
     scrollPosition: progress.scrollPosition,
-    viewMode: progress.viewMode,
+    mode: progress.mode,
     chapterProgress: clampChapterProgress(progress.chapterProgress) ?? 0,
-    isTwoColumn: progress.isTwoColumn ?? false,
     locatorVersion: progress.locatorVersion === 1 ? 1 : undefined,
     locator: progress.locator ?? null,
   });
@@ -296,34 +273,15 @@ function toRemoteProgress(state: ReaderSessionInternalState): ReadingProgress {
     scrollPosition: typeof state.scrollPosition === 'number' && Number.isFinite(state.scrollPosition)
       ? state.scrollPosition
       : 0,
-    viewMode: state.viewMode,
+    mode: state.mode,
     chapterProgress: clampChapterProgress(state.chapterProgress) ?? 0,
-    isTwoColumn: state.isTwoColumn,
     locatorVersion: state.locator ? 1 : undefined,
     locator: state.locator,
   };
 }
 
-function resolveLastContentMode(
-  mode: ReaderMode,
-  fallbackMode: 'scroll' | 'paged',
-): 'scroll' | 'paged' {
-  if (mode === 'summary') return fallbackMode;
-  if (mode === 'paged') return 'paged';
-  return 'scroll';
-}
-
-function resolveReaderModeFromView(
-  currentViewMode: 'summary' | 'original',
-  pageTurnMode: ReaderPageTurnMode,
-): ReaderMode {
-  if (currentViewMode === 'summary') return 'summary';
-  if (isPagedPageTurnMode(pageTurnMode)) return 'paged';
-  return 'scroll';
-}
-
 function inferLegacyPageTurnMode(state: StoredReaderState | null | undefined): ReaderPageTurnMode {
-  return state?.isTwoColumn === true || state?.mode === 'paged' || state?.lastContentMode === 'paged'
+  return state?.mode === 'paged' || state?.lastContentMode === 'paged'
     ? 'cover'
     : 'scroll';
 }
@@ -332,7 +290,7 @@ function createInitialReaderSessionState(): ReaderSessionInternalState {
   const mode: ReaderMode = 'scroll';
   return {
     novelId: 0,
-    ...deriveViewState(mode),
+    mode,
     chapterIndex: 0,
     chapterProgress: undefined,
     scrollPosition: undefined,
@@ -415,12 +373,11 @@ function updateStoredReaderState(
   const currentState = readerSessionStore.getState();
   const merged = mergeStoredReaderState(toStoredReaderState(currentState), nextState);
   const mode = resolveModeFromStoredState(merged);
-  const viewState = deriveViewState(mode);
   const nextLastContentMode = merged.lastContentMode
     ?? resolveLastContentMode(mode, currentState.lastContentMode);
 
   setReaderSessionStoreState({
-    ...viewState,
+    mode,
     chapterIndex: merged.chapterIndex ?? 0,
     chapterProgress: clampChapterProgress(merged.chapterProgress),
     scrollPosition: typeof merged.scrollPosition === 'number' && Number.isFinite(merged.scrollPosition)
@@ -483,8 +440,6 @@ export async function hydrateSession(novelId: number): Promise<StoredReaderState
     locatorVersion: undefined,
     locator: undefined,
     mode: 'scroll',
-    viewMode: 'original',
-    isTwoColumn: false,
     lastContentMode: 'scroll',
   }, { writeCache: false });
 
@@ -509,9 +464,8 @@ export async function hydrateSession(novelId: number): Promise<StoredReaderState
       setLastSyncedRemoteSnapshot(getRemoteProgressSnapshot({
         chapterIndex: progress.chapterIndex ?? 0,
         scrollPosition: progress.scrollPosition ?? 0,
-        viewMode: progress.viewMode ?? 'original',
+        mode: progress.mode ?? 'scroll',
         chapterProgress: progress.chapterProgress,
-        isTwoColumn: progress.isTwoColumn,
         locatorVersion: progress.locatorVersion,
         locator: progress.locator,
       }));
@@ -526,12 +480,10 @@ export async function hydrateSession(novelId: number): Promise<StoredReaderState
 
   const preferences = getReaderPreferencesSnapshot();
   const mergedState = mergeStoredReaderState(remoteState, localState);
-  const currentViewMode =
-    mergedState.viewMode ?? (mergedState.mode === 'summary' ? 'summary' : 'original');
   const resolvedPageTurnMode = hadConfiguredPageTurnModePreference
     ? preferences.pageTurnMode
     : inferLegacyPageTurnMode(mergedState);
-  const mode = resolveReaderModeFromView(currentViewMode, resolvedPageTurnMode);
+  const mode = mergedState.mode ?? resolveContentModeFromPageTurnMode(resolvedPageTurnMode);
   const nextLastContentMode = resolveLastContentMode(
     mode,
     isPagedPageTurnMode(resolvedPageTurnMode) ? 'paged' : 'scroll',
@@ -547,7 +499,7 @@ export async function hydrateSession(novelId: number): Promise<StoredReaderState
 
   setReaderSessionStoreState({
     novelId,
-    ...deriveViewState(mode),
+    mode,
     chapterIndex: mergedState.chapterIndex ?? 0,
     chapterProgress: clampChapterProgress(mergedState.chapterProgress),
     scrollPosition: typeof mergedState.scrollPosition === 'number' && Number.isFinite(mergedState.scrollPosition)
@@ -563,8 +515,6 @@ export async function hydrateSession(novelId: number): Promise<StoredReaderState
   return buildStoredReaderState({
     ...mergedState,
     mode,
-    viewMode: currentViewMode,
-    isTwoColumn: mode === 'paged',
     lastContentMode: nextLastContentMode,
   });
 }

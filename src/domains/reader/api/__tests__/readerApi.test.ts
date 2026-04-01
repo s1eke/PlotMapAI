@@ -76,9 +76,9 @@ describe('readerApi', () => {
     const progress = await readerApi.getProgress(novelId);
     expect(progress.chapterIndex).toBe(0);
     expect(progress.scrollPosition).toBe(0);
-    expect(progress.viewMode).toBe('original');
+    expect(progress.mode).toBe('scroll');
     expect(progress.chapterProgress).toBe(0);
-    expect(progress.isTwoColumn).toBe(false);
+    expect(progress.locatorVersion).toBe(1);
   });
 
   it('saveProgress creates and updates progress', async () => {
@@ -86,16 +86,14 @@ describe('readerApi', () => {
     await readerApi.saveProgress(novelId, {
       chapterIndex: 2,
       scrollPosition: 500,
-      viewMode: 'summary',
+      mode: 'summary',
       chapterProgress: 0.6,
-      isTwoColumn: true,
     });
     const progress = await readerApi.getProgress(novelId);
     expect(progress.chapterIndex).toBe(2);
     expect(progress.scrollPosition).toBe(500);
-    expect(progress.viewMode).toBe('summary');
+    expect(progress.mode).toBe('summary');
     expect(progress.chapterProgress).toBe(0.6);
-    expect(progress.isTwoColumn).toBe(true);
   });
 
   it('saveProgress updates existing progress', async () => {

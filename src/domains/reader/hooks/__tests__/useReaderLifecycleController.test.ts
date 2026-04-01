@@ -1,8 +1,11 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
+import type {
+  ReaderHydrateDataResult,
+  ReaderLoadActiveChapterResult,
+} from '../useReaderChapterData';
 import { useReaderLifecycleController } from '../useReaderLifecycleController';
-import type { ReaderHydrateDataResult, ReaderLoadActiveChapterResult } from '../useReaderChapterData';
 import type { ReaderRestoreTarget, StoredReaderState } from '../useReaderStatePersistence';
 
 function createDeferred<T>() {
@@ -19,18 +22,25 @@ function createDeferred<T>() {
 function createStoredState(overrides: StoredReaderState = {}): StoredReaderState {
   return {
     chapterIndex: 1,
-    viewMode: 'original',
-    isTwoColumn: false,
+    mode: 'scroll',
+    chapterProgress: undefined,
+    scrollPosition: undefined,
+    lastContentMode: 'scroll',
+    locatorVersion: undefined,
+    locator: undefined,
     ...overrides,
   };
 }
 
-function createRestoreTarget(overrides: Partial<ReaderRestoreTarget> = {}): ReaderRestoreTarget {
+function createRestoreTarget(
+  overrides: Partial<ReaderRestoreTarget> = {},
+): ReaderRestoreTarget {
   return {
     chapterIndex: 1,
-    viewMode: 'original',
-    isTwoColumn: false,
+    mode: 'scroll',
     chapterProgress: 0.4,
+    locatorVersion: undefined,
+    locator: undefined,
     ...overrides,
   };
 }
@@ -53,7 +63,9 @@ function createChapterContent(index: number) {
   };
 }
 
-function createProps(overrides: Partial<Parameters<typeof useReaderLifecycleController>[0]> = {}) {
+function createProps(
+  overrides: Partial<Parameters<typeof useReaderLifecycleController>[0]> = {},
+) {
   const hydrateReaderData = vi.fn<() => Promise<ReaderHydrateDataResult>>(async () => ({
     hasChapters: true,
     initialRestoreTarget: null,
@@ -72,9 +84,7 @@ function createProps(overrides: Partial<Parameters<typeof useReaderLifecycleCont
   return {
     novelId: 1,
     chapterIndex: 1,
-    viewMode: 'original' as const,
-    isTwoColumn: false,
-    isPagedMode: false,
+    mode: 'scroll' as const,
     currentPagedLayoutChapterIndex: null,
     chapterData: {
       chapters: [createChapter(1)],
@@ -140,14 +150,15 @@ describe('useReaderLifecycleController', () => {
       hydrateDeferred.resolve({
         hasChapters: true,
         initialRestoreTarget: restoreTarget,
-        resolvedState: createStoredState({ chapterIndex: 2 }),
-        storedState: createStoredState({ chapterIndex: 2 }),
+        resolvedState: createStoredState({ chapterIndex: 2, mode: 'scroll' }),
+        storedState: createStoredState({ chapterIndex: 2, mode: 'scroll' }),
       });
       await Promise.resolve();
     });
 
     rerender(createProps({
       chapterIndex: 2,
+      mode: 'scroll',
       chapterData: {
         chapters: [createChapter(2)],
         currentChapter: null,
@@ -169,9 +180,7 @@ describe('useReaderLifecycleController', () => {
     await waitFor(() => {
       expect(loadActiveChapter).toHaveBeenCalledWith({
         chapterIndex: 2,
-        viewMode: 'original',
-        isTwoColumn: false,
-        isPagedMode: false,
+        mode: 'scroll',
       });
     });
 
@@ -179,26 +188,6 @@ describe('useReaderLifecycleController', () => {
       loadDeferred.resolve({ navigationRestoreTarget: null });
       await Promise.resolve();
     });
-
-    rerender(createProps({
-      chapterIndex: 2,
-      chapterData: {
-        chapters: [createChapter(2)],
-        currentChapter: createChapterContent(2),
-        loadingMessage: null,
-        readerError: null,
-        hydrateReaderData,
-        loadActiveChapter,
-        resetReaderContent: vi.fn(),
-      },
-      restoreFlow: {
-        pendingRestoreTarget: restoreTarget,
-        clearPendingRestoreTarget: vi.fn(),
-        setPendingRestoreTarget,
-        startRestoreMaskForTarget,
-        stopRestoreMask: vi.fn(),
-      },
-    }));
 
     await waitFor(() => {
       expect(result.current.lifecycleStatus).toBe('restoring-position');
@@ -223,8 +212,7 @@ describe('useReaderLifecycleController', () => {
     const { rerender } = renderHook(useReaderLifecycleController, {
       initialProps: createProps({
         chapterIndex: 0,
-        isTwoColumn: false,
-        isPagedMode: false,
+        mode: 'scroll',
         chapterData: {
           chapters: [],
           currentChapter: null,
@@ -243,13 +231,13 @@ describe('useReaderLifecycleController', () => {
         initialRestoreTarget: null,
         resolvedState: createStoredState({
           chapterIndex: 2,
-          viewMode: 'original',
-          isTwoColumn: true,
+          mode: 'paged',
+          lastContentMode: 'paged',
         }),
         storedState: createStoredState({
           chapterIndex: 2,
-          viewMode: 'original',
-          isTwoColumn: true,
+          mode: 'paged',
+          lastContentMode: 'paged',
         }),
       });
       await Promise.resolve();
@@ -257,8 +245,8 @@ describe('useReaderLifecycleController', () => {
 
     rerender(createProps({
       chapterIndex: 0,
-      isTwoColumn: false,
-      isPagedMode: false,
+      mode: 'scroll',
+      currentPagedLayoutChapterIndex: null,
       chapterData: {
         chapters: [createChapter(2)],
         currentChapter: null,
@@ -273,9 +261,7 @@ describe('useReaderLifecycleController', () => {
     await waitFor(() => {
       expect(loadActiveChapter).toHaveBeenCalledWith({
         chapterIndex: 2,
-        viewMode: 'original',
-        isTwoColumn: true,
-        isPagedMode: true,
+        mode: 'paged',
       });
     });
   });
@@ -309,14 +295,15 @@ describe('useReaderLifecycleController', () => {
       hydrateDeferred.resolve({
         hasChapters: true,
         initialRestoreTarget: null,
-        resolvedState: createStoredState({ chapterIndex: 3 }),
-        storedState: createStoredState({ chapterIndex: 3 }),
+        resolvedState: createStoredState({ chapterIndex: 3, mode: 'scroll' }),
+        storedState: createStoredState({ chapterIndex: 3, mode: 'scroll' }),
       });
       await Promise.resolve();
     });
 
     rerender(createProps({
       chapterIndex: 3,
+      mode: 'scroll',
       chapterData: {
         chapters: [createChapter(3)],
         currentChapter: createChapterContent(3),
@@ -373,8 +360,8 @@ describe('useReaderLifecycleController', () => {
     const hydrateReaderData = vi.fn(async () => ({
       hasChapters: true,
       initialRestoreTarget: null,
-      resolvedState: createStoredState({ chapterIndex: 4 }),
-      storedState: createStoredState({ chapterIndex: 4 }),
+      resolvedState: createStoredState({ chapterIndex: 4, mode: 'scroll' }),
+      storedState: createStoredState({ chapterIndex: 4, mode: 'scroll' }),
     }));
     const loadError = new Error('chapter load failed');
     const loadActiveChapter = vi.fn(async () => {
@@ -398,6 +385,7 @@ describe('useReaderLifecycleController', () => {
 
     rerender(createProps({
       chapterIndex: 4,
+      mode: 'scroll',
       chapterData: {
         chapters: [createChapter(4)],
         currentChapter: null,

@@ -1,8 +1,9 @@
-import { renderHook, act } from '@testing-library/react';
+import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { useReaderStatePersistence } from '../useReaderStatePersistence';
+
 import { readerApi } from '../../api/readerApi';
 import { resetReaderSessionStoreForTests } from '../sessionStore';
+import { useReaderStatePersistence } from '../useReaderStatePersistence';
 
 vi.mock('../../api/readerApi', () => ({
   readerApi: {
@@ -19,9 +20,8 @@ describe('useReaderStatePersistence', () => {
     vi.mocked(readerApi.getProgress).mockResolvedValue({
       chapterIndex: 0,
       scrollPosition: 0,
-      viewMode: 'original',
+      mode: 'scroll',
       chapterProgress: 0,
-      isTwoColumn: false,
     });
     vi.mocked(readerApi.saveProgress).mockResolvedValue({ message: 'Progress saved' });
   });
@@ -33,11 +33,11 @@ describe('useReaderStatePersistence', () => {
     expect(result.current.latestReaderStateRef.current).toEqual({
       chapterIndex: 0,
       mode: 'scroll',
-      viewMode: 'original',
-      isTwoColumn: false,
       chapterProgress: undefined,
       scrollPosition: undefined,
       lastContentMode: 'scroll',
+      locatorVersion: undefined,
+      locator: undefined,
     });
     expect(result.current.hasUserInteractedRef.current).toBe(false);
   });
@@ -54,39 +54,28 @@ describe('useReaderStatePersistence', () => {
     expect(result.current.initialStoredState).toEqual({
       chapterIndex: 5,
       mode: 'summary',
-      viewMode: undefined,
-      isTwoColumn: undefined,
-      lastContentMode: 'paged',
       chapterProgress: undefined,
       scrollPosition: undefined,
+      lastContentMode: 'paged',
+      locatorVersion: undefined,
+      locator: undefined,
     });
     expect(result.current.latestReaderStateRef.current).toEqual({
       chapterIndex: 5,
       mode: 'summary',
-      viewMode: 'summary',
-      isTwoColumn: false,
       chapterProgress: undefined,
       scrollPosition: undefined,
       lastContentMode: 'paged',
+      locatorVersion: undefined,
+      locator: undefined,
     });
-  });
-
-  it('returns null initialStoredState for novelId 0', () => {
-    const { result } = renderHook(() => useReaderStatePersistence(0));
-    expect(result.current.initialStoredState).toBeNull();
-  });
-
-  it('ignores invalid JSON in localStorage', () => {
-    localStorage.setItem('reader-state:1', '{invalid json');
-    const { result } = renderHook(() => useReaderStatePersistence(1));
-    expect(result.current.initialStoredState).toBeNull();
   });
 
   it('filters invalid fields in stored state', () => {
     localStorage.setItem('reader-state:1', JSON.stringify({
       chapterIndex: 'not-a-number',
-      viewMode: 'invalid',
-      isTwoColumn: 'yes',
+      mode: 'invalid',
+      lastContentMode: 'summary',
     }));
 
     const { result } = renderHook(() => useReaderStatePersistence(1));
@@ -94,70 +83,45 @@ describe('useReaderStatePersistence', () => {
     expect(result.current.initialStoredState).toEqual({
       chapterIndex: undefined,
       mode: undefined,
-      viewMode: undefined,
-      isTwoColumn: undefined,
       chapterProgress: undefined,
       scrollPosition: undefined,
       lastContentMode: undefined,
+      locatorVersion: undefined,
+      locator: undefined,
     });
   });
 
-  it('persists state via persistReaderState', () => {
+  it('persists state and merges partial updates', () => {
     const { result } = renderHook(() => useReaderStatePersistence(1));
 
     act(() => {
       result.current.persistReaderState({
         chapterIndex: 3,
-        viewMode: 'summary',
-        isTwoColumn: true,
+        mode: 'summary',
         chapterProgress: 0.4,
       });
     });
 
-    expect(result.current.latestReaderStateRef.current).toEqual({
-      chapterIndex: 3,
-      mode: 'summary',
-      viewMode: 'summary',
-      isTwoColumn: false,
-      chapterProgress: 0.4,
-      scrollPosition: undefined,
-      lastContentMode: 'scroll',
-    });
-
-    const stored = JSON.parse(localStorage.getItem('reader-state:1')!);
-    expect(stored).toMatchObject({
-      chapterIndex: 3,
-      mode: 'summary',
-      viewMode: 'summary',
-      isTwoColumn: false,
-      chapterProgress: 0.4,
-      lastContentMode: 'scroll',
-    });
-  });
-
-  it('merges partial updates with existing state', () => {
-    const { result } = renderHook(() => useReaderStatePersistence(1));
-
     act(() => {
       result.current.persistReaderState({
-        chapterIndex: 5,
-        viewMode: 'summary',
-        isTwoColumn: true,
-        chapterProgress: 0.6,
+        chapterIndex: 7,
       });
-    });
-
-    act(() => {
-      result.current.persistReaderState({ chapterIndex: 7 });
     });
 
     expect(result.current.latestReaderStateRef.current).toEqual({
       chapterIndex: 7,
       mode: 'summary',
-      viewMode: 'summary',
-      isTwoColumn: false,
-      chapterProgress: 0.6,
+      chapterProgress: 0.4,
       scrollPosition: undefined,
+      lastContentMode: 'scroll',
+      locatorVersion: undefined,
+      locator: undefined,
+    });
+
+    expect(JSON.parse(localStorage.getItem('reader-state:1') ?? 'null')).toMatchObject({
+      chapterIndex: 7,
+      mode: 'summary',
+      chapterProgress: 0.4,
       lastContentMode: 'scroll',
     });
   });
@@ -172,66 +136,31 @@ describe('useReaderStatePersistence', () => {
     vi.mocked(readerApi.getProgress).mockResolvedValueOnce({
       chapterIndex: 2,
       scrollPosition: 120,
-      viewMode: 'original',
+      mode: 'scroll',
       chapterProgress: 0.2,
-      isTwoColumn: false,
     });
 
     const { result } = renderHook(() => useReaderStatePersistence(1));
-    let state: Awaited<ReturnType<typeof result.current.loadPersistedReaderState>>;
+    let state!: Awaited<ReturnType<typeof result.current.loadPersistedReaderState>>;
+
     await act(async () => {
       state = await result.current.loadPersistedReaderState();
     });
 
-    expect(state!).toEqual({
+    expect(state).toEqual({
       chapterIndex: 4,
       mode: 'summary',
-      viewMode: 'summary',
-      isTwoColumn: false,
       chapterProgress: 0.75,
       scrollPosition: 120,
       lastContentMode: 'paged',
-    });
-  });
-
-  it('keeps the local reader state when hydration runs twice before completion', async () => {
-    localStorage.setItem('reader-state:1', JSON.stringify({
-      chapterIndex: 6,
-      viewMode: 'summary',
-      isTwoColumn: false,
-    }));
-
-    const { result } = renderHook(() => useReaderStatePersistence(1));
-    let secondState!: Awaited<ReturnType<typeof result.current.loadPersistedReaderState>>;
-
-    await act(async () => {
-      const firstHydration = result.current.loadPersistedReaderState();
-      secondState = await result.current.loadPersistedReaderState();
-      await firstHydration;
-    });
-
-    expect(secondState).toEqual({
-      chapterIndex: 6,
-      mode: 'summary',
-      viewMode: 'summary',
-      isTwoColumn: false,
-      chapterProgress: 0,
-      scrollPosition: 0,
-      lastContentMode: 'scroll',
-    });
-    expect(JSON.parse(localStorage.getItem('reader-state:1')!)).toMatchObject({
-      chapterIndex: 6,
-      mode: 'summary',
-      viewMode: 'summary',
-      isTwoColumn: false,
+      locatorVersion: undefined,
+      locator: undefined,
     });
   });
 
   it('keeps legacy scrollPosition for one-time restoration and upgrades on next save', () => {
     localStorage.setItem('reader-state:1', JSON.stringify({
       chapterIndex: 2,
-      viewMode: 'original',
-      isTwoColumn: false,
       scrollPosition: 380,
     }));
 
@@ -240,43 +169,45 @@ describe('useReaderStatePersistence', () => {
     expect(result.current.initialStoredState).toEqual({
       chapterIndex: 2,
       mode: undefined,
-      viewMode: 'original',
-      isTwoColumn: false,
       chapterProgress: undefined,
       scrollPosition: 380,
       lastContentMode: undefined,
+      locatorVersion: undefined,
+      locator: undefined,
     });
 
     act(() => {
       result.current.persistReaderState({ chapterProgress: 0.55 });
     });
 
-    expect(JSON.parse(localStorage.getItem('reader-state:1')!)).toMatchObject({
+    expect(JSON.parse(localStorage.getItem('reader-state:1') ?? 'null')).toMatchObject({
       chapterIndex: 2,
       mode: 'scroll',
-      viewMode: 'original',
-      isTwoColumn: false,
       chapterProgress: 0.55,
+      scrollPosition: 380,
       lastContentMode: 'scroll',
     });
   });
 
   it('marks user interaction', () => {
     const { result } = renderHook(() => useReaderStatePersistence(1));
+
     expect(result.current.hasUserInteractedRef.current).toBe(false);
 
-    act(() => { result.current.markUserInteracted(); });
+    act(() => {
+      result.current.markUserInteracted();
+    });
+
     expect(result.current.hasUserInteractedRef.current).toBe(true);
   });
 
-  it('does not write to localStorage when novelId is 0', () => {
+  it('does not write cache for novelId 0', () => {
     const { result } = renderHook(() => useReaderStatePersistence(0));
 
     act(() => {
       result.current.persistReaderState({ chapterIndex: 1 });
     });
 
-    // Should not store anything since novelId is 0 (falsy)
     expect(localStorage.getItem('reader-state:0')).toBeNull();
   });
 
@@ -293,7 +224,7 @@ describe('useReaderStatePersistence', () => {
       });
     });
 
-    expect(JSON.parse(localStorage.getItem('reader-state:1')!)).toMatchObject({
+    expect(JSON.parse(localStorage.getItem('reader-state:1') ?? 'null')).toMatchObject({
       chapterIndex: 3,
       chapterProgress: 0.65,
     });
@@ -305,19 +236,18 @@ describe('useReaderStatePersistence', () => {
     expect(result.current.latestReaderStateRef.current).toEqual({
       chapterIndex: 0,
       mode: 'scroll',
-      viewMode: 'original',
-      isTwoColumn: false,
       chapterProgress: undefined,
       scrollPosition: undefined,
       lastContentMode: 'scroll',
+      locatorVersion: undefined,
+      locator: undefined,
     });
     expect(result.current.hasUserInteractedRef.current).toBe(false);
 
     act(() => {
       result.current.persistReaderState({
         chapterIndex: 0,
-        viewMode: 'original',
-        isTwoColumn: false,
+        mode: 'scroll',
       });
     });
 

@@ -9,8 +9,7 @@ export interface ScrollModeAnchor {
 
 export function useScrollModeChapters(
   contentRef: React.RefObject<HTMLDivElement | null>,
-  isPagedMode: boolean,
-  viewMode: 'original' | 'summary',
+  enabled: boolean,
   chapters: Chapter[],
   fetchChapterContent: (idx: number) => Promise<ChapterContent>,
   preloadAdjacent: (idx: number, prune?: boolean) => void,
@@ -124,7 +123,7 @@ export function useScrollModeChapters(
   ]);
 
   const getCurrentAnchor = useCallback((): ScrollModeAnchor | null => {
-    if (isPagedMode || !contentRef.current || viewMode !== 'original' || scrollModeChapters.length === 0) {
+    if (!enabled || !contentRef.current || scrollModeChapters.length === 0) {
       return null;
     }
 
@@ -161,10 +160,10 @@ export function useScrollModeChapters(
       chapterIndex: currentReadIdx,
       chapterProgress: Math.max(0, Math.min(1, rawProgress)),
     };
-  }, [contentRef, isPagedMode, scrollModeChapters, viewMode]);
+  }, [contentRef, enabled, scrollModeChapters]);
 
   const handleScroll = useCallback(() => {
-    if (isPagedMode || !contentRef.current || viewMode !== 'original') return;
+    if (!enabled || !contentRef.current) return;
 
     syncViewportState();
 
@@ -200,16 +199,15 @@ export function useScrollModeChapters(
     chapters,
     contentRef,
     getCurrentAnchor,
-    isPagedMode,
     onReadingAnchorChange,
     prependPrevChapter,
     scrollModeChapters,
     syncViewportState,
-    viewMode,
+    enabled,
   ]);
 
   useEffect(() => {
-    if (isPagedMode || viewMode !== 'original' || scrollModeChapters.length === 0) return;
+    if (!enabled || scrollModeChapters.length === 0) return;
 
     let frameId = 0;
     let cancelled = false;
@@ -230,15 +228,15 @@ export function useScrollModeChapters(
       cancelled = true;
       cancelAnimationFrame(frameId);
     };
-  }, [appendNextChapter, contentRef, contentVersion, isPagedMode, scrollModeChapters, viewMode]);
+  }, [appendNextChapter, contentRef, contentVersion, enabled, scrollModeChapters]);
 
   useEffect(() => {
-    if (isPagedMode || viewMode !== 'original') {
+    if (!enabled) {
       return;
     }
 
     syncViewportState({ force: true });
-  }, [contentVersion, isPagedMode, scrollModeChapters, syncViewportState, viewMode]);
+  }, [contentVersion, enabled, scrollModeChapters, syncViewportState]);
 
   useEffect(() => {
     return () => {

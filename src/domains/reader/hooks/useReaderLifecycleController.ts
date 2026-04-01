@@ -3,8 +3,9 @@ import { useTranslation } from 'react-i18next';
 import type { AppError } from '@shared/errors';
 
 import type { ChapterContent } from '../api/readerApi';
+import { isPagedReaderMode } from '../utils/readerMode';
 import { shouldKeepReaderRestoreMask } from '../utils/readerPosition';
-import type { ReaderRestoreTarget } from './useReaderStatePersistence';
+import type { ReaderMode, ReaderRestoreTarget } from './useReaderStatePersistence';
 import type {
   ReaderHydrateDataResult,
   ReaderLoadActiveChapterParams,
@@ -43,9 +44,7 @@ interface ReaderLifecycleControllerRestoreFlow {
 interface UseReaderLifecycleControllerParams {
   novelId: number;
   chapterIndex: number;
-  viewMode: 'original' | 'summary';
-  isTwoColumn: boolean;
-  isPagedMode: boolean;
+  mode: ReaderMode;
   currentPagedLayoutChapterIndex: number | null;
   chapterData: ReaderLifecycleControllerChapterData;
   restoreFlow: ReaderLifecycleControllerRestoreFlow;
@@ -65,14 +64,12 @@ interface UseReaderLifecycleControllerResult {
 function createLifecycleLoadKey(params: {
   novelId: number;
   chapterIndex: number;
-  viewMode: 'original' | 'summary';
-  isTwoColumn: boolean;
+  mode: ReaderMode;
 }): string {
   return [
     params.novelId,
     params.chapterIndex,
-    params.viewMode,
-    params.isTwoColumn ? 'two-column' : 'single-column',
+    params.mode,
   ].join(':');
 }
 
@@ -84,23 +81,18 @@ function buildLoadParamsFromHydratedState(
   }
 
   const chapterIndex = result.resolvedState.chapterIndex ?? result.storedState.chapterIndex ?? 0;
-  const viewMode = result.resolvedState.viewMode ?? result.storedState.viewMode ?? 'original';
-  const isTwoColumn = result.resolvedState.isTwoColumn ?? result.storedState.isTwoColumn ?? false;
+  const mode = result.resolvedState.mode ?? result.storedState.mode ?? 'scroll';
 
   return {
     chapterIndex,
-    viewMode,
-    isTwoColumn,
-    isPagedMode: viewMode === 'original' && isTwoColumn,
+    mode,
   };
 }
 
 export function useReaderLifecycleController({
   novelId,
   chapterIndex,
-  viewMode,
-  isTwoColumn,
-  isPagedMode,
+  mode,
   currentPagedLayoutChapterIndex,
   chapterData,
   restoreFlow,
@@ -136,9 +128,9 @@ export function useReaderLifecycleController({
   const currentLoadKey = createLifecycleLoadKey({
     novelId,
     chapterIndex,
-    viewMode,
-    isTwoColumn,
+    mode,
   });
+  const isPagedMode = isPagedReaderMode(mode);
   const isLoadingLifecyclePhase =
     lifecycleStatus === 'hydrating'
     || lifecycleStatus === 'loading-chapters'
@@ -178,8 +170,7 @@ export function useReaderLifecycleController({
     const loadKey = createLifecycleLoadKey({
       novelId,
       chapterIndex: params.chapterIndex,
-      viewMode: params.viewMode,
-      isTwoColumn: params.isTwoColumn,
+      mode: params.mode,
     });
     lastRequestedLoadKeyRef.current = loadKey;
     awaitingRestoreLoadKeyRef.current = null;
@@ -200,7 +191,7 @@ export function useReaderLifecycleController({
 
       clearPendingRestoreTarget();
       stopRestoreMask();
-      if (!params.isPagedMode) {
+      if (!isPagedReaderMode(params.mode)) {
         setLifecycleStatus('ready');
       }
     } catch (error) {
@@ -311,15 +302,12 @@ export function useReaderLifecycleController({
     const queuedInitialLoadParams = queuedInitialLoadParamsRef.current;
     const nextLoadParams = queuedInitialLoadParams ?? {
       chapterIndex,
-      viewMode,
-      isTwoColumn,
-      isPagedMode,
+      mode,
     };
     const nextLoadKey = createLifecycleLoadKey({
       novelId,
       chapterIndex: nextLoadParams.chapterIndex,
-      viewMode: nextLoadParams.viewMode,
-      isTwoColumn: nextLoadParams.isTwoColumn,
+      mode: nextLoadParams.mode,
     });
 
     if (
@@ -349,12 +337,10 @@ export function useReaderLifecycleController({
     chapters.length,
     chapterIndex,
     currentLoadKey,
-    isPagedMode,
-    isTwoColumn,
     lifecycleStatus,
+    mode,
     novelId,
     runChapterLoad,
-    viewMode,
   ]);
 
   useEffect(() => {

@@ -1,5 +1,6 @@
 import type {
   ReaderNavigationIntent,
+  ReaderMode,
   ReaderRestoreTarget,
   StoredReaderState,
 } from '../hooks/readerSessionTypes';
@@ -55,11 +56,10 @@ export function resolvePagedTargetPage(
 
 function resolveRestoreTargetViewState(
   state: StoredReaderState | null | undefined,
-): Pick<ReaderRestoreTarget, 'chapterIndex' | 'viewMode' | 'isTwoColumn'> {
+): Pick<ReaderRestoreTarget, 'chapterIndex' | 'mode'> {
   return {
     chapterIndex: state?.chapterIndex ?? 0,
-    viewMode: state?.viewMode ?? (state?.mode === 'summary' ? 'summary' : 'original'),
-    isTwoColumn: state?.isTwoColumn ?? (state?.mode === 'paged'),
+    mode: state?.mode ?? 'scroll',
   };
 }
 
@@ -113,12 +113,11 @@ export function createRestoreTargetFromPersistedState(
 
 export function createRestoreTargetFromNavigationIntent(
   intent: ReaderNavigationIntent,
-  viewState: Pick<ReaderRestoreTarget, 'viewMode' | 'isTwoColumn'>,
+  mode: ReaderMode,
 ): ReaderRestoreTarget {
   return {
     chapterIndex: intent.chapterIndex,
-    viewMode: viewState.viewMode,
-    isTwoColumn: viewState.isTwoColumn,
+    mode,
     chapterProgress: intent.pageTarget === 'end' ? 1 : 0,
     locatorVersion: undefined,
     locator: undefined,

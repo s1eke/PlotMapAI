@@ -11,16 +11,20 @@ import {
 
 function createAnimationFrameController() {
   const frameCallbacks: Array<FrameRequestCallback | null> = [];
-  const requestAnimationFrameSpy = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback: FrameRequestCallback) => {
-    frameCallbacks.push(callback);
-    return frameCallbacks.length;
-  });
-  const cancelAnimationFrameSpy = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation((id: number) => {
-    const callbackIndex = id - 1;
-    if (callbackIndex >= 0 && callbackIndex < frameCallbacks.length) {
-      frameCallbacks[callbackIndex] = null;
-    }
-  });
+  const requestAnimationFrameSpy = vi
+    .spyOn(window, 'requestAnimationFrame')
+    .mockImplementation((callback: FrameRequestCallback) => {
+      frameCallbacks.push(callback);
+      return frameCallbacks.length;
+    });
+  const cancelAnimationFrameSpy = vi
+    .spyOn(window, 'cancelAnimationFrame')
+    .mockImplementation((id: number) => {
+      const callbackIndex = id - 1;
+      if (callbackIndex >= 0 && callbackIndex < frameCallbacks.length) {
+        frameCallbacks[callbackIndex] = null;
+      }
+    });
 
   async function flushAnimationFrames() {
     while (frameCallbacks.length > 0) {
@@ -83,8 +87,11 @@ function createContent(getScrollWidth: () => number): HTMLDivElement {
 }
 
 function createHookProps(overrides?: {
+  enabled?: boolean;
   pageIndex?: number;
+  pageTarget?: 'start' | 'end' | null;
   paragraphSpacing?: number;
+  pendingRestoreTarget?: { chapterIndex: number; mode: 'paged'; chapterProgress?: number } | null;
   pagedViewportRef?: RefObject<HTMLDivElement | null>;
   pagedContentRef?: RefObject<HTMLDivElement | null>;
   setPageCount?: Dispatch<SetStateAction<number>>;
@@ -94,16 +101,17 @@ function createHookProps(overrides?: {
     chapterIndex: 0,
     currentChapter: { title: 'Chapter 1' },
     isLoading: false,
-    isPagedMode: true,
+    enabled: overrides?.enabled ?? true,
     pagedViewportRef: overrides?.pagedViewportRef ?? { current: null },
     pagedContentRef: overrides?.pagedContentRef ?? { current: null },
     pageIndex: overrides?.pageIndex ?? 0,
-    pageTargetRef: { current: null as 'start' | 'end' | null },
-    pendingRestoreTargetRef: { current: null },
+    pageTargetRef: { current: overrides?.pageTarget ?? null },
+    pendingRestoreTargetRef: { current: overrides?.pendingRestoreTarget ?? null },
     clearPendingRestoreTarget: vi.fn(),
     stopRestoreMask: vi.fn(),
     setPageCount: overrides?.setPageCount ?? vi.fn(),
     setPageIndex: overrides?.setPageIndex ?? vi.fn(),
+    setPendingPageTarget: vi.fn(),
     fontSize: 18,
     lineSpacing: 1.8,
     paragraphSpacing: overrides?.paragraphSpacing ?? 16,
@@ -147,7 +155,6 @@ describe('usePagedReaderLayout', () => {
     );
 
     await animationFrames.flushAnimationFrames();
-
     expect(setPageCount).toHaveBeenLastCalledWith(3);
 
     act(() => {
@@ -184,17 +191,19 @@ describe('usePagedReaderLayout', () => {
     const setPageCount = vi.fn();
     const setPageIndex = vi.fn();
     const originalGetComputedStyle = window.getComputedStyle.bind(window);
-    const getComputedStyleSpy = vi.spyOn(window, 'getComputedStyle').mockImplementation((element: Element) => {
-      const style = originalGetComputedStyle(element);
-      if (element === content) {
-        return {
-          ...style,
-          columnWidth: '276px',
-          columnGap: '48px',
-        };
-      }
-      return style;
-    });
+    const getComputedStyleSpy = vi
+      .spyOn(window, 'getComputedStyle')
+      .mockImplementation((element: Element) => {
+        const style = originalGetComputedStyle(element);
+        if (element === content) {
+          return {
+            ...style,
+            columnWidth: '276px',
+            columnGap: '48px',
+          };
+        }
+        return style;
+      });
 
     const { result, rerender } = renderHook(
       (props: ReturnType<typeof createHookProps>) => usePagedReaderLayout(props),
@@ -266,6 +275,41 @@ describe('usePagedReaderLayout', () => {
 
     await animationFrames.flushAnimationFrames();
     expect(setPageCount).toHaveBeenLastCalledWith(3);
+
+    animationFrames.restore();
+  });
+
+  it('restores the target page from paged restore progress', async () => {
+    const animationFrames = createAnimationFrameController();
+    const viewport = createViewport(600, 800);
+    const content = createContent(() => 1896);
+    const setPageCount = vi.fn();
+    const setPageIndex = vi.fn();
+    const clearPendingRestoreTarget = vi.fn();
+    const stopRestoreMask = vi.fn();
+
+    renderHook(() => usePagedReaderLayout({
+      ...createHookProps({
+        pagedViewportRef: { current: viewport },
+        pagedContentRef: { current: content },
+        pendingRestoreTarget: {
+          chapterIndex: 0,
+          mode: 'paged',
+          chapterProgress: 1,
+        },
+        setPageCount,
+        setPageIndex,
+      }),
+      clearPendingRestoreTarget,
+      stopRestoreMask,
+    }));
+
+    await animationFrames.flushAnimationFrames();
+
+    expect(setPageCount).toHaveBeenLastCalledWith(3);
+    expect(setPageIndex).toHaveBeenLastCalledWith(2);
+    expect(clearPendingRestoreTarget).toHaveBeenCalled();
+    expect(stopRestoreMask).toHaveBeenCalled();
 
     animationFrames.restore();
   });

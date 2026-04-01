@@ -1,4 +1,5 @@
 import type { Chapter as DbChapter } from '@infra/db';
+import type { ReaderMode } from '../hooks/readerSessionTypes';
 import type { ReaderImageGalleryEntry } from '../utils/readerImageGallery';
 import type { ReaderLocator } from '../utils/readerLayout';
 
@@ -30,9 +31,8 @@ export interface ChapterContent extends Chapter {
 export interface ReadingProgress {
   chapterIndex: number;
   scrollPosition: number;
-  viewMode: 'summary' | 'original';
+  mode: ReaderMode;
   chapterProgress?: number;
-  isTwoColumn?: boolean;
   locatorVersion?: 1;
   locator?: ReaderLocator;
 }
@@ -200,18 +200,19 @@ export const readerApi = {
       return {
         chapterIndex: 0,
         scrollPosition: 0,
-        viewMode: 'original',
+        mode: 'scroll',
         chapterProgress: 0,
-        isTwoColumn: false,
         locatorVersion: 1,
       };
     }
     return {
       chapterIndex: progress.chapterIndex,
       scrollPosition: progress.scrollPosition,
-      viewMode: (progress.viewMode || 'original') as 'summary' | 'original',
+      mode:
+        progress.mode === 'scroll' || progress.mode === 'paged' || progress.mode === 'summary'
+          ? progress.mode
+          : 'scroll',
       chapterProgress: typeof progress.chapterProgress === 'number' ? progress.chapterProgress : undefined,
-      isTwoColumn: typeof progress.isTwoColumn === 'boolean' ? progress.isTwoColumn : undefined,
       locatorVersion: progress.locatorVersion === 1 ? 1 : undefined,
       locator: progress.locatorVersion === 1 ? progress.locator : undefined,
     };
@@ -227,9 +228,8 @@ export const readerApi = {
       await db.readingProgress.update(existing.id, {
         chapterIndex: data.chapterIndex ?? existing.chapterIndex,
         scrollPosition: data.scrollPosition ?? existing.scrollPosition,
-        viewMode: data.viewMode ?? existing.viewMode,
+        mode: data.mode ?? existing.mode,
         chapterProgress: data.chapterProgress ?? existing.chapterProgress,
-        isTwoColumn: data.isTwoColumn ?? existing.isTwoColumn,
         locatorVersion: data.locatorVersion ?? existing.locatorVersion,
         locator: data.locator ?? existing.locator,
         updatedAt: now,
@@ -239,9 +239,8 @@ export const readerApi = {
         novelId,
         chapterIndex: data.chapterIndex ?? 0,
         scrollPosition: data.scrollPosition ?? 0,
-        viewMode: data.viewMode ?? 'original',
+        mode: data.mode ?? 'scroll',
         chapterProgress: data.chapterProgress,
-        isTwoColumn: data.isTwoColumn,
         locatorVersion: data.locatorVersion,
         locator: data.locator,
         updatedAt: now,

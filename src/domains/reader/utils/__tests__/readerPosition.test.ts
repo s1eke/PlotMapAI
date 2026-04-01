@@ -51,36 +51,30 @@ describe('readerPosition', () => {
     expect(canSkipReaderRestore(null)).toBe(true);
     expect(hasReaderRestoreTarget({
       chapterIndex: 0,
-      viewMode: 'original',
-      isTwoColumn: false,
+      mode: 'scroll',
     })).toBe(false);
     expect(canSkipReaderRestore({
       chapterIndex: 0,
-      viewMode: 'original',
-      isTwoColumn: false,
+      mode: 'scroll',
     })).toBe(true);
     expect(hasReaderRestoreTarget({
       chapterIndex: 0,
-      viewMode: 'original',
-      isTwoColumn: false,
+      mode: 'scroll',
       chapterProgress: 0,
     })).toBe(true);
     expect(canSkipReaderRestore({
       chapterIndex: 0,
-      viewMode: 'original',
-      isTwoColumn: false,
+      mode: 'scroll',
       chapterProgress: 0,
     })).toBe(false);
     expect(hasReaderRestoreTarget({
       chapterIndex: 0,
-      viewMode: 'original',
-      isTwoColumn: false,
+      mode: 'scroll',
       scrollPosition: 0,
     })).toBe(true);
     expect(hasReaderRestoreTarget({
       chapterIndex: 0,
-      viewMode: 'original',
-      isTwoColumn: false,
+      mode: 'scroll',
       locator: {
         chapterIndex: 0,
         blockIndex: 1,
@@ -93,32 +87,27 @@ describe('readerPosition', () => {
     expect(shouldKeepReaderRestoreMask(null)).toBe(false);
     expect(shouldKeepReaderRestoreMask({
       chapterIndex: 0,
-      viewMode: 'original',
-      isTwoColumn: false,
+      mode: 'scroll',
       chapterProgress: 0,
     })).toBe(false);
     expect(shouldKeepReaderRestoreMask({
       chapterIndex: 0,
-      viewMode: 'original',
-      isTwoColumn: false,
+      mode: 'scroll',
       scrollPosition: 0,
     })).toBe(false);
     expect(shouldKeepReaderRestoreMask({
       chapterIndex: 0,
-      viewMode: 'original',
-      isTwoColumn: false,
+      mode: 'scroll',
       chapterProgress: 0.4,
     })).toBe(true);
     expect(shouldKeepReaderRestoreMask({
       chapterIndex: 0,
-      viewMode: 'original',
-      isTwoColumn: false,
+      mode: 'scroll',
       scrollPosition: 120,
     })).toBe(true);
     expect(shouldKeepReaderRestoreMask({
       chapterIndex: 0,
-      viewMode: 'original',
-      isTwoColumn: false,
+      mode: 'scroll',
       locator: {
         chapterIndex: 0,
         blockIndex: 1,
@@ -132,24 +121,20 @@ describe('readerPosition', () => {
     expect(createRestoreTargetFromPersistedState(null)).toBeNull();
     expect(createRestoreTargetFromPersistedState({
       chapterIndex: 2,
-      viewMode: 'original',
-      isTwoColumn: false,
+      mode: 'scroll',
     })).toBeNull();
     expect(createRestoreTargetFromPersistedState({
       chapterIndex: 2,
-      viewMode: 'original',
-      isTwoColumn: false,
+      mode: 'scroll',
       chapterProgress: 0,
     })).toBeNull();
     expect(createRestoreTargetFromPersistedState({
       chapterIndex: 2,
-      viewMode: 'original',
-      isTwoColumn: false,
+      mode: 'scroll',
       chapterProgress: 0.4,
     })).toEqual({
       chapterIndex: 2,
-      viewMode: 'original',
-      isTwoColumn: false,
+      mode: 'scroll',
       chapterProgress: 0.4,
       locator: undefined,
       locatorVersion: undefined,
@@ -161,8 +146,7 @@ describe('readerPosition', () => {
       chapterProgress: 1,
     })).toEqual({
       chapterIndex: 2,
-      viewMode: 'original',
-      isTwoColumn: true,
+      mode: 'paged',
       chapterProgress: 1,
       locator: undefined,
       locatorVersion: undefined,
@@ -174,13 +158,9 @@ describe('readerPosition', () => {
     expect(createRestoreTargetFromNavigationIntent({
       chapterIndex: 3,
       pageTarget: 'start',
-    }, {
-      viewMode: 'original',
-      isTwoColumn: false,
-    })).toEqual({
+    }, 'scroll')).toEqual({
       chapterIndex: 3,
-      viewMode: 'original',
-      isTwoColumn: false,
+      mode: 'scroll',
       chapterProgress: 0,
       locator: undefined,
       locatorVersion: undefined,
@@ -189,13 +169,9 @@ describe('readerPosition', () => {
     expect(createRestoreTargetFromNavigationIntent({
       chapterIndex: 3,
       pageTarget: 'end',
-    }, {
-      viewMode: 'original',
-      isTwoColumn: true,
-    })).toEqual({
+    }, 'paged')).toEqual({
       chapterIndex: 3,
-      viewMode: 'original',
-      isTwoColumn: true,
+      mode: 'paged',
       chapterProgress: 1,
       locator: undefined,
       locatorVersion: undefined,

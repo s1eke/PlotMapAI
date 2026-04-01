@@ -432,9 +432,8 @@ describe('ReaderPage', () => {
     vi.mocked(readerApi.getProgress).mockResolvedValue({
       chapterIndex: 0,
       scrollPosition: 0,
-      viewMode: 'original',
+      mode: 'scroll',
       chapterProgress: 0,
-      isTwoColumn: false,
     });
     vi.mocked(readerApi.getChapterContent).mockImplementation(
       async (_novelId, chapterIndex) => chapterContent[chapterIndex],
@@ -470,8 +469,7 @@ describe('ReaderPage', () => {
   it('restores the stored chapter and summary view from reader state', async () => {
     localStorage.setItem('reader-state:1', JSON.stringify({
       chapterIndex: 1,
-      viewMode: 'summary',
-      isTwoColumn: false,
+      mode: 'summary',
     }));
     vi.mocked(analysisApi.getChapterAnalysis).mockResolvedValueOnce({
       analysis: completedAnalysis,
@@ -491,8 +489,7 @@ describe('ReaderPage', () => {
     expect(readerApi.getChapterContent).toHaveBeenCalledWith(1, 1, expect.any(Object));
     expect(JSON.parse(localStorage.getItem('reader-state:1')!)).toMatchObject({
       chapterIndex: 1,
-      viewMode: 'summary',
-      isTwoColumn: false,
+      mode: 'summary',
     });
   });
 
@@ -508,8 +505,7 @@ describe('ReaderPage', () => {
     expect(await screen.findByRole('heading', { name: 'Chapter 2', level: 1 })).toBeInTheDocument();
     expect(JSON.parse(localStorage.getItem('reader-state:1')!)).toMatchObject({
       chapterIndex: 1,
-      viewMode: 'original',
-      isTwoColumn: false,
+      mode: 'scroll',
       chapterProgress: 0,
     });
   });
@@ -674,8 +670,7 @@ describe('ReaderPage', () => {
 
     localStorage.setItem('reader-state:1', JSON.stringify({
       chapterIndex: 9,
-      viewMode: 'original',
-      isTwoColumn: false,
+      mode: 'scroll',
     }));
     vi.mocked(readerApi.getChapters).mockResolvedValueOnce(
       imageChapters.map(({ index, title, wordCount }) => ({ index, title, wordCount })),
@@ -747,8 +742,7 @@ describe('ReaderPage', () => {
 
     localStorage.setItem('reader-state:1', JSON.stringify({
       chapterIndex: 2,
-      viewMode: 'original',
-      isTwoColumn: false,
+      mode: 'scroll',
     }));
     vi.mocked(readerApi.getChapters).mockResolvedValue(longChapters);
     vi.mocked(readerApi.getChapterContent).mockImplementation(async (_novelId, chapterIndex) => {
@@ -777,7 +771,7 @@ describe('ReaderPage', () => {
     await waitFor(() => {
       expect(JSON.parse(localStorage.getItem('reader-state:1')!)).toMatchObject({
         chapterIndex: 5,
-        viewMode: 'original',
+        mode: 'scroll',
       });
     });
     expect(screen.getByRole('button', { name: /Chapter 6/i })).toHaveAttribute('data-active', 'true');
@@ -799,8 +793,7 @@ describe('ReaderPage', () => {
 
     localStorage.setItem('reader-state:1', JSON.stringify({
       chapterIndex: 7,
-      viewMode: 'original',
-      isTwoColumn: false,
+      mode: 'scroll',
     }));
     vi.mocked(readerApi.getChapters).mockResolvedValue(longChapters);
     vi.mocked(readerApi.getChapterContent).mockImplementation(
@@ -815,8 +808,7 @@ describe('ReaderPage', () => {
     });
     expect(JSON.parse(localStorage.getItem('reader-state:1')!)).toMatchObject({
       chapterIndex: 7,
-      viewMode: 'original',
-      isTwoColumn: false,
+      mode: 'scroll',
     });
   });
 
@@ -860,7 +852,7 @@ describe('ReaderPage', () => {
     });
     expect(JSON.parse(localStorage.getItem('reader-state:1')!)).toMatchObject({
       chapterIndex: 9,
-      viewMode: 'original',
+      mode: 'scroll',
     });
   });
 
@@ -991,8 +983,7 @@ describe('ReaderPage', () => {
     expect(await screen.findByText('reader.analysisPanel.statusQueued')).toBeInTheDocument();
     expect(screen.getByText('reader.analysisPanel.progressTitle')).toBeInTheDocument();
     expect(JSON.parse(localStorage.getItem('reader-state:1')!)).toMatchObject({
-      viewMode: 'summary',
-      isTwoColumn: false,
+      mode: 'summary',
     });
   });
 
@@ -1000,8 +991,6 @@ describe('ReaderPage', () => {
     setPrototypeNumberGetter('offsetHeight', 400);
     localStorage.setItem('reader-state:1', JSON.stringify({
       chapterIndex: 0,
-      viewMode: 'original',
-      isTwoColumn: false,
       scrollPosition: 240,
     }));
 
@@ -1046,8 +1035,6 @@ describe('ReaderPage', () => {
 
     localStorage.setItem('reader-state:1', JSON.stringify({
       chapterIndex: 0,
-      viewMode: 'original',
-      isTwoColumn: false,
       locatorVersion: 1,
       locator,
     }));
@@ -1107,8 +1094,7 @@ describe('ReaderPage', () => {
     const expectedPageCount = pagedChapter.layout.pageSlices.length;
     localStorage.setItem('reader-state:1', JSON.stringify({
       chapterIndex: 0,
-      viewMode: 'original',
-      isTwoColumn: true,
+      mode: 'paged',
       chapterProgress: 1,
     }));
 
@@ -1153,8 +1139,7 @@ describe('ReaderPage', () => {
     const expectedPageLabel = `${getPageIndexFromProgress(0.5, expectedPageCount) + 1} / ${expectedPageCount}`;
     localStorage.setItem('reader-state:1', JSON.stringify({
       chapterIndex: 0,
-      viewMode: 'original',
-      isTwoColumn: true,
+      mode: 'paged',
       chapterProgress: 0.5,
     }));
 
@@ -1200,8 +1185,7 @@ describe('ReaderPage', () => {
     enablePagedTestLayout(900);
     localStorage.setItem('reader-state:1', JSON.stringify({
       chapterIndex: 0,
-      viewMode: 'original',
-      isTwoColumn: true,
+      mode: 'paged',
       chapterProgress: 1,
     }));
     vi.mocked(readerApi.getChapters).mockResolvedValueOnce(pagedChapters);
@@ -1242,8 +1226,7 @@ describe('ReaderPage', () => {
     });
     expect(JSON.parse(localStorage.getItem('reader-state:1')!)).toMatchObject({
       chapterIndex: 1,
-      isTwoColumn: true,
-      viewMode: 'original',
+      mode: 'paged',
     });
   });
 
@@ -1260,8 +1243,7 @@ describe('ReaderPage', () => {
     enablePagedTestLayout(900);
     localStorage.setItem('reader-state:1', JSON.stringify({
       chapterIndex: 0,
-      viewMode: 'original',
-      isTwoColumn: true,
+      mode: 'paged',
       chapterProgress: 1,
     }));
     vi.mocked(readerApi.getChapters).mockResolvedValueOnce(pagedChapters);
@@ -1294,8 +1276,7 @@ describe('ReaderPage', () => {
     });
     expect(JSON.parse(localStorage.getItem('reader-state:1')!)).toMatchObject({
       chapterIndex: 1,
-      isTwoColumn: true,
-      viewMode: 'original',
+      mode: 'paged',
     });
   });
 
@@ -1329,9 +1310,8 @@ describe('ReaderPage', () => {
     await waitFor(() => {
       expect(readerApi.saveProgress).toHaveBeenCalledWith(1, expect.objectContaining({
         chapterIndex: 1,
-        viewMode: 'original',
+        mode: 'scroll',
         chapterProgress: 0,
-        isTwoColumn: false,
       }));
     });
   });
@@ -1339,8 +1319,7 @@ describe('ReaderPage', () => {
   it('renders an empty state when the novel has no chapters', async () => {
     localStorage.setItem('reader-state:1', JSON.stringify({
       chapterIndex: 4,
-      viewMode: 'original',
-      isTwoColumn: false,
+      mode: 'scroll',
       scrollPosition: 240,
     }));
     vi.mocked(readerApi.getChapters).mockResolvedValueOnce([]);

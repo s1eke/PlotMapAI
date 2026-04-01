@@ -47,8 +47,7 @@ function populateElements(
 }
 
 function setupHook(opts: {
-  isPagedMode?: boolean;
-  viewMode?: 'original' | 'summary';
+  enabled?: boolean;
   scrollModeChapters?: number[];
   fetchChapterContent?: Mock;
   preloadAdjacent?: Mock;
@@ -67,8 +66,7 @@ function setupHook(opts: {
   const { result } = renderHook(() =>
     useScrollModeChapters(
       contentRef,
-      opts.isPagedMode ?? false,
-      opts.viewMode ?? 'original',
+      opts.enabled ?? true,
       chapters,
       fetchChapterContent,
       preloadAdjacent,
@@ -193,16 +191,8 @@ describe('useScrollModeChapters', () => {
   });
 
   describe('handleScroll guards', () => {
-    it('does nothing in paged mode', () => {
-      const { result, fetchChapterContent } = setupHook({ isPagedMode: true });
-
-      act(() => { result.current.handleScroll(); });
-
-      expect(fetchChapterContent).not.toHaveBeenCalled();
-    });
-
-    it('does nothing in summary view mode', () => {
-      const { result, fetchChapterContent } = setupHook({ viewMode: 'summary' });
+    it('does nothing when disabled', () => {
+      const { result, fetchChapterContent } = setupHook({ enabled: false });
 
       act(() => { result.current.handleScroll(); });
 

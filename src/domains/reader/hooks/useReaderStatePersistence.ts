@@ -15,24 +15,21 @@ interface PersistReaderStateOptions {
 }
 
 export type { PageTarget, StoredReaderState } from './sessionStore';
-export type { ReaderNavigationIntent, ReaderRestoreTarget } from './sessionStore';
+export type {
+  ReaderMode,
+  ReaderNavigationIntent,
+  ReaderRestoreTarget,
+} from './sessionStore';
 
 function buildNovelScopedInitialState(
   initialStoredState: StoredReaderState | null,
 ): StoredReaderState {
-  function resolveInitialMode(): StoredReaderState['mode'] {
-    if (initialStoredState?.mode) return initialStoredState.mode;
-    if (initialStoredState?.viewMode === 'summary') return 'summary';
-    if (initialStoredState?.isTwoColumn) return 'paged';
-    return 'scroll';
-  }
+  const resolvedMode = initialStoredState?.mode ?? 'scroll';
 
   if (!initialStoredState) {
     return {
       chapterIndex: 0,
       mode: 'scroll',
-      viewMode: 'original',
-      isTwoColumn: false,
       chapterProgress: undefined,
       scrollPosition: undefined,
       lastContentMode: 'scroll',
@@ -43,12 +40,10 @@ function buildNovelScopedInitialState(
 
   return {
     chapterIndex: initialStoredState.chapterIndex ?? 0,
-    mode: resolveInitialMode(),
-    viewMode: initialStoredState.viewMode ?? (initialStoredState.mode === 'summary' ? 'summary' : 'original'),
-    isTwoColumn: initialStoredState.isTwoColumn ?? (initialStoredState.mode === 'paged'),
+    mode: resolvedMode,
     chapterProgress: initialStoredState.chapterProgress,
     scrollPosition: initialStoredState.scrollPosition,
-    lastContentMode: initialStoredState.lastContentMode ?? (initialStoredState.mode === 'paged' ? 'paged' : 'scroll'),
+    lastContentMode: initialStoredState.lastContentMode ?? (resolvedMode === 'paged' ? 'paged' : 'scroll'),
     locatorVersion: initialStoredState.locator ? 1 : undefined,
     locator: initialStoredState.locator,
   };
@@ -67,8 +62,6 @@ export function useReaderStatePersistence(novelId: number): {
   const hasUserInteracted = useReaderSessionSelector((state) => state.hasUserInteracted);
   const chapterIndex = useReaderSessionSelector((state) => state.chapterIndex);
   const mode = useReaderSessionSelector((state) => state.mode);
-  const viewMode = useReaderSessionSelector((state) => state.viewMode);
-  const isTwoColumn = useReaderSessionSelector((state) => state.isTwoColumn);
   const chapterProgress = useReaderSessionSelector((state) => state.chapterProgress);
   const scrollPosition = useReaderSessionSelector((state) => state.scrollPosition);
   const lastContentMode = useReaderSessionSelector((state) => state.lastContentMode);
@@ -77,8 +70,6 @@ export function useReaderStatePersistence(novelId: number): {
   const storedState = useMemo<StoredReaderState>(() => ({
     chapterIndex,
     mode,
-    viewMode,
-    isTwoColumn,
     chapterProgress,
     scrollPosition,
     lastContentMode,
@@ -87,13 +78,11 @@ export function useReaderStatePersistence(novelId: number): {
   }), [
     chapterIndex,
     chapterProgress,
-    isTwoColumn,
     lastContentMode,
     locator,
     locatorVersion,
     mode,
     scrollPosition,
-    viewMode,
   ]);
   const snapshot = useMemo(() => ({
     novelId: sessionNovelId,
@@ -144,23 +133,9 @@ export function useReaderStatePersistence(novelId: number): {
       if (novelId) {
         setSessionNovelId(novelId);
       }
-      let inferredMode: StoredReaderState['mode'] | undefined;
-      if (nextState.viewMode === 'summary') {
-        inferredMode = 'summary';
-      } else if (nextState.isTwoColumn === true) {
-        inferredMode = 'paged';
-      } else if (
-        nextState.viewMode === 'original' ||
-        nextState.isTwoColumn === false
-      ) {
-        inferredMode = 'scroll';
-      }
-      const shouldRecomputeMode =
-        inferredMode !== undefined && nextState.mode !== inferredMode;
       const mergedState: StoredReaderState = {
         ...latestReaderStateRef.current,
         ...nextState,
-        ...(shouldRecomputeMode ? { mode: undefined } : {}),
       };
       latestReaderStateRef.current = mergedState;
       persistStoredReaderState(

@@ -254,9 +254,8 @@ export interface ReadingProgress {
   novelId: number;
   chapterIndex: number;
   scrollPosition: number;
-  viewMode: string;
+  mode: string;
   chapterProgress?: number;
-  isTwoColumn?: boolean;
   locatorVersion?: 1;
   locator?: ReaderLocatorRecord;
   updatedAt: string;

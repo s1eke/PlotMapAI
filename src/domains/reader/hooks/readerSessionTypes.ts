@@ -7,8 +7,6 @@ export type RestoreStatus = 'hydrating' | 'restoring' | 'ready' | 'error';
 export interface StoredReaderState {
   chapterIndex?: number;
   mode?: ReaderMode;
-  viewMode?: 'original' | 'summary';
-  isTwoColumn?: boolean;
   chapterProgress?: number;
   scrollPosition?: number;
   lastContentMode?: 'scroll' | 'paged';
@@ -18,8 +16,7 @@ export interface StoredReaderState {
 
 export interface ReaderRestoreTarget {
   chapterIndex: number;
-  viewMode: 'original' | 'summary';
-  isTwoColumn: boolean;
+  mode: ReaderMode;
   chapterProgress?: number;
   scrollPosition?: number;
   locatorVersion?: 1;
@@ -34,8 +31,6 @@ export interface ReaderNavigationIntent {
 export interface ReaderSessionState {
   novelId: number;
   mode: ReaderMode;
-  viewMode: 'original' | 'summary';
-  isTwoColumn: boolean;
   chapterIndex: number;
   chapterProgress?: number;
   scrollPosition?: number;
