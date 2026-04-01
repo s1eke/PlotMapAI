@@ -358,9 +358,12 @@ export interface ReaderRenderCache {
   tree?: ReaderRenderTreeRecord | null;
   queryManifest: ReaderRenderQueryManifestRecord;
   updatedAt: string;
+  expiresAt: string;
 }
 
-const CURRENT_DB_VERSION = 8;
+export const READER_RENDER_CACHE_TTL_MS = 14 * 24 * 60 * 60 * 1000;
+
+const CURRENT_DB_VERSION = 9;
 
 const CURRENT_SCHEMA = {
   novels: '++id, createdAt',
@@ -376,7 +379,7 @@ const CURRENT_SCHEMA = {
   coverImages: '++id, novelId',
   chapterImages: '++id, novelId, [novelId+imageKey]',
   novelImageGalleryEntries: '++id, novelId, [novelId+chapterIndex], [novelId+chapterIndex+blockIndex], [novelId+imageKey]',
-  readerRenderCache: '++id, [novelId+chapterIndex+variantFamily], [novelId+variantFamily], updatedAt',
+  readerRenderCache: '++id, [novelId+chapterIndex+variantFamily], [novelId+variantFamily], updatedAt, expiresAt',
 } as const;
 
 const db = new Dexie('PlotMapAI') as Dexie & {
@@ -421,8 +424,35 @@ db.version(CURRENT_DB_VERSION)
       }))
     ));
 
+    await tx.table('novelImageGalleryEntries').clear();
+
     if (nextEntries.length > 0) {
       await tx.table('novelImageGalleryEntries').bulkAdd(nextEntries);
+    }
+
+    const readerRenderCacheTable = tx.table('readerRenderCache');
+    const now = Date.now();
+    const cacheEntries = await readerRenderCacheTable.toArray() as ReaderRenderCache[];
+
+    await readerRenderCacheTable.clear();
+
+    const activeCacheEntries = cacheEntries.flatMap((entry) => {
+      const updatedAtMs = Date.parse(entry.updatedAt);
+      const baseTime = Number.isNaN(updatedAtMs) ? now : updatedAtMs;
+      const expiresAt = new Date(baseTime + READER_RENDER_CACHE_TTL_MS).toISOString();
+
+      if (Date.parse(expiresAt) <= now) {
+        return [];
+      }
+
+      return [{
+        ...entry,
+        expiresAt,
+      }];
+    });
+
+    if (activeCacheEntries.length > 0) {
+      await readerRenderCacheTable.bulkAdd(activeCacheEntries);
     }
   });
 

@@ -1,10 +1,17 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('@domains/reader', () => ({
+  clearReaderRenderCacheMemoryForNovel: vi.fn(),
+}));
+
+import { clearReaderRenderCacheMemoryForNovel } from '@domains/reader';
 import { db } from '@infra/db';
 import { CACHE_KEYS } from '@infra/storage';
 import { libraryApi } from '../libraryApi';
 
 describe('libraryApi', () => {
   beforeEach(async () => {
+    vi.clearAllMocks();
     await db.delete();
     await db.open();
     localStorage.clear();
@@ -105,6 +112,31 @@ describe('libraryApi', () => {
       imageKey: 'cover',
       order: 0,
     });
+    await db.readerRenderCache.add({
+      novelId: id as number,
+      chapterIndex: 0,
+      variantFamily: 'summary-shell',
+      storageKind: 'manifest',
+      layoutKey: 'summary-shell:base',
+      layoutSignature: {
+        textWidth: 360,
+        pageHeight: 720,
+        columnCount: 1,
+        columnGap: 0,
+        fontSize: 18,
+        lineSpacing: 1.6,
+        paragraphSpacing: 16,
+      },
+      contentHash: 'content-hash',
+      tree: null,
+      queryManifest: {
+        blockCount: 2,
+        lineCount: 4,
+        totalHeight: 120,
+      },
+      updatedAt: '2026-04-02T00:00:00.000Z',
+      expiresAt: '2026-04-16T00:00:00.000Z',
+    });
     localStorage.setItem(CACHE_KEYS.readerState(id as number), JSON.stringify({
       chapterIndex: 3,
       chapterProgress: 0.5,
@@ -121,6 +153,9 @@ describe('libraryApi', () => {
     expect(readingProgress).toEqual([]);
     const imageGalleryEntries = await db.novelImageGalleryEntries.toArray();
     expect(imageGalleryEntries).toEqual([]);
+    const readerRenderCache = await db.readerRenderCache.toArray();
+    expect(readerRenderCache).toEqual([]);
+    expect(vi.mocked(clearReaderRenderCacheMemoryForNovel)).toHaveBeenCalledWith(id);
     expect(localStorage.getItem(CACHE_KEYS.readerState(id as number))).toBeNull();
   });
 

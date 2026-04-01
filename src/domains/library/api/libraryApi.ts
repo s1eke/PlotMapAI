@@ -1,3 +1,4 @@
+import { clearReaderRenderCacheMemoryForNovel } from '@domains/reader';
 import { db } from '@infra/db';
 import { CACHE_KEYS, storage } from '@infra/storage';
 import { AppErrorCode, createAppError } from '@shared/errors';
@@ -71,7 +72,9 @@ export const libraryApi = {
       await db.coverImages.where('novelId').equals(id).delete();
       await db.chapterImages.where('novelId').equals(id).delete();
       await db.novelImageGalleryEntries.where('novelId').equals(id).delete();
+      await db.readerRenderCache.where('novelId').equals(id).delete();
     });
+    clearReaderRenderCacheMemoryForNovel(id);
     storage.cache.remove(CACHE_KEYS.readerState(id));
     return { message: 'Novel deleted' };
   },

@@ -2,6 +2,9 @@ export { readerApi, loadAndPurifyChapters } from './api/readerApi';
 export type { Chapter, ChapterContent, ReadingProgress } from './api/readerApi';
 export { useReaderPreferences } from './hooks/useReaderPreferences';
 export {
+  clearReaderRenderCacheMemoryForNovel,
+} from './utils/readerRenderCache';
+export {
   useReaderSessionSelector,
   resetReaderSessionStoreForTests,
 } from './hooks/sessionStore';

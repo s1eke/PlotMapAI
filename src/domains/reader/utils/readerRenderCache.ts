@@ -12,7 +12,7 @@ import type {
   StaticSummaryShellTree,
 } from './readerLayout';
 
-import { db } from '@infra/db';
+import { db, READER_RENDER_CACHE_TTL_MS } from '@infra/db';
 
 import { extractImageKeysFromText } from './chapterImages';
 import {
@@ -28,6 +28,8 @@ import {
 import { preloadReaderImageResources } from './readerImageResourceCache';
 
 const MEMORY_CACHE_LIMIT = 36;
+const READER_RENDER_CACHE_CLEANUP_INTERVAL_MS = 60 * 60 * 1000;
+const READER_RENDER_CACHE_TOUCH_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 export type ReaderRenderCacheSource = 'memory' | 'dexie' | 'built';
 export type ReaderRenderStorageKind = 'render-tree' | 'manifest';
@@ -71,6 +73,7 @@ interface ReaderRenderCacheLookupParams {
 }
 
 const memoryRenderCache = new Map<string, ReaderRenderCacheEntry>();
+let lastReaderRenderCacheCleanupAt = 0;
 
 function buildFamilyKey(params: {
   chapterIndex: number;
@@ -82,6 +85,55 @@ function buildFamilyKey(params: {
 
 export function buildReaderRenderCacheKey(params: ReaderRenderCacheLookupParams): string {
   return `${buildFamilyKey(params)}:${params.layoutKey}:${params.contentHash}`;
+}
+
+function getReaderRenderCacheTimestampMs(timestamp: string): number {
+  const parsed = Date.parse(timestamp);
+  return Number.isNaN(parsed) ? Date.now() : parsed;
+}
+
+function createReaderRenderCacheExpiresAt(updatedAt: string): string {
+  return new Date(getReaderRenderCacheTimestampMs(updatedAt) + READER_RENDER_CACHE_TTL_MS)
+    .toISOString();
+}
+
+function isPersistedReaderRenderCacheExpired(
+  entry: PersistedReaderRenderCacheRecord,
+  now = Date.now(),
+): boolean {
+  return getReaderRenderCacheTimestampMs(entry.expiresAt) <= now;
+}
+
+async function cleanupExpiredReaderRenderCacheIfNeeded(now = Date.now()): Promise<void> {
+  if (now - lastReaderRenderCacheCleanupAt < READER_RENDER_CACHE_CLEANUP_INTERVAL_MS) {
+    return;
+  }
+
+  lastReaderRenderCacheCleanupAt = now;
+  await db.readerRenderCache.where('expiresAt').belowOrEqual(new Date(now).toISOString()).delete();
+}
+
+async function refreshPersistedReaderRenderCacheIfNeeded(
+  entry: PersistedReaderRenderCacheRecord,
+  now = Date.now(),
+): Promise<PersistedReaderRenderCacheRecord> {
+  if (
+    now - getReaderRenderCacheTimestampMs(entry.updatedAt)
+    < READER_RENDER_CACHE_TOUCH_INTERVAL_MS
+  ) {
+    return entry;
+  }
+
+  const updatedAt = new Date(now).toISOString();
+  const expiresAt = createReaderRenderCacheExpiresAt(updatedAt);
+
+  await db.readerRenderCache.update(entry.id, { expiresAt, updatedAt });
+
+  return {
+    ...entry,
+    expiresAt,
+    updatedAt,
+  };
 }
 
 function evictMemoryRenderCacheIfNeeded(): void {
@@ -174,19 +226,29 @@ export function isMaterializedReaderRenderCacheEntry<TTree extends StaticChapter
 export async function getReaderRenderCacheRecordFromDexie<TTree extends StaticChapterRenderTree>(
   params: ReaderRenderCacheLookupParams,
 ): Promise<ReaderRenderCacheRecord<TTree> | null> {
+  await cleanupExpiredReaderRenderCacheIfNeeded();
+
   const familyRecord = await db.readerRenderCache
     .where('[novelId+chapterIndex+variantFamily]')
     .equals([params.novelId, params.chapterIndex, params.variantFamily])
     .first();
+  if (!familyRecord) {
+    return null;
+  }
+
+  if (isPersistedReaderRenderCacheExpired(familyRecord)) {
+    await db.readerRenderCache.delete(familyRecord.id);
+    return null;
+  }
+
   if (
-    !familyRecord
-    || familyRecord.layoutKey !== params.layoutKey
+    familyRecord.layoutKey !== params.layoutKey
     || familyRecord.contentHash !== params.contentHash
   ) {
     return null;
   }
 
-  return toDomainRecord<TTree>(familyRecord);
+  return toDomainRecord<TTree>(await refreshPersistedReaderRenderCacheIfNeeded(familyRecord));
 }
 
 export async function getReaderRenderCacheEntryFromDexie<TTree extends StaticChapterRenderTree>(
@@ -212,6 +274,8 @@ export function primeReaderRenderCacheEntry<TTree extends StaticChapterRenderTre
 export async function persistReaderRenderCacheEntry<TTree extends StaticChapterRenderTree>(
   entry: ReaderRenderCacheRecord<TTree>,
 ): Promise<void> {
+  await cleanupExpiredReaderRenderCacheIfNeeded();
+
   await db.transaction('rw', db.readerRenderCache, async () => {
     await db.readerRenderCache
       .where('[novelId+chapterIndex+variantFamily]')
@@ -228,6 +292,7 @@ export async function persistReaderRenderCacheEntry<TTree extends StaticChapterR
       storageKind: entry.storageKind,
       tree: entry.tree,
       queryManifest: entry.queryManifest,
+      expiresAt: createReaderRenderCacheExpiresAt(entry.updatedAt),
       updatedAt: entry.updatedAt,
     });
   });

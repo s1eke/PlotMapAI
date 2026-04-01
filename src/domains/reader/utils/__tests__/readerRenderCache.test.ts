@@ -1,8 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 describe('readerRenderCache', () => {
-  afterEach(() => {
+  afterEach(async () => {
     vi.doUnmock('@chenglou/pretext');
+    vi.useRealTimers();
+    const { db } = await import('@infra/db');
+    await db.delete();
     vi.resetModules();
   });
 
@@ -116,5 +119,148 @@ describe('readerRenderCache', () => {
     expect(layoutWithLines).not.toHaveBeenCalled();
 
     resetReaderLayoutPretextCacheForTests();
+  });
+
+  it('persists an expiry timestamp and clears expired records during maintenance', async () => {
+    const { READER_RENDER_CACHE_TTL_MS, db } = await import('@infra/db');
+    const {
+      createReaderLayoutSignature,
+      createReaderTypographyMetrics,
+    } = await import('../readerLayout');
+    const {
+      buildStaticRenderManifest,
+      persistReaderRenderCacheEntry,
+    } = await import('../readerRenderCache');
+
+    await db.delete();
+    await db.open();
+
+    await db.readerRenderCache.add({
+      novelId: 99,
+      chapterIndex: 1,
+      variantFamily: 'summary-shell',
+      storageKind: 'manifest',
+      layoutKey: 'summary-shell:stale',
+      layoutSignature: {
+        textWidth: 360,
+        pageHeight: 720,
+        columnCount: 1,
+        columnGap: 0,
+        fontSize: 18,
+        lineSpacing: 1.6,
+        paragraphSpacing: 16,
+      },
+      contentHash: 'stale-hash',
+      tree: null,
+      queryManifest: {
+        blockCount: 1,
+        lineCount: 1,
+      },
+      updatedAt: '2000-03-01T00:00:00.000Z',
+      expiresAt: '2000-03-15T00:00:00.000Z',
+    });
+
+    const entry = {
+      ...buildStaticRenderManifest({
+        chapter: {
+          index: 2,
+          title: 'Fresh Chapter',
+          content: 'Fresh content for the cache record.',
+          hasNext: false,
+          hasPrev: true,
+          totalChapters: 3,
+          wordCount: 120,
+        },
+        imageDimensionsByKey: new Map(),
+        layoutSignature: createReaderLayoutSignature({
+          columnCount: 1,
+          columnGap: 0,
+          fontSize: 18,
+          lineSpacing: 1.6,
+          pageHeight: 720,
+          paragraphSpacing: 16,
+          textWidth: 360,
+        }),
+        novelId: 7,
+        typography: createReaderTypographyMetrics(18, 1.6, 16, 360),
+        variantFamily: 'summary-shell',
+      }),
+      updatedAt: '2026-04-02T00:00:00.000Z',
+    };
+
+    await persistReaderRenderCacheEntry(entry);
+
+    const persistedEntries = await db.readerRenderCache.toArray();
+
+    expect(persistedEntries).toHaveLength(1);
+    expect(persistedEntries[0]).toMatchObject({
+      chapterIndex: entry.chapterIndex,
+      contentHash: entry.contentHash,
+      layoutKey: entry.layoutKey,
+      novelId: entry.novelId,
+      variantFamily: entry.variantFamily,
+    });
+    expect(persistedEntries[0].expiresAt).toBe(
+      new Date(
+        Date.parse(persistedEntries[0].updatedAt) + READER_RENDER_CACHE_TTL_MS,
+      ).toISOString(),
+    );
+  });
+
+  it('treats expired Dexie cache records as misses and deletes them', async () => {
+    const { db } = await import('@infra/db');
+    const {
+      createReaderLayoutSignature,
+      createReaderTypographyMetrics,
+    } = await import('../readerLayout');
+    const {
+      buildStaticRenderManifest,
+      getReaderRenderCacheRecordFromDexie,
+    } = await import('../readerRenderCache');
+
+    await db.delete();
+    await db.open();
+
+    const entry = buildStaticRenderManifest({
+      chapter: {
+        index: 4,
+        title: 'Expired Chapter',
+        content: 'Expired content.',
+        hasNext: true,
+        hasPrev: true,
+        totalChapters: 8,
+        wordCount: 88,
+      },
+      imageDimensionsByKey: new Map(),
+      layoutSignature: createReaderLayoutSignature({
+        columnCount: 1,
+        columnGap: 0,
+        fontSize: 18,
+        lineSpacing: 1.6,
+        pageHeight: 720,
+        paragraphSpacing: 16,
+        textWidth: 360,
+      }),
+      novelId: 21,
+      typography: createReaderTypographyMetrics(18, 1.6, 16, 360),
+      variantFamily: 'summary-shell',
+    });
+
+    await db.readerRenderCache.add({
+      ...entry,
+      expiresAt: '2000-03-20T00:00:00.000Z',
+      updatedAt: '2000-03-06T00:00:00.000Z',
+    });
+
+    const record = await getReaderRenderCacheRecordFromDexie({
+      chapterIndex: entry.chapterIndex,
+      contentHash: entry.contentHash,
+      layoutKey: entry.layoutKey,
+      novelId: entry.novelId,
+      variantFamily: entry.variantFamily,
+    });
+
+    expect(record).toBeNull();
+    expect(await db.readerRenderCache.toArray()).toEqual([]);
   });
 });
