@@ -79,6 +79,7 @@ describe('ReaderFlowBlock', () => {
   it('renders heading fragments as a single h2 node', () => {
     render(
       <ReaderFlowBlock
+        chapterTitle="Chapter One"
         imageRenderMode="paged"
         novelId={1}
         item={{
@@ -110,14 +111,65 @@ describe('ReaderFlowBlock', () => {
           ],
           marginAfter: 0,
           marginBefore: 0,
+          text: 'Wrong Title',
         }}
       />,
     );
 
     const fragment = screen.getByRole('heading', { level: 2 });
     expect(fragment).toHaveAttribute('data-testid', 'reader-flow-text-fragment');
-    expect(fragment.textContent).toBe('Chapter\nOne');
+    expect(fragment.textContent).toBe('Chapter One');
     expect(fragment.children).toHaveLength(0);
+  });
+
+  it('prefers the original heading text when line fragments are incomplete', () => {
+    const rawTitle = '第36章 命途的起点，以及【记忆】的游戏';
+
+    render(
+      <ReaderFlowBlock
+        chapterTitle={rawTitle}
+        imageRenderMode="paged"
+        novelId={1}
+        item={{
+          blockIndex: 0,
+          chapterIndex: 0,
+          contentHeight: 96,
+          font: '700 24px sans-serif',
+          fontSizePx: 24,
+          height: 96,
+          key: '0:heading:0:0',
+          kind: 'heading',
+          lineHeightPx: 32,
+          lineStartIndex: 0,
+          lines: [
+            {
+              end: { graphemeIndex: 4, segmentIndex: 0 },
+              lineIndex: 0,
+              start: { graphemeIndex: 0, segmentIndex: 0 },
+              text: '第36章',
+              width: 120,
+            },
+            {
+              end: { graphemeIndex: 9, segmentIndex: 0 },
+              lineIndex: 1,
+              start: { graphemeIndex: 4, segmentIndex: 0 },
+              text: '忆】的游戏',
+              width: 140,
+            },
+          ],
+          marginAfter: 0,
+          marginBefore: 0,
+          text: '第36章 忆】的游戏',
+        }}
+      />,
+    );
+
+    const fragment = screen.getByRole('heading', { level: 2 });
+    expect(fragment.textContent).toBe(rawTitle);
+    expect(fragment).toHaveStyle({
+      overflowWrap: 'anywhere',
+      whiteSpace: 'pre-wrap',
+    });
   });
 
   it('keeps the image branch unchanged for paged rendering', () => {

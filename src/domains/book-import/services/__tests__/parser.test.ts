@@ -101,4 +101,56 @@ describe('parseEpub', () => {
     const result = await parseEpub(file);
     expect(result.chapters).toEqual([]);
   });
+
+  it('strips a duplicated chapter heading from epub body content', async () => {
+    const zip = new JSZip();
+    zip.file('META-INF/container.xml', `<?xml version="1.0"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <rootfiles>
+    <rootfile full-path="content.opf" media-type="application/oebps-package+xml"/>
+  </rootfiles>
+</container>`);
+    zip.file('content.opf', `<?xml version="1.0"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="uid">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:title id="uid">Test Book</dc:title>
+  </metadata>
+  <manifest>
+    <item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>
+    <item id="ch1" href="ch1.xhtml" media-type="application/xhtml+xml"/>
+  </manifest>
+  <spine toc="ncx">
+    <itemref idref="ch1"/>
+  </spine>
+</package>`);
+    zip.file('toc.ncx', `<?xml version="1.0" encoding="utf-8"?>
+<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1">
+  <navMap>
+    <navPoint id="navPoint-1" playOrder="1">
+      <navLabel><text>Chapter 1</text></navLabel>
+      <content src="ch1.xhtml"/>
+    </navPoint>
+  </navMap>
+</ncx>`);
+    zip.file(
+      'ch1.xhtml',
+      `<?xml version="1.0"?>
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <body>
+    <h1>Chapter 1</h1>
+    <p>Body paragraph.</p>
+  </body>
+</html>`,
+    );
+
+    const file = await makeEpubFile(zip, 'test.epub');
+    const result = await parseEpub(file);
+
+    expect(result.chapters).toEqual([
+      {
+        title: 'Chapter 1',
+        content: 'Body paragraph.',
+      },
+    ]);
+  });
 });

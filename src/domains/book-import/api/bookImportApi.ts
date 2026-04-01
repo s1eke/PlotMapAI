@@ -8,6 +8,7 @@ import { CACHE_KEYS, storage } from '@infra/storage';
 import { AppErrorCode, createAppError, toAppError } from '@shared/errors';
 import {
   buildChapterImageGalleryEntries,
+  normalizeImportedChapters,
   sortChapterImageGalleryEntries,
 } from '@shared/text-processing';
 
@@ -68,9 +69,12 @@ export const bookImportApi = {
     }
     options.signal?.throwIfAborted?.();
 
+    const normalizedChapters = normalizeImportedChapters(parsed.chapters);
+    const totalWords = normalizedChapters.reduce((sum, chapter) => sum + chapter.content.length, 0);
+
     const now = new Date().toISOString();
     const imageGalleryEntries = sortChapterImageGalleryEntries(
-      parsed.chapters.flatMap((chapter, chapterIndex) => {
+      normalizedChapters.flatMap((chapter, chapterIndex) => {
         options.signal?.throwIfAborted?.();
         return buildChapterImageGalleryEntries({
           content: chapter.content,
@@ -102,7 +106,7 @@ export const bookImportApi = {
           coverPath: parsed.coverBlob ? 'has_cover' : '',
           originalFilename: filename,
           originalEncoding: parsed.encoding || 'utf-8',
-          totalWords: parsed.totalWords,
+          totalWords,
           createdAt: now,
         });
         if (parsed.coverBlob) {
@@ -111,7 +115,7 @@ export const bookImportApi = {
             blob: parsed.coverBlob,
           });
         }
-        await db.chapters.bulkAdd(parsed.chapters.map((chapter, chapterIndex) => ({
+        await db.chapters.bulkAdd(normalizedChapters.map((chapter, chapterIndex) => ({
           novelId,
           title: chapter.title,
           content: chapter.content,

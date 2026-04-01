@@ -1,5 +1,6 @@
 import JSZip from 'jszip';
 import { computeHash } from '@shared/text-processing';
+import { stripLeadingChapterTitle } from '@shared/text-processing';
 import type { ParsedBook } from '../bookParser';
 import type { BookImportProgress } from '../progress';
 import { buildTocMap } from './toc';
@@ -96,7 +97,12 @@ export async function parseEpubCore(
     if (isNonContentPage(chapterTitle, item.href)) {
       continue;
     }
-    chapters.push({ title: chapterTitle, content: text });
+    const content = stripLeadingChapterTitle(text, chapterTitle);
+    if (!content) {
+      continue;
+    }
+
+    chapters.push({ title: chapterTitle, content });
   }
 
   throwIfAborted(signal);

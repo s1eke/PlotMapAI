@@ -177,6 +177,7 @@ describe('readerLocator', () => {
       ],
       marginAfter: 0,
       marginBefore: 0,
+      text: 'line-0-0line-0-1',
     };
     const secondPageItem: ReaderTextPageItem = {
       ...firstPageItem,

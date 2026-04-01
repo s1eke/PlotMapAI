@@ -187,6 +187,64 @@ describe('PagedReaderContent', () => {
     expect(screen.getByText('Text')).toBeInTheDocument();
   });
 
+  it('renders the body heading from chapter.title even when the page item heading text is stale', () => {
+    const chapter = {
+      index: 0,
+      title: 'Chapter 1',
+      content: 'Text',
+      wordCount: 100,
+      totalChapters: 1,
+      hasPrev: false,
+      hasNext: false,
+    };
+    const viewportMetrics = createReaderViewportMetrics(720, 1200, 720, 1200, 18);
+    const typography = createReaderTypographyMetrics(
+      18,
+      1.8,
+      24,
+      viewportMetrics.pagedViewportWidth,
+    );
+    const measuredLayout = measureReaderChapterLayout(
+      chapter,
+      viewportMetrics.pagedColumnWidth,
+      typography,
+      new Map(),
+      undefined,
+      TEXT_LAYOUT_ENGINE,
+    );
+    const currentLayout = composePaginatedChapterLayout(
+      measuredLayout,
+      getPagedContentHeight(viewportMetrics.pagedViewportHeight),
+      viewportMetrics.pagedColumnCount,
+      viewportMetrics.pagedColumnGap,
+    );
+    const staleLayout = {
+      ...currentLayout,
+      pageSlices: currentLayout.pageSlices.map((pageSlice) => ({
+        ...pageSlice,
+        columns: pageSlice.columns.map((column) => ({
+          ...column,
+          items: column.items.map((item) => (
+            item.kind === 'heading'
+              ? {
+                ...item,
+                text: 'Wrong Heading',
+              }
+              : item
+          )),
+        })),
+      })),
+    };
+
+    renderPagedContent({
+      chapter,
+      currentLayout: staleLayout,
+    });
+
+    expect(screen.getByRole('heading', { name: 'Chapter 1', level: 2 })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Wrong Heading', level: 2 })).not.toBeInTheDocument();
+  });
+
   it('applies an opaque page background to animated layers', () => {
     const { container } = renderPagedContent({
       chapter: {

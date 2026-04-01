@@ -4,6 +4,7 @@ import type {
   DetectedChapter,
   SplitChapter,
 } from './types';
+import { stripLeadingChapterTitle } from './chapterContent';
 
 const MIN_WEAK_CANDIDATE_COUNT = 3;
 const MIN_INCREMENTING_RATIO = 0.8;
@@ -608,7 +609,10 @@ export function splitByChapters(
 
   const result: SplitChapter[] = [];
   for (const chapter of chapters) {
-    const content = lines.slice(chapter.start, chapter.end).join('\n').trim();
+    const content = stripLeadingChapterTitle(
+      lines.slice(chapter.start, chapter.end).join('\n').trim(),
+      chapter.title,
+    );
     if (content.length <= maxChunkSize) {
       result.push({ title: chapter.title, content });
       continue;

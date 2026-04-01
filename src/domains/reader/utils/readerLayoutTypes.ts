@@ -105,6 +105,7 @@ export interface ReaderTextPageItem {
   lines: ReaderMeasuredLine[];
   marginAfter: number;
   marginBefore: number;
+  text: string;
 }
 
 export interface ReaderImagePageItem {

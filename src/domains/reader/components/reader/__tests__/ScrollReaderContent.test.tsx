@@ -60,6 +60,42 @@ describe('ScrollReaderContent', () => {
     expect(screen.queryByTestId('paged-reader-page-frame')).not.toBeInTheDocument();
   });
 
+  it('renders the body heading from chapter.title even when the layout heading text is stale', () => {
+    const { chapter, layout } = createScrollChapterLayout('Text');
+    const staleLayout = {
+      ...layout,
+      metrics: layout.metrics.map((metric, metricIndex) => (
+        metricIndex === 0
+          ? {
+            ...metric,
+            block: {
+              ...metric.block,
+              text: 'Wrong Heading',
+            },
+          }
+          : metric
+      )),
+    };
+
+    render(
+      <ScrollReaderContent
+        chapters={[{
+          index: 0,
+          chapter,
+          layout: staleLayout,
+        }]}
+        novelId={1}
+        readerTheme="auto"
+        textClassName=""
+        headerBgClassName=""
+        onChapterElement={() => {}}
+      />,
+    );
+
+    expect(screen.getByRole('heading', { name: 'Chapter 1', level: 2 })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Wrong Heading', level: 2 })).not.toBeInTheDocument();
+  });
+
   it('lets the scroll reader text body inherit the global sans font stack', () => {
     const { chapter, layout } = createScrollChapterLayout('Text');
 

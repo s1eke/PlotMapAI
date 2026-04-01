@@ -3,6 +3,11 @@ export {
   buildChapterBlockSequence,
   parseParagraphSegments,
 } from './chapterBlocks';
+export {
+  normalizeImportedChapter,
+  normalizeImportedChapters,
+  stripLeadingChapterTitle,
+} from './chapterContent';
 export type {
   ChapterBlockSequenceEntry,
   ChapterBlockSource,

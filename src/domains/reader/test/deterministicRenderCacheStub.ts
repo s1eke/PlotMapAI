@@ -181,6 +181,7 @@ export function createDeterministicPagedLayout(
         lines: createTextLines(block.text),
         marginAfter: block.hasParagraphSpacingAfter ? BLOCK_MARGIN_AFTER : 0,
         marginBefore: BLOCK_MARGIN_BEFORE,
+        text: block.text,
       };
     });
   const pageSlices = pageItems.length === 0

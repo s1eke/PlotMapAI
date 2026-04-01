@@ -87,6 +87,38 @@ describe('bookImportApi', () => {
     ]);
   });
 
+  it('stores chapter.content without a duplicated leading title line', async () => {
+    vi.mocked(parseBook).mockResolvedValueOnce({
+      title: 'Parsed Novel',
+      author: 'Parsed Author',
+      description: 'Parsed desc',
+      coverBlob: null,
+      chapters: [
+        { title: 'Ch1', content: 'Ch1\n\nBody 1' },
+        { title: 'Ch2', content: 'Body 2' },
+      ],
+      rawText: 'raw',
+      encoding: 'utf-8',
+      totalWords: 20,
+      fileHash: 'parsedhash-2',
+      tags: ['fiction'],
+      images: [],
+    });
+
+    const file = new File(['content'], 'normalized.txt', { type: 'text/plain' });
+    const novel = await bookImportApi.importBook(file);
+    const storedChapters = await db.chapters.where('novelId').equals(novel.id).sortBy('chapterIndex');
+
+    expect(storedChapters.map((chapter) => ({
+      content: chapter.content,
+      title: chapter.title,
+      wordCount: chapter.wordCount,
+    }))).toEqual([
+      { title: 'Ch1', content: 'Body 1', wordCount: 6 },
+      { title: 'Ch2', content: 'Body 2', wordCount: 6 },
+    ]);
+  });
+
   it('upload throws for unsupported file type', async () => {
     const file = new File(['data'], 'test.pdf', { type: 'application/pdf' });
     await expect(bookImportApi.importBook(file)).rejects.toThrow('Only .txt and .epub files are supported');

@@ -256,6 +256,28 @@ describe('splitByChapters', () => {
     expect(result[1].title).toBe('第二章 B');
   });
 
+  it('strips duplicated title lines from split chapter content', () => {
+    const lines = [
+      '第一章 A',
+      '',
+      '第一章 A',
+      'content a',
+      '',
+      '第二章 B',
+      '第二章 B',
+      'content b',
+    ];
+    const chapters = [
+      { title: '第一章 A', start: 0, end: 5 },
+      { title: '第二章 B', start: 5, end: 8 },
+    ];
+
+    expect(splitByChapters(lines.join('\n'), chapters, 50000)).toEqual([
+      { title: '第一章 A', content: 'content a' },
+      { title: '第二章 B', content: 'content b' },
+    ]);
+  });
+
   it('sub-splits large chapters', () => {
     const bigContent = 'x\n'.repeat(1000);
     const text = bigContent;

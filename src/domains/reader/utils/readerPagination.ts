@@ -349,6 +349,7 @@ export function composePaginatedChapterLayout(
         lines,
         marginAfter,
         marginBefore,
+        text: metric.block.text ?? '',
       };
       getCurrentColumn().items.push(item);
       getCurrentColumn().height += item.height;

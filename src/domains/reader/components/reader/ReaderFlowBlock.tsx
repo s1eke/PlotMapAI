@@ -15,6 +15,7 @@ import type {
 } from '../../utils/readerImageGallery';
 
 interface ReaderFlowBlockProps {
+  chapterTitle?: string;
   imageRenderMode: 'paged' | 'scroll';
   item: StaticReaderNode;
   novelId: number;
@@ -46,6 +47,7 @@ interface RenderTextItem {
   lines: StaticTextLine[];
   marginAfter: number;
   marginBefore: number;
+  text: string;
 }
 
 function serializeTextLines(lines: StaticTextLine[]): string {
@@ -88,6 +90,7 @@ function ReaderLayoutImage({
 }
 
 export default function ReaderFlowBlock({
+  chapterTitle,
   imageRenderMode,
   item,
   novelId,
@@ -125,6 +128,7 @@ export default function ReaderFlowBlock({
         lines: item.lines,
         marginAfter: item.marginAfter,
         marginBefore: item.marginBefore,
+        text: item.block.text ?? '',
       };
     }
   } else {
@@ -155,6 +159,7 @@ export default function ReaderFlowBlock({
         lines: pageTextItem.lines,
         marginAfter: pageTextItem.marginAfter,
         marginBefore: pageTextItem.marginBefore,
+        text: pageTextItem.text,
       };
     }
   }
@@ -228,6 +233,9 @@ export default function ReaderFlowBlock({
     lineHeight: `${textItem.lineHeightPx}px`,
   } satisfies CSSProperties;
   const serializedText = serializeTextLines(textItem.lines);
+  const renderedText = textItem.kind === 'heading'
+    ? chapterTitle ?? textItem.text
+    : serializedText;
 
   return (
     <div
@@ -245,10 +253,11 @@ export default function ReaderFlowBlock({
           style={{
             ...textStyle,
             overflow: 'hidden',
-            whiteSpace: 'pre',
+            overflowWrap: 'anywhere',
+            whiteSpace: 'pre-wrap',
           }}
         >
-          {serializedText}
+          {renderedText}
         </h2>
       ) : (
         <div
@@ -260,7 +269,7 @@ export default function ReaderFlowBlock({
             whiteSpace: 'pre',
           }}
         >
-          {serializedText}
+          {renderedText}
         </div>
       )}
     </div>

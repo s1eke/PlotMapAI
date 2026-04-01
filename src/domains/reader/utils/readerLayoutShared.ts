@@ -101,6 +101,7 @@ export function buildReaderBlocks(
   chapter: ChapterContent,
   paragraphSpacing: number,
 ): ReaderBlock[] {
+  // The chapter title is the single source of truth for every rendered heading.
   const blocks: ReaderBlock[] = [{
     chapterIndex: chapter.index,
     blockIndex: 0,
