@@ -606,4 +606,76 @@ describe('useScrollReaderController', () => {
       animationFrames.restore();
     }
   });
+
+  it('clears visible block ranges cleanly after the scroll controller is disabled', async () => {
+    const animationFrames = createAnimationFrameController();
+    const currentChapter = createChapter(
+      0,
+      1,
+      Array.from({ length: 12 }, (_, index) => `Paragraph ${index + 1}`).join('\n'),
+    );
+    const contentRef = {
+      current: makeContainer({
+        clientHeight: 400,
+        scrollHeight: 3200,
+      }),
+    };
+    const chapterBodyElement = makeChapterBodyElement({
+      height: 2400,
+      offsetTop: 80,
+      top: 80,
+    });
+    const contextValue = createReaderPageContextValue({
+      contentRef,
+      chapterCacheRef: {
+        current: new Map([[currentChapter.index, currentChapter]]),
+      },
+    });
+    const props = createHookProps({
+      chapterIndex: 0,
+      chapters: [{ index: 0, title: 'Chapter 1', wordCount: 100 }],
+      currentChapter,
+    });
+
+    try {
+      const { result, rerender } = renderHook(
+        (hookProps: ReturnType<typeof createHookProps>) => useScrollReaderController(hookProps),
+        {
+          initialProps: props,
+          wrapper: ({ children }: { children: ReactNode }) => ReaderPageContextProvider({
+            value: contextValue,
+            children,
+          }),
+        },
+      );
+
+      act(() => {
+        result.current.handleScrollChapterBodyElement(0, chapterBodyElement);
+      });
+
+      await animationFrames.flushAnimationFrames();
+
+      await waitFor(() => {
+        expect(result.current.visibleScrollBlockRangeByChapter.size).toBeGreaterThan(0);
+      });
+
+      rerender({
+        ...props,
+        enabled: false,
+      });
+      await animationFrames.flushAnimationFrames();
+
+      expect(result.current.visibleScrollBlockRangeByChapter.size).toBe(0);
+
+      rerender({
+        ...props,
+        enabled: false,
+      });
+      await animationFrames.flushAnimationFrames();
+
+      expect(result.current.visibleScrollBlockRangeByChapter.size).toBe(0);
+    } finally {
+      animationFrames.restore();
+    }
+  });
 });

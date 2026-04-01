@@ -65,6 +65,31 @@ type VisibleScrollBlockRange =
     ? Range
     : never;
 
+const EMPTY_PAGED_CHAPTERS: ChapterContent[] = [];
+const EMPTY_SCROLL_READER_CHAPTERS: Array<{ index: number; chapter: ChapterContent }> = [];
+
+function areVisibleScrollBlockRangesEqual(
+  previousRanges: ReadonlyMap<number, VisibleScrollBlockRange>,
+  nextRanges: ReadonlyMap<number, VisibleScrollBlockRange>,
+): boolean {
+  if (previousRanges.size !== nextRanges.size) {
+    return false;
+  }
+
+  for (const [chapterIndex, nextRange] of nextRanges) {
+    const previousRange = previousRanges.get(chapterIndex);
+    if (
+      !previousRange
+      || previousRange.startIndex !== nextRange.startIndex
+      || previousRange.endIndex !== nextRange.endIndex
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 export interface UseScrollReaderControllerResult {
   handleContentScroll: () => void;
   handleScrollChapterBodyElement: (
@@ -125,17 +150,17 @@ export function useScrollReaderController({
     resolveScrollLocatorOffsetRef,
   } = useReaderPageContext();
   const [scrollModeChapters, setScrollModeChapters] = useState<number[]>([]);
-  const [scrollReaderChapters, setScrollReaderChapters] = useState<
-    Array<{ index: number; chapter: ChapterContent }>
-  >([]);
   const [visibleScrollBlockRangeByChapter, setVisibleScrollBlockRangeByChapter] =
     useState<Map<number, VisibleScrollBlockRange>>(new Map());
 
   useEffect(() => {
     if (!enabled) {
-      setScrollModeChapters([]);
-      setScrollReaderChapters([]);
-      setVisibleScrollBlockRangeByChapter(new Map());
+      setScrollModeChapters((previousWindow) => (
+        previousWindow.length === 0 ? previousWindow : []
+      ));
+      setVisibleScrollBlockRangeByChapter((previousRanges) => (
+        previousRanges.size === 0 ? previousRanges : new Map()
+      ));
       scrollChapterElementsBridgeRef.current.clear();
       scrollChapterBodyElementsBridgeRef.current.clear();
     }
@@ -207,11 +232,15 @@ export function useScrollReaderController({
     setChapterIndex,
   ]);
 
+  const fetchScrollChapterContent = useCallback((index: number) => {
+    return fetchChapterContent(index);
+  }, [fetchChapterContent]);
+
   const scrollMode = useScrollModeChapters(
     contentRef,
     enabled,
     chapters,
-    (index) => fetchChapterContent(index),
+    fetchScrollChapterContent,
     preloadAdjacent,
     scrollModeChapters,
     setScrollModeChapters,
@@ -233,16 +262,24 @@ export function useScrollReaderController({
     };
   }, [getCurrentAnchor, getCurrentAnchorRef]);
 
-  useEffect(() => {
-    setScrollReaderChapters(
-      scrollModeChapters
-        .map((index) => {
-          const chapter = chapterCacheRef.current.get(index);
-          return chapter ? { index, chapter } : null;
-        })
-        .filter((item): item is { index: number; chapter: ChapterContent } => Boolean(item)),
-    );
-  }, [chapterCacheRef, contentVersion, currentChapter, scrollModeChapters]);
+  const scrollReaderChapterCacheVersion = contentVersion;
+  const scrollReaderChapters = useMemo(() => {
+    if (!enabled) {
+      return EMPTY_SCROLL_READER_CHAPTERS;
+    }
+
+    // Recompute against the mutable chapter cache when chapter hydration advances.
+    if (scrollReaderChapterCacheVersion < 0) {
+      return EMPTY_SCROLL_READER_CHAPTERS;
+    }
+
+    return scrollModeChapters
+      .map((index) => {
+        const chapter = chapterCacheRef.current.get(index);
+        return chapter ? { index, chapter } : null;
+      })
+      .filter((item): item is { index: number; chapter: ChapterContent } => Boolean(item));
+  }, [chapterCacheRef, enabled, scrollModeChapters, scrollReaderChapterCacheVersion]);
 
   const renderCache = useReaderRenderCache({
     chapters,
@@ -253,10 +290,10 @@ export function useScrollReaderController({
     isPagedMode: false,
     lineSpacing: preferences.lineSpacing,
     novelId,
-    pagedChapters: [],
+    pagedChapters: EMPTY_PAGED_CHAPTERS,
     pagedViewportElement: null,
     paragraphSpacing: preferences.paragraphSpacing,
-    scrollChapters: enabled ? scrollReaderChapters : [],
+    scrollChapters: enabled ? scrollReaderChapters : EMPTY_SCROLL_READER_CHAPTERS,
     viewMode: 'original',
   });
 
@@ -331,27 +368,11 @@ export function useScrollReaderController({
         viewMode: 'original',
       });
 
-      setVisibleScrollBlockRangeByChapter((previousRanges) => {
-        if (previousRanges.size === nextRanges.size) {
-          let matches = true;
-          for (const [chapterKey, nextRange] of nextRanges) {
-            const previousRange = previousRanges.get(chapterKey);
-            if (
-              !previousRange
-              || previousRange.startIndex !== nextRange.startIndex
-              || previousRange.endIndex !== nextRange.endIndex
-            ) {
-              matches = false;
-              break;
-            }
-          }
-          if (matches) {
-            return previousRanges;
-          }
-        }
-
-        return nextRanges;
-      });
+      setVisibleScrollBlockRangeByChapter((previousRanges) => (
+        areVisibleScrollBlockRangesEqual(previousRanges, nextRanges)
+          ? previousRanges
+          : nextRanges
+      ));
     });
 
     return () => {

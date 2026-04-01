@@ -285,7 +285,9 @@ export function useReaderRenderCache({
   const [readerTelemetryEnabled, setReaderTelemetryEnabled] = useState(() => isDebugFeatureEnabled('readerTelemetry'));
   const readerTelemetryEnabledRef = useRef(readerTelemetryEnabled);
   const pendingPreheatCountRef = useRef(pendingPreheatCount);
+  const fetchChapterContentRef = useRef(fetchChapterContent);
   const loadedChaptersRef = useRef<Map<number, ChapterContent>>(new Map());
+  const currentChapterIndex = currentChapter?.index ?? null;
   const hasRenderableContent = Boolean(currentChapter)
     || pagedChapters.length > 0
     || scrollChapters.length > 0;
@@ -300,6 +302,10 @@ export function useReaderRenderCache({
   useEffect(() => {
     pendingPreheatCountRef.current = pendingPreheatCount;
   }, [pendingPreheatCount]);
+
+  useEffect(() => {
+    fetchChapterContentRef.current = fetchChapterContent;
+  }, [fetchChapterContent]);
 
   useEffect(() => {
     const nextLoadedChapters = new Map<number, ChapterContent>();
@@ -423,16 +429,27 @@ export function useReaderRenderCache({
         keys.add(imageKey);
       }
     }
-    return Array.from(keys.values());
+    return Array.from(keys.values()).sort();
   }, [currentChapter, pagedChapters, scrollChapters]);
+  const loadedImageKeySignature = useMemo(
+    () => loadedImageKeys.join('\u0000'),
+    [loadedImageKeys],
+  );
+  const stableLoadedImageKeysRef = useRef(loadedImageKeys);
+  const stableLoadedImageKeySignatureRef = useRef(loadedImageKeySignature);
+  if (stableLoadedImageKeySignatureRef.current !== loadedImageKeySignature) {
+    stableLoadedImageKeySignatureRef.current = loadedImageKeySignature;
+    stableLoadedImageKeysRef.current = loadedImageKeys;
+  }
 
   useEffect(() => {
-    if (!novelId || loadedImageKeys.length === 0) {
+    const imageKeys = stableLoadedImageKeysRef.current;
+    if (!novelId || imageKeys.length === 0) {
       return;
     }
 
     let cancelled = false;
-    preloadReaderImageResources(novelId, loadedImageKeys)
+    preloadReaderImageResources(novelId, imageKeys)
       .finally(() => {
         if (!cancelled) {
           setImageRevision((previous) => previous + 1);
@@ -442,7 +459,7 @@ export function useReaderRenderCache({
     return () => {
       cancelled = true;
     };
-  }, [loadedImageKeys, novelId]);
+  }, [loadedImageKeySignature, novelId]);
 
   const visibleTargets = useMemo(() => {
     const targets: VisibleRenderTarget[] = [];
@@ -663,7 +680,7 @@ export function useReaderRenderCache({
   }, [visibleResults]);
 
   const preheatTargets = useMemo(() => {
-    if (!currentChapter || chapters.length === 0) {
+    if (currentChapterIndex === null || chapters.length === 0) {
       return [] as PreheatTarget[];
     }
 
@@ -684,7 +701,7 @@ export function useReaderRenderCache({
 
     for (const variantFamily of RENDER_VARIANTS) {
       if (variantFamily !== activeVariant) {
-        pushTarget(currentChapter.index, variantFamily, 'render-tree');
+        pushTarget(currentChapterIndex, variantFamily, 'render-tree');
       }
     }
 
@@ -693,8 +710,8 @@ export function useReaderRenderCache({
     }
 
     for (let distance = 1; distance < chapters.length; distance += 1) {
-      const previousIndex = currentChapter.index - distance;
-      const nextIndex = currentChapter.index + distance;
+      const previousIndex = currentChapterIndex - distance;
+      const nextIndex = currentChapterIndex + distance;
 
       if (previousIndex >= 0) {
         pushTarget(previousIndex, activeVariant, 'manifest');
@@ -706,10 +723,10 @@ export function useReaderRenderCache({
     }
 
     return targets;
-  }, [activeVariant, chapters.length, currentChapter]);
+  }, [activeVariant, chapters.length, currentChapterIndex]);
 
   useEffect(() => {
-    if (!novelId || !currentChapter || preheatTargets.length === 0) {
+    if (!novelId || currentChapterIndex === null || preheatTargets.length === 0) {
       setIsPreheating((previousState) => (previousState ? false : previousState));
       setPendingPreheatCount((previousCount) => (previousCount === 0 ? previousCount : 0));
       return;
@@ -749,7 +766,7 @@ export function useReaderRenderCache({
             const controller = new AbortController();
             controllers.add(controller);
             try {
-              chapter = await fetchChapterContent(target.chapterIndex, {
+              chapter = await fetchChapterContentRef.current(target.chapterIndex, {
                 signal: controller.signal,
               });
               if (!cancelled) {
@@ -896,7 +913,13 @@ export function useReaderRenderCache({
         controller.abort();
       }
     };
-  }, [currentChapter, fetchChapterContent, novelId, preheatTargets, typography, variantSignatures]);
+  }, [
+    currentChapterIndex,
+    novelId,
+    preheatTargets,
+    typography,
+    variantSignatures,
+  ]);
 
   useEffect(() => {
     return () => {

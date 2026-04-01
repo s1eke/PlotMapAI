@@ -1,5 +1,6 @@
 import type { ComponentProps } from 'react';
 import type { AppError } from '@shared/errors';
+import type { ReaderImageViewerProps } from '../../components/reader/ReaderImageViewer';
 
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -14,7 +15,7 @@ import { translateAppError } from '@shared/errors';
 import { cn } from '@shared/utils/cn';
 
 interface ReaderPageLayoutProps {
-  imageViewerProps: ComponentProps<typeof ReaderImageViewer>;
+  imageViewerProps: ReaderImageViewerProps;
   pageBgClassName: string;
   readerError: AppError | null;
   sidebarProps: ComponentProps<typeof ReaderSidebar>;

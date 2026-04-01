@@ -15,16 +15,6 @@ export interface ReaderImageActivationPayload {
 
 export type ReaderImageGalleryEntry = ChapterImageGalleryEntry;
 
-export interface ReaderImageViewerState {
-  activeEntry: ReaderImageGalleryEntry | null;
-  isIndexLoading: boolean;
-  isOpen: boolean;
-  originRect: DOMRect | null;
-  scale: number;
-  translateX: number;
-  translateY: number;
-}
-
 export function buildReaderImageGalleryEntries(
   chapter: Pick<ChapterContent, 'content' | 'index' | 'title'>,
 ): ReaderImageGalleryEntry[] {

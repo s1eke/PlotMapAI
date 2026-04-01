@@ -284,12 +284,20 @@ export default function PagedReaderContent({
   const [pendingCommittedPageOverride, setPendingCommittedPageOverride] =
     useState<PendingCommittedPageOverride | null>(null);
   const dragAnimationRef = useRef<AnimationPlaybackControls | null>(null);
+  const pagedViewportRefBridgeRef = useRef(pagedViewportRef);
   const suppressNextClickRef = useRef(false);
   const dragOffset = useMotionValue(0);
-  const handlePagedViewportRef = useCallback((element: HTMLDivElement | null) => {
-    setViewportElement(element);
-    assignPagedViewportRef(pagedViewportRef, element);
+
+  useEffect(() => {
+    pagedViewportRefBridgeRef.current = pagedViewportRef;
   }, [pagedViewportRef]);
+
+  const handlePagedViewportRef = useCallback((element: HTMLDivElement | null) => {
+    setViewportElement((previousElement) => (
+      previousElement === element ? previousElement : element
+    ));
+    assignPagedViewportRef(pagedViewportRefBridgeRef.current, element);
+  }, []);
   const fallbackViewportWidth = useMemo(
     () => getFallbackViewportWidth(currentLayout, fitsTwoColumns, twoColumnGap, twoColumnWidth),
     [currentLayout, fitsTwoColumns, twoColumnGap, twoColumnWidth],

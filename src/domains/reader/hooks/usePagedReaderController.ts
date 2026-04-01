@@ -25,6 +25,9 @@ type PagedReaderLayout =
     ? Layout
     : never;
 
+const EMPTY_PAGED_CHAPTERS: ChapterContent[] = [];
+const EMPTY_SCROLL_CHAPTERS: Array<{ chapter: ChapterContent; index: number }> = [];
+
 interface PagedReaderControllerPreferences {
   fontSize: number;
   lineSpacing: number;
@@ -165,7 +168,9 @@ export function usePagedReaderController({
 
   const handlePagedViewportRef = useCallback((element: HTMLDivElement | null) => {
     pagedViewportRef.current = element;
-    setPagedViewportElement(element);
+    setPagedViewportElement((previousElement) => (
+      previousElement === element ? previousElement : element
+    ));
   }, [pagedViewportRef]);
   const handlePagedContentRef = useCallback((element: HTMLDivElement | null) => {
     pagedContentRef.current = element;
@@ -173,7 +178,7 @@ export function usePagedReaderController({
 
   const pagedChapters = useMemo(() => {
     if (!enabled) {
-      return [];
+      return EMPTY_PAGED_CHAPTERS;
     }
 
     const chaptersToLayout = new Map<number, ChapterContent>();
@@ -197,7 +202,7 @@ export function usePagedReaderController({
     pagedChapters,
     pagedViewportElement,
     paragraphSpacing: preferences.paragraphSpacing,
-    scrollChapters: [],
+    scrollChapters: EMPTY_SCROLL_CHAPTERS,
     viewMode: 'original',
   });
 

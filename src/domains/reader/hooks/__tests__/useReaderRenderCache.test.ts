@@ -437,6 +437,141 @@ describe('useReaderRenderCache', () => {
     );
   });
 
+  it('does not retrigger image preload forever when chapter arrays get recreated on rerender', async () => {
+    const currentChapter = {
+      ...createChapter(0, 1),
+      content: 'Before image\n[IMG:cover]\nAfter image',
+    };
+    const viewport = createViewport();
+    const contentRef = { current: viewport };
+
+    renderHook(() => useReaderRenderCache({
+      chapters: [{ index: 0, title: 'Chapter 1', wordCount: 120 }],
+      contentRef,
+      currentChapter,
+      fetchChapterContent: async (index: number) => createChapter(index, 1),
+      fontSize: 18,
+      isPagedMode: false,
+      lineSpacing: 1.8,
+      novelId: 7,
+      pagedChapters: [],
+      pagedViewportElement: viewport,
+      paragraphSpacing: 16,
+      scrollChapters: [{ chapter: currentChapter, index: currentChapter.index }],
+      viewMode: 'original',
+    }));
+
+    await waitFor(() => {
+      expect(imageCacheMock.preloadReaderImageResources).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('does not restart preheating when the current chapter object is recreated with the same index', async () => {
+    const currentChapter = createChapter(0, 1);
+    const viewport = createViewport();
+    const contentRef = { current: viewport };
+    const chapters = [{ index: 0, title: 'Chapter 1', wordCount: 120 }];
+    const fetchChapterContent = async (index: number) => createChapter(index, 1);
+
+    const { result, rerender } = renderHook(
+      ({ nextCurrentChapter }: { nextCurrentChapter: ChapterContent }) => useReaderRenderCache({
+        chapters,
+        contentRef,
+        currentChapter: nextCurrentChapter,
+        fetchChapterContent,
+        fontSize: 18,
+        isPagedMode: false,
+        lineSpacing: 1.8,
+        novelId: 11,
+        pagedChapters: [],
+        pagedViewportElement: viewport,
+        paragraphSpacing: 16,
+        scrollChapters: [{ chapter: nextCurrentChapter, index: nextCurrentChapter.index }],
+        viewMode: 'original',
+      }),
+      {
+        initialProps: { nextCurrentChapter: currentChapter },
+      },
+    );
+
+    await waitFor(() => {
+      expect(result.current.isPreheating).toBe(false);
+      expect(result.current.pendingPreheatCount).toBe(0);
+    });
+    const initialDexieLookupCount =
+      renderCacheMock.getReaderRenderCacheRecordFromDexie.mock.calls.length;
+    expect(initialDexieLookupCount).toBeGreaterThan(0);
+
+    rerender({
+      nextCurrentChapter: {
+        ...currentChapter,
+      },
+    });
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(
+      renderCacheMock.getReaderRenderCacheRecordFromDexie,
+    ).toHaveBeenCalledTimes(initialDexieLookupCount);
+  });
+
+  it('does not restart preheating when fetchChapterContent gets a new function identity', async () => {
+    const currentChapter = createChapter(0, 1);
+    const viewport = createViewport();
+    const contentRef = { current: viewport };
+    const chapters = [{ index: 0, title: 'Chapter 1', wordCount: 120 }];
+    const createFetchChapterContent = () => async (index: number) => createChapter(index, 1);
+
+    const { result, rerender } = renderHook(
+      ({ nextFetchChapterContent }: {
+        nextFetchChapterContent: (index: number) => Promise<ChapterContent>;
+      }) => useReaderRenderCache({
+        chapters,
+        contentRef,
+        currentChapter,
+        fetchChapterContent: nextFetchChapterContent,
+        fontSize: 18,
+        isPagedMode: false,
+        lineSpacing: 1.8,
+        novelId: 13,
+        pagedChapters: [],
+        pagedViewportElement: viewport,
+        paragraphSpacing: 16,
+        scrollChapters: [{ chapter: currentChapter, index: currentChapter.index }],
+        viewMode: 'original',
+      }),
+      {
+        initialProps: {
+          nextFetchChapterContent: createFetchChapterContent(),
+        },
+      },
+    );
+
+    await waitFor(() => {
+      expect(result.current.isPreheating).toBe(false);
+      expect(result.current.pendingPreheatCount).toBe(0);
+    });
+    const initialDexieLookupCount =
+      renderCacheMock.getReaderRenderCacheRecordFromDexie.mock.calls.length;
+    expect(initialDexieLookupCount).toBeGreaterThan(0);
+
+    rerender({
+      nextFetchChapterContent: createFetchChapterContent(),
+    });
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(
+      renderCacheMock.getReaderRenderCacheRecordFromDexie,
+    ).toHaveBeenCalledTimes(initialDexieLookupCount);
+  });
+
   it('logs reader layout snapshots with visible counts and cache source breakdowns', async () => {
     debugFeatureState.set('readerTelemetry', true);
     const currentChapter = createChapter(0, 1);

@@ -5,6 +5,9 @@ import type { ReaderImageGalleryEntry } from '../../../utils/readerImageGallery'
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+const clearReaderImageResourcesForNovelMock = vi.hoisted(() => vi.fn());
+const preloadReaderImageResourcesMock = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+
 import {
   ReaderPageContextProvider,
 } from '../ReaderPageContext';
@@ -15,6 +18,11 @@ vi.mock('../../../api/readerApi', () => ({
   readerApi: {
     getImageGalleryEntries: vi.fn(),
   },
+}));
+
+vi.mock('../../../utils/readerImageResourceCache', () => ({
+  clearReaderImageResourcesForNovel: clearReaderImageResourcesForNovelMock,
+  preloadReaderImageResources: preloadReaderImageResourcesMock,
 }));
 
 function createDeferred<T>() {
@@ -73,6 +81,7 @@ describe('useReaderPageImageOverlay', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(readerApi.getImageGalleryEntries).mockResolvedValue([]);
+    preloadReaderImageResourcesMock.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -279,5 +288,61 @@ describe('useReaderPageImageOverlay', () => {
     expect(result.current.imageViewerProps.activeEntry).toEqual(
       createEntry(1, 0, 'second', 0),
     );
+  });
+
+  it('preloads the current image with adjacent neighbors once the viewer opens', async () => {
+    vi.mocked(readerApi.getImageGalleryEntries).mockResolvedValueOnce([
+      createEntry(0, 0, 'first', 0),
+      createEntry(1, 0, 'second', 0),
+      createEntry(1, 1, 'third', 1),
+    ]);
+
+    const contextValue = createReaderPageContextValue(1);
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <ReaderPageContextProvider value={contextValue}>
+        {children}
+      </ReaderPageContextProvider>
+    );
+    const { result } = renderHook(
+      ({ isEnabled }) => useReaderPageImageOverlay({
+        dismissBlockedInteraction: vi.fn(),
+        isEnabled,
+      }),
+      {
+        initialProps: { isEnabled: true },
+        wrapper,
+      },
+    );
+
+    await waitFor(() => {
+      expect(result.current.imageViewerProps.entries).toHaveLength(3);
+    });
+    preloadReaderImageResourcesMock.mockClear();
+
+    const sourceElement = document.createElement('button');
+    Object.defineProperty(sourceElement, 'getBoundingClientRect', {
+      configurable: true,
+      value: () => new DOMRect(0, 0, 20, 20),
+    });
+
+    act(() => {
+      result.current.handleImageActivate({
+        blockIndex: 0,
+        chapterIndex: 1,
+        imageKey: 'second',
+        sourceElement,
+      });
+    });
+
+    await waitFor(() => {
+      expect(preloadReaderImageResourcesMock).toHaveBeenCalledTimes(1);
+    });
+
+    const [preloadedNovelId, preloadedKeys] = preloadReaderImageResourcesMock.mock.calls[0] as [
+      number,
+      Set<string>,
+    ];
+    expect(preloadedNovelId).toBe(1);
+    expect(Array.from(preloadedKeys)).toEqual(['second', 'first', 'third']);
   });
 });

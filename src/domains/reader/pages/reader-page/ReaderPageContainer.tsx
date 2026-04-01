@@ -54,6 +54,9 @@ export default function ReaderPageContainer() {
   const handleChapterDataSuppressScrollSync = useCallback(() => {
     suppressScrollSyncTemporarilyRef.current();
   }, []);
+  const handleChapterContentResolved = useCallback(() => {
+    setChapterContentVersion((previousVersion) => previousVersion + 1);
+  }, []);
 
   const preferences = useReaderPreferences();
   const sidebar = useSidebarDrag();
@@ -93,9 +96,7 @@ export default function ReaderPageContainer() {
     setMode,
     chapterChangeSourceRef,
     suppressScrollSyncTemporarily: handleChapterDataSuppressScrollSync,
-    onChapterContentResolved: () => {
-      setChapterContentVersion((previousVersion) => previousVersion + 1);
-    },
+    onChapterContentResolved: handleChapterContentResolved,
   });
 
   const restoreFlow = useReaderRestoreFlow({
