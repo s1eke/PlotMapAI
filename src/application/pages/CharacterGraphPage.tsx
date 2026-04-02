@@ -9,7 +9,7 @@ import { appPaths } from '@app/router/paths';
 import { reportAppError } from '@app/debug/service';
 import {
   CharacterGraphStage,
-  useCharacterGraphCanvas,
+  useCharacterGraphCanvasController,
 } from '@domains/character-graph';
 import type { CharacterGraphResponse } from '@shared/contracts';
 import type { NovelView } from '@domains/library';
@@ -40,7 +40,7 @@ export default function CharacterGraphPage() {
   const [actionError, setActionError] = useState<AppError | null>(null);
   const [isMobile, setIsMobile] = useState<boolean>(getIsMobileViewport);
 
-  const canvas = useCharacterGraphCanvas({ graph, isLoading, isMobile, t });
+  const canvas = useCharacterGraphCanvasController({ graph, isMobile, t });
 
   const loadData = useCallback(async () => {
     if (!Number.isFinite(novelId) || novelId <= 0) {
@@ -195,49 +195,26 @@ export default function CharacterGraphPage() {
   }
 
   let actionBannerMessage = actionMessage;
-  if (canvas.layoutError) {
-    actionBannerMessage = translateAppError(canvas.layoutError, t, 'characterGraph.loadError');
+  if (canvas.layout.error) {
+    actionBannerMessage = translateAppError(canvas.layout.error, t, 'characterGraph.loadError');
   } else if (actionError) {
     actionBannerMessage = translateAppError(actionError, t, 'characterGraph.refreshFailed');
   }
 
   return (
     <CharacterGraphStage
+      canvas={canvas}
       fullscreenRef={fullscreenRef}
       actionMessage={actionBannerMessage}
       backHref={appPaths.novel(novel.id)}
-      canPanCanvas={canvas.canPanCanvas}
       canRefreshOverview={canRefreshOverview}
-      focusNodeId={canvas.focusNodeId}
       graphGeneratedAt={graph.meta.generatedAt}
-      highlightedNodeIds={canvas.highlightedNodeIds}
       isComplete={graph.meta.isComplete}
       isFullscreen={isFullscreen}
-      isGestureInteracting={canvas.isGestureInteracting}
-      isLayoutComputing={canvas.isLayoutComputing}
       isMobile={isMobile}
-      isPanning={canvas.isPanning}
       isRefreshingOverview={isRefreshingOverview}
-      layoutEdges={canvas.layoutEdges}
-      layoutMessage={canvas.layoutMessage}
-      layoutNodes={canvas.layoutNodes}
-      layoutProgress={canvas.layoutProgress}
       novelTitle={novel.title}
-      relatedEdges={canvas.relatedEdges}
-      selectedNode={canvas.selectedNode}
-      selectedNodeId={canvas.selectedNodeId}
-      stageHeight={canvas.stageHeight}
-      stageMeta={canvas.stageMeta}
-      zoomState={canvas.zoomState}
-      svgRef={canvas.svgRef}
-      onCanvasPointerDown={canvas.handleCanvasPointerDown}
-      onClearSelection={canvas.clearSelection}
-      onNodeMouseEnter={canvas.handleNodeMouseEnter}
-      onNodeMouseLeave={canvas.handleNodeMouseLeave}
-      onNodePointerDown={canvas.handleNodePointerDown}
       onRefreshOverview={handleRefreshOverview}
-      onResetLayout={canvas.resetLayout}
-      onSelectNode={canvas.selectNode}
       onToggleFullscreen={toggleFullscreen}
     />
   );

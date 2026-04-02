@@ -8,7 +8,7 @@ import {
 } from '@application/use-cases/library';
 import { refreshAnalysisOverview } from '@application/use-cases/analysis';
 import { createAppError, AppErrorCode } from '@shared/errors';
-import { useCharacterGraphCanvas } from '@domains/character-graph';
+import { useCharacterGraphCanvasController } from '@domains/character-graph';
 
 import CharacterGraphPage from '../CharacterGraphPage';
 
@@ -25,7 +25,7 @@ vi.mock('@application/use-cases/analysis', () => ({
 }));
 
 vi.mock('@domains/character-graph', () => ({
-  useCharacterGraphCanvas: vi.fn(),
+  useCharacterGraphCanvasController: vi.fn(),
   CharacterGraphStage: ({
     actionMessage,
     canRefreshOverview,
@@ -62,34 +62,44 @@ function renderPage(initialEntry = '/novel/1/graph') {
 
 function createCanvasState() {
   return {
-    canPanCanvas: false,
-    clearSelection: vi.fn(),
-    focusNodeId: null,
-    handleCanvasPointerDown: vi.fn(),
-    handleNodeMouseEnter: vi.fn(),
-    handleNodeMouseLeave: vi.fn(),
-    handleNodePointerDown: vi.fn(),
-    highlightedNodeIds: new Set<string>(),
-    isGestureInteracting: false,
-    isLayoutComputing: false,
-    isPanning: false,
-    layoutEdges: [],
-    layoutError: null,
-    layoutMessage: null,
-    layoutNodes: [],
-    layoutProgress: 0,
-    relatedEdges: [],
-    resetLayout: vi.fn(),
-    selectNode: vi.fn(),
-    selectedNode: null,
-    selectedNodeId: null,
-    stageHeight: 960,
-    stageMeta: [],
-    svgRef: { current: null },
-    zoomState: {
-      offsetX: 0,
-      offsetY: 0,
-      scale: 1,
+    actions: {
+      clearSelection: vi.fn(),
+      resetLayout: vi.fn(),
+      selectNode: vi.fn(),
+    },
+    bindings: {
+      onCanvasPointerDown: vi.fn(),
+      onNodeMouseEnter: vi.fn(),
+      onNodeMouseLeave: vi.fn(),
+      onNodePointerDown: vi.fn(),
+      svgRef: { current: null },
+    },
+    gesture: {
+      isInteracting: false,
+      isPanning: false,
+    },
+    layout: {
+      edges: [],
+      error: null,
+      focusNodeId: null,
+      highlightedNodeIds: new Set<string>(),
+      isComputing: false,
+      message: null,
+      nodes: [],
+      progress: 0,
+      relatedEdges: [],
+      selectedNode: null,
+      selectedNodeId: null,
+      stageHeight: 960,
+      stageMeta: [],
+    },
+    viewport: {
+      canPanCanvas: false,
+      zoomState: {
+        offsetX: 0,
+        offsetY: 0,
+        scale: 1,
+      },
     },
   };
 }
@@ -163,7 +173,7 @@ describe('application CharacterGraphPage', () => {
       },
       overview: null,
     });
-    vi.mocked(useCharacterGraphCanvas).mockReturnValue(createCanvasState());
+    vi.mocked(useCharacterGraphCanvasController).mockReturnValue(createCanvasState());
   });
 
   it('loads graph data and refreshes the overview through application use-cases', async () => {
@@ -179,15 +189,18 @@ describe('application CharacterGraphPage', () => {
   });
 
   it('surfaces layout errors from the graph canvas controller', async () => {
-    vi.mocked(useCharacterGraphCanvas).mockReturnValue({
+    vi.mocked(useCharacterGraphCanvasController).mockReturnValue({
       ...createCanvasState(),
-      layoutError: createAppError({
-        code: AppErrorCode.WORKER_UNAVAILABLE,
-        debugMessage: 'worker unavailable',
-        kind: 'unsupported',
-        source: 'character-graph',
-        userMessageKey: 'errors.WORKER_UNAVAILABLE',
-      }),
+      layout: {
+        ...createCanvasState().layout,
+        error: createAppError({
+          code: AppErrorCode.WORKER_UNAVAILABLE,
+          debugMessage: 'worker unavailable',
+          kind: 'unsupported',
+          source: 'character-graph',
+          userMessageKey: 'errors.WORKER_UNAVAILABLE',
+        }),
+      },
     });
 
     renderPage();

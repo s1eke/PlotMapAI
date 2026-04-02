@@ -1,31 +1,14 @@
 import { useTranslation } from 'react-i18next';
-import type { PointerEvent as ReactPointerEvent, RefObject } from 'react';
+import type { CharacterGraphCanvasController } from '../../hooks/useCharacterGraphCanvasController';
 import {
   estimateTextUnits,
   getNodeLabelLayout,
   STAGE_WIDTH,
-  type LayoutEdge,
-  type LayoutNode,
-  type ZoomState,
 } from '../../utils/characterGraphLayout';
 
 interface CharacterGraphCanvasProps {
-  svgRef: RefObject<SVGSVGElement | null>;
-  canPanCanvas: boolean;
-  focusNodeId: string | null;
-  highlightedNodeIds: ReadonlySet<string>;
-  isGestureInteracting: boolean;
+  canvas: Pick<CharacterGraphCanvasController, 'bindings' | 'gesture' | 'layout' | 'viewport'>;
   isMobile: boolean;
-  isPanning: boolean;
-  layoutEdges: LayoutEdge[];
-  layoutNodes: LayoutNode[];
-  selectedNodeId: string | null;
-  stageHeight: number;
-  zoomState: ZoomState;
-  onCanvasPointerDown: (event: ReactPointerEvent<SVGSVGElement>) => void;
-  onNodeMouseEnter: (nodeId: string) => void;
-  onNodeMouseLeave: (nodeId: string) => void;
-  onNodePointerDown: (event: ReactPointerEvent<SVGGElement>, node: LayoutNode) => void;
 }
 
 function resolveInteractionTransition(
@@ -88,44 +71,31 @@ function resolveNodeOuterStroke(nodeIsCore: boolean, isActive: boolean): string 
 }
 
 export default function CharacterGraphCanvas({
-  svgRef,
-  canPanCanvas,
-  focusNodeId,
-  highlightedNodeIds,
-  isGestureInteracting,
+  canvas,
   isMobile,
-  isPanning,
-  layoutEdges,
-  layoutNodes,
-  selectedNodeId,
-  stageHeight,
-  zoomState,
-  onCanvasPointerDown,
-  onNodeMouseEnter,
-  onNodeMouseLeave,
-  onNodePointerDown,
 }: CharacterGraphCanvasProps) {
   const { t } = useTranslation();
+  const { bindings, gesture, layout, viewport } = canvas;
   const opacityTransition = resolveInteractionTransition(
-    isGestureInteracting,
+    gesture.isInteracting,
     isMobile,
     'opacity 140ms ease-out',
     'opacity 220ms ease',
   );
   const transformTransition = resolveInteractionTransition(
-    isGestureInteracting,
+    gesture.isInteracting,
     isMobile,
     'transform 150ms cubic-bezier(0.2, 0.9, 0.2, 1)',
     'transform 240ms cubic-bezier(0.22,1,0.36,1)',
   );
   const colorTransition = resolveInteractionTransition(
-    isGestureInteracting,
+    gesture.isInteracting,
     isMobile,
     'fill 140ms ease-out, stroke 140ms ease-out, stroke-width 140ms ease-out, opacity 140ms ease-out',
     'fill 220ms ease, stroke 220ms ease, stroke-width 220ms ease, opacity 220ms ease',
   );
   const badgeOpacityTransition = resolveInteractionTransition(
-    isGestureInteracting,
+    gesture.isInteracting,
     isMobile,
     'opacity 120ms ease-out',
     'opacity 180ms ease',
@@ -133,15 +103,15 @@ export default function CharacterGraphCanvas({
 
   return (
     <svg
-      ref={svgRef}
-      viewBox={`0 0 ${STAGE_WIDTH} ${stageHeight}`}
+      ref={bindings.svgRef}
+      viewBox={`0 0 ${STAGE_WIDTH} ${layout.stageHeight}`}
       preserveAspectRatio="xMidYMid meet"
       className="relative block h-full w-full"
       style={{
-        cursor: resolveCanvasCursor(isPanning, canPanCanvas),
+        cursor: resolveCanvasCursor(gesture.isPanning, viewport.canPanCanvas),
         touchAction: 'none',
       }}
-      onPointerDown={onCanvasPointerDown}
+      onPointerDown={bindings.onCanvasPointerDown}
     >
       <defs>
         <filter id="node-shadow" x="-80%" y="-80%" width="260%" height="260%">
@@ -156,13 +126,17 @@ export default function CharacterGraphCanvas({
         </filter>
       </defs>
 
-      <rect x="0" y="0" width={STAGE_WIDTH} height={stageHeight} fill="transparent" />
+      <rect x="0" y="0" width={STAGE_WIDTH} height={layout.stageHeight} fill="transparent" />
 
-      <g transform={`matrix(${zoomState.scale} 0 0 ${zoomState.scale} ${zoomState.offsetX} ${zoomState.offsetY})`}>
-        {layoutEdges.map((edge) => {
+      <g
+        transform={`matrix(${viewport.zoomState.scale} 0 0 ${viewport.zoomState.scale} ${viewport.zoomState.offsetX} ${viewport.zoomState.offsetY})`}
+      >
+        {layout.edges.map((edge) => {
           const isHighlighted =
-            !focusNodeId || edge.source === focusNodeId || edge.target === focusNodeId;
-          const opacity = resolveEdgeOpacity(focusNodeId, isHighlighted);
+            !layout.focusNodeId
+            || edge.source === layout.focusNodeId
+            || edge.target === layout.focusNodeId;
+          const opacity = resolveEdgeOpacity(layout.focusNodeId, isHighlighted);
           const strokeWidth = Math.max(1.6, Math.min(5.5, 1.2 + edge.weight / 24));
 
           return (
@@ -188,11 +162,11 @@ export default function CharacterGraphCanvas({
           );
         })}
 
-        {layoutNodes.map((node) => {
-          const isSelected = selectedNodeId === node.id;
-          const isFocused = focusNodeId === node.id;
+        {layout.nodes.map((node) => {
+          const isSelected = layout.selectedNodeId === node.id;
+          const isFocused = layout.focusNodeId === node.id;
           const isActive = isSelected || isFocused;
-          const isVisible = !focusNodeId || highlightedNodeIds.has(node.id);
+          const isVisible = !layout.focusNodeId || layout.highlightedNodeIds.has(node.id);
           const focusedLift = isMobile ? 'translateY(-1px) scale(1.012)' : 'translateY(-2px) scale(1.018)';
           const selectedLift = isMobile ? 'scale(1.006)' : 'scale(1.01)';
           const labelLayout = getNodeLabelLayout(node.name, node.radius);
@@ -204,9 +178,9 @@ export default function CharacterGraphCanvas({
             <g
               key={node.id}
               transform={`translate(${node.x} ${node.y})`}
-              onPointerDown={(event) => onNodePointerDown(event, node)}
-              onMouseEnter={() => onNodeMouseEnter(node.id)}
-              onMouseLeave={() => onNodeMouseLeave(node.id)}
+              onPointerDown={(event) => bindings.onNodePointerDown(event, node)}
+              onMouseEnter={() => bindings.onNodeMouseEnter(node.id)}
+              onMouseLeave={() => bindings.onNodeMouseLeave(node.id)}
               style={{
                 cursor: 'grab',
                 opacity: isVisible ? 1 : 0.16,

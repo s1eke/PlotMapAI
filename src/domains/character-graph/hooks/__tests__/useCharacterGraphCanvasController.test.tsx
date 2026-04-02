@@ -3,7 +3,7 @@ import type { TFunction } from 'i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CharacterGraphResponse } from '@shared/contracts';
 import { STAGE_WIDTH, viewportPointToGraphPoint } from '../../utils/characterGraphLayout';
-import { useCharacterGraphCanvas } from '../useCharacterGraphCanvas';
+import { useCharacterGraphCanvasController } from '../useCharacterGraphCanvasController';
 
 const testT = ((key: string) => key) as TFunction;
 
@@ -98,10 +98,10 @@ function createMockSvg(): SVGSVGElement {
   return svg;
 }
 
-function attachSvg(result: ReturnType<typeof renderHook<typeof useCharacterGraphCanvas>>['result']): SVGSVGElement {
+function attachSvg(result: ReturnType<typeof renderHook<typeof useCharacterGraphCanvasController>>['result']): SVGSVGElement {
   const svg = createMockSvg();
   act(() => {
-    const svgRef = result.current.svgRef as { current: SVGSVGElement | null };
+    const svgRef = result.current.bindings.svgRef as { current: SVGSVGElement | null };
     svgRef.current = svg;
   });
   return svg;
@@ -118,7 +118,7 @@ function createPointerEventData(overrides: Record<string, unknown> = {}) {
   };
 }
 
-describe('useCharacterGraphCanvas', () => {
+describe('useCharacterGraphCanvasController', () => {
   const originalRequestAnimationFrame = window.requestAnimationFrame;
   const originalCancelAnimationFrame = window.cancelAnimationFrame;
 
@@ -137,24 +137,22 @@ describe('useCharacterGraphCanvas', () => {
   });
 
   it('applies a fitted mobile viewport on first render', async () => {
-    const { result } = renderHook(() => useCharacterGraphCanvas({
+    const { result } = renderHook(() => useCharacterGraphCanvasController({
       graph,
-      isLoading: false,
       isMobile: true,
       t: testT,
     }));
 
     await waitFor(() => {
-      expect(result.current.zoomState.scale).toBeGreaterThan(1);
-      expect(result.current.zoomState.offsetY).not.toBe(0);
+      expect(result.current.viewport.zoomState.scale).toBeGreaterThan(1);
+      expect(result.current.viewport.zoomState.offsetY).not.toBe(0);
     });
   });
 
   it('keeps the user-adjusted mobile viewport on rerender with the same graph data', async () => {
     const { result, rerender } = renderHook(
-      ({ graphData, isMobile }) => useCharacterGraphCanvas({
+      ({ graphData, isMobile }) => useCharacterGraphCanvasController({
         graph: graphData,
-        isLoading: false,
         isMobile,
         t: testT,
       }),
@@ -167,13 +165,13 @@ describe('useCharacterGraphCanvas', () => {
     );
 
     await waitFor(() => {
-      expect(result.current.zoomState.scale).toBeGreaterThan(1);
+      expect(result.current.viewport.zoomState.scale).toBeGreaterThan(1);
     });
 
     attachSvg(result);
 
     act(() => {
-      result.current.handleCanvasPointerDown(createPointerEventData({
+      result.current.bindings.onCanvasPointerDown(createPointerEventData({
         pointerId: 1,
         clientX: 50,
         clientY: 50,
@@ -184,34 +182,33 @@ describe('useCharacterGraphCanvas', () => {
     fireEvent.pointerUp(window, { pointerId: 1 });
 
     await waitFor(() => {
-      expect(result.current.zoomState.offsetX).not.toBe(0);
+      expect(result.current.viewport.zoomState.offsetX).not.toBe(0);
     });
 
-    const zoomAfterPan = result.current.zoomState;
+    const zoomAfterPan = result.current.viewport.zoomState;
     rerender({ graphData: graph, isMobile: true });
 
     await waitFor(() => {
-      expect(result.current.zoomState).toEqual(zoomAfterPan);
+      expect(result.current.viewport.zoomState).toEqual(zoomAfterPan);
     });
   });
 
   it('pans the mobile canvas without selecting a node', async () => {
-    const { result } = renderHook(() => useCharacterGraphCanvas({
+    const { result } = renderHook(() => useCharacterGraphCanvasController({
       graph,
-      isLoading: false,
       isMobile: true,
       t: testT,
     }));
 
     await waitFor(() => {
-      expect(result.current.layoutNodes.length).toBeGreaterThan(0);
+      expect(result.current.layout.nodes.length).toBeGreaterThan(0);
     });
 
     attachSvg(result);
-    const initialZoom = result.current.zoomState;
+    const initialZoom = result.current.viewport.zoomState;
 
     act(() => {
-      result.current.handleCanvasPointerDown(createPointerEventData({
+      result.current.bindings.onCanvasPointerDown(createPointerEventData({
         pointerId: 1,
         clientX: 48,
         clientY: 44,
@@ -222,29 +219,28 @@ describe('useCharacterGraphCanvas', () => {
     fireEvent.pointerUp(window, { pointerId: 1 });
 
     await waitFor(() => {
-      expect(result.current.zoomState.offsetX).not.toBe(initialZoom.offsetX);
-      expect(result.current.selectedNodeId).toBeNull();
+      expect(result.current.viewport.zoomState.offsetX).not.toBe(initialZoom.offsetX);
+      expect(result.current.layout.selectedNodeId).toBeNull();
     });
   });
 
   it('keeps node tap selection but treats large movement as dragging instead of a tap', async () => {
-    const { result } = renderHook(() => useCharacterGraphCanvas({
+    const { result } = renderHook(() => useCharacterGraphCanvasController({
       graph,
-      isLoading: false,
       isMobile: true,
       t: testT,
     }));
 
     await waitFor(() => {
-      expect(result.current.layoutNodes.length).toBeGreaterThan(0);
+      expect(result.current.layout.nodes.length).toBeGreaterThan(0);
     });
 
     attachSvg(result);
-    const heroNode = result.current.layoutNodes.find((node) => node.id === 'hero');
+    const heroNode = result.current.layout.nodes.find((node) => node.id === 'hero');
     expect(heroNode).toBeDefined();
 
     act(() => {
-      result.current.handleNodePointerDown(createPointerEventData({
+      result.current.bindings.onNodePointerDown(createPointerEventData({
         pointerId: 1,
         clientX: 50,
         clientY: 50,
@@ -254,17 +250,17 @@ describe('useCharacterGraphCanvas', () => {
     fireEvent.pointerUp(window, { pointerId: 1 });
 
     await waitFor(() => {
-      expect(result.current.selectedNodeId).toBe('hero');
+      expect(result.current.layout.selectedNodeId).toBe('hero');
     });
 
     act(() => {
-      result.current.clearSelection();
+      result.current.actions.clearSelection();
     });
 
-    const initialHeroPosition = result.current.layoutNodes.find((node) => node.id === 'hero');
+    const initialHeroPosition = result.current.layout.nodes.find((node) => node.id === 'hero');
 
     act(() => {
-      result.current.handleNodePointerDown(createPointerEventData({
+      result.current.bindings.onNodePointerDown(createPointerEventData({
         pointerId: 1,
         clientX: 50,
         clientY: 50,
@@ -275,31 +271,30 @@ describe('useCharacterGraphCanvas', () => {
     fireEvent.pointerUp(window, { pointerId: 1 });
 
     await waitFor(() => {
-      const movedHero = result.current.layoutNodes.find((node) => node.id === 'hero');
-      expect(result.current.selectedNodeId).toBeNull();
+      const movedHero = result.current.layout.nodes.find((node) => node.id === 'hero');
+      expect(result.current.layout.selectedNodeId).toBeNull();
       expect(movedHero?.x).not.toBe(initialHeroPosition?.x);
     });
   });
 
   it('lets nodes reach the visible mobile canvas edges while dragging', async () => {
-    const { result } = renderHook(() => useCharacterGraphCanvas({
+    const { result } = renderHook(() => useCharacterGraphCanvasController({
       graph,
-      isLoading: false,
       isMobile: true,
       t: testT,
     }));
 
     await waitFor(() => {
-      expect(result.current.layoutNodes.length).toBeGreaterThan(0);
-      expect(result.current.zoomState.scale).toBeGreaterThan(1);
+      expect(result.current.layout.nodes.length).toBeGreaterThan(0);
+      expect(result.current.viewport.zoomState.scale).toBeGreaterThan(1);
     });
 
     attachSvg(result);
-    const heroNode = result.current.layoutNodes.find((node) => node.id === 'hero');
+    const heroNode = result.current.layout.nodes.find((node) => node.id === 'hero');
     expect(heroNode).toBeDefined();
 
     act(() => {
-      result.current.handleNodePointerDown(createPointerEventData({
+      result.current.bindings.onNodePointerDown(createPointerEventData({
         pointerId: 1,
         clientX: 50,
         clientY: 50,
@@ -310,10 +305,10 @@ describe('useCharacterGraphCanvas', () => {
     fireEvent.pointerUp(window, { pointerId: 1 });
 
     await waitFor(() => {
-      const movedHero = result.current.layoutNodes.find((node) => node.id === 'hero');
+      const movedHero = result.current.layout.nodes.find((node) => node.id === 'hero');
       const visibleBottomRight = viewportPointToGraphPoint(
-        { x: STAGE_WIDTH, y: result.current.stageHeight },
-        result.current.zoomState,
+        { x: STAGE_WIDTH, y: result.current.layout.stageHeight },
+        result.current.viewport.zoomState,
       );
 
       expect(movedHero).toBeDefined();
@@ -323,27 +318,26 @@ describe('useCharacterGraphCanvas', () => {
   });
 
   it('supports pinch zoom on mobile without jumping away from the viewport', async () => {
-    const { result } = renderHook(() => useCharacterGraphCanvas({
+    const { result } = renderHook(() => useCharacterGraphCanvasController({
       graph,
-      isLoading: false,
       isMobile: true,
       t: testT,
     }));
 
     await waitFor(() => {
-      expect(result.current.zoomState.scale).toBeGreaterThan(1);
+      expect(result.current.viewport.zoomState.scale).toBeGreaterThan(1);
     });
 
     attachSvg(result);
-    const initialZoom = result.current.zoomState;
+    const initialZoom = result.current.viewport.zoomState;
 
     act(() => {
-      result.current.handleCanvasPointerDown(createPointerEventData({
+      result.current.bindings.onCanvasPointerDown(createPointerEventData({
         pointerId: 1,
         clientX: 30,
         clientY: 40,
       }) as never);
-      result.current.handleCanvasPointerDown(createPointerEventData({
+      result.current.bindings.onCanvasPointerDown(createPointerEventData({
         pointerId: 2,
         clientX: 70,
         clientY: 40,
@@ -353,14 +347,36 @@ describe('useCharacterGraphCanvas', () => {
     fireEvent.pointerMove(window, { pointerId: 2, clientX: 90, clientY: 40 });
 
     await waitFor(() => {
-      expect(result.current.zoomState.scale).toBeGreaterThan(initialZoom.scale);
+      expect(result.current.viewport.zoomState.scale).toBeGreaterThan(initialZoom.scale);
     });
 
     fireEvent.pointerUp(window, { pointerId: 1 });
     fireEvent.pointerUp(window, { pointerId: 2 });
 
     await waitFor(() => {
-      expect(result.current.isGestureInteracting).toBe(false);
+      expect(result.current.gesture.isInteracting).toBe(false);
     });
+  });
+
+  it('cleans up global pointer listeners on unmount', async () => {
+    const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
+    const removeEventListenerSpy = vi.spyOn(window, 'removeEventListener');
+    const { unmount } = renderHook(() => useCharacterGraphCanvasController({
+      graph,
+      isMobile: true,
+      t: testT,
+    }));
+
+    await waitFor(() => {
+      expect(addEventListenerSpy).toHaveBeenCalledWith('pointermove', expect.any(Function));
+      expect(addEventListenerSpy).toHaveBeenCalledWith('pointerup', expect.any(Function));
+      expect(addEventListenerSpy).toHaveBeenCalledWith('pointercancel', expect.any(Function));
+    });
+
+    unmount();
+
+    expect(removeEventListenerSpy).toHaveBeenCalledWith('pointermove', expect.any(Function));
+    expect(removeEventListenerSpy).toHaveBeenCalledWith('pointerup', expect.any(Function));
+    expect(removeEventListenerSpy).toHaveBeenCalledWith('pointercancel', expect.any(Function));
   });
 });
