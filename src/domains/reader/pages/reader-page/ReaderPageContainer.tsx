@@ -4,10 +4,8 @@ import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { appPaths } from '@app/router/paths';
-import { useChapterAnalysis } from '@domains/analysis';
 
 import { useContentClick } from '../../hooks/useContentClick';
-import { usePagedReaderController } from '../../hooks/usePagedReaderController';
 import { useReaderChapterData } from '../../hooks/useReaderChapterData';
 import { useReaderInput } from '../../hooks/useReaderInput';
 import { useReaderLifecycleController } from '../../hooks/useReaderLifecycleController';
@@ -15,26 +13,41 @@ import { useReaderMobileBack } from '../../hooks/useReaderMobileBack';
 import { useReaderNavigation } from '../../hooks/useReaderNavigation';
 import { useReaderPreferences } from '../../hooks/useReaderPreferences';
 import { useReaderRestoreFlow } from '../../hooks/useReaderRestoreFlow';
-import { useScrollReaderController } from '../../hooks/useScrollReaderController';
 import { useSidebarDrag } from '../../hooks/useSidebarDrag';
+import { useReaderAnalysisBridge } from '../../reader-analysis-bridge';
+import {
+  usePagedReaderController,
+  useScrollReaderController,
+} from '../../reader-layout';
+import { useReaderSession } from '../../reader-session';
 import { resolveContentModeFromPageTurnMode } from '../../utils/readerMode';
 import ReaderPageLayout from './ReaderPageLayout';
 import { useReaderContext } from './ReaderContext';
 import { useReaderPageImageOverlay } from './useReaderPageImageOverlay';
 
-export default function ReaderPageContainer() {
+interface ReaderPageContainerProps {
+  novelId: number;
+}
+
+export default function ReaderPageContainer({
+  novelId,
+}: ReaderPageContainerProps) {
   const { t } = useTranslation();
+  const uiBridge = useReaderContext();
+  const session = useReaderSession(novelId);
+  const { snapshot: sessionSnapshot, commands: sessionCommands } = session;
   const {
-    novelId,
     chapterIndex,
+    isPagedMode,
     mode,
     viewMode,
-    isPagedMode,
+  } = sessionSnapshot;
+  const {
     contentRef,
-    wheelDeltaRef,
     pageTurnLockedRef,
     restoreSettledHandlerRef,
-  } = useReaderContext();
+    wheelDeltaRef,
+  } = uiBridge;
   const [chapterContentVersion, setChapterContentVersion] = useState(0);
   const handleChapterContentResolved = useCallback(() => {
     setChapterContentVersion((previousVersion) => previousVersion + 1);
@@ -45,7 +58,11 @@ export default function ReaderPageContainer() {
   const closeSidebar = useCallback(() => {
     sidebar.setIsSidebarOpen(false);
   }, [sidebar]);
-  const analysis = useChapterAnalysis(novelId, viewMode === 'summary' ? chapterIndex : -1);
+  const analysis = useReaderAnalysisBridge({
+    novelId,
+    chapterIndex,
+    viewMode,
+  });
   const { handleMobileBack } = useReaderMobileBack({
     isSidebarOpen: sidebar.isSidebarOpen,
     closeSidebar,
@@ -53,20 +70,31 @@ export default function ReaderPageContainer() {
   });
 
   const chapterData = useReaderChapterData({
+    novelId,
+    sessionSnapshot,
+    sessionCommands,
+    uiBridge,
     onChapterContentResolved: handleChapterContentResolved,
   });
 
   const restoreFlow = useReaderRestoreFlow({
+    sessionSnapshot,
+    sessionCommands,
+    uiBridge,
     currentChapter: chapterData.currentChapter,
-    summaryRestoreSignal: analysis.chapterAnalysis,
+    summaryRestoreSignal: analysis.summaryRestoreSignal,
     isChapterAnalysisLoading: analysis.isChapterAnalysisLoading,
   });
 
   const scrollController = useScrollReaderController({
     enabled: mode === 'scroll',
+    novelId,
     chapters: chapterData.chapters,
     currentChapter: chapterData.currentChapter,
     contentVersion: chapterContentVersion,
+    sessionSnapshot,
+    sessionCommands,
+    uiBridge,
     fetchChapterContent: chapterData.fetchChapterContent,
     preloadAdjacent: chapterData.preloadAdjacent,
     preferences: {
@@ -82,9 +110,13 @@ export default function ReaderPageContainer() {
 
   const pagedController = usePagedReaderController({
     enabled: mode === 'paged',
+    novelId,
     chapters: chapterData.chapters,
     currentChapter: chapterData.currentChapter,
     contentVersion: chapterContentVersion,
+    sessionSnapshot,
+    sessionCommands,
+    uiBridge,
     fetchChapterContent: chapterData.fetchChapterContent,
     preferences: {
       fontSize: preferences.fontSize,
@@ -111,6 +143,9 @@ export default function ReaderPageContainer() {
   const navigation = useReaderNavigation({
     chapters: chapterData.chapters,
     currentChapter: chapterData.currentChapter,
+    sessionSnapshot,
+    sessionCommands,
+    uiBridge,
     pagedNavigation: {
       goToChapter: pagedController.goToChapter,
       goToNextPage: pagedController.goToNextPage,
@@ -145,6 +180,7 @@ export default function ReaderPageContainer() {
   const imageOverlay = useReaderPageImageOverlay({
     dismissBlockedInteraction,
     isEnabled: viewMode === 'original',
+    novelId,
   });
   const isContentInteractionLocked =
     isChromeVisible || sidebar.isSidebarOpen || imageOverlay.isImageViewerOpen;
@@ -251,12 +287,7 @@ export default function ReaderPageContainer() {
 
   const summaryContentProps = renderableChapter && viewMode === 'summary' ? {
     chapter: renderableChapter,
-    novelId,
-    analysis: analysis.chapterAnalysis,
-    job: analysis.analysisStatus?.job ?? null,
-    isLoading: analysis.isChapterAnalysisLoading,
-    isAnalyzingChapter: analysis.isAnalyzingChapter,
-    onAnalyzeChapter: analysis.handleAnalyzeChapter,
+    analysisPanel: analysis.summaryPanel,
     readerTheme: preferences.readerTheme,
     textClassName: preferences.currentTheme.text,
     headerBgClassName: preferences.headerBg,

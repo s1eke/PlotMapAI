@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { db } from '@infra/db';
 import { APP_SETTING_KEYS, storage } from '@infra/storage';
+import { mergeReaderStateCacheSnapshot } from '@infra/storage/readerStateCache';
 import { analysisApi } from '@domains/analysis';
 import { buildChapterImageGalleryEntries } from '@shared/text-processing';
 
@@ -24,9 +25,7 @@ vi.mock('react-i18next', () => ({
 vi.mock('../../api/readerApi', () => ({
   readerApi: {
     getChapters: vi.fn(),
-    getProgress: vi.fn(),
     getChapterContent: vi.fn(),
-    saveProgress: vi.fn(),
     getImageBlob: vi.fn(),
     getImageGalleryEntries: vi.fn(),
     getImageUrl: vi.fn(),
@@ -161,6 +160,40 @@ function renderPage() {
   );
 }
 
+function seedReaderStateCache(state: Record<string, unknown>): void {
+  mergeReaderStateCacheSnapshot(1, state);
+}
+
+async function seedDurableProgress(
+  overrides: Partial<{
+    chapterIndex: number;
+    scrollPosition: number;
+    mode: 'scroll' | 'paged' | 'summary';
+    chapterProgress: number;
+    locatorVersion: 1;
+    locator: {
+      chapterIndex: number;
+      blockIndex: number;
+      kind: 'heading' | 'text' | 'image';
+      lineIndex?: number;
+      edge?: 'start' | 'end';
+    };
+  }> = {},
+): Promise<void> {
+  await db.readingProgress.add({
+    novelId: 1,
+    chapterIndex: 0,
+    scrollPosition: 0,
+    mode: 'scroll',
+    updatedAt: new Date().toISOString(),
+    ...overrides,
+  });
+}
+
+async function readDurableProgress() {
+  return db.readingProgress.where('novelId').equals(1).first();
+}
+
 describe('ReaderPage', () => {
   beforeEach(async () => {
     await db.delete();
@@ -171,16 +204,9 @@ describe('ReaderPage', () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     Element.prototype.scrollIntoView = vi.fn();
     vi.mocked(readerApi.getChapters).mockResolvedValue(chapters);
-    vi.mocked(readerApi.getProgress).mockResolvedValue({
-      chapterIndex: 0,
-      scrollPosition: 0,
-      mode: 'scroll',
-      chapterProgress: 0,
-    });
     vi.mocked(readerApi.getChapterContent).mockImplementation(
       async (_novelId, chapterIndex) => chapterContent[chapterIndex],
     );
-    vi.mocked(readerApi.saveProgress).mockResolvedValue({ message: 'Progress saved' });
     vi.mocked(readerApi.getImageBlob).mockResolvedValue(null);
     vi.mocked(readerApi.getImageGalleryEntries).mockResolvedValue([]);
     vi.mocked(readerApi.getImageUrl).mockResolvedValue(null);
@@ -206,10 +232,10 @@ describe('ReaderPage', () => {
   });
 
   it('renders the stored summary view on startup', async () => {
-    localStorage.setItem('reader-state:1', JSON.stringify({
+    seedReaderStateCache({
       chapterIndex: 1,
       mode: 'summary',
-    }));
+    });
     vi.mocked(analysisApi.getChapterAnalysis).mockResolvedValueOnce({
       analysis: completedAnalysis,
     });
@@ -230,10 +256,10 @@ describe('ReaderPage', () => {
   it('renders the paged reading surface when startup mode is paged', async () => {
     setPrototypeNumberGetter('clientWidth', 600);
     setPrototypeNumberGetter('clientHeight', 800);
-    localStorage.setItem('reader-state:1', JSON.stringify({
+    seedReaderStateCache({
       chapterIndex: 0,
       mode: 'paged',
-    }));
+    });
     vi.mocked(readerApi.getChapterContent).mockResolvedValueOnce({
       ...chapterContent[0],
       content: 'First page\nSecond page\nThird page\nFourth page',
@@ -243,6 +269,23 @@ describe('ReaderPage', () => {
 
     expect(await screen.findByTestId('paged-reader-page-frame')).toBeInTheDocument();
     expect(await screen.findByText('1 / 2')).toBeInTheDocument();
+  });
+
+  it('prefers Dexie progress over the cache snapshot on startup', async () => {
+    seedReaderStateCache({
+      chapterIndex: 0,
+      mode: 'scroll',
+    });
+    await seedDurableProgress({
+      chapterIndex: 1,
+      scrollPosition: 120,
+      mode: 'scroll',
+      chapterProgress: 0.2,
+    });
+
+    renderPage();
+
+    expect(await screen.findByText('Chapter 2 content')).toBeInTheDocument();
   });
 
   it('navigates to the selected chapter from the table of contents in scroll mode', async () => {
@@ -258,17 +301,25 @@ describe('ReaderPage', () => {
       expect(readerApi.getChapterContent).toHaveBeenCalledWith(1, 1, expect.anything());
     });
     expect(await screen.findByText('Chapter 2 content')).toBeInTheDocument();
+
+    fireEvent(window, new Event('pagehide'));
+
+    await waitFor(async () => {
+      const progress = await readDurableProgress();
+      expect(progress).not.toBeNull();
+      expect(progress?.mode).toBe('scroll');
+    });
   });
 
   it('navigates to the selected chapter from the table of contents in paged mode', async () => {
     setPrototypeNumberGetter('clientWidth', 600);
     setPrototypeNumberGetter('clientHeight', 800);
     await storage.primary.settings.set(APP_SETTING_KEYS.readerPageTurnMode, 'cover');
-    localStorage.setItem('reader-state:1', JSON.stringify({
+    seedReaderStateCache({
       chapterIndex: 0,
       mode: 'paged',
       lastContentMode: 'paged',
-    }));
+    });
 
     renderPage();
 
@@ -287,11 +338,11 @@ describe('ReaderPage', () => {
     setPrototypeNumberGetter('clientWidth', 600);
     setPrototypeNumberGetter('clientHeight', 800);
     await storage.primary.settings.set(APP_SETTING_KEYS.readerPageTurnMode, 'cover');
-    localStorage.setItem('reader-state:1', JSON.stringify({
+    seedReaderStateCache({
       chapterIndex: 0,
       mode: 'scroll',
       lastContentMode: 'scroll',
-    }));
+    });
     vi.mocked(readerApi.getChapterContent).mockResolvedValueOnce({
       ...chapterContent[0],
       content: 'First page\nSecond page\nThird page\nFourth page',
@@ -305,10 +356,10 @@ describe('ReaderPage', () => {
   it('advances within the current paged chapter before navigating to the next chapter', async () => {
     setPrototypeNumberGetter('clientWidth', 600);
     setPrototypeNumberGetter('clientHeight', 800);
-    localStorage.setItem('reader-state:1', JSON.stringify({
+    seedReaderStateCache({
       chapterIndex: 0,
       mode: 'paged',
-    }));
+    });
     vi.mocked(readerApi.getChapterContent).mockImplementation(async (_novelId, chapterIndex) => ({
       ...chapterContent[chapterIndex],
       content: [
@@ -348,6 +399,55 @@ describe('ReaderPage', () => {
 
     expect(await screen.findByText('2 / 2')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Chapter 1' })).toBeInTheDocument();
+  });
+
+  it('switches from scroll to paged and flushes a canonical locator to Dexie', async () => {
+    setPrototypeNumberGetter('clientWidth', 600);
+    setPrototypeNumberGetter('clientHeight', 800);
+
+    renderPage();
+
+    expect(await screen.findByText('Chapter 1 content')).toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByTitle('reader.twoColumn')[0]);
+
+    expect(await screen.findByTestId('paged-reader-page-frame')).toBeInTheDocument();
+
+    fireEvent(window, new Event('pagehide'));
+
+    await waitFor(async () => {
+      const progress = await readDurableProgress();
+      expect(progress?.chapterIndex).toBe(0);
+      expect(progress?.mode).toBe('paged');
+      expect(progress?.locatorVersion).toBe(1);
+      expect(progress?.locator?.chapterIndex).toBe(0);
+      expect(progress?.chapterProgress).toBeUndefined();
+    });
+  });
+
+  it('returns to paged content after a summary round-trip without persisting summary as durable mode', async () => {
+    setPrototypeNumberGetter('clientWidth', 600);
+    setPrototypeNumberGetter('clientHeight', 800);
+    await storage.primary.settings.set(APP_SETTING_KEYS.readerPageTurnMode, 'cover');
+
+    renderPage();
+
+    expect(await screen.findByTestId('paged-reader-page-frame')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'reader.summary' }));
+
+    expect(await screen.findByText('reader.analysisPanel.statusEmpty')).toBeInTheDocument();
+
+    fireEvent(window, new Event('pagehide'));
+
+    await waitFor(async () => {
+      const progress = await readDurableProgress();
+      expect(progress?.mode).toBe('paged');
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'reader.original' }));
+
+    expect(await screen.findByTestId('paged-reader-page-frame')).toBeInTheDocument();
   });
 
   it('opens the mobile contents sheet and closes it after selecting a chapter', async () => {
@@ -463,10 +563,10 @@ describe('ReaderPage', () => {
       hasNext: index < 9,
     }));
 
-    localStorage.setItem('reader-state:1', JSON.stringify({
+    seedReaderStateCache({
       chapterIndex: 9,
       mode: 'scroll',
-    }));
+    });
     vi.mocked(readerApi.getChapters).mockResolvedValueOnce(
       imageChapters.map(({ index, title, wordCount }) => ({ index, title, wordCount })),
     );

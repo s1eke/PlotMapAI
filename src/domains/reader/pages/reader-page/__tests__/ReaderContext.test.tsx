@@ -1,39 +1,14 @@
 import type { ReactNode } from 'react';
-import type { StoredReaderState } from '../../../hooks/useReaderStatePersistence';
 
 import { act, renderHook } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
-const readerApiMock = vi.hoisted(() => ({
-  getProgress: vi.fn(),
-  saveProgress: vi.fn(async () => ({ message: 'saved' })),
-}));
-
-const readerStatePersistenceMock = vi.hoisted(() => ({
-  latestReaderStateRef: { current: {} satisfies StoredReaderState },
-  hasUserInteractedRef: { current: false },
-  markUserInteracted: vi.fn(),
-  persistReaderState: vi.fn(),
-  flushReaderState: vi.fn(async () => undefined),
-  loadPersistedReaderState: vi.fn(async (): Promise<StoredReaderState> => ({})),
-  initialStoredState: null,
-}));
-
-vi.mock('../../../api/readerApi', () => ({
-  readerApi: readerApiMock,
-}));
-
-vi.mock('../../../hooks/useReaderStatePersistence', () => ({
-  useReaderStatePersistence: vi.fn(() => readerStatePersistenceMock),
-}));
-
-import { resetReaderSessionStoreForTests } from '../../../hooks/sessionStore';
 import { ReaderProvider, useReaderContext } from '../ReaderContext';
 
-function createWrapper() {
+function createWrapper(novelId = 1) {
   return function Wrapper({ children }: { children: ReactNode }) {
     return (
-      <ReaderProvider novelId={1}>
+      <ReaderProvider novelId={novelId}>
         {children}
       </ReaderProvider>
     );
@@ -41,92 +16,85 @@ function createWrapper() {
 }
 
 describe('ReaderProvider', () => {
-  beforeEach(() => {
-    resetReaderSessionStoreForTests();
-    vi.clearAllMocks();
-    readerStatePersistenceMock.latestReaderStateRef.current = {};
-    readerStatePersistenceMock.hasUserInteractedRef.current = false;
+  it('provides stable UI bridge refs across rerenders', () => {
+    const { result, rerender } = renderHook(() => useReaderContext(), {
+      wrapper: createWrapper(),
+    });
+
+    const initialRefs = {
+      contentRef: result.current.contentRef,
+      pageTargetRef: result.current.pageTargetRef,
+      chapterCacheRef: result.current.chapterCacheRef,
+      pagedStateRef: result.current.pagedStateRef,
+      restoreSettledHandlerRef: result.current.restoreSettledHandlerRef,
+    };
+
+    rerender();
+
+    expect(result.current.contentRef).toBe(initialRefs.contentRef);
+    expect(result.current.pageTargetRef).toBe(initialRefs.pageTargetRef);
+    expect(result.current.chapterCacheRef).toBe(initialRefs.chapterCacheRef);
+    expect(result.current.pagedStateRef).toBe(initialRefs.pagedStateRef);
+    expect(result.current.restoreSettledHandlerRef).toBe(initialRefs.restoreSettledHandlerRef);
   });
 
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  it('derives view mode and paged mode from the shared session state', () => {
+  it('keeps mutable bridge state writable for page orchestration', () => {
     const { result } = renderHook(() => useReaderContext(), {
       wrapper: createWrapper(),
     });
 
-    expect(result.current.mode).toBe('scroll');
-    expect(result.current.viewMode).toBe('original');
-    expect(result.current.isPagedMode).toBe(false);
+    const onRestoreSettled = () => undefined;
 
     act(() => {
-      result.current.setMode('paged');
-    });
-
-    expect(result.current.mode).toBe('paged');
-    expect(result.current.viewMode).toBe('original');
-    expect(result.current.isPagedMode).toBe(true);
-
-    act(() => {
-      result.current.setMode('summary');
-    });
-
-    expect(result.current.mode).toBe('summary');
-    expect(result.current.viewMode).toBe('summary');
-    expect(result.current.isPagedMode).toBe(false);
-  });
-
-  it('updates chapter index through the shared setter without scheduling remote persistence', () => {
-    vi.useFakeTimers();
-
-    const { result } = renderHook(() => useReaderContext(), {
-      wrapper: createWrapper(),
-    });
-
-    expect(result.current.chapterIndex).toBe(0);
-
-    act(() => {
-      result.current.setChapterIndex((currentChapterIndex) => currentChapterIndex + 2);
-      result.current.setMode('paged');
-      vi.runAllTimers();
-    });
-
-    expect(result.current.chapterIndex).toBe(2);
-    expect(result.current.mode).toBe('paged');
-    expect(readerApiMock.saveProgress).not.toHaveBeenCalled();
-  });
-
-  it('keeps orchestration refs stable across rerenders', () => {
-    const { result } = renderHook(() => useReaderContext(), {
-      wrapper: createWrapper(),
-    });
-
-    const {
-      chapterChangeSourceRef,
-      pagedStateRef,
-      restoreSettledHandlerRef,
-      isScrollSyncSuppressedRef,
-      suppressScrollSyncTemporarilyRef,
-    } = result.current;
-
-    act(() => {
+      result.current.pageTargetRef.current = 'end';
       result.current.chapterChangeSourceRef.current = 'navigation';
       result.current.pagedStateRef.current = { pageCount: 4, pageIndex: 2 };
-      result.current.restoreSettledHandlerRef.current('completed');
+      result.current.restoreSettledHandlerRef.current = onRestoreSettled;
       result.current.isScrollSyncSuppressedRef.current = true;
-      result.current.suppressScrollSyncTemporarilyRef.current();
-      result.current.setMode('summary');
+      result.current.chapterCacheRef.current.set(3, {
+        index: 3,
+        title: 'Chapter 4',
+        content: 'content',
+        wordCount: 100,
+        totalChapters: 4,
+        hasPrev: true,
+        hasNext: false,
+      });
     });
 
-    expect(result.current.chapterChangeSourceRef).toBe(chapterChangeSourceRef);
+    expect(result.current.pageTargetRef.current).toBe('end');
     expect(result.current.chapterChangeSourceRef.current).toBe('navigation');
-    expect(result.current.pagedStateRef).toBe(pagedStateRef);
     expect(result.current.pagedStateRef.current).toEqual({ pageCount: 4, pageIndex: 2 });
-    expect(result.current.restoreSettledHandlerRef).toBe(restoreSettledHandlerRef);
-    expect(result.current.isScrollSyncSuppressedRef).toBe(isScrollSyncSuppressedRef);
+    expect(result.current.restoreSettledHandlerRef.current).toBe(onRestoreSettled);
     expect(result.current.isScrollSyncSuppressedRef.current).toBe(true);
-    expect(result.current.suppressScrollSyncTemporarilyRef).toBe(suppressScrollSyncTemporarilyRef);
+    expect(result.current.chapterCacheRef.current.get(3)?.title).toBe('Chapter 4');
+  });
+
+  it('resets the bridge when the page mounts for a different novel', () => {
+    const firstRender = renderHook(() => useReaderContext(), {
+      wrapper: createWrapper(1),
+    });
+
+    act(() => {
+      firstRender.result.current.pageTargetRef.current = 'end';
+      firstRender.result.current.chapterCacheRef.current.set(1, {
+        index: 1,
+        title: 'Persisted Chapter',
+        content: 'content',
+        wordCount: 50,
+        totalChapters: 2,
+        hasPrev: true,
+        hasNext: false,
+      });
+    });
+
+    firstRender.unmount();
+
+    const secondRender = renderHook(() => useReaderContext(), {
+      wrapper: createWrapper(2),
+    });
+
+    expect(secondRender.result.current.pageTargetRef.current).toBeNull();
+    expect(secondRender.result.current.chapterCacheRef.current.size).toBe(0);
   });
 });

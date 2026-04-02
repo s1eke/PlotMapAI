@@ -1,6 +1,8 @@
 import { useCallback, useMemo } from 'react';
 
 import type { Chapter, ChapterContent } from '../api/readerApi';
+import type { ReaderSessionCommands, ReaderSessionSnapshot } from '../reader-session';
+import type { ReaderUiBridgeValue } from '../reader-ui';
 import type { UsePagedReaderControllerResult } from './usePagedReaderController';
 import type { PageTarget } from './useReaderStatePersistence';
 import { useReaderContext } from '../pages/reader-page/ReaderContext';
@@ -10,6 +12,12 @@ type NavigationDirection = 'next' | 'prev';
 interface UseReaderNavigationParams {
   chapters: Chapter[];
   currentChapter: ChapterContent | null;
+  sessionSnapshot?: Pick<ReaderSessionSnapshot, 'chapterIndex' | 'mode'>;
+  sessionCommands?: Pick<
+    ReaderSessionCommands,
+    'hasUserInteractedRef' | 'persistReaderState' | 'setChapterIndex'
+  >;
+  uiBridge?: Pick<ReaderUiBridgeValue, 'chapterChangeSourceRef' | 'pageTargetRef'>;
   pagedNavigation: Pick<
     UsePagedReaderControllerResult,
     | 'goToChapter'
@@ -44,18 +52,26 @@ interface UseReaderNavigationResult {
 export function useReaderNavigation({
   chapters,
   currentChapter,
+  sessionSnapshot,
+  sessionCommands,
+  uiBridge,
   pagedNavigation,
   beforeChapterChange,
 }: UseReaderNavigationParams): UseReaderNavigationResult {
+  const readerContext = useReaderContext();
+  const { chapterIndex, mode } = sessionSnapshot ?? {
+    chapterIndex: readerContext.chapterIndex ?? 0,
+    mode: readerContext.mode ?? 'scroll',
+  };
   const {
-    chapterIndex,
-    mode,
-    hasUserInteractedRef,
+    hasUserInteractedRef = readerContext.hasUserInteractedRef ?? { current: false },
+    persistReaderState = () => undefined,
+    setChapterIndex = () => undefined,
+  } = sessionCommands ?? readerContext;
+  const {
     chapterChangeSourceRef,
-    persistReaderState,
     pageTargetRef,
-    setChapterIndex,
-  } = useReaderContext();
+  } = uiBridge ?? readerContext;
   const userInteractedRef = hasUserInteractedRef;
   const navigationSourceRef = chapterChangeSourceRef;
   const pendingPageTargetRef = pageTargetRef;

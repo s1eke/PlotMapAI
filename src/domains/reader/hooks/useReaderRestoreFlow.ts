@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { ChapterContent } from '../api/readerApi';
+import type { ReaderSessionCommands, ReaderSessionSnapshot } from '../reader-session';
+import type { ReaderUiBridgeValue } from '../reader-ui';
 import type { ReaderMode, ReaderRestoreTarget, StoredReaderState } from './useReaderStatePersistence';
 import {
   beginRestore,
   completeRestore,
   getStoredReaderStateSnapshot,
-  setRestoreStatus,
   setPendingRestoreTarget as setStorePendingRestoreTarget,
   useReaderSessionSelector,
 } from './sessionStore';
@@ -15,10 +16,33 @@ import {
   getContainerProgress,
   shouldKeepReaderRestoreMask,
 } from '../utils/readerPosition';
-import { getReaderViewMode } from '../utils/readerMode';
 import { useReaderContext } from '../pages/reader-page/ReaderContext';
 
 interface UseReaderRestoreFlowParams {
+  sessionSnapshot?: Pick<
+    ReaderSessionSnapshot,
+    'chapterIndex' | 'lastContentMode' | 'mode' | 'pendingRestoreTarget' | 'viewMode'
+  >;
+  sessionCommands?: Pick<
+    ReaderSessionCommands,
+    | 'latestReaderStateRef'
+    | 'markUserInteracted'
+    | 'persistReaderState'
+    | 'setChapterIndex'
+    | 'setMode'
+  >;
+  uiBridge?: Pick<
+    ReaderUiBridgeValue,
+    | 'chapterChangeSourceRef'
+    | 'contentRef'
+    | 'getCurrentAnchorRef'
+    | 'getCurrentOriginalLocatorRef'
+    | 'getCurrentPagedLocatorRef'
+    | 'isScrollSyncSuppressedRef'
+    | 'pagedStateRef'
+    | 'restoreSettledHandlerRef'
+    | 'suppressScrollSyncTemporarilyRef'
+  >;
   currentChapter: ChapterContent | null;
   summaryRestoreSignal: unknown;
   isChapterAnalysisLoading: boolean;
@@ -43,30 +67,47 @@ interface UseReaderRestoreFlowResult {
 }
 
 export function useReaderRestoreFlow({
+  sessionSnapshot,
+  sessionCommands,
+  uiBridge,
   currentChapter,
   summaryRestoreSignal,
   isChapterAnalysisLoading,
 }: UseReaderRestoreFlowParams): UseReaderRestoreFlowResult {
+  const readerContext = useReaderContext();
+  const storeLastContentMode = useReaderSessionSelector((state) => state.lastContentMode);
+  const storePendingRestoreTarget = useReaderSessionSelector((state) => state.pendingRestoreTarget);
   const {
     chapterIndex,
+    lastContentMode,
     mode,
-    setChapterIndex,
-    setMode,
-    latestReaderStateRef,
-    markUserInteracted,
-    persistReaderState,
-    contentRef,
+    pendingRestoreTarget,
+    viewMode,
+  } = sessionSnapshot ?? {
+    chapterIndex: readerContext.chapterIndex ?? 0,
+    lastContentMode: readerContext.lastContentMode ?? storeLastContentMode,
+    mode: readerContext.mode ?? 'scroll',
+    pendingRestoreTarget: readerContext.pendingRestoreTarget ?? storePendingRestoreTarget,
+    viewMode: readerContext.viewMode ?? 'original',
+  };
+  const {
+    latestReaderStateRef = readerContext.latestReaderStateRef ?? { current: {} },
+    markUserInteracted = () => undefined,
+    persistReaderState = () => undefined,
+    setChapterIndex = () => undefined,
+    setMode = () => undefined,
+  } = sessionCommands ?? readerContext;
+  const {
     chapterChangeSourceRef,
-    pagedStateRef,
-    restoreSettledHandlerRef,
-    isScrollSyncSuppressedRef,
-    suppressScrollSyncTemporarilyRef,
+    contentRef,
     getCurrentAnchorRef,
     getCurrentOriginalLocatorRef,
     getCurrentPagedLocatorRef,
-  } = useReaderContext();
-  const pendingRestoreTarget = useReaderSessionSelector((state) => state.pendingRestoreTarget);
-  const lastContentMode = useReaderSessionSelector((state) => state.lastContentMode);
+    isScrollSyncSuppressedRef,
+    pagedStateRef,
+    restoreSettledHandlerRef,
+    suppressScrollSyncTemporarilyRef,
+  } = uiBridge ?? readerContext;
   const pendingRestoreTargetRef = useRef<ReaderRestoreTarget | null>(pendingRestoreTarget);
   const captureCurrentReaderPositionRef = useRef<
     (options?: { flush?: boolean }) => StoredReaderState
@@ -81,7 +122,6 @@ export function useReaderRestoreFlow({
   const getOriginalLocator = getCurrentOriginalLocatorRef;
   const getPagedLocator = getCurrentPagedLocatorRef;
   const isActiveChapterResolved = currentChapter?.index === chapterIndex;
-  const viewMode = getReaderViewMode(mode);
 
   useEffect(() => {
     pendingRestoreTargetRef.current = pendingRestoreTarget;
@@ -145,7 +185,7 @@ export function useReaderRestoreFlow({
         beginRestore(target);
         return;
       }
-      setRestoreStatus('ready');
+      completeRestore();
     },
     [],
   );

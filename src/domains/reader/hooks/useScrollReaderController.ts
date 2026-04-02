@@ -1,15 +1,17 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import type { Chapter, ChapterContent } from '../api/readerApi';
+import type { ReaderSessionCommands, ReaderSessionSnapshot } from '../reader-session';
+import type { ReaderUiBridgeValue } from '../reader-ui';
 import type { ReaderRestoreTarget } from './useReaderStatePersistence';
 import type { ScrollModeAnchor } from './useScrollModeChapters';
-import { useReaderRenderCache } from './useReaderRenderCache';
-import { useScrollModeChapters } from './useScrollModeChapters';
 import {
   calculateVisibleScrollBlockRanges,
   resolveCurrentScrollLocator,
   resolveCurrentScrollLocatorOffset,
-} from '../pages/reader-page/useReaderPageViewport';
+} from '../reader-layout';
+import { useReaderRenderCache } from './useReaderRenderCache';
+import { useScrollModeChapters } from './useScrollModeChapters';
 import { getChapterBoundaryLocator } from '../utils/readerLayout';
 import {
   canSkipReaderRestore,
@@ -26,9 +28,29 @@ interface ScrollReaderControllerPreferences {
 
 interface UseScrollReaderControllerParams {
   enabled: boolean;
+  novelId: number;
   chapters: Chapter[];
   currentChapter: ChapterContent | null;
   contentVersion: number;
+  sessionSnapshot?: Pick<ReaderSessionSnapshot, 'chapterIndex'>;
+  sessionCommands?: Pick<
+    ReaderSessionCommands,
+    'persistReaderState' | 'setChapterIndex'
+  >;
+  uiBridge?: Pick<
+    ReaderUiBridgeValue,
+    | 'chapterCacheRef'
+    | 'chapterChangeSourceRef'
+    | 'contentRef'
+    | 'getCurrentAnchorRef'
+    | 'getCurrentOriginalLocatorRef'
+    | 'isScrollSyncSuppressedRef'
+    | 'resolveScrollLocatorOffsetRef'
+    | 'restoreSettledHandlerRef'
+    | 'scrollChapterBodyElementsBridgeRef'
+    | 'scrollChapterElementsBridgeRef'
+    | 'suppressScrollSyncTemporarilyRef'
+  >;
   fetchChapterContent: (
     index: number,
     options?: {
@@ -125,9 +147,13 @@ function buildFocusedScrollWindow(
 
 export function useScrollReaderController({
   enabled,
+  novelId,
   chapters,
   currentChapter,
   contentVersion,
+  sessionSnapshot,
+  sessionCommands,
+  uiBridge,
   fetchChapterContent,
   preloadAdjacent,
   preferences,
@@ -136,23 +162,27 @@ export function useScrollReaderController({
   clearPendingRestoreTarget,
   stopRestoreMask,
 }: UseScrollReaderControllerParams): UseScrollReaderControllerResult {
+  const readerContext = useReaderContext();
+  const { chapterIndex } = sessionSnapshot ?? {
+    chapterIndex: readerContext.chapterIndex ?? 0,
+  };
   const {
-    chapterIndex,
-    novelId,
-    contentRef,
+    persistReaderState = () => undefined,
+    setChapterIndex = () => undefined,
+  } = sessionCommands ?? readerContext;
+  const {
     chapterCacheRef,
-    scrollChapterElementsBridgeRef,
-    scrollChapterBodyElementsBridgeRef,
     chapterChangeSourceRef,
-    setChapterIndex,
-    persistReaderState,
-    restoreSettledHandlerRef,
-    isScrollSyncSuppressedRef,
-    suppressScrollSyncTemporarilyRef,
+    contentRef,
     getCurrentAnchorRef,
     getCurrentOriginalLocatorRef,
+    isScrollSyncSuppressedRef,
     resolveScrollLocatorOffsetRef,
-  } = useReaderContext();
+    restoreSettledHandlerRef,
+    scrollChapterBodyElementsBridgeRef,
+    scrollChapterElementsBridgeRef,
+    suppressScrollSyncTemporarilyRef,
+  } = uiBridge ?? readerContext;
   const navigationSourceRef = chapterChangeSourceRef;
   const [scrollModeChapters, setScrollModeChapters] = useState<number[]>([]);
   const [visibleScrollBlockRangeByChapter, setVisibleScrollBlockRangeByChapter] =

@@ -5,6 +5,8 @@ import { AppErrorCode, toAppError, type AppError } from '@shared/errors';
 
 import { readerApi } from '../api/readerApi';
 import type { Chapter, ChapterContent } from '../api/readerApi';
+import type { ReaderSessionCommands, ReaderSessionSnapshot } from '../reader-session';
+import type { ReaderUiBridgeValue } from '../reader-ui';
 import { extractImageKeysFromText } from '../utils/chapterImages';
 import {
   createRestoreTargetFromNavigationIntent,
@@ -40,6 +42,27 @@ export interface ReaderLoadActiveChapterResult {
 }
 
 interface UseReaderChapterDataParams {
+  novelId?: number;
+  sessionSnapshot?: Pick<ReaderSessionSnapshot, 'mode'>;
+  sessionCommands?: Pick<
+    ReaderSessionCommands,
+    | 'hasUserInteractedRef'
+    | 'latestReaderStateRef'
+    | 'loadPersistedReaderState'
+    | 'setChapterIndex'
+    | 'setMode'
+  >;
+  uiBridge?: Pick<
+    ReaderUiBridgeValue,
+    | 'chapterCacheRef'
+    | 'chapterChangeSourceRef'
+    | 'contentRef'
+    | 'pageTargetRef'
+    | 'pagedViewportRef'
+    | 'pageTurnLockedRef'
+    | 'suppressScrollSyncTemporarilyRef'
+    | 'wheelDeltaRef'
+  >;
   onChapterContentResolved?: (chapterIndex: number) => void;
 }
 
@@ -64,26 +87,35 @@ export interface UseReaderChapterDataResult {
 }
 
 export function useReaderChapterData({
+  novelId,
+  sessionSnapshot,
+  sessionCommands,
+  uiBridge,
   onChapterContentResolved,
 }: UseReaderChapterDataParams): UseReaderChapterDataResult {
   const { t } = useTranslation();
+  const readerContext = useReaderContext();
+  const resolvedNovelId = novelId ?? readerContext.novelId ?? 0;
+  const { mode } = sessionSnapshot ?? {
+    mode: readerContext.mode ?? 'scroll',
+  };
   const {
-    novelId,
-    mode,
-    setChapterIndex,
-    setMode,
-    latestReaderStateRef,
-    hasUserInteractedRef,
-    loadPersistedReaderState,
-    contentRef,
-    pagedViewportRef,
+    hasUserInteractedRef = readerContext.hasUserInteractedRef ?? { current: false },
+    latestReaderStateRef = readerContext.latestReaderStateRef ?? { current: {} },
+    loadPersistedReaderState = async (): Promise<StoredReaderState> => ({}),
+    setChapterIndex = () => undefined,
+    setMode = () => undefined,
+  } = sessionCommands ?? readerContext;
+  const {
     chapterCacheRef,
-    pageTargetRef,
-    wheelDeltaRef,
-    pageTurnLockedRef,
     chapterChangeSourceRef,
+    contentRef,
+    pageTargetRef,
+    pagedViewportRef,
+    pageTurnLockedRef,
     suppressScrollSyncTemporarilyRef,
-  } = useReaderContext();
+    wheelDeltaRef,
+  } = uiBridge ?? readerContext;
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [currentChapter, setCurrentChapter] = useState<ChapterContent | null>(null);
   const [loadingMessage, setLoadingMessage] = useState<string | null>(null);
@@ -118,12 +150,12 @@ export function useReaderChapterData({
     }
 
     const imageKeys = getChapterImageKeys(chapter);
-    if (imageKeys.length === 0 || areReaderImageResourcesReady(novelId, imageKeys)) {
+    if (imageKeys.length === 0 || areReaderImageResourcesReady(resolvedNovelId, imageKeys)) {
       return;
     }
 
-    await preloadReaderImageResources(novelId, imageKeys);
-  }, [getChapterImageKeys, mode, novelId]);
+    await preloadReaderImageResources(resolvedNovelId, imageKeys);
+  }, [getChapterImageKeys, mode, resolvedNovelId]);
 
   const clearScheduledPreloads = useCallback(() => {
     preloadTimeoutIdsRef.current.forEach((timeoutId) => {
@@ -154,7 +186,7 @@ export function useReaderChapterData({
     const cached = chapterCacheRef.current.get(index);
     if (cached) return cached;
 
-    const data = await readerApi.getChapterContent(novelId, index, {
+    const data = await readerApi.getChapterContent(resolvedNovelId, index, {
       signal: options.signal,
       onProgress: (progress) => {
         const message = t('reader.processingChapter', { percent: progress.progress });
@@ -164,7 +196,7 @@ export function useReaderChapterData({
     chapterCacheRef.current.set(index, data);
     onChapterContentResolved?.(index);
     return data;
-  }, [chapterCacheRef, novelId, onChapterContentResolved, t]);
+  }, [chapterCacheRef, onChapterContentResolved, resolvedNovelId, t]);
 
   const preloadAdjacent = useCallback((index: number, prune = true) => {
     clearScheduledPreloads();
@@ -187,7 +219,7 @@ export function useReaderChapterData({
         if (chapterCacheRef.current.has(adjacentIndex)) return;
         const controller = new AbortController();
         preloadControllersRef.current.push(controller);
-        readerApi.getChapterContent(novelId, adjacentIndex, {
+        readerApi.getChapterContent(resolvedNovelId, adjacentIndex, {
           signal: controller.signal,
         })
           .then((data) => {
@@ -221,7 +253,7 @@ export function useReaderChapterData({
     chapters.length,
     clearScheduledPreloads,
     mode,
-    novelId,
+    resolvedNovelId,
     onChapterContentResolved,
     warmChapterImages,
   ]);
@@ -279,7 +311,7 @@ export function useReaderChapterData({
       setMode(nextStoredState.mode ?? 'scroll');
       setChapterIndex(nextStoredState.chapterIndex ?? 0);
 
-      const toc = await readerApi.getChapters(novelId, {
+      const toc = await readerApi.getChapters(resolvedNovelId, {
         signal: controller.signal,
         onProgress: (progress) => {
           setLoadingMessage(t('reader.processingContents', { percent: progress.progress }));
@@ -356,7 +388,7 @@ export function useReaderChapterData({
     abortHydrationRequest,
     latestStoredStateRef,
     loadPersistedReaderState,
-    novelId,
+    resolvedNovelId,
     setChapterIndex,
     setMode,
     t,
@@ -366,7 +398,7 @@ export function useReaderChapterData({
   const loadActiveChapter = useCallback(async (
     params: ReaderLoadActiveChapterParams,
   ): Promise<ReaderLoadActiveChapterResult> => {
-    if (!novelId || chapters.length === 0) {
+    if (!resolvedNovelId || chapters.length === 0) {
       setLoadingMessage(null);
       return { navigationRestoreTarget: null };
     }
@@ -441,7 +473,7 @@ export function useReaderChapterData({
         if (
           params.mode === 'paged' &&
           cachedImageKeys.length > 0 &&
-          !areReaderImageResourcesReady(novelId, cachedImageKeys)
+          !areReaderImageResourcesReady(resolvedNovelId, cachedImageKeys)
         ) {
           setLoadingMessage(t('reader.processingChapter', { percent: 100 }));
         }
@@ -451,7 +483,7 @@ export function useReaderChapterData({
 
       setReaderError(null);
       setLoadingMessage(t('reader.processingChapter', { percent: 0 }));
-      const chapter = await readerApi.getChapterContent(novelId, params.chapterIndex, {
+      const chapter = await readerApi.getChapterContent(resolvedNovelId, params.chapterIndex, {
         signal: controller.signal,
         onProgress: (progress) => {
           setLoadingMessage(t('reader.processingChapter', { percent: progress.progress }));
@@ -485,7 +517,7 @@ export function useReaderChapterData({
     chapterSourceRef,
     chapters.length,
     getChapterImageKeys,
-    novelId,
+    resolvedNovelId,
     onChapterContentResolved,
     pageTargetRef,
     pagedReaderViewportRef,

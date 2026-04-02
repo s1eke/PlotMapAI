@@ -9,7 +9,7 @@ export default function ReaderPage() {
 
   return (
     <ReaderProvider novelId={novelId}>
-      <ReaderPageContainer />
+      <ReaderPageContainer novelId={novelId} />
     </ReaderProvider>
   );
 }

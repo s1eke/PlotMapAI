@@ -1,15 +1,11 @@
-import { ChapterAnalysisPanel, type AnalysisJobStatus, type ChapterAnalysisResult } from '@domains/analysis';
+import type { ReactNode } from 'react';
 import type { ChapterContent } from '../../api/readerApi';
+
 import { cn } from '@shared/utils/cn';
 
 interface SummaryReaderContentProps {
   chapter: ChapterContent;
-  novelId: number;
-  analysis: ChapterAnalysisResult | null;
-  job: AnalysisJobStatus | null;
-  isLoading: boolean;
-  isAnalyzingChapter: boolean;
-  onAnalyzeChapter: () => void;
+  analysisPanel: ReactNode;
   readerTheme: string;
   textClassName: string;
   headerBgClassName: string;
@@ -17,12 +13,7 @@ interface SummaryReaderContentProps {
 
 export default function SummaryReaderContent({
   chapter,
-  novelId,
-  analysis,
-  job,
-  isLoading,
-  isAnalyzingChapter,
-  onAnalyzeChapter,
+  analysisPanel,
   readerTheme,
   textClassName,
   headerBgClassName,
@@ -33,14 +24,7 @@ export default function SummaryReaderContent({
         <h1 className={cn('text-sm font-medium truncate transition-colors', readerTheme === 'auto' ? 'text-text-secondary' : 'opacity-60')}>{chapter.title}</h1>
       </div>
       <div className="pt-6">
-        <ChapterAnalysisPanel
-          novelId={novelId}
-          analysis={analysis}
-          job={job}
-          isLoading={isLoading}
-          onAnalyzeChapter={onAnalyzeChapter}
-          isAnalyzingChapter={isAnalyzingChapter}
-        />
+        {analysisPanel}
       </div>
     </div>
   );

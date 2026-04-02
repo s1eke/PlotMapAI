@@ -1,7 +1,5 @@
 import type { Chapter as DbChapter } from '@infra/db';
-import type { ReaderMode } from '../hooks/readerSessionTypes';
 import type { ReaderImageGalleryEntry } from '../utils/readerImageGallery';
-import type { ReaderLocator } from '../utils/readerLayout';
 
 import { db } from '@infra/db';
 import { AppErrorCode, createAppError } from '@shared/errors';
@@ -26,15 +24,6 @@ export interface ChapterContent extends Chapter {
   totalChapters: number;
   hasPrev: boolean;
   hasNext: boolean;
-}
-
-export interface ReadingProgress {
-  chapterIndex: number;
-  scrollPosition: number;
-  mode: ReaderMode;
-  chapterProgress?: number;
-  locatorVersion?: 1;
-  locator?: ReaderLocator;
 }
 
 export interface ReaderTextProcessingOptions {
@@ -192,61 +181,6 @@ export const readerApi = {
       hasPrev: chapterIndex > 0,
       hasNext: chapterIndex < totalChapters - 1,
     };
-  },
-
-  getProgress: async (novelId: number): Promise<ReadingProgress> => {
-    const progress = await db.readingProgress.where('novelId').equals(novelId).first();
-    if (!progress) {
-      return {
-        chapterIndex: 0,
-        scrollPosition: 0,
-        mode: 'scroll',
-        chapterProgress: 0,
-        locatorVersion: 1,
-      };
-    }
-    return {
-      chapterIndex: progress.chapterIndex,
-      scrollPosition: progress.scrollPosition,
-      mode:
-        progress.mode === 'scroll' || progress.mode === 'paged' || progress.mode === 'summary'
-          ? progress.mode
-          : 'scroll',
-      chapterProgress: typeof progress.chapterProgress === 'number' ? progress.chapterProgress : undefined,
-      locatorVersion: progress.locatorVersion === 1 ? 1 : undefined,
-      locator: progress.locatorVersion === 1 ? progress.locator : undefined,
-    };
-  },
-
-  saveProgress: async (
-    novelId: number,
-    data: Partial<ReadingProgress>,
-  ): Promise<{ message: string }> => {
-    const existing = await db.readingProgress.where('novelId').equals(novelId).first();
-    const now = new Date().toISOString();
-    if (existing) {
-      await db.readingProgress.update(existing.id, {
-        chapterIndex: data.chapterIndex ?? existing.chapterIndex,
-        scrollPosition: data.scrollPosition ?? existing.scrollPosition,
-        mode: data.mode ?? existing.mode,
-        chapterProgress: data.chapterProgress ?? existing.chapterProgress,
-        locatorVersion: data.locatorVersion ?? existing.locatorVersion,
-        locator: data.locator ?? existing.locator,
-        updatedAt: now,
-      });
-    } else {
-      await db.readingProgress.add({
-        novelId,
-        chapterIndex: data.chapterIndex ?? 0,
-        scrollPosition: data.scrollPosition ?? 0,
-        mode: data.mode ?? 'scroll',
-        chapterProgress: data.chapterProgress,
-        locatorVersion: data.locatorVersion,
-        locator: data.locator,
-        updatedAt: now,
-      });
-    }
-    return { message: 'Progress saved' };
   },
 
   getImageBlob: async (novelId: number, imageKey: string): Promise<Blob | null> => {

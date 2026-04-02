@@ -71,45 +71,6 @@ describe('readerApi', () => {
     await expect(readerApi.getChapterContent(novelId, 99)).rejects.toThrow('Chapter not found');
   });
 
-  it('getProgress returns default when no progress saved', async () => {
-    const novelId = await getNovelId();
-    const progress = await readerApi.getProgress(novelId);
-    expect(progress.chapterIndex).toBe(0);
-    expect(progress.scrollPosition).toBe(0);
-    expect(progress.mode).toBe('scroll');
-    expect(progress.chapterProgress).toBe(0);
-    expect(progress.locatorVersion).toBe(1);
-  });
-
-  it('saveProgress creates and updates progress', async () => {
-    const novelId = await getNovelId();
-    await readerApi.saveProgress(novelId, {
-      chapterIndex: 2,
-      scrollPosition: 500,
-      mode: 'summary',
-      chapterProgress: 0.6,
-    });
-    const progress = await readerApi.getProgress(novelId);
-    expect(progress.chapterIndex).toBe(2);
-    expect(progress.scrollPosition).toBe(500);
-    expect(progress.mode).toBe('summary');
-    expect(progress.chapterProgress).toBe(0.6);
-  });
-
-  it('saveProgress updates existing progress', async () => {
-    const novelId = await getNovelId();
-    await readerApi.saveProgress(novelId, { chapterIndex: 1 });
-    await readerApi.saveProgress(novelId, {
-      chapterIndex: 2,
-      scrollPosition: 100,
-      chapterProgress: 0.25,
-    });
-    const progress = await readerApi.getProgress(novelId);
-    expect(progress.chapterIndex).toBe(2);
-    expect(progress.scrollPosition).toBe(100);
-    expect(progress.chapterProgress).toBe(0.25);
-  });
-
   it('getImageUrl returns null for non-existent image', async () => {
     const novelId = await getNovelId();
     const result = await readerApi.getImageUrl(novelId, 'nonexistent');

@@ -8,13 +8,13 @@ import { useEffect, useMemo } from 'react';
 
 import { preloadReaderImageResources, clearReaderImageResourcesForNovel } from '../../utils/readerImageResourceCache';
 import { createReaderImageEntryId } from '../../utils/readerImageGallery';
-import { useReaderContext } from './ReaderContext';
 import { useReaderPageImageGalleryIndex } from './useReaderPageImageGalleryIndex';
 import { useReaderPageImageViewerSession } from './useReaderPageImageViewerSession';
 
 interface UseReaderPageImageOverlayParams {
   dismissBlockedInteraction: () => void;
   isEnabled: boolean;
+  novelId: number;
 }
 
 interface UseReaderPageImageOverlayResult {
@@ -31,8 +31,8 @@ interface UseReaderPageImageOverlayResult {
 export function useReaderPageImageOverlay({
   dismissBlockedInteraction,
   isEnabled,
+  novelId,
 }: UseReaderPageImageOverlayParams): UseReaderPageImageOverlayResult {
-  const { novelId } = useReaderContext();
   const galleryIndex = useReaderPageImageGalleryIndex(novelId);
   const viewerSession = useReaderPageImageViewerSession({
     dismissBlockedInteraction,

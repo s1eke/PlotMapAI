@@ -6,11 +6,13 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 import { appPaths } from '@app/router/paths';
-import ReaderToolbar from '../../components/ReaderToolbar';
-import ReaderImageViewer from '../../components/reader/ReaderImageViewer';
-import ReaderSidebar from '../../components/reader/ReaderSidebar';
-import ReaderTopBar from '../../components/reader/ReaderTopBar';
-import ReaderViewport from '../../components/reader/ReaderViewport';
+import {
+  ReaderImageViewer,
+  ReaderSidebar,
+  ReaderToolbar,
+  ReaderTopBar,
+  ReaderViewport,
+} from '../../reader-ui';
 import { translateAppError } from '@shared/errors';
 import { cn } from '@shared/utils/cn';
 

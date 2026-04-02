@@ -1,4 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
+
+import {
+  ensureReaderPreferencesHydrated,
+  getReaderPreferencesSnapshot,
+  hasConfiguredReaderPageTurnMode,
+} from './readerPreferencesStore';
 import {
   flushPersistence,
   getStoredReaderStateSnapshot,
@@ -11,6 +17,7 @@ import {
   useReaderSessionSelector,
   type StoredReaderState,
 } from './sessionStore';
+import { createDefaultStoredReaderState } from '../reader-session/state';
 
 interface PersistReaderStateOptions {
   flush?: boolean;
@@ -29,15 +36,7 @@ function buildNovelScopedInitialState(
   const resolvedMode = initialStoredState?.mode ?? 'scroll';
 
   if (!initialStoredState) {
-    return {
-      chapterIndex: 0,
-      mode: 'scroll',
-      chapterProgress: undefined,
-      scrollPosition: undefined,
-      lastContentMode: 'scroll',
-      locatorVersion: undefined,
-      locator: undefined,
-    };
+    return createDefaultStoredReaderState();
   }
 
   return {
@@ -149,7 +148,12 @@ export function useReaderStatePersistence(novelId: number): {
   );
 
   const loadPersistedReaderState = useCallback(async (): Promise<StoredReaderState> => {
-    return hydrateSession(novelId);
+    await ensureReaderPreferencesHydrated();
+    const preferences = getReaderPreferencesSnapshot();
+    return hydrateSession(novelId, {
+      hasConfiguredPageTurnMode: hasConfiguredReaderPageTurnMode(),
+      pageTurnMode: preferences.pageTurnMode,
+    });
   }, [novelId]);
 
   const flushReaderState = useCallback(async (): Promise<void> => {

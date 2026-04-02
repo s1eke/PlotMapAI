@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { Chapter, ChapterContent } from '../api/readerApi';
+import type { ReaderSessionCommands, ReaderSessionSnapshot } from '../reader-session';
+import type { ReaderUiBridgeValue } from '../reader-ui';
 import type {
   PageTarget,
   ReaderRestoreTarget,
 } from './useReaderStatePersistence';
+import { resolveCurrentPagedLocator } from '../reader-layout';
 import { usePagedChapterTransition } from './usePagedChapterTransition';
 import { usePagedReaderLayout } from './usePagedReaderLayout';
 import { useReaderRenderCache } from './useReaderRenderCache';
-import { resolveCurrentPagedLocator } from '../pages/reader-page/useReaderPageViewport';
 import { clampProgress } from '../utils/readerPosition';
 import { useReaderContext } from '../pages/reader-page/ReaderContext';
 
@@ -34,9 +36,25 @@ interface PagedReaderControllerPreferences {
 
 interface UsePagedReaderControllerParams {
   enabled: boolean;
+  novelId: number;
   chapters: Chapter[];
   currentChapter: ChapterContent | null;
   contentVersion: number;
+  sessionSnapshot?: Pick<ReaderSessionSnapshot, 'chapterIndex'>;
+  sessionCommands?: Pick<
+    ReaderSessionCommands,
+    'hasUserInteractedRef' | 'persistReaderState' | 'setChapterIndex'
+  >;
+  uiBridge?: Pick<
+    ReaderUiBridgeValue,
+    | 'chapterCacheRef'
+    | 'chapterChangeSourceRef'
+    | 'contentRef'
+    | 'getCurrentPagedLocatorRef'
+    | 'pagedStateRef'
+    | 'pagedViewportRef'
+    | 'pageTargetRef'
+  >;
   fetchChapterContent: (
     index: number,
     options?: {
@@ -78,9 +96,13 @@ export interface UsePagedReaderControllerResult {
 
 export function usePagedReaderController({
   enabled,
+  novelId,
   chapters,
   currentChapter,
   contentVersion,
+  sessionSnapshot,
+  sessionCommands,
+  uiBridge,
   fetchChapterContent,
   preferences,
   pendingRestoreTargetRef,
@@ -88,20 +110,24 @@ export function usePagedReaderController({
   stopRestoreMask,
   beforeChapterChange,
 }: UsePagedReaderControllerParams): UsePagedReaderControllerResult {
+  const readerContext = useReaderContext();
+  const { chapterIndex } = sessionSnapshot ?? {
+    chapterIndex: readerContext.chapterIndex ?? 0,
+  };
   const {
-    chapterIndex,
-    novelId,
-    contentRef,
-    pagedViewportRef,
-    pageTargetRef,
+    hasUserInteractedRef = readerContext.hasUserInteractedRef ?? { current: false },
+    persistReaderState = () => undefined,
+    setChapterIndex = () => undefined,
+  } = sessionCommands ?? readerContext;
+  const {
     chapterCacheRef,
     chapterChangeSourceRef,
-    hasUserInteractedRef,
-    pagedStateRef,
-    persistReaderState,
-    setChapterIndex,
+    contentRef,
     getCurrentPagedLocatorRef,
-  } = useReaderContext();
+    pagedStateRef,
+    pagedViewportRef,
+    pageTargetRef,
+  } = uiBridge ?? readerContext;
   const userInteractedRef = hasUserInteractedRef;
   const navigationSourceRef = chapterChangeSourceRef;
   const pagedContentRef = useRef<HTMLDivElement | null>(null);

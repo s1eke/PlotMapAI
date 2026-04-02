@@ -112,12 +112,13 @@ describe('useReaderPageImageOverlay', () => {
       </ReaderContextProvider>
     );
     const { result } = renderHook(
-      ({ isEnabled }) => useReaderPageImageOverlay({
+      ({ isEnabled, novelId }) => useReaderPageImageOverlay({
         dismissBlockedInteraction: vi.fn(),
         isEnabled,
+        novelId,
       }),
       {
-        initialProps: { isEnabled: true },
+        initialProps: { isEnabled: true, novelId: 1 },
         wrapper,
       },
     );
@@ -167,18 +168,19 @@ describe('useReaderPageImageOverlay', () => {
     );
 
     const { result, rerender } = renderHook(
-      ({ isEnabled }) => useReaderPageImageOverlay({
+      ({ isEnabled, novelId }) => useReaderPageImageOverlay({
         dismissBlockedInteraction: vi.fn(),
         isEnabled,
+        novelId,
       }),
       {
-        initialProps: { isEnabled: true },
+        initialProps: { isEnabled: true, novelId: 1 },
         wrapper,
       },
     );
 
     contextValue = createReaderContextValue(2);
-    rerender({ isEnabled: true });
+    rerender({ isEnabled: true, novelId: 2 });
 
     firstRequest.resolve([createEntry(0, 0, 'stale', 0)]);
     secondRequest.resolve([createEntry(1, 0, 'fresh', 0)]);
@@ -202,12 +204,13 @@ describe('useReaderPageImageOverlay', () => {
       </ReaderContextProvider>
     );
     const { result } = renderHook(
-      ({ isEnabled }) => useReaderPageImageOverlay({
+      ({ isEnabled, novelId }) => useReaderPageImageOverlay({
         dismissBlockedInteraction: vi.fn(),
         isEnabled,
+        novelId,
       }),
       {
-        initialProps: { isEnabled: true },
+        initialProps: { isEnabled: true, novelId: 1 },
         wrapper,
       },
     );
@@ -257,12 +260,13 @@ describe('useReaderPageImageOverlay', () => {
       </ReaderContextProvider>
     );
     const { result } = renderHook(
-      ({ isEnabled }) => useReaderPageImageOverlay({
+      ({ isEnabled, novelId }) => useReaderPageImageOverlay({
         dismissBlockedInteraction: vi.fn(),
         isEnabled,
+        novelId,
       }),
       {
-        initialProps: { isEnabled: true },
+        initialProps: { isEnabled: true, novelId: 1 },
         wrapper,
       },
     );
@@ -317,12 +321,13 @@ describe('useReaderPageImageOverlay', () => {
       </ReaderContextProvider>
     );
     const { result } = renderHook(
-      ({ isEnabled }) => useReaderPageImageOverlay({
+      ({ isEnabled, novelId }) => useReaderPageImageOverlay({
         dismissBlockedInteraction: vi.fn(),
         isEnabled,
+        novelId,
       }),
       {
-        initialProps: { isEnabled: true },
+        initialProps: { isEnabled: true, novelId: 1 },
         wrapper,
       },
     );

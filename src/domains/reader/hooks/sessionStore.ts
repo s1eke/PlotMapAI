@@ -8,7 +8,11 @@ export type {
   RestoreStatus,
   StoredReaderState,
 } from './readerSessionTypes';
-export type { ReaderSessionActions } from './readerSessionStore';
+export type {
+  ReaderSessionActions,
+  ReaderSessionHydrationOptions,
+} from './readerSessionStore';
+export { mergeStoredReaderState } from '../reader-session/state';
 export {
   beginRestore,
   completeRestore,
@@ -18,7 +22,6 @@ export {
   getStoredReaderStateSnapshot,
   hydrateSession,
   markUserInteracted,
-  mergeStoredReaderState,
   persistStoredReaderState,
   readInitialStoredReaderState,
   resetReaderSessionStoreForTests,
