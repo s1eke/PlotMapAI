@@ -1,0 +1,1 @@
+var e={bookshelf(){return`/`},settings(){return`/settings`},novel(e){return`/novel/${e}`},reader(e){return`/novel/${e}/read`},characterGraph(e){return`/novel/${e}/graph`}};export{e as t};
