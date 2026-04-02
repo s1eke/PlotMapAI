@@ -1,4 +1,7 @@
 import { describe, it, expect } from 'vitest';
+
+import type { BookChapter } from '@shared/contracts';
+
 import { DEFAULT_ANALYSIS_PROVIDER_ID } from '../../providers';
 import {
   buildRuntimeAnalysisConfig,
@@ -16,7 +19,10 @@ import {
   ChunkingError,
   type RuntimeAnalysisConfig,
 } from '..';
-import type { Chapter, ChapterAnalysis, AnalysisOverview } from '@infra/db';
+import type {
+  StoredAnalysisOverview,
+  StoredChapterAnalysis,
+} from '../../runtime/types';
 
 describe('maskApiKey', () => {
   it('returns empty string for empty input', () => {
@@ -213,7 +219,7 @@ describe('isChapterAnalysisComplete', () => {
   });
 
   it('returns false for empty summary', () => {
-    const row: ChapterAnalysis = {
+    const row: StoredChapterAnalysis = {
       id: 1,
       novelId: 1,
       chapterIndex: 0,
@@ -230,7 +236,7 @@ describe('isChapterAnalysisComplete', () => {
   });
 
   it('returns true for valid complete analysis', () => {
-    const row: ChapterAnalysis = {
+    const row: StoredChapterAnalysis = {
       id: 1,
       novelId: 1,
       chapterIndex: 0,
@@ -247,7 +253,7 @@ describe('isChapterAnalysisComplete', () => {
   });
 
   it('returns true for analysis with all arrays present (even empty)', () => {
-    const row: ChapterAnalysis = {
+    const row: StoredChapterAnalysis = {
       id: 1,
       novelId: 1,
       chapterIndex: 0,
@@ -270,7 +276,7 @@ describe('isOverviewComplete', () => {
   });
 
   it('returns false when totalChapters <= 0', () => {
-    const overview: AnalysisOverview = {
+    const overview: StoredAnalysisOverview = {
       id: 0,
       novelId: 0,
       bookIntro: '',
@@ -286,7 +292,7 @@ describe('isOverviewComplete', () => {
   });
 
   it('returns false for empty bookIntro', () => {
-    const overview: AnalysisOverview = {
+    const overview: StoredAnalysisOverview = {
       id: 1,
       novelId: 1,
       bookIntro: '',
@@ -302,7 +308,7 @@ describe('isOverviewComplete', () => {
   });
 
   it('returns true for valid complete overview', () => {
-    const overview: AnalysisOverview = {
+    const overview: StoredAnalysisOverview = {
       id: 1,
       novelId: 1,
       bookIntro: 'A book about adventure and mystery in a faraway land.',
@@ -324,7 +330,7 @@ describe('serializeOverview', () => {
   });
 
   it('serializes with native array fields', () => {
-    const overview: AnalysisOverview = {
+    const overview: StoredAnalysisOverview = {
       id: 1,
       novelId: 1,
       bookIntro: 'Intro',
@@ -350,7 +356,7 @@ describe('serializeChapterAnalysis', () => {
   });
 
   it('serializes with native array fields', () => {
-    const row: ChapterAnalysis = {
+    const row: StoredChapterAnalysis = {
       id: 1,
       novelId: 1,
       chapterIndex: 0,
@@ -380,10 +386,10 @@ describe('buildCharacterGraphPayload', () => {
   });
 
   it('builds graph from chapter analyses', () => {
-    const chapters: Chapter[] = [
-      { id: 1, novelId: 1, title: 'Ch1', content: 'content', chapterIndex: 0, wordCount: 100 },
+    const chapters: BookChapter[] = [
+      { title: 'Ch1', content: 'content', chapterIndex: 0, wordCount: 100 },
     ];
-    const analyses: ChapterAnalysis[] = [{
+    const analyses: StoredChapterAnalysis[] = [{
       id: 1,
       novelId: 1,
       chapterIndex: 0,

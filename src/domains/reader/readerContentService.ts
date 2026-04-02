@@ -1,4 +1,4 @@
-import type { Chapter as DbChapter } from '@infra/db';
+import type { BookChapter } from '@shared/contracts';
 import type { ReaderImageGalleryEntry } from './utils/readerImageGallery';
 
 import { db } from '@infra/db';
@@ -63,14 +63,28 @@ async function getNovelTitle(novelId: number): Promise<string> {
   return novel.title;
 }
 
+function toBookChapter(chapter: {
+  chapterIndex: number;
+  title: string;
+  content: string;
+  wordCount: number;
+}): BookChapter {
+  return {
+    chapterIndex: chapter.chapterIndex,
+    title: chapter.title,
+    content: chapter.content,
+    wordCount: chapter.wordCount,
+  };
+}
+
 export async function loadAndPurifyChapters(
   novelId: number,
   options: ReaderTextProcessingOptions = {},
-): Promise<DbChapter[]> {
+): Promise<BookChapter[]> {
   const novelTitle = await getNovelTitle(novelId);
   const rawChapters = await db.chapters.where('novelId').equals(novelId).sortBy('chapterIndex');
   const rules = await getPurifyRules();
-  if (rules.length === 0) return rawChapters;
+  if (rules.length === 0) return rawChapters.map(toBookChapter);
 
   const purified = await runPurifyChaptersTask(
     {
@@ -87,7 +101,7 @@ export async function loadAndPurifyChapters(
   );
 
   return rawChapters.map((chapter, index) => ({
-    ...chapter,
+    ...toBookChapter(chapter),
     title: purified[index].title,
     content: purified[index].content,
   }));

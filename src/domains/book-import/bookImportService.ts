@@ -1,4 +1,11 @@
 import type { ChapterDetectionRule } from '@shared/text-processing';
+import type {
+  ChapterImageRecord,
+  ChapterRecord,
+  CoverImageRecord,
+  NovelImageGalleryEntryRecord,
+  NovelRecord,
+} from '@infra/db/library';
 
 import { debugLog } from '@shared/debug';
 import { db } from '@infra/db';
@@ -95,7 +102,7 @@ export const bookImportService = {
         db.novelImageGalleryEntries,
       ],
       async () => {
-        novelId = await db.novels.add({
+        const novelRecord = {
           title: parsed.title,
           author: parsed.author,
           description: parsed.description,
@@ -107,12 +114,16 @@ export const bookImportService = {
           originalEncoding: parsed.encoding || 'utf-8',
           totalWords,
           createdAt: now,
-        });
+        } satisfies Omit<NovelRecord, 'id'>;
+
+        novelId = await db.novels.add(novelRecord);
         if (parsed.coverBlob) {
-          await db.coverImages.add({
+          const coverImageRecord = {
             novelId,
             blob: parsed.coverBlob,
-          });
+          } satisfies Omit<CoverImageRecord, 'id'>;
+
+          await db.coverImages.add(coverImageRecord);
         }
         await db.chapters.bulkAdd(normalizedChapters.map((chapter, chapterIndex) => ({
           novelId,
@@ -120,13 +131,13 @@ export const bookImportService = {
           content: chapter.content,
           chapterIndex,
           wordCount: chapter.content.length,
-        })));
+        } satisfies Omit<ChapterRecord, 'id'>)));
         if (parsed.images.length > 0) {
           await db.chapterImages.bulkAdd(parsed.images.map((image) => ({
             novelId,
             imageKey: image.imageKey,
             blob: image.blob,
-          })));
+          } satisfies Omit<ChapterImageRecord, 'id'>)));
         }
         if (imageGalleryEntries.length > 0) {
           await db.novelImageGalleryEntries.bulkAdd(imageGalleryEntries.map((entry) => ({
@@ -135,7 +146,7 @@ export const bookImportService = {
             blockIndex: entry.blockIndex,
             imageKey: entry.imageKey,
             order: entry.order,
-          })));
+          } satisfies Omit<NovelImageGalleryEntryRecord, 'id'>)));
         }
       },
     );

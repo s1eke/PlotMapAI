@@ -1,4 +1,4 @@
-import type { ReaderRenderCache as PersistedReaderRenderCacheRecord } from '@infra/db';
+import type { ReaderRenderCacheRecord as PersistedReaderRenderCacheRecord } from '@infra/db/reader';
 import type { ChapterContent } from '../readerContentService';
 import type { ReaderImageDimensions } from './readerImageResourceCache';
 import type {
@@ -12,7 +12,7 @@ import type {
   StaticSummaryShellTree,
 } from './readerLayout';
 
-import { db, READER_RENDER_CACHE_TTL_MS } from '@infra/db';
+import { db } from '@infra/db';
 
 import { extractImageKeysFromText } from './chapterImages';
 import {
@@ -25,11 +25,16 @@ import {
   estimateReaderRenderQueryManifest,
   serializeReaderLayoutSignature,
 } from './readerLayout';
+import {
+  toDomainReaderRenderCacheRecord,
+  toPersistedReaderRenderCacheRecord,
+} from './readerRenderCacheMapper';
 import { preloadReaderImageResources } from './readerImageResourceCache';
 
 const MEMORY_CACHE_LIMIT = 36;
 const READER_RENDER_CACHE_CLEANUP_INTERVAL_MS = 60 * 60 * 1000;
 const READER_RENDER_CACHE_TOUCH_INTERVAL_MS = 24 * 60 * 60 * 1000;
+export const READER_RENDER_CACHE_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 
 export type ReaderRenderCacheSource = 'memory' | 'dexie' | 'built';
 export type ReaderRenderStorageKind = 'render-tree' | 'manifest';
@@ -181,42 +186,6 @@ export function getReaderRenderCacheEntryFromMemory<TTree extends StaticChapterR
   return touchMemoryEntry(cacheKey, cached);
 }
 
-function toDomainRecord<TTree extends StaticChapterRenderTree>(
-  persisted: PersistedReaderRenderCacheRecord,
-): ReaderRenderCacheRecord<TTree> {
-  const storageKind = persisted.storageKind === 'manifest' || !persisted.tree
-    ? 'manifest'
-    : 'render-tree';
-
-  if (storageKind === 'manifest') {
-    return {
-      chapterIndex: persisted.chapterIndex,
-      contentHash: persisted.contentHash,
-      layoutKey: persisted.layoutKey,
-      layoutSignature: persisted.layoutSignature,
-      novelId: persisted.novelId,
-      queryManifest: persisted.queryManifest,
-      storageKind,
-      tree: null,
-      updatedAt: persisted.updatedAt,
-      variantFamily: persisted.variantFamily,
-    };
-  }
-
-  return {
-    chapterIndex: persisted.chapterIndex,
-    contentHash: persisted.contentHash,
-    layoutKey: persisted.layoutKey,
-    layoutSignature: persisted.layoutSignature,
-    novelId: persisted.novelId,
-    queryManifest: persisted.queryManifest,
-    storageKind,
-    tree: persisted.tree as TTree,
-    updatedAt: persisted.updatedAt,
-    variantFamily: persisted.variantFamily,
-  };
-}
-
 export function isMaterializedReaderRenderCacheEntry<TTree extends StaticChapterRenderTree>(
   entry: ReaderRenderCacheRecord<TTree> | null | undefined,
 ): entry is ReaderRenderCacheEntry<TTree> {
@@ -248,7 +217,9 @@ export async function getReaderRenderCacheRecordFromDexie<TTree extends StaticCh
     return null;
   }
 
-  return toDomainRecord<TTree>(await refreshPersistedReaderRenderCacheIfNeeded(familyRecord));
+  return toDomainReaderRenderCacheRecord<TTree>(
+    await refreshPersistedReaderRenderCacheIfNeeded(familyRecord),
+  );
 }
 
 export async function getReaderRenderCacheEntryFromDexie<TTree extends StaticChapterRenderTree>(
@@ -282,19 +253,12 @@ export async function persistReaderRenderCacheEntry<TTree extends StaticChapterR
       .equals([entry.novelId, entry.chapterIndex, entry.variantFamily])
       .delete();
 
-    await db.readerRenderCache.add({
-      novelId: entry.novelId,
-      chapterIndex: entry.chapterIndex,
-      variantFamily: entry.variantFamily,
-      layoutKey: entry.layoutKey,
-      layoutSignature: entry.layoutSignature,
-      contentHash: entry.contentHash,
-      storageKind: entry.storageKind,
-      tree: entry.tree,
-      queryManifest: entry.queryManifest,
-      expiresAt: createReaderRenderCacheExpiresAt(entry.updatedAt),
-      updatedAt: entry.updatedAt,
-    });
+    await db.readerRenderCache.add(
+      toPersistedReaderRenderCacheRecord(
+        entry,
+        createReaderRenderCacheExpiresAt(entry.updatedAt),
+      ),
+    );
   });
 }
 

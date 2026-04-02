@@ -1,4 +1,4 @@
-import type { AnalysisOverview, Chapter, ChapterAnalysis } from '@infra/db';
+import type { BookChapter } from '@shared/contracts';
 import type {
   AggregatedCharacterStat,
   AggregatedRelationshipGraphEdge,
@@ -9,6 +9,7 @@ import type {
 } from './types';
 import { cleanText, coerceWeight } from './text';
 import { buildLocalRelationshipGraphMap, buildOverviewRelationshipMap, normalizeCharacterPair, normalizeRelationTags } from './relationships';
+import type { StoredAnalysisOverview, StoredChapterAnalysis } from '../runtime/types';
 
 interface CharacterAccumulator {
   name: string;
@@ -28,14 +29,14 @@ interface RelationshipAccumulator {
   relationTypes: Map<string, number>;
 }
 
-export function isChapterAnalysisComplete(row: ChapterAnalysis | undefined): boolean {
+export function isChapterAnalysisComplete(row: StoredChapterAnalysis | undefined): boolean {
   if (!row) return false;
   if (!cleanText(row.summary, 400)) return false;
   return [row.keyPoints, row.characters, row.relationships, row.tags].every(Array.isArray);
 }
 
 export function isOverviewComplete(
-  overview: AnalysisOverview | undefined,
+  overview: StoredAnalysisOverview | undefined,
   totalChapters: number,
 ): boolean {
   if (!overview) return false;
@@ -53,7 +54,7 @@ export function isOverviewComplete(
 }
 
 export function serializeOverview(
-  overview: AnalysisOverview | undefined,
+  overview: StoredAnalysisOverview | undefined,
 ): SerializedOverview | null {
   if (!overview) return null;
   return {
@@ -69,7 +70,7 @@ export function serializeOverview(
 }
 
 export function serializeChapterAnalysis(
-  row: ChapterAnalysis | undefined,
+  row: StoredChapterAnalysis | undefined,
 ): SerializedChapterAnalysis | null {
   if (!row) return null;
   return {
@@ -85,7 +86,9 @@ export function serializeChapterAnalysis(
   };
 }
 
-export function collectAnalysisAggregates(chapterRows: ChapterAnalysis[]): AnalysisAggregates {
+export function collectAnalysisAggregates(
+  chapterRows: StoredChapterAnalysis[],
+): AnalysisAggregates {
   const themeCounter = new Map<string, number>();
   const characterMap = new Map<string, CharacterAccumulator>();
   const relationshipMap = new Map<string, RelationshipAccumulator>();
@@ -238,9 +241,9 @@ export function collectAnalysisAggregates(chapterRows: ChapterAnalysis[]): Analy
 }
 
 export function buildCharacterGraphPayload(
-  chapters: Chapter[],
-  chapterRows: ChapterAnalysis[],
-  overview: AnalysisOverview | undefined,
+  chapters: BookChapter[],
+  chapterRows: StoredChapterAnalysis[],
+  overview: StoredAnalysisOverview | undefined,
 ): CharacterGraphPayload {
   const totalChapters = chapters.length;
   const overviewPayload = serializeOverview(overview);

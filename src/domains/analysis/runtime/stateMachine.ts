@@ -1,7 +1,7 @@
-import type { AnalysisJob } from '@infra/db';
 import type { AnalysisJobStatus } from '@shared/contracts';
 
 import { AnalysisErrorCode, AnalysisJobStateError } from '../services/errors';
+import type { AnalysisJobState } from './types';
 
 const RUNNING_STATUSES = new Set<AnalysisJobStatus['status']>(['running', 'pausing']);
 const RESUMABLE_STATUSES = new Set<AnalysisJobStatus['status']>(['paused', 'failed']);
@@ -121,7 +121,7 @@ export function deriveJobPatchForStart(
   totalChapters: number,
   totalChunks: number,
   currentChunkIndex: number,
-): Partial<AnalysisJob> {
+): Partial<AnalysisJobState> {
   return {
     status: 'running',
     totalChapters,
@@ -136,15 +136,15 @@ export function deriveJobPatchForStart(
   };
 }
 
-export function deriveJobPatchForPauseRequest(): Partial<AnalysisJob> {
+export function deriveJobPatchForPauseRequest(): Partial<AnalysisJobState> {
   return { pauseRequested: true, status: 'pausing' };
 }
 
-export function deriveJobPatchForPauseCommit(): Partial<AnalysisJob> {
+export function deriveJobPatchForPauseCommit(): Partial<AnalysisJobState> {
   return { status: 'paused', pauseRequested: false };
 }
 
-export function deriveJobPatchForResume(input: ResumePatchInput): Partial<AnalysisJob> {
+export function deriveJobPatchForResume(input: ResumePatchInput): Partial<AnalysisJobState> {
   return {
     status: 'running',
     pauseRequested: false,
@@ -158,7 +158,7 @@ export function deriveJobPatchForResume(input: ResumePatchInput): Partial<Analys
   };
 }
 
-export function deriveJobPatchForChunkStart(chunkIndex: number): Partial<AnalysisJob> {
+export function deriveJobPatchForChunkStart(chunkIndex: number): Partial<AnalysisJobState> {
   return {
     status: 'running',
     currentChunkIndex: chunkIndex,
@@ -166,14 +166,14 @@ export function deriveJobPatchForChunkStart(chunkIndex: number): Partial<Analysi
   };
 }
 
-export function deriveJobPatchForChunkSuccess(): Partial<AnalysisJob> {
+export function deriveJobPatchForChunkSuccess(): Partial<AnalysisJobState> {
   return {
     status: 'running',
     lastError: '',
   };
 }
 
-export function deriveJobPatchForChunkFailure(message: string): Partial<AnalysisJob> {
+export function deriveJobPatchForChunkFailure(message: string): Partial<AnalysisJobState> {
   return {
     status: 'failed',
     pauseRequested: false,
@@ -181,7 +181,7 @@ export function deriveJobPatchForChunkFailure(message: string): Partial<Analysis
   };
 }
 
-export function deriveJobPatchForOverviewStart(totalChunks: number): Partial<AnalysisJob> {
+export function deriveJobPatchForOverviewStart(totalChunks: number): Partial<AnalysisJobState> {
   return {
     status: 'running',
     currentChunkIndex: totalChunks,
@@ -190,7 +190,7 @@ export function deriveJobPatchForOverviewStart(totalChunks: number): Partial<Ana
   };
 }
 
-export function deriveJobPatchForOverviewSuccess(): Partial<AnalysisJob> {
+export function deriveJobPatchForOverviewSuccess(): Partial<AnalysisJobState> {
   return {
     status: 'completed',
     pauseRequested: false,
@@ -198,7 +198,7 @@ export function deriveJobPatchForOverviewSuccess(): Partial<AnalysisJob> {
   };
 }
 
-export function deriveJobPatchForOverviewFailure(message: string): Partial<AnalysisJob> {
+export function deriveJobPatchForOverviewFailure(message: string): Partial<AnalysisJobState> {
   return {
     status: 'failed',
     pauseRequested: false,
@@ -206,7 +206,7 @@ export function deriveJobPatchForOverviewFailure(message: string): Partial<Analy
   };
 }
 
-export function deriveJobPatchForRecovery(snapshot: RuntimeSnapshot): Partial<AnalysisJob> {
+export function deriveJobPatchForRecovery(snapshot: RuntimeSnapshot): Partial<AnalysisJobState> {
   return {
     status: 'paused',
     pauseRequested: false,

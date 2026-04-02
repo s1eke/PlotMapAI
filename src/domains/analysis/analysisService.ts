@@ -1,7 +1,7 @@
-import type { Chapter as DbChapter } from '@infra/db';
 import type {
   AnalysisOverview,
   AnalysisStatusResponse,
+  BookChapter,
   ChapterAnalysisResult,
   CharacterGraphResponse,
 } from '@shared/contracts';
@@ -19,10 +19,11 @@ import {
   restartAnalysis,
   resumeAnalysis,
   startAnalysis,
+  deleteAnalysisArtifacts as deletePersistedAnalysisArtifacts,
 } from './runtime/orchestrator';
 
 export interface AnalysisExecutionContext {
-  chapters: DbChapter[];
+  chapters: BookChapter[];
   novelId: number;
   novelTitle: string;
   runtimeConfig: RuntimeAnalysisConfig;
@@ -49,7 +50,7 @@ export const analysisService = {
 
   getCharacterGraph: (
     novelId: number,
-    chapters: DbChapter[],
+    chapters: BookChapter[],
   ): Promise<CharacterGraphResponse> => {
     return getCharacterGraphRecord(novelId, chapters);
   },
@@ -84,5 +85,9 @@ export const analysisService = {
 
   start: (input: AnalysisExecutionContext): Promise<AnalysisStatusResponse> => {
     return startAnalysis(input);
+  },
+
+  deleteArtifacts: async (novelId: number): Promise<void> => {
+    return deletePersistedAnalysisArtifacts(novelId);
   },
 };

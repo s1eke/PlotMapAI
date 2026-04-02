@@ -5,9 +5,8 @@ import type { AppError } from '@shared/errors';
 import { analysisService } from '@domains/analysis';
 import { bookImportService } from '@domains/book-import';
 import { novelRepository } from '@domains/library';
-import { clearReaderRenderCacheMemoryForNovel, loadAndPurifyChapters } from '@domains/reader';
+import { deleteReaderArtifacts, loadAndPurifyChapters } from '@domains/reader';
 import { ensureDefaultTocRules, tocRuleRepository } from '@domains/settings';
-import { db } from '@infra/db';
 import { CACHE_KEYS, storage } from '@infra/storage';
 import { AppErrorCode, toAppError } from '@shared/errors';
 
@@ -29,27 +28,11 @@ export interface CharacterGraphPageData {
 export async function deleteNovelAndCleanupArtifacts(
   novelId: number,
 ): Promise<{ message: string }> {
-  await db.transaction(
-    'rw',
-    [
-      db.analysisJobs,
-      db.analysisChunks,
-      db.analysisOverviews,
-      db.chapterAnalyses,
-      db.readerRenderCache,
-      db.readingProgress,
-    ],
-    async () => {
-      await db.readingProgress.where('novelId').equals(novelId).delete();
-      await db.analysisJobs.where('novelId').equals(novelId).delete();
-      await db.analysisChunks.where('novelId').equals(novelId).delete();
-      await db.chapterAnalyses.where('novelId').equals(novelId).delete();
-      await db.analysisOverviews.where('novelId').equals(novelId).delete();
-      await db.readerRenderCache.where('novelId').equals(novelId).delete();
-    },
-  );
+  await Promise.all([
+    analysisService.deleteArtifacts(novelId),
+    deleteReaderArtifacts(novelId),
+  ]);
   await novelRepository.delete(novelId);
-  clearReaderRenderCacheMemoryForNovel(novelId);
   storage.cache.remove(CACHE_KEYS.readerState(novelId));
   return { message: 'Novel deleted' };
 }

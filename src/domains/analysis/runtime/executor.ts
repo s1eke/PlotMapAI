@@ -1,3 +1,5 @@
+import type { BookChapter } from '@shared/contracts';
+
 import { reportAppError } from '@shared/debug';
 import { AppErrorCode, toAppError } from '@shared/errors';
 import { buildChunkFromChapters } from '../services/chunking';
@@ -11,7 +13,6 @@ import {
   runOverviewAnalysis,
 } from '../services/service';
 import type { AnalysisChunkPayload, RuntimeAnalysisConfig } from '../services/types';
-import type { AnalysisChunk, Chapter } from '@infra/db';
 import type { AnalysisRuntimeRepository } from './repository';
 import {
   deriveJobPatchForChunkFailure,
@@ -22,6 +23,7 @@ import {
   deriveJobPatchForOverviewSuccess,
   deriveJobPatchForPauseCommit,
 } from './stateMachine';
+import type { AnalysisChunkState } from './types';
 
 function nowISO(): string {
   return new Date().toISOString();
@@ -38,10 +40,10 @@ function normalizeRuntimeError(error: unknown, details?: Record<string, unknown>
 }
 
 function hydrateChunkPayload(
-  chunk: AnalysisChunk,
-  chapterMap: Map<number, Chapter>,
+  chunk: AnalysisChunkState,
+  chapterMap: Map<number, BookChapter>,
 ): AnalysisChunkPayload {
-  const chapters: Chapter[] = [];
+  const chapters: BookChapter[] = [];
   for (const chapterIndex of chunk.chapterIndices) {
     const chapter = chapterMap.get(chapterIndex);
     if (!chapter) throw new AnalysisJobStateError(AnalysisErrorCode.CHAPTER_MISSING);
@@ -94,7 +96,7 @@ export async function runAnalysisExecution({
 }: {
   novelId: number;
   novelTitle: string;
-  chapters: Chapter[];
+  chapters: BookChapter[];
   runtimeConfig: RuntimeAnalysisConfig;
   signal: AbortSignal;
   repository: AnalysisRuntimeRepository;

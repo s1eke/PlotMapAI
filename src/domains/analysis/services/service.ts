@@ -1,5 +1,4 @@
 import { AppErrorCode } from '@shared/errors';
-import type { ChapterAnalysis } from '@infra/db';
 import { resolveAnalysisProviderAdapter } from '../providers';
 import { ANALYSIS_RETRY_LIMIT, LLM_MAX_OUTPUT_TOKENS } from './constants';
 import { AnalysisExecutionError } from './errors';
@@ -9,6 +8,7 @@ import { buildAnalysisChunks } from './chunking';
 import { normalizeChunkResult, normalizeOverviewResult, normalizeSingleChapterResult } from './parsers';
 import { buildChunkPrompt, buildOverviewPrompt, buildSingleChapterPrompt } from './prompts';
 import type { AnalysisChunkPayload, ChunkAnalysisResult, OverviewAnalysisResult, PromptChapter, RuntimeAnalysisConfig } from './types';
+import type { StoredChapterAnalysis } from '../runtime/types';
 
 const CHAPTER_ANALYZER_SYSTEM_PROMPT =
   '你是一个严谨的小说结构分析器。你必须只返回 JSON 对象，不允许返回 markdown、解释文本或多余前后缀。';
@@ -69,7 +69,7 @@ export async function runSingleChapterAnalysis(
 export async function runOverviewAnalysis(
   config: RuntimeAnalysisConfig,
   novelTitle: string,
-  chapterRows: ChapterAnalysis[],
+  chapterRows: StoredChapterAnalysis[],
   totalChapters: number,
   signal?: AbortSignal,
 ): Promise<OverviewAnalysisResult> {

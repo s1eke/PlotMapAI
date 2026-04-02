@@ -4,26 +4,14 @@ import { AppErrorCode, createAppError } from '@shared/errors';
 
 import type { ChapterDetectionRule } from '@shared/text-processing';
 
+import { mapTocRuleRecordToDomain } from './persistenceMappers';
 import { dumpYaml, loadYaml } from './services/yaml';
 import type { TocRule } from './types';
-
-function tocRuleToApi(rule: import('@infra/db').TocRule): TocRule {
-  return {
-    id: rule.id,
-    name: rule.name,
-    rule: rule.rule,
-    example: rule.example,
-    priority: rule.serialNumber,
-    isEnabled: rule.enable,
-    isDefault: rule.isDefault,
-    createdAt: rule.createdAt,
-  };
-}
 
 export const tocRuleRepository = {
   getTocRules: async (): Promise<TocRule[]> => {
     const rules = await db.tocRules.orderBy('serialNumber').toArray();
-    return rules.map(tocRuleToApi);
+    return rules.map(mapTocRuleRecordToDomain);
   },
 
   createTocRule: async (data: Omit<TocRule, 'id' | 'isDefault'>): Promise<TocRule> => {
@@ -39,7 +27,7 @@ export const tocRuleRepository = {
       createdAt: now,
     });
     const rule = await db.tocRules.get(id);
-    return tocRuleToApi(rule!);
+    return mapTocRuleRecordToDomain(rule!);
   },
 
   updateTocRule: async (id: number, data: Partial<TocRule>): Promise<TocRule> => {
@@ -60,7 +48,7 @@ export const tocRuleRepository = {
         debugMessage: 'Rule not found',
       });
     }
-    return tocRuleToApi(rule);
+    return mapTocRuleRecordToDomain(rule);
   },
 
   deleteTocRule: async (id: number): Promise<{ message: string }> => {

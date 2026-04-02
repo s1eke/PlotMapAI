@@ -1,21 +1,10 @@
 import { db } from '@infra/db';
 
-import type { ReaderMode, StoredReaderState } from '../hooks/readerSessionTypes';
-import type { ReaderLocator } from '../utils/readerLayout';
+import type { StoredReaderState } from '../hooks/readerSessionTypes';
 
-import {
-  buildStoredReaderState,
-  clampChapterProgress,
-  sanitizeStoredReaderState,
-  shouldUseLocatorAsPrimaryPosition,
-} from './state';
-
-export interface ReadingProgress {
-  chapterIndex: number;
-  mode: ReaderMode;
-  chapterProgress?: number;
-  locator?: ReaderLocator;
-}
+import { toReadingProgressRecord, toStoredReaderState } from './mapper';
+export type { ReadingProgress } from './mapper';
+export { toReadingProgress } from './mapper';
 
 export async function readReadingProgress(
   novelId: number,
@@ -25,33 +14,7 @@ export async function readReadingProgress(
     return null;
   }
 
-  return sanitizeStoredReaderState({
-    chapterIndex: progress.chapterIndex,
-    mode:
-      progress.mode === 'scroll' || progress.mode === 'paged' || progress.mode === 'summary'
-        ? progress.mode
-        : 'scroll',
-    chapterProgress: progress.chapterProgress,
-    locator: progress.locator,
-  });
-}
-
-export function toReadingProgress(state: StoredReaderState): ReadingProgress {
-  const canonicalState = buildStoredReaderState(state);
-  const durableMode = canonicalState.mode ?? 'scroll';
-  const usesLocator = shouldUseLocatorAsPrimaryPosition(
-    durableMode,
-    canonicalState.locator,
-  );
-
-  return {
-    chapterIndex: canonicalState.chapterIndex ?? 0,
-    mode: durableMode,
-    chapterProgress: durableMode === 'summary'
-      ? clampChapterProgress(canonicalState.chapterProgress)
-      : undefined,
-    locator: usesLocator ? canonicalState.locator : undefined,
-  };
+  return toStoredReaderState(progress);
 }
 
 export async function replaceReadingProgress(
@@ -59,16 +22,14 @@ export async function replaceReadingProgress(
   state: StoredReaderState,
 ): Promise<void> {
   const existing = await db.readingProgress.where('novelId').equals(novelId).first();
-  const progress = toReadingProgress(state);
   const now = new Date().toISOString();
-
-  await db.readingProgress.put({
-    id: existing?.id,
+  const progressRecord = toReadingProgressRecord({
+    existingId: existing?.id,
     novelId,
-    chapterIndex: progress.chapterIndex,
-    mode: progress.mode,
-    chapterProgress: progress.chapterProgress,
-    locator: progress.locator,
+    state,
     updatedAt: now,
   });
+  const { id: _unusedId, ...record } = progressRecord;
+
+  await db.readingProgress.put(existing ? progressRecord : record);
 }

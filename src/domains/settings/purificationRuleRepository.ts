@@ -1,6 +1,7 @@
 import { debugLog } from '@shared/debug';
 import { db } from '@infra/db';
 import { AppErrorCode, createAppError } from '@shared/errors';
+import { mapPurificationRuleRecordToDomain } from './persistenceMappers';
 import { dumpYaml, loadYaml } from './services/yaml';
 import { normalizeImportedPurificationRules } from './services/importedPurificationRules';
 import type { PurificationRule } from './types';
@@ -14,32 +15,10 @@ function unescapeReplacement(raw: string): string {
   });
 }
 
-function purRuleToApi(rule: import('@infra/db').PurificationRule): PurificationRule {
-  return {
-    id: rule.id,
-    externalId: rule.externalId ?? undefined,
-    name: rule.name,
-    group: rule.group,
-    pattern: rule.pattern,
-    replacement: rule.replacement,
-    isRegex: rule.isRegex,
-    isEnabled: rule.isEnabled,
-    order: rule.order,
-    scopeTitle: rule.scopeTitle,
-    scopeContent: rule.scopeContent,
-    bookScope: rule.bookScope || undefined,
-    excludeBookScope: rule.excludeBookScope || undefined,
-    exclusiveGroup: rule.exclusiveGroup || undefined,
-    isDefault: rule.isDefault,
-    timeoutMs: rule.timeoutMs,
-    createdAt: rule.createdAt,
-  };
-}
-
 export const purificationRuleRepository = {
   getPurificationRules: async (): Promise<PurificationRule[]> => {
     const rules = await db.purificationRules.orderBy('order').toArray();
-    return rules.map(purRuleToApi);
+    return rules.map(mapPurificationRuleRecordToDomain);
   },
 
   createPurificationRule: async (data: Partial<PurificationRule>): Promise<PurificationRule> => {
@@ -72,7 +51,7 @@ export const purificationRuleRepository = {
       createdAt: now,
     });
     const rule = await db.purificationRules.get(id);
-    return purRuleToApi(rule!);
+    return mapPurificationRuleRecordToDomain(rule!);
   },
 
   updatePurificationRule: async (
@@ -111,7 +90,7 @@ export const purificationRuleRepository = {
         debugMessage: 'Rule not found',
       });
     }
-    return purRuleToApi(rule);
+    return mapPurificationRuleRecordToDomain(rule);
   },
 
   deletePurificationRule: async (id: number): Promise<{ message: string }> => {

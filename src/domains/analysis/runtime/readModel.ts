@@ -1,5 +1,3 @@
-import { db } from '@infra/db';
-import type { AnalysisChunk, AnalysisJob, AnalysisOverview, ChapterAnalysis } from '@infra/db';
 import type {
   AnalysisChunkStatus,
   AnalysisJobStatus,
@@ -10,21 +8,28 @@ import type {
 
 import { isChapterAnalysisComplete, isOverviewComplete } from '../services/aggregates';
 import { deriveCapabilities, deriveCurrentStage, deriveProgress, type RuntimeSnapshot } from './stateMachine';
+import type {
+  AnalysisChunkState,
+  AnalysisJobState,
+  LoadedAnalysisRuntimeState,
+  StoredAnalysisOverview,
+  StoredChapterAnalysis,
+} from './types';
 
-function serializeChunk(chunk: AnalysisChunk): AnalysisChunkStatus {
+function serializeChunk(chunk: AnalysisChunkState): AnalysisChunkStatus {
   return {
     chunkIndex: chunk.chunkIndex,
     startChapterIndex: chunk.startChapterIndex,
     endChapterIndex: chunk.endChapterIndex,
     chapterIndices: chunk.chapterIndices,
-    status: chunk.status as AnalysisChunkStatus['status'],
+    status: chunk.status,
     chunkSummary: chunk.chunkSummary,
     errorMessage: chunk.errorMessage,
     updatedAt: chunk.updatedAt,
   };
 }
 
-export function serializeOverview(overview?: AnalysisOverview): ApiAnalysisOverview | null {
+export function serializeOverview(overview?: StoredAnalysisOverview): ApiAnalysisOverview | null {
   return overview
     ? {
       bookIntro: overview.bookIntro,
@@ -39,7 +44,7 @@ export function serializeOverview(overview?: AnalysisOverview): ApiAnalysisOverv
     : null;
 }
 
-export function serializeChapter(row?: ChapterAnalysis): ChapterAnalysisResult | null {
+export function serializeChapter(row?: StoredChapterAnalysis): ChapterAnalysisResult | null {
   return row
     ? {
       chapterIndex: row.chapterIndex,
@@ -55,19 +60,17 @@ export function serializeChapter(row?: ChapterAnalysis): ChapterAnalysisResult |
     : null;
 }
 
-export function countCompleteChapterAnalyses(rows: ChapterAnalysis[]): number {
+export function countCompleteChapterAnalyses(rows: StoredChapterAnalysis[]): number {
   return rows.filter((row) => isChapterAnalysisComplete(row)).length;
 }
 
-export async function findIncompleteChunkIndices(
-  novelId: number,
-  chunks: AnalysisChunk[],
-  chapterRows?: ChapterAnalysis[],
-): Promise<Set<number>> {
+export function findIncompleteChunkIndices(
+  chunks: AnalysisChunkState[],
+  chapterRows: StoredChapterAnalysis[],
+): Set<number> {
   if (!chunks.length) return new Set();
-  const chapterMap = new Map<number, ChapterAnalysis>();
-  const rows = chapterRows ?? await db.chapterAnalyses.where('novelId').equals(novelId).sortBy('chapterIndex');
-  for (const row of rows) chapterMap.set(row.chapterIndex, row);
+  const chapterMap = new Map<number, StoredChapterAnalysis>();
+  for (const row of chapterRows) chapterMap.set(row.chapterIndex, row);
   return new Set(
     chunks
       .filter(
@@ -80,10 +83,11 @@ export async function findIncompleteChunkIndices(
   );
 }
 
-async function readStatusState(novelId: number): Promise<{
-  job?: AnalysisJob;
-  overview?: AnalysisOverview;
-  chunks: AnalysisChunk[];
+interface DerivedAnalysisRuntimeState {
+  job?: AnalysisJobState;
+  overview?: StoredAnalysisOverview;
+  chunks: AnalysisChunkState[];
+  chapterRows: StoredChapterAnalysis[];
   incompleteChunkIndices: Set<number>;
   completedChunks: number;
   totalChunks: number;
@@ -91,31 +95,30 @@ async function readStatusState(novelId: number): Promise<{
   analyzedChapters: number;
   overviewComplete: boolean;
   analysisComplete: boolean;
-}> {
-  const [job, overview, chunks, chapterCount, chapterRows] = await Promise.all([
-    db.analysisJobs.where('novelId').equals(novelId).first(),
-    db.analysisOverviews.where('novelId').equals(novelId).first(),
-    db.analysisChunks.where('novelId').equals(novelId).sortBy('chunkIndex'),
-    db.chapters.where('novelId').equals(novelId).count(),
-    db.chapterAnalyses.where('novelId').equals(novelId).sortBy('chapterIndex'),
-  ]);
-  const incompleteChunkIndices = await findIncompleteChunkIndices(novelId, chunks, chapterRows);
-  const completedChunks = chunks.filter(
+}
+
+export function deriveAnalysisRuntimeState(
+  state: LoadedAnalysisRuntimeState,
+): DerivedAnalysisRuntimeState {
+  const incompleteChunkIndices = findIncompleteChunkIndices(state.chunks, state.chapterRows);
+  const completedChunks = state.chunks.filter(
     (chunk) => chunk.status === 'completed' && !incompleteChunkIndices.has(chunk.chunkIndex),
   ).length;
-  const totalChapters = job && job.totalChapters > 0 ? job.totalChapters : chapterCount;
-  const analyzedChapters = countCompleteChapterAnalyses(chapterRows);
-  const totalChunks = chunks.length;
-  const overviewComplete = isOverviewComplete(overview, totalChapters);
+  const totalChapters =
+    state.job && state.job.totalChapters > 0 ? state.job.totalChapters : state.totalChapterCount;
+  const analyzedChapters = countCompleteChapterAnalyses(state.chapterRows);
+  const totalChunks = state.chunks.length;
+  const overviewComplete = isOverviewComplete(state.overview, totalChapters);
   const analysisComplete =
     totalChunks > 0 &&
     incompleteChunkIndices.size === 0 &&
     overviewComplete &&
     completedChunks >= totalChunks;
   return {
-    job,
-    overview,
-    chunks,
+    job: state.job,
+    overview: state.overview,
+    chunks: state.chunks,
+    chapterRows: state.chapterRows,
     incompleteChunkIndices,
     completedChunks,
     totalChunks,
@@ -126,48 +129,45 @@ async function readStatusState(novelId: number): Promise<{
   };
 }
 
-function toSnapshot(state: Awaited<ReturnType<typeof readStatusState>>): RuntimeSnapshot {
+export function createRuntimeSnapshot(state: LoadedAnalysisRuntimeState): RuntimeSnapshot {
+  const derived = deriveAnalysisRuntimeState(state);
   return {
-    status: (state.job?.status as AnalysisJobStatus['status']) ?? 'idle',
-    pauseRequested: state.job?.pauseRequested ?? false,
-    totalChunks: state.totalChunks,
-    completedChunks: state.completedChunks,
-    totalChapters: state.totalChapters,
-    analyzedChapters: state.analyzedChapters,
-    currentChunkIndex: state.job?.currentChunkIndex ?? 0,
-    overviewComplete: state.overviewComplete,
-    analysisComplete: state.analysisComplete,
-    hasReusableChunks: state.totalChunks > 0,
-    hasIncompleteChunks: state.incompleteChunkIndices.size > 0,
-    lastError: state.job?.lastError ?? '',
+    status: (derived.job?.status as AnalysisJobStatus['status']) ?? 'idle',
+    pauseRequested: derived.job?.pauseRequested ?? false,
+    totalChunks: derived.totalChunks,
+    completedChunks: derived.completedChunks,
+    totalChapters: derived.totalChapters,
+    analyzedChapters: derived.analyzedChapters,
+    currentChunkIndex: derived.job?.currentChunkIndex ?? 0,
+    overviewComplete: derived.overviewComplete,
+    analysisComplete: derived.analysisComplete,
+    hasReusableChunks: derived.totalChunks > 0,
+    hasIncompleteChunks: derived.incompleteChunkIndices.size > 0,
+    lastError: derived.job?.lastError ?? '',
   };
 }
 
-export async function readRuntimeSnapshot(novelId: number): Promise<RuntimeSnapshot> {
-  return toSnapshot(await readStatusState(novelId));
-}
-
-export async function buildAnalysisStatusResponse(
-  novelId: number,
-): Promise<AnalysisStatusResponse> {
-  const state = await readStatusState(novelId);
-  const snapshot = toSnapshot(state);
+export function buildAnalysisStatusResponse(
+  state: LoadedAnalysisRuntimeState,
+): AnalysisStatusResponse {
+  const derived = deriveAnalysisRuntimeState(state);
+  const snapshot = createRuntimeSnapshot(state);
   const currentStage = deriveCurrentStage(snapshot);
-  let currentChunk = state.job && currentStage === 'chapters'
-    ? state.chunks.find((chunk) => chunk.chunkIndex === state.job?.currentChunkIndex) ?? null
+  let currentChunk = derived.job && currentStage === 'chapters'
+    ? derived.chunks.find((chunk) => chunk.chunkIndex === derived.job?.currentChunkIndex) ?? null
     : null;
   if (
     currentChunk &&
     currentChunk.status === 'completed' &&
-    state.incompleteChunkIndices.has(currentChunk.chunkIndex)
+    derived.incompleteChunkIndices.has(currentChunk.chunkIndex)
   ) {
     currentChunk =
-      state.chunks.find(
+      derived.chunks.find(
         (chunk) =>
           chunk.status === 'running' ||
           chunk.status === 'pending' ||
           chunk.status === 'failed' ||
-          state.incompleteChunkIndices.has(chunk.chunkIndex),
+          derived.incompleteChunkIndices.has(chunk.chunkIndex),
       ) ?? null;
   }
   return {
@@ -177,20 +177,20 @@ export async function buildAnalysisStatusResponse(
       analysisComplete: snapshot.analysisComplete,
       totalChapters: snapshot.totalChapters,
       analyzedChapters: snapshot.analyzedChapters,
-      totalChunks: state.job ? state.job.totalChunks : state.totalChunks,
+      totalChunks: derived.job ? derived.job.totalChunks : derived.totalChunks,
       completedChunks: snapshot.completedChunks,
       currentChunkIndex: snapshot.currentChunkIndex,
       progressPercent: deriveProgress(snapshot),
       pauseRequested: snapshot.pauseRequested,
       lastError: snapshot.lastError,
-      startedAt: state.job?.startedAt ?? null,
-      completedAt: state.job?.completedAt ?? null,
-      lastHeartbeat: state.job?.lastHeartbeat ?? null,
-      updatedAt: state.job?.updatedAt ?? null,
+      startedAt: derived.job?.startedAt ?? null,
+      completedAt: derived.job?.completedAt ?? null,
+      lastHeartbeat: derived.job?.lastHeartbeat ?? null,
+      updatedAt: derived.job?.updatedAt ?? null,
       currentChunk: currentChunk ? serializeChunk(currentChunk) : null,
       ...deriveCapabilities(snapshot),
     },
-    overview: serializeOverview(state.overview),
-    chunks: state.chunks.map(serializeChunk),
+    overview: serializeOverview(derived.overview),
+    chunks: derived.chunks.map(serializeChunk),
   };
 }

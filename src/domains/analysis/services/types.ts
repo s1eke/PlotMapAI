@@ -1,3 +1,4 @@
+import type { BookChapter } from '@shared/contracts';
 import type {
   AnalysisProviderId,
   OpenAiCompatibleProviderConfig,
@@ -9,11 +10,7 @@ export interface RuntimeAnalysisConfig {
   providerConfig: OpenAiCompatibleProviderConfig;
 }
 
-export interface PromptChapter {
-  chapterIndex: number;
-  title: string;
-  content: string;
-}
+export interface PromptChapter extends Pick<BookChapter, 'chapterIndex' | 'title' | 'content'> {}
 
 export interface ChunkPromptChapter extends PromptChapter {
   text: string;

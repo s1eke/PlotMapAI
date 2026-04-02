@@ -1,6 +1,6 @@
-import type { PurificationRule } from '@infra/db';
-
 import { db } from '@infra/db';
+
+import type { PurificationRuleRecord } from '@infra/db/settings';
 
 import { loadYaml } from './yaml';
 
@@ -30,7 +30,7 @@ async function loadDefaultPurificationRules(): Promise<DefaultPurificationRuleRe
 function mapDefaultPurificationRule(
   rule: DefaultPurificationRuleRecord,
   createdAt: string,
-): Omit<PurificationRule, 'id'> {
+): Omit<PurificationRuleRecord, 'id'> {
   return {
     externalId: rule.externalId,
     name: rule.name,

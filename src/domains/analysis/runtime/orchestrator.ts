@@ -1,7 +1,7 @@
-import type { Chapter as DbChapter } from '@infra/db';
 import type {
   AnalysisOverview,
   AnalysisStatusResponse,
+  BookChapter,
   ChapterAnalysisResult,
   CharacterGraphResponse,
 } from '@shared/contracts';
@@ -25,7 +25,7 @@ import {
 } from './stateMachine';
 
 interface AnalysisExecutionContext {
-  chapters: DbChapter[];
+  chapters: BookChapter[];
   novelId: number;
   novelTitle: string;
   runtimeConfig: RuntimeAnalysisConfig;
@@ -188,7 +188,7 @@ export async function analyzeSingleChapter({
 
 export async function getCharacterGraph(
   novelId: number,
-  chapters: DbChapter[],
+  chapters: BookChapter[],
 ): Promise<CharacterGraphResponse> {
   return repository.getCharacterGraph(novelId, chapters);
 }
@@ -204,4 +204,8 @@ export async function getOverview(
   novelId: number,
 ): Promise<{ overview: AnalysisOverview | null }> {
   return repository.getOverview(novelId);
+}
+
+export async function deleteAnalysisArtifacts(novelId: number): Promise<void> {
+  await repository.deleteAnalysisArtifacts(novelId);
 }

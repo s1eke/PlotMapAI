@@ -122,12 +122,13 @@ describe('readerRenderCache', () => {
   });
 
   it('persists an expiry timestamp and clears expired records during maintenance', async () => {
-    const { READER_RENDER_CACHE_TTL_MS, db } = await import('@infra/db');
+    const { db } = await import('@infra/db');
     const {
       createReaderLayoutSignature,
       createReaderTypographyMetrics,
     } = await import('../readerLayout');
     const {
+      READER_RENDER_CACHE_TTL_MS,
       buildStaticRenderManifest,
       persistReaderRenderCacheEntry,
     } = await import('../readerRenderCache');

@@ -1,6 +1,8 @@
 import { db } from '@infra/db';
 import { AppErrorCode, createAppError } from '@shared/errors';
 
+import { mapNovelRecordToView } from './mappers';
+
 export interface NovelView {
   id: number;
   title: string;
@@ -16,30 +18,13 @@ export interface NovelView {
   createdAt: string;
 }
 
-function novelToView(novel: import('@infra/db').Novel, chapterCount: number): NovelView {
-  return {
-    id: novel.id,
-    title: novel.title,
-    author: novel.author,
-    description: novel.description,
-    tags: novel.tags,
-    fileType: novel.fileType,
-    hasCover: Boolean(novel.coverPath),
-    originalFilename: novel.originalFilename,
-    originalEncoding: novel.originalEncoding,
-    totalWords: novel.totalWords,
-    createdAt: novel.createdAt,
-    chapterCount,
-  };
-}
-
 export const novelRepository = {
   async list(): Promise<NovelView[]> {
     const novels = await db.novels.orderBy('createdAt').reverse().toArray();
     const counts = await Promise.all(
       novels.map((novel) => db.chapters.where('novelId').equals(novel.id).count()),
     );
-    return novels.map((novel, index) => novelToView(novel, counts[index]));
+    return novels.map((novel, index) => mapNovelRecordToView(novel, counts[index]));
   },
 
   async get(id: number): Promise<NovelView> {
@@ -56,7 +41,7 @@ export const novelRepository = {
     }
 
     const count = await db.chapters.where('novelId').equals(id).count();
-    return novelToView(novel, count);
+    return mapNovelRecordToView(novel, count);
   },
 
   async delete(id: number): Promise<{ message: string }> {
