@@ -1,3 +1,4 @@
+import { AppErrorCode } from '@shared/errors';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createWorkerTaskRunner, type WorkerLike } from '../client';
 
@@ -7,15 +8,15 @@ interface TestProgress {
 
 class FakeWorker implements WorkerLike {
   messages: unknown[] = [];
-  private listeners = new Map<string, Set<(event: MessageEvent) => void>>();
+  private listeners = new Map<string, Set<(event: Event) => void>>();
 
-  addEventListener(type: string, listener: (event: MessageEvent) => void) {
+  addEventListener(type: string, listener: (event: Event) => void) {
     const current = this.listeners.get(type) ?? new Set();
     current.add(listener);
     this.listeners.set(type, current);
   }
 
-  removeEventListener(type: string, listener: (event: MessageEvent) => void) {
+  removeEventListener(type: string, listener: (event: Event) => void) {
     this.listeners.get(type)?.delete(listener);
   }
 
@@ -45,10 +46,32 @@ class FakeWorker implements WorkerLike {
     this.listeners.clear();
   }
 
-  emit(type: string, event: MessageEvent) {
+  emit(type: string, event: Event) {
     this.listeners.get(type)?.forEach((listener) => listener(event));
   }
 }
+
+class BrokenWorker extends FakeWorker {
+  override postMessage(message: { kind: string; requestId: string; task?: string }) {
+    this.messages.push(message);
+    if (message.kind === 'run') {
+      queueMicrotask(() => {
+        this.emit('error', new ErrorEvent('error', {
+          error: new Error('worker init failed'),
+          message: 'worker init failed',
+        }));
+      });
+    }
+  }
+}
+
+const unavailableError = {
+  code: AppErrorCode.WORKER_UNAVAILABLE,
+  kind: 'unsupported' as const,
+  source: 'worker' as const,
+  userMessageKey: 'errors.WORKER_UNAVAILABLE',
+  debugMessage: 'Worker task is unavailable.',
+};
 
 describe('createWorkerTaskRunner', () => {
   afterEach(() => {
@@ -65,10 +88,28 @@ describe('createWorkerTaskRunner', () => {
       createWorker,
       task: 'test-task',
       fallback,
+      unavailableError,
     });
 
     await expect(runTask('payload')).resolves.toBe('fallback');
     expect(fallback).toHaveBeenCalledWith('payload', {});
+    expect(createWorker).not.toHaveBeenCalled();
+  });
+
+  it('throws unavailableError when Worker is unavailable in worker-only mode', async () => {
+    // @ts-expect-error test override
+    globalThis.Worker = undefined;
+    const createWorker = vi.fn();
+    const runTask = createWorkerTaskRunner<string, string, TestProgress>({
+      createWorker,
+      task: 'test-task',
+      unavailableError,
+    });
+
+    await expect(runTask('payload')).rejects.toMatchObject({
+      code: AppErrorCode.WORKER_UNAVAILABLE,
+      userMessageKey: 'errors.WORKER_UNAVAILABLE',
+    });
     expect(createWorker).not.toHaveBeenCalled();
   });
 
@@ -80,6 +121,7 @@ describe('createWorkerTaskRunner', () => {
       createWorker: () => worker,
       task: 'test-task',
       fallback: vi.fn(),
+      unavailableError,
     });
 
     await expect(runTask('payload', { onProgress })).resolves.toBe('done');
@@ -95,6 +137,7 @@ describe('createWorkerTaskRunner', () => {
       createWorker: () => worker,
       task: 'test-task',
       fallback: vi.fn(),
+      unavailableError,
     });
 
     const promise = runTask('payload', { signal: controller.signal });
@@ -105,5 +148,20 @@ describe('createWorkerTaskRunner', () => {
       expect.objectContaining({ kind: 'run', task: 'test-task' }),
       expect.objectContaining({ kind: 'cancel' }),
     ]);
+  });
+
+  it('throws unavailableError when the worker fails before initialization completes', async () => {
+    vi.stubGlobal('Worker', BrokenWorker);
+    const worker = new BrokenWorker();
+    const runTask = createWorkerTaskRunner<string, string, TestProgress>({
+      createWorker: () => worker,
+      task: 'test-task',
+      unavailableError,
+    });
+
+    await expect(runTask('payload')).rejects.toMatchObject({
+      code: AppErrorCode.WORKER_UNAVAILABLE,
+      userMessageKey: 'errors.WORKER_UNAVAILABLE',
+    });
   });
 });

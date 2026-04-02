@@ -476,6 +476,7 @@
     "AI_CONFIG_JSON_INVALID": "The decrypted AI config is not valid JSON.",
     "AI_CONFIG_MISSING_FIELDS": "The imported AI config is missing required fields.",
     "BOOK_IMPORT_FAILED": "Failed to import the book. Please try again later.",
+    "WORKER_UNAVAILABLE": "Background tasks are unavailable in this browser environment.",
     "WORKER_EXECUTION_FAILED": "A background task failed. Please try again later.",
     "TEXT_PROCESSING_RULES_INVALID": "Text processing rules are invalid."
   }

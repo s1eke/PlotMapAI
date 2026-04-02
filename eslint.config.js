@@ -7,13 +7,24 @@ export default defineConfig([
   ...aliReact,
   reactRefresh.configs.vite,
   {
-    files: ['src/**/__tests__/**/*.{ts,tsx}', 'src/test/**/*.{ts,tsx}', 'vitest.config.ts'],
+    files: [
+      'scripts/**/*.test.ts',
+      'src/**/__tests__/**/*.{ts,tsx}',
+      'src/test/**/*.{ts,tsx}',
+      'vitest.config.ts',
+    ],
     languageOptions: {
       parserOptions: {
         project: ['./tsconfig.eslint.json'],
         projectService: false,
         tsconfigRootDir: import.meta.dirname,
       },
+    },
+  },
+  {
+    files: ['scripts/**/*.{mjs,js}'],
+    rules: {
+      'no-console': 'off',
     },
   },
   {

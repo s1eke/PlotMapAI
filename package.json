@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "dev:debug": "VITE_DEBUG=true vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && node scripts/checkBundleBudget.mjs",
+    "analyze": "ANALYZE_BUNDLE=1 npm run build",
     "generate:pwa-icons": "node scripts/generateMaskableIcons.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
@@ -52,6 +53,7 @@
     "globals": "^17.4.0",
     "jsdom": "^29.0.0",
     "msw": "^2.12.13",
+    "rollup-plugin-visualizer": "^7.0.1",
     "tailwindcss": "^4.2.2",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.56.1",

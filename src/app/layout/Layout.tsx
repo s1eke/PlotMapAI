@@ -3,7 +3,10 @@ import { BookOpen, Settings } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { type AppTheme, useAppThemeSelector } from '@app/stores/appThemeStore';
-import { useReaderPreferences } from '@domains/reader';
+import {
+  ensureReaderAppearanceHydrated,
+  useReaderAppearanceSelector,
+} from '@shared/stores/readerAppearanceStore';
 import { cn } from '@shared/utils/cn';
 
 import { appPaths } from '../router/paths';
@@ -60,13 +63,17 @@ export default function Layout({ children }: LayoutProps) {
   const location = useLocation();
   const isReader = location.pathname.includes('/read');
   const appTheme = useAppThemeSelector((state) => state.theme);
-  const { readerTheme } = useReaderPreferences();
+  const readerTheme = useReaderAppearanceSelector((state) => state.readerTheme);
   const shellSurfaceColor = resolveShellSurfaceColor(isReader, readerTheme, appTheme);
   const layoutStyle: CSSProperties & Record<'--app-header-height' | '--app-header-offset', string> = {
     '--app-header-height': isReader ? '0px' : 'calc(4rem + env(safe-area-inset-top, 0px))',
     '--app-header-offset': '0px',
     backgroundColor: shellSurfaceColor,
   };
+
+  useEffect(() => {
+    ensureReaderAppearanceHydrated().catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     const themeColorMeta = ensureMetaTag('theme-color');

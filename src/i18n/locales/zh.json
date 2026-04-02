@@ -476,6 +476,7 @@
     "AI_CONFIG_JSON_INVALID": "解密后的 AI 配置不是合法 JSON。",
     "AI_CONFIG_MISSING_FIELDS": "导入的 AI 配置缺少必填字段。",
     "BOOK_IMPORT_FAILED": "导入书籍失败，请稍后重试。",
+    "WORKER_UNAVAILABLE": "当前浏览器环境不支持后台任务执行。",
     "WORKER_EXECUTION_FAILED": "后台任务执行失败，请稍后重试。",
     "TEXT_PROCESSING_RULES_INVALID": "文本处理规则无效。"
   }

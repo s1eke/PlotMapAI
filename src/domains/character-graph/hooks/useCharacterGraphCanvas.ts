@@ -2,6 +2,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type { PointerEvent as ReactPointerEvent, RefObject } from 'react';
 import type { TFunction } from 'i18next';
 import type { CharacterGraphEdge, CharacterGraphResponse } from '@domains/analysis';
+import type { AppError } from '@shared/errors';
+import { AppErrorCode, toAppError } from '@shared/errors';
 import type { GraphLayoutProgress } from '../workers/layoutClient';
 import { runGraphLayoutTask } from '../workers/layoutClient';
 import {
@@ -93,6 +95,7 @@ interface UseCharacterGraphCanvasResult {
   highlightedNodeIds: Set<string>;
   isGestureInteracting: boolean;
   isLayoutComputing: boolean;
+  layoutError: AppError | null;
   isPanning: boolean;
   layoutEdges: LayoutEdge[];
   layoutMessage: string | null;
@@ -285,11 +288,13 @@ export function useCharacterGraphCanvas({
   const [layoutRevision, setLayoutRevision] = useState(0);
   const [viewportSize, setViewportSize] = useState<ViewportSize>(DEFAULT_VIEWPORT_SIZE);
   const [layoutState, setLayoutState] = useState<{
+    error: AppError | null;
     graph: CharacterGraphResponse | null;
     isComputing: boolean;
     nodes: LayoutNode[];
     progress: number;
   }>({
+    error: null,
     graph: null,
     isComputing: false,
     nodes: [],
@@ -304,6 +309,7 @@ export function useCharacterGraphCanvas({
     const controller = new AbortController();
     const run = async () => {
       setLayoutState((current) => ({
+        error: null,
         graph,
         isComputing: true,
         nodes: current.graph === graph ? current.nodes : [],
@@ -333,6 +339,7 @@ export function useCharacterGraphCanvas({
           },
         );
         setLayoutState({
+          error: null,
           graph,
           isComputing: false,
           nodes,
@@ -342,7 +349,14 @@ export function useCharacterGraphCanvas({
         if (isAbortError(error)) {
           return;
         }
+        const normalized = toAppError(error, {
+          code: AppErrorCode.WORKER_EXECUTION_FAILED,
+          kind: 'execution',
+          source: 'character-graph',
+          userMessageKey: 'errors.WORKER_EXECUTION_FAILED',
+        });
         setLayoutState({
+          error: normalized,
           graph,
           isComputing: false,
           nodes: [],
@@ -363,6 +377,7 @@ export function useCharacterGraphCanvas({
     [graph, layoutState.graph, layoutState.nodes],
   );
   const isLayoutComputing = layoutState.graph === graph && layoutState.isComputing;
+  const layoutError = layoutState.graph === graph ? layoutState.error : null;
   const layoutProgress = layoutState.graph === graph ? layoutState.progress : 0;
   const stageHeight = useMemo(
     () => getResponsiveStageHeight(viewportSize, isMobile),
@@ -967,6 +982,7 @@ export function useCharacterGraphCanvas({
     highlightedNodeIds,
     isGestureInteracting,
     isLayoutComputing,
+    layoutError,
     isPanning,
     layoutEdges,
     layoutMessage: isLayoutComputing ? getLayoutMessage(layoutProgress, t) : null,

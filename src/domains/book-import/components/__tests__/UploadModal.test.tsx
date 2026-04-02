@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { AppErrorCode, createAppError } from '@shared/errors';
 import UploadModal from '../UploadModal';
 import { bookImportApi } from '../../api/bookImportApi';
 
@@ -117,6 +118,22 @@ describe('UploadModal', () => {
     expect(await screen.findByText('bookshelf.uploadFailed')).toBeInTheDocument();
     expect(onSuccess).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('shows translated worker unavailable errors from the API', async () => {
+    vi.mocked(bookImportApi.importBook).mockRejectedValueOnce(createAppError({
+      code: AppErrorCode.WORKER_UNAVAILABLE,
+      kind: 'unsupported',
+      source: 'book-import',
+      userMessageKey: 'errors.WORKER_UNAVAILABLE',
+      debugMessage: 'Import worker is unavailable.',
+    }));
+    const user = userEvent.setup();
+    render(<UploadModal isOpen onClose={() => {}} onSuccess={() => {}} />);
+
+    await user.upload(getFileInput(), new File(['chapter 1'], 'novel.txt', { type: 'text/plain' }));
+
+    expect(await screen.findByText('errors.WORKER_UNAVAILABLE')).toBeInTheDocument();
   });
 
   it('auto-imports files provided by the File Handling API', async () => {

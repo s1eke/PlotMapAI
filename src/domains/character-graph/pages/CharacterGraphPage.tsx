@@ -194,10 +194,17 @@ export default function CharacterGraphPage() {
     );
   }
 
+  let actionBannerMessage = actionMessage;
+  if (canvas.layoutError) {
+    actionBannerMessage = translateAppError(canvas.layoutError, t, 'characterGraph.loadError');
+  } else if (actionError) {
+    actionBannerMessage = translateAppError(actionError, t, 'characterGraph.refreshFailed');
+  }
+
   return (
     <CharacterGraphStage
       fullscreenRef={fullscreenRef}
-      actionMessage={actionError ? translateAppError(actionError, t, 'characterGraph.refreshFailed') : actionMessage}
+      actionMessage={actionBannerMessage}
       canPanCanvas={canvas.canPanCanvas}
       canRefreshOverview={canRefreshOverview}
       focusNodeId={canvas.focusNodeId}

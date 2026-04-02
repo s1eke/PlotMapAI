@@ -1,6 +1,10 @@
 import type { ReaderPageTurnMode } from '../constants/pageTurnMode';
 
 import { useCallback, useEffect, useMemo } from 'react';
+import {
+  ensureReaderAppearanceHydrated,
+  useReaderAppearanceSelector,
+} from '@shared/stores/readerAppearanceStore';
 
 import { READER_THEMES } from '../constants/readerThemes';
 import {
@@ -21,11 +25,18 @@ const HEADER_BG_MAP: Record<string, string> = {
 
 export function useReaderPreferences() {
   useEffect(() => {
-    ensureReaderPreferencesHydrated();
+    const hydratePreferences = async () => {
+      await Promise.all([
+        ensureReaderAppearanceHydrated(),
+        ensureReaderPreferencesHydrated(),
+      ]);
+    };
+
+    hydratePreferences().catch(() => undefined);
   }, []);
 
   const fontSize = useReaderPreferencesSelector((state) => state.fontSize);
-  const readerTheme = useReaderPreferencesSelector((state) => state.readerTheme);
+  const readerTheme = useReaderAppearanceSelector((state) => state.readerTheme);
   const pageTurnMode = useReaderPreferencesSelector((state) => state.pageTurnMode);
   const lineSpacing = useReaderPreferencesSelector((state) => state.lineSpacing);
   const paragraphSpacing = useReaderPreferencesSelector((state) => state.paragraphSpacing);

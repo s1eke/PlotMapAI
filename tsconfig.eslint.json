@@ -11,6 +11,7 @@
   },
   "include": [
     "src",
+    "scripts/**/*.test.ts",
     "vitest.config.ts"
   ],
   "exclude": [
