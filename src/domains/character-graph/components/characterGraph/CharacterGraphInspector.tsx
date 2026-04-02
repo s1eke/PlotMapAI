@@ -1,6 +1,6 @@
 import { X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import type { CharacterGraphEdge } from '@domains/analysis';
+import type { CharacterGraphEdge } from '@shared/contracts';
 import type { LayoutNode } from '../../utils/characterGraphLayout';
 import CharacterGraphProfileContent from './CharacterGraphProfileContent';
 

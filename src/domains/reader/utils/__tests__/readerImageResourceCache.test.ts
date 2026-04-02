@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { readerApi } from '../../api/readerApi';
+import { readerContentService } from '../../readerContentService';
 import {
   acquireReaderImageResource,
   areReaderImageResourcesReady,
@@ -11,8 +11,8 @@ import {
   resetReaderImageResourceCacheForTests,
 } from '../readerImageResourceCache';
 
-vi.mock('../../api/readerApi', () => ({
-  readerApi: {
+vi.mock('../../readerContentService', () => ({
+  readerContentService: {
     getImageBlob: vi.fn(),
   },
 }));
@@ -48,7 +48,7 @@ describe('readerImageResourceCache', () => {
   });
 
   it('reuses one object URL for concurrent acquisitions and revokes it after the last release', async () => {
-    vi.mocked(readerApi.getImageBlob).mockResolvedValue(new Blob(['image-data']));
+    vi.mocked(readerContentService.getImageBlob).mockResolvedValue(new Blob(['image-data']));
 
     const [firstUrl, secondUrl] = await Promise.all([
       acquireReaderImageResource(1, 'hero'),
@@ -57,7 +57,7 @@ describe('readerImageResourceCache', () => {
 
     expect(firstUrl).toBe('blob:10');
     expect(secondUrl).toBe('blob:10');
-    expect(readerApi.getImageBlob).toHaveBeenCalledTimes(1);
+    expect(readerContentService.getImageBlob).toHaveBeenCalledTimes(1);
     expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
 
     releaseReaderImageResource(1, 'hero');
@@ -71,18 +71,18 @@ describe('readerImageResourceCache', () => {
   });
 
   it('preloads unique image keys without creating duplicate URLs', async () => {
-    vi.mocked(readerApi.getImageBlob).mockResolvedValue(new Blob(['image-data']));
+    vi.mocked(readerContentService.getImageBlob).mockResolvedValue(new Blob(['image-data']));
 
     await preloadReaderImageResources(1, ['hero', 'hero', 'cover']);
 
-    expect(readerApi.getImageBlob).toHaveBeenCalledTimes(2);
+    expect(readerContentService.getImageBlob).toHaveBeenCalledTimes(2);
     expect(URL.createObjectURL).toHaveBeenCalledTimes(2);
     expect(peekReaderImageResource(1, 'hero')).toBe('blob:10');
     expect(areReaderImageResourcesReady(1, ['hero', 'cover'])).toBe(true);
   });
 
   it('clears all URLs for a novel without touching other novels', async () => {
-    vi.mocked(readerApi.getImageBlob)
+    vi.mocked(readerContentService.getImageBlob)
       .mockResolvedValueOnce(new Blob(['one']))
       .mockResolvedValueOnce(new Blob(['two']));
 
@@ -96,7 +96,7 @@ describe('readerImageResourceCache', () => {
   });
 
   it('keeps preloaded resources alive until decode finishes', async () => {
-    vi.mocked(readerApi.getImageBlob).mockResolvedValue(new Blob(['image-data']));
+    vi.mocked(readerContentService.getImageBlob).mockResolvedValue(new Blob(['image-data']));
 
     let resolveDecode!: () => void;
     const decodePromise = new Promise<void>((resolve) => {
@@ -128,7 +128,7 @@ describe('readerImageResourceCache', () => {
   });
 
   it('assigns image.src only once when decode() is unavailable', async () => {
-    vi.mocked(readerApi.getImageBlob).mockResolvedValue(new Blob(['image-data']));
+    vi.mocked(readerContentService.getImageBlob).mockResolvedValue(new Blob(['image-data']));
 
     let srcAssignments = 0;
     vi.stubGlobal('Image', class {

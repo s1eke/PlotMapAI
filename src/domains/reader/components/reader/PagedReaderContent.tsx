@@ -1,4 +1,4 @@
-import type { ChapterContent } from '../../api/readerApi';
+import type { ChapterContent } from '../../readerContentService';
 import type { ReaderPageTurnMode } from '../../constants/pageTurnMode';
 import type { PageTarget } from '../../hooks/useReaderStatePersistence';
 import type { AnimationPlaybackControls, PanInfo, Variants } from 'motion/react';

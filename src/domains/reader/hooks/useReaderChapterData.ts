@@ -3,8 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { reportAppError } from '@app/debug/service';
 import { AppErrorCode, toAppError, type AppError } from '@shared/errors';
 
-import { readerApi } from '../api/readerApi';
-import type { Chapter, ChapterContent } from '../api/readerApi';
+import { readerContentService } from '../readerContentService';
+import type { Chapter, ChapterContent } from '../readerContentService';
 import type { ReaderSessionCommands, ReaderSessionSnapshot } from '../reader-session';
 import type { ReaderUiBridgeValue } from '../reader-ui';
 import { extractImageKeysFromText } from '../utils/chapterImages';
@@ -186,7 +186,7 @@ export function useReaderChapterData({
     const cached = chapterCacheRef.current.get(index);
     if (cached) return cached;
 
-    const data = await readerApi.getChapterContent(resolvedNovelId, index, {
+    const data = await readerContentService.getChapterContent(resolvedNovelId, index, {
       signal: options.signal,
       onProgress: (progress) => {
         const message = t('reader.processingChapter', { percent: progress.progress });
@@ -219,7 +219,7 @@ export function useReaderChapterData({
         if (chapterCacheRef.current.has(adjacentIndex)) return;
         const controller = new AbortController();
         preloadControllersRef.current.push(controller);
-        readerApi.getChapterContent(resolvedNovelId, adjacentIndex, {
+        readerContentService.getChapterContent(resolvedNovelId, adjacentIndex, {
           signal: controller.signal,
         })
           .then((data) => {
@@ -311,7 +311,7 @@ export function useReaderChapterData({
       setMode(nextStoredState.mode ?? 'scroll');
       setChapterIndex(nextStoredState.chapterIndex ?? 0);
 
-      const toc = await readerApi.getChapters(resolvedNovelId, {
+      const toc = await readerContentService.getChapters(resolvedNovelId, {
         signal: controller.signal,
         onProgress: (progress) => {
           setLoadingMessage(t('reader.processingContents', { percent: progress.progress }));
@@ -483,12 +483,16 @@ export function useReaderChapterData({
 
       setReaderError(null);
       setLoadingMessage(t('reader.processingChapter', { percent: 0 }));
-      const chapter = await readerApi.getChapterContent(resolvedNovelId, params.chapterIndex, {
-        signal: controller.signal,
-        onProgress: (progress) => {
-          setLoadingMessage(t('reader.processingChapter', { percent: progress.progress }));
+      const chapter = await readerContentService.getChapterContent(
+        resolvedNovelId,
+        params.chapterIndex,
+        {
+          signal: controller.signal,
+          onProgress: (progress) => {
+            setLoadingMessage(t('reader.processingChapter', { percent: progress.progress }));
+          },
         },
-      });
+      );
       if (controller.signal.aborted) {
         throw new DOMException('Chapter load aborted', 'AbortError');
       }

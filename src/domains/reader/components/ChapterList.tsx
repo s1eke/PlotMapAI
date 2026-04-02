@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef } from 'react';
-import type { Chapter } from '../api/readerApi';
+import type { Chapter } from '../readerContentService';
 import { cn } from '@shared/utils/cn';
 
 interface ChapterListProps {

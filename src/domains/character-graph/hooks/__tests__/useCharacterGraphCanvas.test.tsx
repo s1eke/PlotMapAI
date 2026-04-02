@@ -1,7 +1,7 @@
 import { act, fireEvent, renderHook, waitFor } from '@testing-library/react';
 import type { TFunction } from 'i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { CharacterGraphResponse } from '@domains/analysis';
+import type { CharacterGraphResponse } from '@shared/contracts';
 import { STAGE_WIDTH, viewportPointToGraphPoint } from '../../utils/characterGraphLayout';
 import { useCharacterGraphCanvas } from '../useCharacterGraphCanvas';
 

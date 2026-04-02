@@ -1,4 +1,4 @@
-import type { CharacterGraphEdge, CharacterGraphNode } from '@domains/analysis';
+import type { CharacterGraphEdge, CharacterGraphNode } from '@shared/contracts';
 
 export interface ZoomState {
   scale: number;

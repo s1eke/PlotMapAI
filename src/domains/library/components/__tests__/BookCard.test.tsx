@@ -2,15 +2,15 @@ import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import BookCard from '../BookCard';
-import type { NovelView } from '../../api/libraryApi';
-import { libraryApi } from '../../api/libraryApi';
+import type { NovelView } from '../../novelRepository';
+import { novelRepository } from '../../novelRepository';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 
-vi.mock('../../api/libraryApi', () => ({
-  libraryApi: {
+vi.mock('../../novelRepository', () => ({
+  novelRepository: {
     getCoverUrl: vi.fn(),
   },
 }));
@@ -37,7 +37,7 @@ const mockNovel: NovelView = {
 describe('BookCard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(libraryApi.getCoverUrl).mockResolvedValue('blob:cover');
+    vi.mocked(novelRepository.getCoverUrl).mockResolvedValue('blob:cover');
   });
 
   it('loads and renders a cover image when the novel has a stored cover', async () => {
@@ -49,7 +49,7 @@ describe('BookCard', () => {
     );
 
     expect(await screen.findByRole('img', { name: 'Test Novel' })).toHaveAttribute('src', 'blob:cover');
-    expect(libraryApi.getCoverUrl).toHaveBeenCalledWith(1);
+    expect(novelRepository.getCoverUrl).toHaveBeenCalledWith(1);
     expect(screen.queryByTestId('txt-cover')).not.toBeInTheDocument();
   });
 
@@ -62,7 +62,7 @@ describe('BookCard', () => {
     );
 
     expect(screen.getByTestId('txt-cover')).toHaveTextContent('Test Novel');
-    expect(libraryApi.getCoverUrl).not.toHaveBeenCalled();
+    expect(novelRepository.getCoverUrl).not.toHaveBeenCalled();
     expect(screen.queryByText('Test Author')).not.toBeInTheDocument();
   });
 

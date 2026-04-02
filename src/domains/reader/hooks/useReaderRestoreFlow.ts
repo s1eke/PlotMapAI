@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
-import type { ChapterContent } from '../api/readerApi';
+import type { ChapterContent } from '../readerContentService';
 import type { ReaderSessionCommands, ReaderSessionSnapshot } from '../reader-session';
 import type { ReaderUiBridgeValue } from '../reader-ui';
 import type { ReaderMode, ReaderRestoreTarget, StoredReaderState } from './useReaderStatePersistence';

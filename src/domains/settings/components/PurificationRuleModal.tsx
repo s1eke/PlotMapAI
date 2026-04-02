@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Loader2 } from 'lucide-react';
 import Modal from '@shared/components/Modal';
 import Toggle from '@shared/components/Toggle';
-import type { PurificationRule } from '../api/types';
+import type { PurificationRule } from '../types';
 
 interface PurificationRuleModalProps {
   isOpen: boolean;

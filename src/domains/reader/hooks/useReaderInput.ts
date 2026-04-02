@@ -1,5 +1,5 @@
 import { useEffect, useCallback, useRef } from 'react';
-import type { ChapterContent } from '../api/readerApi';
+import type { ChapterContent } from '../readerContentService';
 import type { PageTarget } from './useReaderStatePersistence';
 
 const PAGE_TURN_LOCK_MS = 280;

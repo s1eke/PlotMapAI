@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { AppError } from '@shared/errors';
 
-import type { ChapterContent } from '../api/readerApi';
+import type { ChapterContent } from '../readerContentService';
 import { isPagedReaderMode } from '../utils/readerMode';
 import { shouldKeepReaderRestoreMask } from '../utils/readerPosition';
 import type { ReaderMode, ReaderRestoreTarget } from './useReaderStatePersistence';

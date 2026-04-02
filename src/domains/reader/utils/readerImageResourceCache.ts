@@ -1,4 +1,4 @@
-import { readerApi } from '../api/readerApi';
+import { readerContentService } from '../readerContentService';
 
 const RELEASE_DELAY_MS = 10_000;
 
@@ -105,7 +105,7 @@ async function ensureLoaded(entry: ReaderImageResourceEntry): Promise<string | n
   }
 
   const cacheKey = getCacheKey(resourceEntry.novelId, resourceEntry.imageKey);
-  resourceEntry.loadPromise = readerApi.getImageBlob(
+  resourceEntry.loadPromise = readerContentService.getImageBlob(
     resourceEntry.novelId,
     resourceEntry.imageKey,
   )

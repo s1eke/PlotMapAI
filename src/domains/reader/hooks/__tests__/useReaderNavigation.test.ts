@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import type { Chapter, ChapterContent } from '../../api/readerApi';
+import type { Chapter, ChapterContent } from '../../readerContentService';
 import type { ReaderContextValue } from '../../pages/reader-page/ReaderContext';
 import type { ChapterChangeSource } from '../navigationTypes';
 import type { PageTarget, ReaderMode } from '../useReaderStatePersistence';

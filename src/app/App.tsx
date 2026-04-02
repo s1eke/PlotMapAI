@@ -1,10 +1,13 @@
 import { lazy, Suspense, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
 import { HashRouter as Router, Routes, Route } from 'react-router-dom';
-import { loadBookDetailPage, loadBookshelfPage } from '@domains/library';
-import { loadCharacterGraphPage } from '@domains/character-graph';
-import { loadReaderPage } from '@domains/reader';
-import { loadSettingsPage } from '@domains/settings';
+import {
+  loadBookDetailPage,
+  loadBookshelfPage,
+  loadCharacterGraphPage,
+  loadReaderPage,
+  loadSettingsPage,
+} from '@application/pages';
 import type { AppError } from '@shared/errors';
 
 import InstallPrompt from './components/InstallPrompt';

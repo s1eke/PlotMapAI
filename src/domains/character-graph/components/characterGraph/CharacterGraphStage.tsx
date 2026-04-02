@@ -13,7 +13,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import type { PointerEvent as ReactPointerEvent, PointerEventHandler, ReactNode, RefObject } from 'react';
 import { appPaths } from '@app/router/paths';
-import type { CharacterGraphEdge } from '@domains/analysis';
+import type { CharacterGraphEdge } from '@shared/contracts';
 import { cn } from '@shared/utils/cn';
 import type { LayoutEdge, LayoutNode, ZoomState } from '../../utils/characterGraphLayout';
 import BottomSheet from '@shared/components/BottomSheet';

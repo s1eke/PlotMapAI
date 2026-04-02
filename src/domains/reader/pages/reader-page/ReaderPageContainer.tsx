@@ -26,10 +26,12 @@ import { useReaderContext } from './ReaderContext';
 import { useReaderPageImageOverlay } from './useReaderPageImageOverlay';
 
 interface ReaderPageContainerProps {
+  analysisController: import('../../reader-analysis-bridge').ReaderAnalysisBridgeController;
   novelId: number;
 }
 
 export default function ReaderPageContainer({
+  analysisController,
   novelId,
 }: ReaderPageContainerProps) {
   const { t } = useTranslation();
@@ -59,6 +61,7 @@ export default function ReaderPageContainer({
     sidebar.setIsSidebarOpen(false);
   }, [sidebar]);
   const analysis = useReaderAnalysisBridge({
+    controller: analysisController,
     novelId,
     chapterIndex,
     viewMode,

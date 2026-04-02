@@ -2,7 +2,7 @@ import { renderHook, act, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Mock } from 'vitest';
 import { useScrollModeChapters } from '../useScrollModeChapters';
-import type { Chapter, ChapterContent } from '../../api/readerApi';
+import type { Chapter, ChapterContent } from '../../readerContentService';
 
 const chapters: Chapter[] = [
   { index: 0, title: 'Ch 1', wordCount: 100 },

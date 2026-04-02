@@ -70,6 +70,30 @@ export default defineConfig([
     },
   },
   {
+    files: ['src/domains/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['@application/*', '@application/*/*'],
+              message: 'domain code must not depend on application code.',
+            },
+            {
+              group: ['@domains/*'],
+              message: 'domain code must not depend on other domains.',
+            },
+            {
+              group: ['@domains/*/*'],
+              message: 'domain code must not depend on other domain internals.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ['src/shared/**/*.{ts,tsx}', 'src/infra/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-imports': [

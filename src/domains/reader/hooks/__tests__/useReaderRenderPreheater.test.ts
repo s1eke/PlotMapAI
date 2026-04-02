@@ -95,7 +95,7 @@ vi.mock('@app/debug/service', () => ({
 vi.mock('../../utils/readerImageResourceCache', () => imageCacheMock);
 vi.mock('../../utils/readerRenderCache', () => renderCacheMock);
 
-import type { ChapterContent } from '../../api/readerApi';
+import type { ChapterContent } from '../../readerContentService';
 import type { ReaderLayoutSignature } from '../../utils/readerLayout';
 import { useReaderRenderPreheater } from '../useReaderRenderPreheater';
 

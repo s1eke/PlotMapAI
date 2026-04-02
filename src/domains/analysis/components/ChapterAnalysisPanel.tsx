@@ -2,8 +2,9 @@ import { AlertTriangle, Bot, GitBranch, Loader2, PauseCircle, Sparkles, Tags, Us
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
+
 import { appPaths } from '@app/router/paths';
-import type { AnalysisJobStatus, ChapterAnalysisResult } from '../api/analysisApi';
+import type { AnalysisJobStatus, ChapterAnalysisResult } from '@shared/contracts';
 
 interface ChapterAnalysisPanelProps {
   novelId: number;

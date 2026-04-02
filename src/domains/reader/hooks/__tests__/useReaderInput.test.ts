@@ -1,7 +1,7 @@
 import { renderHook, act } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useReaderInput } from '../useReaderInput';
-import type { ChapterContent } from '../../api/readerApi';
+import type { ChapterContent } from '../../readerContentService';
 
 const makeChapter = (overrides: Partial<ChapterContent> = {}): ChapterContent => ({
   index: 0,

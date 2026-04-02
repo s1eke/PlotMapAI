@@ -1,6 +1,6 @@
 import { translateAppError } from '@shared/errors';
 import type { TFunction } from 'i18next';
-import type { PurificationRule } from '../api/types';
+import type { PurificationRule } from '../types';
 
 export type SettingsTabId = 'toc' | 'purification' | 'ai';
 

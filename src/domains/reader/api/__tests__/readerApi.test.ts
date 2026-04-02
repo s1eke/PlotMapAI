@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { db } from '@infra/db';
-import { readerApi, loadAndPurifyChapters } from '../readerApi';
+import { readerContentService, loadAndPurifyChapters } from '../../readerContentService';
 
-describe('readerApi', () => {
+describe('readerContentService', () => {
   beforeEach(async () => {
     await db.delete();
     await db.open();
@@ -36,7 +36,7 @@ describe('readerApi', () => {
 
   it('getChapters returns chapter list', async () => {
     const novelId = await getNovelId();
-    const chapters = await readerApi.getChapters(novelId);
+    const chapters = await readerContentService.getChapters(novelId);
     expect(chapters.length).toBe(3);
     expect(chapters[0].title).toBe('Ch1');
     expect(chapters[0].index).toBe(0);
@@ -44,7 +44,7 @@ describe('readerApi', () => {
 
   it('getChapterContent returns content with navigation info', async () => {
     const novelId = await getNovelId();
-    const ch = await readerApi.getChapterContent(novelId, 1);
+    const ch = await readerContentService.getChapterContent(novelId, 1);
     expect(ch.title).toBe('Ch2');
     expect(ch.content).toBe('Content two');
     expect(ch.hasPrev).toBe(true);
@@ -54,26 +54,26 @@ describe('readerApi', () => {
 
   it('getChapterContent marks first chapter hasPrev=false', async () => {
     const novelId = await getNovelId();
-    const ch = await readerApi.getChapterContent(novelId, 0);
+    const ch = await readerContentService.getChapterContent(novelId, 0);
     expect(ch.hasPrev).toBe(false);
     expect(ch.hasNext).toBe(true);
   });
 
   it('getChapterContent marks last chapter hasNext=false', async () => {
     const novelId = await getNovelId();
-    const ch = await readerApi.getChapterContent(novelId, 2);
+    const ch = await readerContentService.getChapterContent(novelId, 2);
     expect(ch.hasPrev).toBe(true);
     expect(ch.hasNext).toBe(false);
   });
 
   it('getChapterContent throws for non-existent chapter', async () => {
     const novelId = await getNovelId();
-    await expect(readerApi.getChapterContent(novelId, 99)).rejects.toThrow('Chapter not found');
+    await expect(readerContentService.getChapterContent(novelId, 99)).rejects.toThrow('Chapter not found');
   });
 
   it('getImageUrl returns null for non-existent image', async () => {
     const novelId = await getNovelId();
-    const result = await readerApi.getImageUrl(novelId, 'nonexistent');
+    const result = await readerContentService.getImageUrl(novelId, 'nonexistent');
     expect(result).toBeNull();
   });
 
@@ -86,7 +86,7 @@ describe('readerApi', () => {
       blob,
     });
 
-    const result = await readerApi.getImageBlob(novelId, 'cover');
+    const result = await readerContentService.getImageBlob(novelId, 'cover');
 
     expect(result).not.toBeNull();
   });
@@ -117,7 +117,7 @@ describe('readerApi', () => {
       },
     ]);
 
-    const result = await readerApi.getImageGalleryEntries(novelId);
+    const result = await readerContentService.getImageGalleryEntries(novelId);
 
     expect(result).toEqual([
       { blockIndex: 3, chapterIndex: 0, imageKey: 'first', order: 0 },

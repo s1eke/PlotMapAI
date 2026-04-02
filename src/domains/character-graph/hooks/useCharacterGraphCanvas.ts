@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent, RefObject } from 'react';
 import type { TFunction } from 'i18next';
-import type { CharacterGraphEdge, CharacterGraphResponse } from '@domains/analysis';
+import type { CharacterGraphEdge, CharacterGraphResponse } from '@shared/contracts';
 import type { AppError } from '@shared/errors';
 import { AppErrorCode, toAppError } from '@shared/errors';
 import type { GraphLayoutProgress } from '../workers/layoutClient';

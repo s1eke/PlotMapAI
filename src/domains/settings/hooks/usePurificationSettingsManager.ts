@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { purificationRulesApi } from '../api/purificationRules';
-import type { PurificationRule } from '../api/types';
+
+import { purificationRuleRepository } from '../purificationRuleRepository';
+import type { PurificationRule } from '../types';
 import type { PurificationRuleGroup, SettingsFeedbackState } from '../utils/settingsPage';
 import {
   buildActionErrorMessage,
@@ -54,7 +55,7 @@ export function usePurificationSettingsManager(): PurificationSettingsManager {
   const loadRules = useCallback(async () => {
     setIsLoading(true);
     try {
-      const data = await purificationRulesApi.getPurificationRules();
+      const data = await purificationRuleRepository.getPurificationRules();
       setRules(data);
     } catch (error) {
       setFeedback({
@@ -93,9 +94,9 @@ export function usePurificationSettingsManager(): PurificationSettingsManager {
   const saveRule = useCallback(async (data: Partial<PurificationRule>) => {
     try {
       if (editingRule) {
-        await purificationRulesApi.updatePurificationRule(editingRule.id, data);
+        await purificationRuleRepository.updatePurificationRule(editingRule.id, data);
       } else {
-        await purificationRulesApi.createPurificationRule(data);
+        await purificationRuleRepository.createPurificationRule(data);
       }
 
       await loadRules();
@@ -117,7 +118,7 @@ export function usePurificationSettingsManager(): PurificationSettingsManager {
       previous.map((rule) => (rule.id === id ? { ...rule, isEnabled } : rule)));
 
     try {
-      await purificationRulesApi.updatePurificationRule(id, { isEnabled });
+      await purificationRuleRepository.updatePurificationRule(id, { isEnabled });
     } catch (error) {
       setRules((previous) =>
         previous.map((rule) =>
@@ -141,7 +142,7 @@ export function usePurificationSettingsManager(): PurificationSettingsManager {
     if (!pendingDeleteRule) return;
 
     try {
-      await purificationRulesApi.deletePurificationRule(pendingDeleteRule.id);
+      await purificationRuleRepository.deletePurificationRule(pendingDeleteRule.id);
       setRules((previous) => previous.filter((rule) => rule.id !== pendingDeleteRule.id));
       setFeedback({
         type: 'success',
@@ -168,7 +169,7 @@ export function usePurificationSettingsManager(): PurificationSettingsManager {
     setIsClearingAll(true);
 
     try {
-      await purificationRulesApi.clearAllPurificationRules();
+      await purificationRuleRepository.clearAllPurificationRules();
       setRules([]);
       setFeedback({
         type: 'success',
@@ -189,7 +190,7 @@ export function usePurificationSettingsManager(): PurificationSettingsManager {
     setIsLoading(true);
 
     try {
-      await purificationRulesApi.uploadPurificationRulesYaml(file);
+      await purificationRuleRepository.uploadPurificationRulesYaml(file);
       await loadRules();
       setFeedback({
         type: 'success',
@@ -207,7 +208,7 @@ export function usePurificationSettingsManager(): PurificationSettingsManager {
 
   const exportYaml = useCallback(async () => {
     try {
-      const content = await purificationRulesApi.exportPurificationRulesYaml();
+      const content = await purificationRuleRepository.exportPurificationRulesYaml();
       downloadFile(content, 'purification-rules.yaml', 'text/yaml');
       setFeedback({
         type: 'success',

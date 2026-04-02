@@ -1,4 +1,4 @@
-import type { ChapterContent } from '../api/readerApi';
+import type { ChapterContent } from '../readerContentService';
 import type {
   ReaderLayoutSnapshot,
   UseReaderRenderCacheParams,

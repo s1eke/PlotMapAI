@@ -1,5 +1,5 @@
 import type { MutableRefObject } from 'react';
-import type { ChapterContent } from '../api/readerApi';
+import type { ChapterContent } from '../readerContentService';
 import type {
   ReaderLayoutSignature,
   ReaderRenderVariant,

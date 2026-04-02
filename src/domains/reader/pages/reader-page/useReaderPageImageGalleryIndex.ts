@@ -3,7 +3,7 @@ import type { ReaderImageGalleryEntry } from '../../utils/readerImageGallery';
 
 import { startTransition, useCallback, useEffect, useRef, useState } from 'react';
 
-import { readerApi } from '../../api/readerApi';
+import { readerContentService } from '../../readerContentService';
 
 interface UseReaderPageImageGalleryIndexResult {
   entries: ReaderImageGalleryEntry[];
@@ -57,7 +57,7 @@ export function useReaderPageImageGalleryIndex(
     const loadToken = imageGalleryIndexLoadTokenRef.current;
     setIsIndexLoading(true);
 
-    const loadPromise = readerApi.getImageGalleryEntries(novelId)
+    const loadPromise = readerContentService.getImageGalleryEntries(novelId)
       .then((loadedEntries) => {
         if (imageGalleryIndexLoadTokenRef.current !== loadToken) {
           return false;

@@ -1,15 +1,15 @@
 import { db } from '@infra/db';
 import type { AnalysisChunk, AnalysisJob, AnalysisOverview, ChapterAnalysis } from '@infra/db';
-import { isChapterAnalysisComplete, isOverviewComplete } from '../services/aggregates';
-import { deriveCapabilities, deriveCurrentStage, deriveProgress, type RuntimeSnapshot } from './stateMachine';
-
 import type {
   AnalysisChunkStatus,
   AnalysisJobStatus,
   AnalysisOverview as ApiAnalysisOverview,
   AnalysisStatusResponse,
   ChapterAnalysisResult,
-} from '../api/analysisApi';
+} from '@shared/contracts';
+
+import { isChapterAnalysisComplete, isOverviewComplete } from '../services/aggregates';
+import { deriveCapabilities, deriveCurrentStage, deriveProgress, type RuntimeSnapshot } from './stateMachine';
 
 function serializeChunk(chunk: AnalysisChunk): AnalysisChunkStatus {
   return {

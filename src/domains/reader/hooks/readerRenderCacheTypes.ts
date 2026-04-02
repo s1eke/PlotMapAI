@@ -1,5 +1,5 @@
 import type { RefObject } from 'react';
-import type { Chapter, ChapterContent } from '../api/readerApi';
+import type { Chapter, ChapterContent } from '../readerContentService';
 import type {
   ReaderLayoutSignature,
   ReaderRenderVariant,

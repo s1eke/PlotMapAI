@@ -1,17 +1,17 @@
 import type { ReactNode } from 'react';
-import type { ChapterContent } from '../../api/readerApi';
+import type { ChapterContent } from '../../readerContentService';
 import type { ReaderContextValue } from '../../pages/reader-page/ReaderContext';
 import type { ChapterChangeSource } from '../navigationTypes';
 
 import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { readerApi } from '../../api/readerApi';
+import { readerContentService } from '../../readerContentService';
 import { ReaderContextProvider } from '../../pages/reader-page/ReaderContext';
 import { useReaderChapterData } from '../useReaderChapterData';
 
-vi.mock('../../api/readerApi', () => ({
-  readerApi: {
+vi.mock('../../readerContentService', () => ({
+  readerContentService: {
     getChapterContent: vi.fn(),
     getChapters: vi.fn(),
   },
@@ -107,8 +107,8 @@ describe('useReaderChapterData', () => {
     const suppressScrollSyncTemporarily = vi.fn();
     const pageTargetRef = { current: 'start' as const };
 
-    vi.mocked(readerApi.getChapters).mockResolvedValue(chapters);
-    vi.mocked(readerApi.getChapterContent).mockResolvedValue(targetChapter);
+    vi.mocked(readerContentService.getChapters).mockResolvedValue(chapters);
+    vi.mocked(readerContentService.getChapterContent).mockResolvedValue(targetChapter);
 
     const contextValue = createReaderContextValue({
       contentRef,

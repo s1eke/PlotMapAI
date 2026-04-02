@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import type { ChapterContent } from '../../api/readerApi';
+import type { ChapterContent } from '../../readerContentService';
 
 import { cn } from '@shared/utils/cn';
 

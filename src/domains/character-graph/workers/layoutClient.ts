@@ -1,6 +1,6 @@
 import { createWorkerTaskRunner } from '@infra/workers';
 import type { WorkerTaskOptions } from '@infra/workers';
-import type { CharacterGraphEdge, CharacterGraphNode } from '@domains/analysis';
+import type { CharacterGraphEdge, CharacterGraphNode } from '@shared/contracts';
 import { AppErrorCode } from '@shared/errors';
 import type { LayoutNode } from '../utils/characterGraphLayout';
 

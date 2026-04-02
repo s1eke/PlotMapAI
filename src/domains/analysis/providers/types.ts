@@ -1,6 +1,8 @@
-export const DEFAULT_ANALYSIS_PROVIDER_ID = 'openai-compatible';
-
-export type AnalysisProviderId = typeof DEFAULT_ANALYSIS_PROVIDER_ID;
+export {
+  DEFAULT_ANALYSIS_PROVIDER_ID,
+  isAnalysisProviderId,
+} from '@shared/contracts';
+export type { AnalysisProviderId } from '@shared/contracts';
 
 export interface OpenAiCompatibleProviderConfig {
   apiBaseUrl: string;
@@ -27,8 +29,4 @@ export interface AnalysisProviderAdapter {
     config: AnalysisProviderConfig,
     signal?: AbortSignal,
   ) => Promise<string>;
-}
-
-export function isAnalysisProviderId(value: unknown): value is AnalysisProviderId {
-  return value === DEFAULT_ANALYSIS_PROVIDER_ID;
 }

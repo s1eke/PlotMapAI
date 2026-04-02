@@ -1,5 +1,5 @@
 import type { ChapterImageGalleryEntry } from '@shared/text-processing';
-import type { ChapterContent } from '../api/readerApi';
+import type { ChapterContent } from '../readerContentService';
 
 import {
   buildChapterImageGalleryEntries,

@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from 'react';
 
-import type { Chapter, ChapterContent } from '../api/readerApi';
+import type { Chapter, ChapterContent } from '../readerContentService';
 import type { ReaderSessionCommands, ReaderSessionSnapshot } from '../reader-session';
 import type { ReaderUiBridgeValue } from '../reader-ui';
 import type { UsePagedReaderControllerResult } from './usePagedReaderController';

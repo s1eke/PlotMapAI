@@ -13,7 +13,7 @@ vi.mock('@shared/text-processing', () => ({
   runPurifyTitlesTask,
 }));
 
-describe('readerApi worker unavailable handling', () => {
+describe('readerContentService worker unavailable handling', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     await db.delete();
@@ -68,10 +68,10 @@ describe('readerApi worker unavailable handling', () => {
     });
     runPurifyTitlesTask.mockRejectedValueOnce(unavailableError);
     vi.resetModules();
-    const { readerApi } = await import('../readerApi');
+    const { readerContentService } = await import('../../readerContentService');
     const novel = await db.novels.orderBy('id').last();
 
-    await expect(readerApi.getChapters(novel!.id)).rejects.toMatchObject({
+    await expect(readerContentService.getChapters(novel!.id)).rejects.toMatchObject({
       code: AppErrorCode.WORKER_UNAVAILABLE,
       userMessageKey: 'errors.WORKER_UNAVAILABLE',
     });

@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import ChapterAnalysisPanel from '../ChapterAnalysisPanel';
 import { MemoryRouter } from 'react-router-dom';
-import type { AnalysisJobStatus, ChapterAnalysisResult } from '../../api/analysisApi';
+import type { AnalysisJobStatus, ChapterAnalysisResult } from '../../analysisService';
 
 const changeLanguage = vi.fn();
 const t = (key: string) => key;

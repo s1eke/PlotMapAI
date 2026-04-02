@@ -1,5 +1,5 @@
 import type { ReaderRenderCache as PersistedReaderRenderCacheRecord } from '@infra/db';
-import type { ChapterContent } from '../api/readerApi';
+import type { ChapterContent } from '../readerContentService';
 import type { ReaderImageDimensions } from './readerImageResourceCache';
 import type {
   ReaderLayoutSignature,

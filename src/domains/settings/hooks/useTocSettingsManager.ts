@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { tocRulesApi } from '../api/tocRules';
-import type { TocRule } from '../api/types';
+
+import { tocRuleRepository } from '../tocRuleRepository';
+import type { TocRule } from '../types';
 import type { SettingsFeedbackState } from '../utils/settingsPage';
 import {
   buildActionErrorMessage,
@@ -45,7 +46,7 @@ export function useTocSettingsManager(): TocSettingsManager {
   const loadRules = useCallback(async () => {
     setIsLoading(true);
     try {
-      const data = await tocRulesApi.getTocRules();
+      const data = await tocRuleRepository.getTocRules();
       setRules(data);
     } catch (error) {
       setFeedback({
@@ -79,9 +80,9 @@ export function useTocSettingsManager(): TocSettingsManager {
   const saveRule = useCallback(async (data: Partial<TocRule>) => {
     try {
       if (editingRule) {
-        await tocRulesApi.updateTocRule(editingRule.id, data);
+        await tocRuleRepository.updateTocRule(editingRule.id, data);
       } else {
-        await tocRulesApi.createTocRule(data as Omit<TocRule, 'id' | 'isDefault'>);
+        await tocRuleRepository.createTocRule(data as Omit<TocRule, 'id' | 'isDefault'>);
       }
 
       await loadRules();
@@ -103,7 +104,7 @@ export function useTocSettingsManager(): TocSettingsManager {
       previous.map((rule) => (rule.id === id ? { ...rule, isEnabled } : rule)));
 
     try {
-      await tocRulesApi.updateTocRule(id, { isEnabled });
+      await tocRuleRepository.updateTocRule(id, { isEnabled });
     } catch (error) {
       setRules((previous) =>
         previous.map((rule) =>
@@ -127,7 +128,7 @@ export function useTocSettingsManager(): TocSettingsManager {
     if (!pendingDeleteRule) return;
 
     try {
-      await tocRulesApi.deleteTocRule(pendingDeleteRule.id);
+      await tocRuleRepository.deleteTocRule(pendingDeleteRule.id);
       setRules((previous) => previous.filter((rule) => rule.id !== pendingDeleteRule.id));
       setFeedback({
         type: 'success',
@@ -146,7 +147,7 @@ export function useTocSettingsManager(): TocSettingsManager {
     setIsLoading(true);
 
     try {
-      await tocRulesApi.uploadTocRulesYaml(file);
+      await tocRuleRepository.uploadTocRulesYaml(file);
       await loadRules();
       setFeedback({
         type: 'success',
@@ -164,7 +165,7 @@ export function useTocSettingsManager(): TocSettingsManager {
 
   const exportYaml = useCallback(async () => {
     try {
-      const content = await tocRulesApi.exportTocRulesYaml();
+      const content = await tocRuleRepository.exportTocRulesYaml();
       downloadFile(content, 'toc-rules.yaml', 'text/yaml');
       setFeedback({
         type: 'success',

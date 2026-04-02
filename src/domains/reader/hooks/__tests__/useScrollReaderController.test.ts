@@ -1,5 +1,5 @@
 import type { Dispatch, ReactNode, RefObject, SetStateAction } from 'react';
-import type { ChapterContent } from '../../api/readerApi';
+import type { ChapterContent } from '../../readerContentService';
 import type {
   ReaderContextValue,
 } from '../../pages/reader-page/ReaderContext';

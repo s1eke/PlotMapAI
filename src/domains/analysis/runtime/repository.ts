@@ -1,5 +1,12 @@
 import { db } from '@infra/db';
-import type { AnalysisChunk, AnalysisJob, AnalysisOverview, Chapter, ChapterAnalysis, Novel } from '@infra/db';
+import type { AnalysisChunk, AnalysisJob, AnalysisOverview, Chapter, ChapterAnalysis } from '@infra/db';
+import type {
+  AnalysisOverview as ApiAnalysisOverview,
+  AnalysisStatusResponse,
+  ChapterAnalysisResult,
+  CharacterGraphResponse,
+} from '@shared/contracts';
+
 import { buildCharacterGraphPayload } from '../services/aggregates';
 import { AnalysisErrorCode, AnalysisJobStateError } from '../services/errors';
 import type { AnalysisChunkPayload, ChunkAnalysisResult, OverviewAnalysisResult } from '../services/types';
@@ -12,15 +19,8 @@ import {
   serializeChapter,
   serializeOverview,
 } from './readModel';
-import type {
-  AnalysisOverview as ApiAnalysisOverview,
-  AnalysisStatusResponse,
-  ChapterAnalysisResult,
-  CharacterGraphResponse,
-} from '../api/analysisApi';
 
 export interface AnalysisRuntimeRepository {
-  loadNovel: (novelId: number) => Promise<Novel>;
   loadJob: (novelId: number) => Promise<AnalysisJob | undefined>;
   ensureJob: (novelId: number) => Promise<AnalysisJob>;
   ensureJobRecord: (novelId: number) => Promise<AnalysisJob>;
@@ -71,12 +71,6 @@ function nowISO(): string {
 }
 
 export function createDexieAnalysisRuntimeRepository(): AnalysisRuntimeRepository {
-  async function loadNovel(novelId: number): Promise<Novel> {
-    const novel = await db.novels.get(novelId);
-    if (!novel) throw new AnalysisJobStateError(AnalysisErrorCode.NOVEL_NOT_FOUND);
-    return novel;
-  }
-
   async function loadJob(novelId: number): Promise<AnalysisJob | undefined> {
     return db.analysisJobs.where('novelId').equals(novelId).first();
   }
@@ -210,7 +204,6 @@ export function createDexieAnalysisRuntimeRepository(): AnalysisRuntimeRepositor
   }
 
   return {
-    loadNovel,
     loadJob,
     ensureJob,
     ensureJobRecord,

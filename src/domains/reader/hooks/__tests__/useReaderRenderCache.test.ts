@@ -182,7 +182,7 @@ vi.mock('../../utils/readerImageResourceCache', () => imageCacheMock);
 
 vi.mock('../../utils/readerRenderCache', () => renderCacheMock);
 
-import type { Chapter, ChapterContent } from '../../api/readerApi';
+import type { Chapter, ChapterContent } from '../../readerContentService';
 import { useReaderRenderCache } from '../useReaderRenderCache';
 
 function createChapter(index: number, totalChapters: number): ChapterContent {

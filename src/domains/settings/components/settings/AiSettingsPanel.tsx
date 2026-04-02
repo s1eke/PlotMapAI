@@ -2,8 +2,10 @@ import { useRef } from 'react';
 import type { ChangeEvent } from 'react';
 import { Download, Loader2, Save, Upload, Wifi } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+
 import Modal from '@shared/components/Modal';
-import type { AiSettingsManager } from '../../hooks/useAiSettingsManager';
+
+import type { AiSettingsManager } from '../../settingsManagers';
 import SettingsActionMenu from './SettingsActionMenu';
 import SettingsFeedbackBanner from './SettingsFeedbackBanner';
 import SettingsSectionHeader from './SettingsSectionHeader';

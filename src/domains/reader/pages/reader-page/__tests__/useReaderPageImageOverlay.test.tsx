@@ -12,10 +12,10 @@ import {
   ReaderContextProvider,
 } from '../ReaderContext';
 import { useReaderPageImageOverlay } from '../useReaderPageImageOverlay';
-import { readerApi } from '../../../api/readerApi';
+import { readerContentService } from '../../../readerContentService';
 
-vi.mock('../../../api/readerApi', () => ({
-  readerApi: {
+vi.mock('../../../readerContentService', () => ({
+  readerContentService: {
     getImageGalleryEntries: vi.fn(),
   },
 }));
@@ -93,7 +93,7 @@ function createEntry(
 describe('useReaderPageImageOverlay', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(readerApi.getImageGalleryEntries).mockResolvedValue([]);
+    vi.mocked(readerContentService.getImageGalleryEntries).mockResolvedValue([]);
     preloadReaderImageResourcesMock.mockResolvedValue(undefined);
   });
 
@@ -103,7 +103,7 @@ describe('useReaderPageImageOverlay', () => {
 
   it('deduplicates gallery index loading while opening the viewer', async () => {
     const deferred = createDeferred<ReaderImageGalleryEntry[]>();
-    vi.mocked(readerApi.getImageGalleryEntries).mockReturnValueOnce(deferred.promise);
+    vi.mocked(readerContentService.getImageGalleryEntries).mockReturnValueOnce(deferred.promise);
 
     const contextValue = createReaderContextValue(1);
     const wrapper = ({ children }: { children: ReactNode }) => (
@@ -144,7 +144,7 @@ describe('useReaderPageImageOverlay', () => {
       });
     });
 
-    expect(readerApi.getImageGalleryEntries).toHaveBeenCalledTimes(1);
+    expect(readerContentService.getImageGalleryEntries).toHaveBeenCalledTimes(1);
     expect(result.current.imageViewerProps.isIndexLoading).toBe(true);
 
     deferred.resolve([createEntry(0, 0, 'cover', 0)]);
@@ -156,7 +156,7 @@ describe('useReaderPageImageOverlay', () => {
   it('ignores stale gallery results after switching novels', async () => {
     const firstRequest = createDeferred<ReaderImageGalleryEntry[]>();
     const secondRequest = createDeferred<ReaderImageGalleryEntry[]>();
-    vi.mocked(readerApi.getImageGalleryEntries)
+    vi.mocked(readerContentService.getImageGalleryEntries)
       .mockReturnValueOnce(firstRequest.promise)
       .mockReturnValueOnce(secondRequest.promise);
 
@@ -193,7 +193,7 @@ describe('useReaderPageImageOverlay', () => {
   });
 
   it('restores focus to the activating element when the viewer closes', async () => {
-    vi.mocked(readerApi.getImageGalleryEntries).mockResolvedValueOnce([
+    vi.mocked(readerContentService.getImageGalleryEntries).mockResolvedValueOnce([
       createEntry(0, 0, 'cover', 0),
     ]);
 
@@ -247,7 +247,7 @@ describe('useReaderPageImageOverlay', () => {
   });
 
   it('navigates using the full-book image order', async () => {
-    vi.mocked(readerApi.getImageGalleryEntries).mockResolvedValueOnce([
+    vi.mocked(readerContentService.getImageGalleryEntries).mockResolvedValueOnce([
       createEntry(0, 0, 'first', 0),
       createEntry(1, 0, 'second', 0),
       createEntry(1, 1, 'third', 1),
@@ -308,7 +308,7 @@ describe('useReaderPageImageOverlay', () => {
   });
 
   it('preloads the current image with adjacent neighbors once the viewer opens', async () => {
-    vi.mocked(readerApi.getImageGalleryEntries).mockResolvedValueOnce([
+    vi.mocked(readerContentService.getImageGalleryEntries).mockResolvedValueOnce([
       createEntry(0, 0, 'first', 0),
       createEntry(1, 0, 'second', 0),
       createEntry(1, 1, 'third', 1),

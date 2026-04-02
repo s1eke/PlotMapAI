@@ -3,8 +3,8 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { appPaths } from '@app/router/paths';
 
-import { libraryApi } from '../api/libraryApi';
-import type { NovelView } from '../api/libraryApi';
+import { novelRepository } from '../novelRepository';
+import type { NovelView } from '../novelRepository';
 import TxtCover from './TxtCover';
 
 interface BookCardProps {
@@ -18,7 +18,7 @@ export default function BookCard({ novel }: BookCardProps) {
   useEffect(() => {
     if (!novel.hasCover) return;
     let revoked = false;
-    libraryApi.getCoverUrl(novel.id).then((url) => {
+    novelRepository.getCoverUrl(novel.id).then((url) => {
       if (!revoked) setCoverUrl(url);
     });
     return () => { revoked = true; };

@@ -1,7 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 
 import type { ReactNode } from 'react';
-import type { ChapterContent } from '../api/readerApi';
+import type { ChapterContent } from '../readerContentService';
 import type { ChapterChangeSource } from '../hooks/navigationTypes';
 import type { ScrollModeAnchor } from '../hooks/useScrollModeChapters';
 import type { PageTarget } from '../hooks/readerSessionTypes';

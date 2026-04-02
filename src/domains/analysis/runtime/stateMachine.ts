@@ -1,7 +1,7 @@
 import type { AnalysisJob } from '@infra/db';
-import { AnalysisErrorCode, AnalysisJobStateError } from '../services/errors';
+import type { AnalysisJobStatus } from '@shared/contracts';
 
-import type { AnalysisJobStatus } from '../api/analysisApi';
+import { AnalysisErrorCode, AnalysisJobStateError } from '../services/errors';
 
 const RUNNING_STATUSES = new Set<AnalysisJobStatus['status']>(['running', 'pausing']);
 const RESUMABLE_STATUSES = new Set<AnalysisJobStatus['status']>(['paused', 'failed']);

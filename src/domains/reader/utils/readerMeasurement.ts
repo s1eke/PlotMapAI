@@ -1,5 +1,5 @@
 import type { PreparedTextWithSegments } from '@chenglou/pretext';
-import type { ChapterContent } from '../api/readerApi';
+import type { ChapterContent } from '../readerContentService';
 import type { ReaderImageDimensions } from './readerImageResourceCache';
 import type {
   MeasuredChapterLayout,

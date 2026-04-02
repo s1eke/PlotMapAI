@@ -142,6 +142,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
+      '@application': resolve(__dirname, './src/application'),
       '@app': resolve(__dirname, './src/app'),
       '@domains': resolve(__dirname, './src/domains'),
       '@shared': resolve(__dirname, './src/shared'),
