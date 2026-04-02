@@ -2,6 +2,7 @@ import { debugLog } from '@app/debug/service';
 import { db } from '@infra/db';
 import { AppErrorCode, createAppError } from '@shared/errors';
 import { dumpYaml, loadYaml } from './services/yaml';
+import { normalizeImportedPurificationRules } from './services/importedPurificationRules';
 import type { PurificationRule } from './types';
 
 function unescapeReplacement(raw: string): string {
@@ -159,19 +160,17 @@ export const purificationRuleRepository = {
         cause: error,
       });
     }
-    debugLog('Settings', `parsed ${parsed.length} rules`);
+    const importedRules = normalizeImportedPurificationRules(parsed);
+    debugLog('Settings', `parsed ${importedRules.length} rules`);
     const existing = await db.purificationRules.toArray();
     const existingKeys = new Set(existing.map((rule) => `${rule.pattern}\u0000${rule.isRegex}`));
     const now = new Date().toISOString();
     let added = 0;
-    for (let index = 0; index < parsed.length; index += 1) {
-      const candidate = parsed[index];
-      if (typeof candidate !== 'object' || candidate === null) continue;
-      const rule = candidate as Record<string, unknown>;
-      const pattern = (rule.pattern as string) || '';
-      const isRegex = (rule.is_regex ?? rule.isRegex ?? true) as boolean;
-      const name = (rule.name as string) || `Imported Rule ${index}`;
-      const exclusiveGroup = (rule.exclusive_group ?? rule.exclusiveGroup ?? '') as string;
+    for (const rule of importedRules) {
+      const pattern = rule.pattern || '';
+      const isRegex = rule.is_regex ?? true;
+      const name = rule.name || 'Imported Rule';
+      const exclusiveGroup = rule.exclusive_group || '';
       const key = `${pattern}\u0000${isRegex}`;
       if (!pattern || existingKeys.has(key)) {
         debugLog('Settings', `    skip duplicate: "${name}"`);
@@ -181,16 +180,16 @@ export const purificationRuleRepository = {
       await db.purificationRules.add({
         externalId: null,
         name,
-        group: (rule.group as string) || 'Purification',
+        group: rule.group || 'Purification',
         pattern,
-        replacement: unescapeReplacement((rule.replacement as string) || ''),
+        replacement: unescapeReplacement(rule.replacement || ''),
         isRegex,
-        isEnabled: (rule.is_enabled ?? rule.isEnabled ?? true) as boolean,
-        order: (rule.order as number) ?? 10,
-        scopeTitle: (rule.scope_title ?? rule.scopeTitle ?? true) as boolean,
-        scopeContent: (rule.scope_content ?? rule.scopeContent ?? true) as boolean,
-        bookScope: (rule.book_scope ?? rule.bookScope ?? '') as string,
-        excludeBookScope: (rule.exclude_book_scope ?? rule.excludeBookScope ?? '') as string,
+        isEnabled: rule.is_enabled ?? true,
+        order: rule.order ?? 10,
+        scopeTitle: rule.scope_title ?? true,
+        scopeContent: rule.scope_content ?? true,
+        bookScope: rule.book_scope || '',
+        excludeBookScope: rule.exclude_book_scope || '',
         exclusiveGroup,
         isDefault: false,
         timeoutMs: 3000,

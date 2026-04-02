@@ -302,8 +302,6 @@ export function useReaderChapterData({
         chapterIndex: storedState.chapterIndex ?? 0,
         mode: storedState.mode ?? 'scroll',
         chapterProgress: storedState.chapterProgress,
-        scrollPosition: storedState.scrollPosition,
-        locatorVersion: storedState.locator ? 1 : undefined,
         locator: storedState.locator,
       };
 
@@ -352,8 +350,6 @@ export function useReaderChapterData({
         chapterIndex: resolvedChapterIndex,
         mode: nextMode,
         chapterProgress: hasChapter ? nextStoredState.chapterProgress : 0,
-        scrollPosition: hasChapter ? nextStoredState.scrollPosition : undefined,
-        locatorVersion: hasChapter && nextStoredState.locator ? 1 : undefined,
         locator: hasChapter ? nextStoredState.locator : undefined,
       };
 

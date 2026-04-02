@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { purify, loadRulesFromJson, type PurifyRule } from '../purifier';
+import {
+  loadImportedPurificationRulesFromJson,
+  loadRulesFromJson,
+  purify,
+  type PurifyRule,
+} from '../purifier';
 
 describe('purify', () => {
   it('returns text unchanged when no rules', () => {
@@ -158,11 +163,11 @@ describe('loadRulesFromJson', () => {
     expect(rules[0].name).toBe('Rule1');
   });
 
-  it('maps camelCase keys to snake_case', () => {
+  it('does not map legacy camelCase keys', () => {
     const json = JSON.stringify([{ name: 'R', pattern: 'p', replacement: 'r', isRegex: true, isEnabled: false }]);
     const rules = loadRulesFromJson(json);
-    expect(rules[0].is_regex).toBe(true);
-    expect(rules[0].is_enabled).toBe(false);
+    expect(rules[0].is_regex).toBeUndefined();
+    expect(rules[0].is_enabled).toBeUndefined();
   });
 
   it('assigns default name for unnamed rules', () => {
@@ -184,5 +189,33 @@ describe('loadRulesFromJson', () => {
     const rules = loadRulesFromJson(json);
     expect(rules.length).toBe(1);
     expect(rules[0].pattern).toBe('ok');
+  });
+});
+
+describe('loadImportedPurificationRulesFromJson', () => {
+  it('normalizes legacy camelCase keys at the import boundary', () => {
+    const json = JSON.stringify([{
+      name: 'R',
+      pattern: 'p',
+      replacement: 'r',
+      isRegex: true,
+      isEnabled: false,
+      scopeTitle: false,
+      scopeContent: true,
+      exclusiveGroup: 'formatting',
+    }]);
+
+    const rules = loadImportedPurificationRulesFromJson(json);
+
+    expect(rules[0]).toMatchObject({
+      name: 'R',
+      pattern: 'p',
+      replacement: 'r',
+      is_regex: true,
+      is_enabled: false,
+      scope_title: false,
+      scope_content: true,
+      exclusive_group: 'formatting',
+    });
   });
 });

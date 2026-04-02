@@ -8,10 +8,6 @@ export function clampChapterProgress(value: number | undefined): number | undefi
   return value;
 }
 
-export function sanitizeFiniteNumber(value: unknown): number | undefined {
-  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
-}
-
 export function shouldUseLocatorAsPrimaryPosition(
   mode: ReaderMode | undefined,
   locator: ReaderLocator | null | undefined,
@@ -72,24 +68,19 @@ export function sanitizeStoredReaderState(raw: unknown): StoredReaderState | nul
     ? parsed.mode
     : undefined;
   const locator = sanitizeLocator(parsed.locator);
-  const useLocatorAsPrimary = shouldUseLocatorAsPrimaryPosition(mode, locator);
   const chapterIndex = typeof parsed.chapterIndex === 'number' ? parsed.chapterIndex : undefined;
-  const chapterProgress = clampChapterProgress(
-    typeof parsed.chapterProgress === 'number' ? parsed.chapterProgress : undefined,
-  );
-  const scrollPosition = sanitizeFiniteNumber(parsed.scrollPosition);
 
-  return {
-    chapterIndex: useLocatorAsPrimary ? locator.chapterIndex : chapterIndex,
+  return buildStoredReaderState({
+    chapterIndex: locator?.chapterIndex ?? chapterIndex,
     mode,
-    chapterProgress: useLocatorAsPrimary ? undefined : chapterProgress,
-    scrollPosition: useLocatorAsPrimary ? undefined : scrollPosition,
+    chapterProgress: clampChapterProgress(
+      typeof parsed.chapterProgress === 'number' ? parsed.chapterProgress : undefined,
+    ),
     lastContentMode: parsed.lastContentMode === 'paged' || parsed.lastContentMode === 'scroll'
       ? parsed.lastContentMode
       : undefined,
-    locatorVersion: useLocatorAsPrimary && parsed.locatorVersion === 1 ? 1 : undefined,
-    locator: useLocatorAsPrimary ? locator : undefined,
-  };
+    locator,
+  });
 }
 
 export function resolveModeFromStoredState(
@@ -102,17 +93,18 @@ export function buildStoredReaderState(
   state: StoredReaderState | null | undefined,
 ): StoredReaderState {
   const mode = resolveModeFromStoredState(state);
-  const useLocatorAsPrimary = shouldUseLocatorAsPrimaryPosition(mode, state?.locator);
-  const primaryLocator = useLocatorAsPrimary ? state?.locator : undefined;
-  const scrollPosition = sanitizeFiniteNumber(state?.scrollPosition);
+  const primaryLocator = shouldUseLocatorAsPrimaryPosition(mode, state?.locator)
+    ? state.locator
+    : undefined;
+  const chapterProgress = mode === 'summary'
+    ? clampChapterProgress(state?.chapterProgress)
+    : undefined;
 
   return {
     chapterIndex: primaryLocator?.chapterIndex ?? state?.chapterIndex ?? 0,
     mode,
-    chapterProgress: useLocatorAsPrimary ? undefined : clampChapterProgress(state?.chapterProgress),
-    scrollPosition: useLocatorAsPrimary ? undefined : scrollPosition,
+    chapterProgress,
     lastContentMode: state?.lastContentMode ?? (mode === 'paged' ? 'paged' : 'scroll'),
-    locatorVersion: useLocatorAsPrimary ? 1 : undefined,
     locator: primaryLocator,
   };
 }
@@ -122,58 +114,38 @@ export function mergeStoredReaderState(
   overrideState: StoredReaderState | null | undefined,
 ): StoredReaderState {
   const canonicalBaseState = buildStoredReaderState(baseState);
-  const nextMode = overrideState?.mode
-    ?? canonicalBaseState.mode
-    ?? resolveModeFromStoredState(canonicalBaseState);
-  const canonicalOverrideChapterIndex = shouldUseLocatorAsPrimaryPosition(
-    nextMode,
-    overrideState?.locator,
-  )
-    ? overrideState!.locator.chapterIndex
-    : overrideState?.chapterIndex;
-  const chapterIndexChanged = typeof canonicalOverrideChapterIndex === 'number'
-    && canonicalOverrideChapterIndex !== canonicalBaseState.chapterIndex;
-  const shouldPreferLocator = shouldUseLocatorAsPrimaryPosition(nextMode, overrideState?.locator);
-  const prefersLegacyScrollPosition = overrideState?.chapterProgress === undefined
-    && typeof overrideState?.scrollPosition === 'number'
-    && Number.isFinite(overrideState.scrollPosition);
-  const shouldResetLocator = !shouldPreferLocator && overrideState?.locator === undefined && (
-    chapterIndexChanged
-    || overrideState?.chapterProgress !== undefined
-    || overrideState?.scrollPosition !== undefined
-  );
-  const shouldResetLegacyPosition = shouldPreferLocator || (
-    chapterIndexChanged
-    && overrideState?.chapterProgress === undefined
-    && overrideState?.scrollPosition === undefined
-  );
-  const nextChapterProgress =
-    shouldResetLegacyPosition || prefersLegacyScrollPosition
-      ? undefined
-      : overrideState?.chapterProgress ?? canonicalBaseState.chapterProgress;
-  const nextScrollPosition = shouldResetLegacyPosition
-    ? undefined
-    : overrideState?.scrollPosition ?? canonicalBaseState.scrollPosition;
-  let nextLocatorVersion = overrideState?.locatorVersion ?? canonicalBaseState.locatorVersion;
-  if (shouldPreferLocator) {
-    nextLocatorVersion = 1;
-  } else if (shouldResetLocator) {
-    nextLocatorVersion = undefined;
-  }
-  let nextLocator = overrideState?.locator ?? canonicalBaseState.locator;
-  if (shouldPreferLocator) {
-    nextLocator = overrideState?.locator;
-  } else if (shouldResetLocator) {
-    nextLocator = undefined;
+  if (!overrideState) {
+    return canonicalBaseState;
   }
 
+  const nextMode = overrideState.mode ?? canonicalBaseState.mode;
+  const overrideLocator = shouldUseLocatorAsPrimaryPosition(nextMode, overrideState.locator)
+    ? overrideState.locator
+    : undefined;
+  const nextChapterIndex = overrideLocator?.chapterIndex
+    ?? overrideState.chapterIndex
+    ?? canonicalBaseState.chapterIndex;
+  const chapterIndexChanged = nextChapterIndex !== canonicalBaseState.chapterIndex;
+  const nextChapterProgress = nextMode === 'summary'
+    ? clampChapterProgress(
+      overrideState.chapterProgress
+        ?? (
+          !chapterIndexChanged && canonicalBaseState.mode === 'summary'
+            ? canonicalBaseState.chapterProgress
+            : undefined
+        ),
+    )
+    : undefined;
+  const nextLocator = nextMode === 'summary'
+    ? undefined
+    : overrideLocator
+      ?? (chapterIndexChanged ? undefined : canonicalBaseState.locator);
+
   return buildStoredReaderState({
-    chapterIndex: canonicalOverrideChapterIndex ?? canonicalBaseState.chapterIndex,
+    chapterIndex: nextChapterIndex,
     mode: nextMode,
     chapterProgress: nextChapterProgress,
-    scrollPosition: nextScrollPosition,
     lastContentMode: overrideState?.lastContentMode ?? canonicalBaseState.lastContentMode,
-    locatorVersion: nextLocatorVersion,
     locator: nextLocator,
   });
 }
@@ -183,9 +155,7 @@ export function createDefaultStoredReaderState(): StoredReaderState {
     chapterIndex: 0,
     mode: 'scroll',
     chapterProgress: undefined,
-    scrollPosition: undefined,
     lastContentMode: 'scroll',
-    locatorVersion: undefined,
     locator: undefined,
   };
 }

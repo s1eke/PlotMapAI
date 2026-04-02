@@ -9,9 +9,7 @@ export interface StoredReaderState {
   chapterIndex?: number;
   mode?: ReaderMode;
   chapterProgress?: number;
-  scrollPosition?: number;
   lastContentMode?: 'scroll' | 'paged';
-  locatorVersion?: 1;
   locator?: ReaderLocator;
 }
 
@@ -20,8 +18,6 @@ export interface ReaderRestoreTarget {
   mode: ReaderMode;
   locatorBoundary?: ReaderLocatorBoundary;
   chapterProgress?: number;
-  scrollPosition?: number;
-  locatorVersion?: 1;
   locator?: ReaderLocator;
 }
 
@@ -37,8 +33,6 @@ export interface ReaderSessionState {
   mode: ReaderMode;
   chapterIndex: number;
   chapterProgress?: number;
-  scrollPosition?: number;
-  locatorVersion?: 1;
   locator?: ReaderLocator;
   restoreStatus: RestoreStatus;
   lastContentMode: 'scroll' | 'paged';

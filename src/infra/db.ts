@@ -1,7 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie';
 
-import { buildChapterImageGalleryEntries } from '@shared/text-processing';
-
 interface ReaderLocatorRecord {
   chapterIndex: number;
   blockIndex: number;
@@ -253,10 +251,8 @@ export interface ReadingProgress {
   id: number;
   novelId: number;
   chapterIndex: number;
-  scrollPosition: number;
   mode: string;
   chapterProgress?: number;
-  locatorVersion?: 1;
   locator?: ReaderLocatorRecord;
   updatedAt: string;
 }
@@ -363,7 +359,8 @@ export interface ReaderRenderCache {
 
 export const READER_RENDER_CACHE_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 
-const CURRENT_DB_VERSION = 9;
+export const PLOTMAPAI_DB_NAME = 'PlotMapAI';
+const CURRENT_DB_VERSION = 1;
 
 const CURRENT_SCHEMA = {
   novels: '++id, createdAt',
@@ -382,7 +379,7 @@ const CURRENT_SCHEMA = {
   readerRenderCache: '++id, [novelId+chapterIndex+variantFamily], [novelId+variantFamily], updatedAt, expiresAt',
 } as const;
 
-const db = new Dexie('PlotMapAI') as Dexie & {
+const db = new Dexie(PLOTMAPAI_DB_NAME) as Dexie & {
   novels: EntityTable<Novel, 'id'>;
   chapters: EntityTable<Chapter, 'id'>;
   tocRules: EntityTable<TocRule, 'id'>;
@@ -399,61 +396,33 @@ const db = new Dexie('PlotMapAI') as Dexie & {
   readerRenderCache: EntityTable<ReaderRenderCache, 'id'>;
 };
 
-// Development phase: keep a single declaration for the latest schema instead of
-// preserving every intermediate migration step. If we later need production-grade
-// upgrade compatibility, reintroduce explicit version history and upgrades here.
 db.version(CURRENT_DB_VERSION)
-  .stores(CURRENT_SCHEMA)
-  .upgrade(async (tx) => {
-    const chapters = (await tx.table('chapters').toArray() as Chapter[])
-      .sort((left, right) => (
-        left.novelId - right.novelId
-        || left.chapterIndex - right.chapterIndex
-      ));
-    const nextEntries = chapters.flatMap((chapter) => (
-      buildChapterImageGalleryEntries({
-        content: chapter.content,
-        index: chapter.chapterIndex,
-        title: chapter.title,
-      }).map((entry) => ({
-        novelId: chapter.novelId,
-        chapterIndex: entry.chapterIndex,
-        blockIndex: entry.blockIndex,
-        imageKey: entry.imageKey,
-        order: entry.order,
-      }))
-    ));
+  .stores(CURRENT_SCHEMA);
 
-    await tx.table('novelImageGalleryEntries').clear();
+function isLegacyDatabaseVersionError(error: unknown): boolean {
+  return error instanceof Dexie.DexieError && error.name === Dexie.errnames.Version;
+}
 
-    if (nextEntries.length > 0) {
-      await tx.table('novelImageGalleryEntries').bulkAdd(nextEntries);
+async function clearLegacyDatabase(): Promise<void> {
+  db.close();
+  await db.delete();
+}
+
+export async function prepareDatabase(): Promise<void> {
+  if (db.isOpen()) {
+    return;
+  }
+
+  try {
+    await db.open();
+  } catch (error) {
+    if (!isLegacyDatabaseVersionError(error)) {
+      throw error;
     }
 
-    const readerRenderCacheTable = tx.table('readerRenderCache');
-    const now = Date.now();
-    const cacheEntries = await readerRenderCacheTable.toArray() as ReaderRenderCache[];
-
-    await readerRenderCacheTable.clear();
-
-    const activeCacheEntries = cacheEntries.flatMap((entry) => {
-      const updatedAtMs = Date.parse(entry.updatedAt);
-      const baseTime = Number.isNaN(updatedAtMs) ? now : updatedAtMs;
-      const expiresAt = new Date(baseTime + READER_RENDER_CACHE_TTL_MS).toISOString();
-
-      if (Date.parse(expiresAt) <= now) {
-        return [];
-      }
-
-      return [{
-        ...entry,
-        expiresAt,
-      }];
-    });
-
-    if (activeCacheEntries.length > 0) {
-      await readerRenderCacheTable.bulkAdd(activeCacheEntries);
-    }
-  });
+    await clearLegacyDatabase();
+    await db.open();
+  }
+}
 
 export { db };

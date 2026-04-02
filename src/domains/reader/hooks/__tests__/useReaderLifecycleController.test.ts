@@ -24,9 +24,7 @@ function createStoredState(overrides: StoredReaderState = {}): StoredReaderState
     chapterIndex: 1,
     mode: 'scroll',
     chapterProgress: undefined,
-    scrollPosition: undefined,
     lastContentMode: 'scroll',
-    locatorVersion: undefined,
     locator: undefined,
     ...overrides,
   };
@@ -39,7 +37,6 @@ function createRestoreTarget(
     chapterIndex: 1,
     mode: 'scroll',
     chapterProgress: 0.4,
-    locatorVersion: undefined,
     locator: undefined,
     ...overrides,
   };

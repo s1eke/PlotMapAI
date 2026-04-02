@@ -2,8 +2,6 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import {
   APP_SETTING_KEYS,
-  LEGACY_CACHE_KEYS,
-  LEGACY_SECURE_KEYS,
   SECURE_KEYS,
   storage,
 } from '@infra/storage';
@@ -23,7 +21,6 @@ describe('aiConfigRepository', () => {
     localStorage.clear();
     await storage.primary.settings.remove(APP_SETTING_KEYS.aiConfig);
     await storage.secure.remove(SECURE_KEYS.aiApiKey);
-    await storage.secure.remove(LEGACY_SECURE_KEYS.aiApiKey);
     resetDeviceKeyForTesting();
   });
 
@@ -63,44 +60,14 @@ describe('aiConfigRepository', () => {
     });
   });
 
-  it('defaults providerId for legacy primary-storage records', async () => {
+  it('ignores non-canonical primary-storage records', async () => {
     await storage.primary.settings.set(APP_SETTING_KEYS.aiConfig, {
       apiBaseUrl: 'http://legacy-host:5000',
       contextSize: 64000,
       modelName: 'legacy-model',
     });
-    await storage.secure.set(SECURE_KEYS.aiApiKey, 'sk-legacy-secret');
 
-    const settings = await getAiProviderSettings();
-
-    expect(settings.providerId).toBe(DEFAULT_ANALYSIS_PROVIDER_ID);
-  });
-
-  it('migrates legacy ai config from cache and legacy secure storage', async () => {
-    localStorage.setItem(LEGACY_CACHE_KEYS.aiConfig, JSON.stringify({
-      apiBaseUrl: 'http://legacy-host:5000',
-      contextSize: 64000,
-      modelName: 'legacy-model',
-    }));
-    await storage.secure.set(LEGACY_SECURE_KEYS.aiApiKey, 'sk-legacy-secret');
-
-    const settings = await getAiProviderSettings();
-
-    expect(settings).toMatchObject({
-      apiBaseUrl: 'http://legacy-host:5000',
-      contextSize: 64000,
-      hasApiKey: true,
-      modelName: 'legacy-model',
-      providerId: DEFAULT_ANALYSIS_PROVIDER_ID,
-    });
-    await expect(storage.primary.settings.get(APP_SETTING_KEYS.aiConfig)).resolves.toEqual({
-      apiBaseUrl: 'http://legacy-host:5000',
-      contextSize: 64000,
-      modelName: 'legacy-model',
-      providerId: DEFAULT_ANALYSIS_PROVIDER_ID,
-    });
-    expect(localStorage.getItem(LEGACY_CACHE_KEYS.aiConfig)).toBeNull();
-    expect(localStorage.getItem(LEGACY_SECURE_KEYS.aiApiKey)).toBeNull();
+    await expect(getAiConfig()).resolves.toBeNull();
   });
 
   it('exports and re-imports encrypted ai config', async () => {

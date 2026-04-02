@@ -76,8 +76,7 @@ export function hasReaderRestoreTarget(
 
   return target.locator !== undefined
     || target.locatorBoundary !== undefined
-    || (typeof target.chapterProgress === 'number' && Number.isFinite(target.chapterProgress))
-    || (typeof target.scrollPosition === 'number' && Number.isFinite(target.scrollPosition));
+    || (typeof target.chapterProgress === 'number' && Number.isFinite(target.chapterProgress));
 }
 
 export function shouldKeepReaderRestoreMask(
@@ -87,8 +86,7 @@ export function shouldKeepReaderRestoreMask(
 
   return target.locator !== undefined
     || target.locatorBoundary !== undefined
-    || (typeof target.chapterProgress === 'number' && target.chapterProgress > 0)
-    || (typeof target.scrollPosition === 'number' && target.scrollPosition > 0);
+    || (typeof target.chapterProgress === 'number' && target.chapterProgress > 0);
 }
 
 export function canSkipReaderRestore(
@@ -106,18 +104,13 @@ export function createRestoreTargetFromPersistedState(
 
   const target: ReaderRestoreTarget = {
     ...resolveRestoreTargetViewState(state),
-    locatorVersion: state.locator ? 1 : undefined,
     locator: state.locator,
   };
 
-  if (!state?.locator || target.mode === 'summary') {
+  if (target.mode === 'summary') {
     target.chapterProgress = typeof state?.chapterProgress === 'number'
       ? clampProgress(state.chapterProgress)
       : undefined;
-    target.scrollPosition =
-      typeof state?.scrollPosition === 'number' && Number.isFinite(state.scrollPosition)
-        ? state.scrollPosition
-        : undefined;
   }
 
   return shouldKeepReaderRestoreMask(target) ? target : null;
@@ -133,7 +126,6 @@ export function createRestoreTargetFromNavigationIntent(
     chapterIndex: intent.locator?.chapterIndex ?? intent.chapterIndex,
     mode,
     locatorBoundary: intent.locator ? undefined : locatorBoundary,
-    locatorVersion: intent.locator ? 1 : undefined,
     locator: intent.locator,
   };
 }

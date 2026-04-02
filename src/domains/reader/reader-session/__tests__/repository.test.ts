@@ -22,7 +22,6 @@ describe('reader-session repository', () => {
       chapterIndex: 2,
       mode: 'summary',
       chapterProgress: 0.6,
-      scrollPosition: 240,
       lastContentMode: 'paged',
     });
 
@@ -30,29 +29,24 @@ describe('reader-session repository', () => {
 
     expect(row).toMatchObject({
       chapterIndex: 2,
-      mode: 'paged',
+      mode: 'summary',
       chapterProgress: 0.6,
-      scrollPosition: 240,
-      locatorVersion: undefined,
       locator: undefined,
     });
 
     await expect(readReadingProgress(1)).resolves.toMatchObject({
       chapterIndex: 2,
-      mode: 'paged',
+      mode: 'summary',
       chapterProgress: 0.6,
-      scrollPosition: 240,
-      locatorVersion: undefined,
       locator: undefined,
     });
   });
 
-  it('replaces stale legacy fields when a locator snapshot is persisted', async () => {
+  it('replaces a summary snapshot when a locator snapshot is persisted', async () => {
     await db.readingProgress.add({
       novelId: 1,
       chapterIndex: 3,
-      scrollPosition: 500,
-      mode: 'scroll',
+      mode: 'summary',
       chapterProgress: 0.75,
       updatedAt: new Date().toISOString(),
     });
@@ -60,7 +54,6 @@ describe('reader-session repository', () => {
     await replaceReadingProgress(1, {
       chapterIndex: 4,
       mode: 'paged',
-      locatorVersion: 1,
       locator: {
         chapterIndex: 4,
         blockIndex: 2,
@@ -74,10 +67,8 @@ describe('reader-session repository', () => {
 
     expect(row).toMatchObject({
       chapterIndex: 4,
-      scrollPosition: 0,
       mode: 'paged',
       chapterProgress: undefined,
-      locatorVersion: 1,
       locator: {
         chapterIndex: 4,
         blockIndex: 2,
@@ -90,8 +81,6 @@ describe('reader-session repository', () => {
       chapterIndex: 4,
       mode: 'paged',
       chapterProgress: undefined,
-      scrollPosition: undefined,
-      locatorVersion: 1,
       locator: {
         chapterIndex: 4,
         blockIndex: 2,

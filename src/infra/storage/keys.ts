@@ -20,16 +20,8 @@ export const CACHE_KEYS = {
   readerState: (novelId: number) => `reader-state:${novelId}`,
 } as const;
 
-export const LEGACY_CACHE_KEYS = {
-  aiConfig: 'plotmapai_ai_config',
-} as const;
-
 export const SECURE_KEYS = {
   aiApiKey: 'plotmapai_secure_ai_api_key',
-} as const;
-
-export const LEGACY_SECURE_KEYS = {
-  aiApiKey: 'plotmapai_encrypted_api_key',
 } as const;
 
 export const DEVICE_KEY_STORAGE_KEY = 'plotmapai_device_key';

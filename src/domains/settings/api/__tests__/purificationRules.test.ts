@@ -103,6 +103,32 @@ describe('purificationRuleRepository', () => {
     expect(rules.find((rule) => rule.pattern === 'bar')?.exclusiveGroup).toBe('formatting');
   });
 
+  it('uploadPurificationRulesYaml normalizes legacy camelCase keys', async () => {
+    const file = new File([`
+- name: Legacy Rule
+  pattern: legacy
+  replacement: updated
+  isRegex: false
+  isEnabled: false
+  scopeTitle: false
+  scopeContent: true
+  exclusiveGroup: cleanup
+`], 'purification.yaml', { type: 'text/yaml' });
+
+    const rules = await purificationRuleRepository.uploadPurificationRulesYaml(file);
+
+    expect(rules).toHaveLength(1);
+    expect(rules[0]).toMatchObject({
+      pattern: 'legacy',
+      replacement: 'updated',
+      isRegex: false,
+      isEnabled: false,
+      scopeTitle: false,
+      scopeContent: true,
+      exclusiveGroup: 'cleanup',
+    });
+  });
+
   it('unescapes replacement sequences when importing and saving', async () => {
     const created = await purificationRuleRepository.createPurificationRule({
       name: 'Escaped',

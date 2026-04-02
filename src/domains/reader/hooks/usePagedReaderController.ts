@@ -11,7 +11,6 @@ import { resolveCurrentPagedLocator } from '../reader-layout';
 import { usePagedChapterTransition } from './usePagedChapterTransition';
 import { usePagedReaderLayout } from './usePagedReaderLayout';
 import { useReaderRenderCache } from './useReaderRenderCache';
-import { clampProgress } from '../utils/readerPosition';
 import { useReaderContext } from '../pages/reader-page/ReaderContext';
 
 type NavigationDirection = 'next' | 'prev';
@@ -447,24 +446,15 @@ export function usePagedReaderController({
     }
 
     const locator = getCurrentPagedLocatorRef.current();
-    let chapterProgress: number | undefined;
-    if (!locator) {
-      chapterProgress = effectivePageCount <= 1
-        ? 0
-        : clampProgress(pageIndex / (effectivePageCount - 1));
-    }
     persistReaderState({
       chapterIndex: locator?.chapterIndex ?? chapterIndex,
       mode: 'paged',
-      chapterProgress,
-      locatorVersion: locator ? 1 : undefined,
       locator: locator ?? undefined,
     });
   }, [
     chapterIndex,
     currentChapter,
     enabled,
-    effectivePageCount,
     getCurrentPagedLocatorRef,
     pageIndex,
     pendingRestoreTargetRef,

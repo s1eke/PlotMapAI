@@ -1,6 +1,7 @@
 import {
   resetAppThemeStoreForTests,
 } from '@app/stores/appThemeStore';
+import { migrateLegacyReaderStateCacheSnapshot } from '@infra/migrations';
 import { mergeReaderStateCacheSnapshot, readReaderStateCacheSnapshot } from '@infra/storage/readerStateCache';
 import { useStore } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
@@ -88,6 +89,7 @@ function readLocalSessionState(novelId: number): StoredReaderState | null {
     return null;
   }
 
+  migrateLegacyReaderStateCacheSnapshot(novelId);
   const parsed = readReaderStateCacheSnapshot(novelId);
   if (!parsed) {
     return null;
@@ -105,9 +107,7 @@ function toStoredReaderState(state: ReaderSessionInternalState): StoredReaderSta
     chapterIndex: state.chapterIndex,
     mode: state.mode,
     chapterProgress: state.chapterProgress,
-    scrollPosition: state.scrollPosition,
     lastContentMode: state.lastContentMode,
-    locatorVersion: state.locatorVersion,
     locator: state.locator,
   });
 }
@@ -115,10 +115,8 @@ function toStoredReaderState(state: ReaderSessionInternalState): StoredReaderSta
 function getRemoteProgressSnapshot(progress: ReadingProgress): string {
   return JSON.stringify({
     chapterIndex: progress.chapterIndex,
-    scrollPosition: progress.scrollPosition,
     mode: progress.mode,
-    chapterProgress: clampChapterProgress(progress.chapterProgress) ?? 0,
-    locatorVersion: progress.locatorVersion === 1 ? 1 : undefined,
+    chapterProgress: clampChapterProgress(progress.chapterProgress) ?? null,
     locator: progress.locator ?? null,
   });
 }
@@ -127,7 +125,9 @@ function toRemoteProgress(state: ReaderSessionInternalState): ReadingProgress {
   return toReadingProgress(toStoredReaderState(state));
 }
 
-function inferLegacyPageTurnMode(state: StoredReaderState | null | undefined): ReaderPageTurnMode {
+function inferPageTurnModeFromPersistedState(
+  state: StoredReaderState | null | undefined,
+): ReaderPageTurnMode {
   return state?.mode === 'paged' || state?.lastContentMode === 'paged'
     ? 'cover'
     : 'scroll';
@@ -140,8 +140,6 @@ function createInitialReaderSessionState(): ReaderSessionInternalState {
     mode,
     chapterIndex: 0,
     chapterProgress: undefined,
-    scrollPosition: undefined,
-    locatorVersion: undefined,
     locator: undefined,
     restoreStatus: 'hydrating',
     lastContentMode: 'scroll',
@@ -194,10 +192,8 @@ function enqueueRemotePersistence(
       if (snapshot === lastSyncedRemoteSnapshot) return;
       await replaceReadingProgress(novelId, {
         chapterIndex: progress.chapterIndex,
-        scrollPosition: progress.scrollPosition,
         mode: progress.mode,
         chapterProgress: progress.chapterProgress,
-        locatorVersion: progress.locatorVersion,
         locator: progress.locator,
       });
       setLastSyncedRemoteSnapshot(snapshot);
@@ -234,10 +230,6 @@ function updateStoredReaderState(
     mode,
     chapterIndex: merged.chapterIndex ?? 0,
     chapterProgress: clampChapterProgress(merged.chapterProgress),
-    scrollPosition: typeof merged.scrollPosition === 'number' && Number.isFinite(merged.scrollPosition)
-      ? merged.scrollPosition
-      : undefined,
-    locatorVersion: merged.locator ? 1 : undefined,
     locator: merged.locator,
     lastContentMode: resolveLastContentMode(mode, nextLastContentMode),
     hasUserInteracted: options.markUserInteracted ?? currentState.hasUserInteracted,
@@ -269,8 +261,6 @@ export async function hydrateSession(
     hasUserInteracted: false,
     chapterIndex: 0,
     chapterProgress: undefined,
-    scrollPosition: undefined,
-    locatorVersion: undefined,
     locator: undefined,
     mode: 'scroll',
     lastContentMode: 'scroll',
@@ -293,7 +283,7 @@ export async function hydrateSession(
   const baseState = remoteState ?? localState;
   const resolvedPageTurnMode = options.hasConfiguredPageTurnMode && options.pageTurnMode
     ? options.pageTurnMode
-    : inferLegacyPageTurnMode(baseState);
+    : inferPageTurnModeFromPersistedState(baseState);
   const resolvedContentMode = resolveContentModeFromPageTurnMode(resolvedPageTurnMode);
   const mode = baseState?.mode === 'summary'
     ? 'summary'
@@ -314,10 +304,6 @@ export async function hydrateSession(
     mode,
     chapterIndex: hydratedState.chapterIndex ?? 0,
     chapterProgress: clampChapterProgress(hydratedState.chapterProgress),
-    scrollPosition: typeof hydratedState.scrollPosition === 'number' && Number.isFinite(hydratedState.scrollPosition)
-      ? hydratedState.scrollPosition
-      : undefined,
-    locatorVersion: hydratedState.locator ? 1 : undefined,
     locator: hydratedState.locator,
     lastContentMode: nextLastContentMode,
     pendingRestoreTarget,
@@ -333,7 +319,6 @@ export function setMode(mode: ReaderMode, options: SessionUpdateOptions = {}): v
     {
       chapterIndex: currentState.chapterIndex,
       chapterProgress: currentState.chapterProgress,
-      scrollPosition: currentState.scrollPosition,
       mode,
       lastContentMode: resolveLastContentMode(mode, currentState.lastContentMode),
     },

@@ -601,7 +601,7 @@ describe('useScrollReaderController', () => {
     expect(setChapterIndex).not.toHaveBeenCalled();
   });
 
-  it('restores legacy scroll positions and settles the restore lifecycle', async () => {
+  it('skips non-canonical restore targets and settles the restore lifecycle', async () => {
     const animationFrames = createAnimationFrameController();
     const contentRef = { current: makeContainer() };
     const clearPendingRestoreTarget = vi.fn();
@@ -623,13 +623,11 @@ describe('useScrollReaderController', () => {
       pendingRestoreTarget: {
         chapterIndex: 1,
         mode: 'scroll',
-        scrollPosition: 240,
       },
       pendingRestoreTargetRef: {
         current: {
           chapterIndex: 1,
           mode: 'scroll',
-          scrollPosition: 240,
         },
       },
       clearPendingRestoreTarget,
@@ -653,10 +651,10 @@ describe('useScrollReaderController', () => {
 
       await animationFrames.flushAnimationFrames();
 
-      expect(contentRef.current.scrollTop).toBe(240);
+      expect(contentRef.current.scrollTop).toBe(0);
       expect(clearPendingRestoreTarget).toHaveBeenCalled();
       expect(stopRestoreMask).toHaveBeenCalled();
-      expect(onRestoreSettled).toHaveBeenCalledWith('completed');
+      expect(onRestoreSettled).toHaveBeenCalledWith('skipped');
     } finally {
       animationFrames.restore();
     }
@@ -697,14 +695,12 @@ describe('useScrollReaderController', () => {
       pendingRestoreTarget: {
         chapterIndex: 1,
         locator,
-        locatorVersion: 1,
         mode: 'scroll',
       },
       pendingRestoreTargetRef: {
         current: {
           chapterIndex: 1,
           locator,
-          locatorVersion: 1,
           mode: 'scroll',
         },
       },
@@ -874,7 +870,7 @@ describe('useScrollReaderController', () => {
       const lateTarget: ReaderRestoreTarget = {
         chapterIndex: 1,
         mode: 'scroll',
-        chapterProgress: 0,
+        locatorBoundary: 'start',
       };
       pendingRestoreTargetRef.current = lateTarget;
 

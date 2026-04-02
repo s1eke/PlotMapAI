@@ -15,7 +15,6 @@ import { useScrollModeChapters } from './useScrollModeChapters';
 import { getChapterBoundaryLocator } from '../utils/readerLayout';
 import {
   canSkipReaderRestore,
-  clampProgress,
   SCROLL_READING_ANCHOR_RATIO,
 } from '../utils/readerPosition';
 import { useReaderContext } from '../pages/reader-page/ReaderContext';
@@ -271,8 +270,6 @@ export function useScrollReaderController({
     persistReaderState({
       chapterIndex: locator?.chapterIndex ?? anchor.chapterIndex,
       mode: 'scroll',
-      chapterProgress: locator ? undefined : clampProgress(anchor.chapterProgress),
-      locatorVersion: locator ? 1 : undefined,
       locator: locator ?? undefined,
     });
 
@@ -439,25 +436,6 @@ export function useScrollReaderController({
       if (!hasResolvedChapterLayout) {
         return { status: 'pending' as const };
       }
-    }
-
-    if (typeof target.chapterProgress === 'number' && targetElement) {
-      return {
-        status: 'resolved' as const,
-        locator: null,
-        scrollTop: Math.round(
-          targetElement.offsetTop
-            + targetElement.offsetHeight * clampProgress(target.chapterProgress),
-        ),
-      };
-    }
-
-    if (typeof target.scrollPosition === 'number') {
-      return {
-        status: 'resolved' as const,
-        locator: null,
-        scrollTop: target.scrollPosition,
-      };
     }
 
     if (resolvedLocator || target.locatorBoundary !== undefined) {
@@ -664,7 +642,6 @@ export function useScrollReaderController({
         persistReaderState({
           chapterIndex: resolvedTarget.locator.chapterIndex,
           mode: 'scroll',
-          locatorVersion: 1,
           locator: resolvedTarget.locator,
         });
       }

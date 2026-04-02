@@ -43,9 +43,7 @@ function buildNovelScopedInitialState(
     chapterIndex: initialStoredState.chapterIndex ?? 0,
     mode: resolvedMode,
     chapterProgress: initialStoredState.chapterProgress,
-    scrollPosition: initialStoredState.scrollPosition,
     lastContentMode: initialStoredState.lastContentMode ?? (resolvedMode === 'paged' ? 'paged' : 'scroll'),
-    locatorVersion: initialStoredState.locator ? 1 : undefined,
     locator: initialStoredState.locator,
   };
 }
@@ -64,26 +62,20 @@ export function useReaderStatePersistence(novelId: number): {
   const chapterIndex = useReaderSessionSelector((state) => state.chapterIndex);
   const mode = useReaderSessionSelector((state) => state.mode);
   const chapterProgress = useReaderSessionSelector((state) => state.chapterProgress);
-  const scrollPosition = useReaderSessionSelector((state) => state.scrollPosition);
   const lastContentMode = useReaderSessionSelector((state) => state.lastContentMode);
-  const locatorVersion = useReaderSessionSelector((state) => state.locatorVersion);
   const locator = useReaderSessionSelector((state) => state.locator);
   const storedState = useMemo<StoredReaderState>(() => ({
     chapterIndex,
     mode,
     chapterProgress,
-    scrollPosition,
     lastContentMode,
-    locatorVersion,
     locator,
   }), [
     chapterIndex,
     chapterProgress,
     lastContentMode,
     locator,
-    locatorVersion,
     mode,
-    scrollPosition,
   ]);
   const snapshot = useMemo(() => ({
     novelId: sessionNovelId,

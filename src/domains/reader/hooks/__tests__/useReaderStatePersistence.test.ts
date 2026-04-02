@@ -33,9 +33,7 @@ describe('useReaderStatePersistence', () => {
       chapterIndex: 0,
       mode: 'scroll',
       chapterProgress: undefined,
-      scrollPosition: undefined,
       lastContentMode: 'scroll',
-      locatorVersion: undefined,
       locator: undefined,
     });
     expect(result.current.hasUserInteractedRef.current).toBe(false);
@@ -54,18 +52,14 @@ describe('useReaderStatePersistence', () => {
       chapterIndex: 5,
       mode: 'summary',
       chapterProgress: undefined,
-      scrollPosition: undefined,
       lastContentMode: 'paged',
-      locatorVersion: undefined,
       locator: undefined,
     });
     expect(result.current.latestReaderStateRef.current).toEqual({
       chapterIndex: 5,
       mode: 'summary',
       chapterProgress: undefined,
-      scrollPosition: undefined,
       lastContentMode: 'paged',
-      locatorVersion: undefined,
       locator: undefined,
     });
   });
@@ -83,9 +77,7 @@ describe('useReaderStatePersistence', () => {
       chapterIndex: 0,
       mode: 'scroll',
       chapterProgress: undefined,
-      scrollPosition: undefined,
       lastContentMode: 'scroll',
-      locatorVersion: undefined,
       locator: undefined,
     });
   });
@@ -111,9 +103,7 @@ describe('useReaderStatePersistence', () => {
       chapterIndex: 7,
       mode: 'summary',
       chapterProgress: undefined,
-      scrollPosition: undefined,
       lastContentMode: 'scroll',
-      locatorVersion: undefined,
       locator: undefined,
     });
 
@@ -135,8 +125,7 @@ describe('useReaderStatePersistence', () => {
     await db.readingProgress.add({
       novelId: 1,
       chapterIndex: 2,
-      scrollPosition: 120,
-      mode: 'scroll',
+      mode: 'summary',
       chapterProgress: 0.2,
       updatedAt: new Date().toISOString(),
     });
@@ -150,16 +139,14 @@ describe('useReaderStatePersistence', () => {
 
     expect(state).toEqual({
       chapterIndex: 2,
-      mode: 'scroll',
+      mode: 'summary',
       chapterProgress: 0.2,
-      scrollPosition: 120,
       lastContentMode: 'scroll',
-      locatorVersion: undefined,
       locator: undefined,
     });
   });
 
-  it('keeps legacy scrollPosition for one-time restoration and upgrades on next save', () => {
+  it('drops legacy scrollPosition from the local cache on first read', () => {
     seedReaderStateCache(1, {
       chapterIndex: 2,
       scrollPosition: 380,
@@ -171,23 +158,17 @@ describe('useReaderStatePersistence', () => {
       chapterIndex: 2,
       mode: 'scroll',
       chapterProgress: undefined,
-      scrollPosition: 380,
       lastContentMode: 'scroll',
-      locatorVersion: undefined,
       locator: undefined,
-    });
-
-    act(() => {
-      result.current.persistReaderState({ chapterProgress: 0.55 });
     });
 
     expect(readReaderStateCacheSnapshot(1)).toMatchObject({
       chapterIndex: 2,
       mode: 'scroll',
-      chapterProgress: 0.55,
-      scrollPosition: 380,
       lastContentMode: 'scroll',
     });
+    expect(readReaderStateCacheSnapshot(1)).not.toHaveProperty('scrollPosition');
+    expect(readReaderStateCacheSnapshot(1)).not.toHaveProperty('chapterProgress');
   });
 
   it('treats the locator chapter as authoritative for initial stored state', () => {
@@ -210,9 +191,7 @@ describe('useReaderStatePersistence', () => {
       chapterIndex: 8,
       mode: 'scroll',
       chapterProgress: undefined,
-      scrollPosition: undefined,
       lastContentMode: 'scroll',
-      locatorVersion: 1,
       locator: {
         chapterIndex: 8,
         blockIndex: 3,
@@ -220,6 +199,7 @@ describe('useReaderStatePersistence', () => {
         lineIndex: 1,
       },
     });
+    expect(readReaderStateCacheSnapshot(1)).not.toHaveProperty('locatorVersion');
   });
 
   it('clears a stale locator when a chapter jump persists a new chapter index', () => {
@@ -248,9 +228,7 @@ describe('useReaderStatePersistence', () => {
       chapterIndex: 1,
       mode: 'scroll',
       chapterProgress: undefined,
-      scrollPosition: undefined,
       lastContentMode: 'scroll',
-      locatorVersion: undefined,
       locator: undefined,
     });
 
@@ -293,12 +271,14 @@ describe('useReaderStatePersistence', () => {
     act(() => {
       result.current.persistReaderState({
         chapterIndex: 3,
+        mode: 'summary',
         chapterProgress: 0.65,
       });
     });
 
     expect(readReaderStateCacheSnapshot(1)).toMatchObject({
       chapterIndex: 3,
+      mode: 'summary',
       chapterProgress: 0.65,
     });
 
@@ -310,9 +290,7 @@ describe('useReaderStatePersistence', () => {
       chapterIndex: 0,
       mode: 'scroll',
       chapterProgress: undefined,
-      scrollPosition: undefined,
       lastContentMode: 'scroll',
-      locatorVersion: undefined,
       locator: undefined,
     });
     expect(result.current.hasUserInteractedRef.current).toBe(false);

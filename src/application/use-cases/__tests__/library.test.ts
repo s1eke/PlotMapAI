@@ -170,7 +170,6 @@ describe('application library use-cases', () => {
       chapterIndex: 0,
       mode: 'scroll',
       novelId: 5,
-      scrollPosition: 42,
       updatedAt: new Date().toISOString(),
     });
     storage.cache.set(CACHE_KEYS.readerState(5), {

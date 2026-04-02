@@ -1,7 +1,5 @@
 import {
   APP_SETTING_KEYS,
-  LEGACY_CACHE_KEYS,
-  LEGACY_SECURE_KEYS,
   SECURE_KEYS,
   storage,
 } from '@infra/storage';
@@ -33,8 +31,12 @@ function sanitizeProviderId(value: unknown): AnalysisProviderId {
 function sanitizeAiConfigRecord(raw: unknown): StoredAiConfigRecord | null {
   if (!raw || typeof raw !== 'object') return null;
   const parsed = raw as Record<string, unknown>;
+  if (!isAnalysisProviderId(parsed.providerId)) {
+    return null;
+  }
+
   return {
-    providerId: sanitizeProviderId(parsed.providerId),
+    providerId: parsed.providerId,
     apiBaseUrl: typeof parsed.apiBaseUrl === 'string' ? parsed.apiBaseUrl : '',
     modelName: typeof parsed.modelName === 'string' ? parsed.modelName : '',
     contextSize: typeof parsed.contextSize === 'number' ? parsed.contextSize : DEFAULT_CONTEXT_SIZE,
@@ -82,46 +84,14 @@ function assertImportedAiConfig(raw: unknown): RuntimeAiConfig {
   return config;
 }
 
-async function migrateLegacyAiConfig(): Promise<StoredAiConfigRecord | null> {
-  const raw = storage.cache.getString(LEGACY_CACHE_KEYS.aiConfig);
-  if (!raw) return null;
-
-  try {
-    const config = sanitizeAiConfigRecord(JSON.parse(raw) as unknown);
-    storage.cache.remove(LEGACY_CACHE_KEYS.aiConfig);
-    if (!config) return null;
-    await storage.primary.settings.set(APP_SETTING_KEYS.aiConfig, config);
-    return config;
-  } catch {
-    storage.cache.remove(LEGACY_CACHE_KEYS.aiConfig);
-    return null;
-  }
-}
-
 async function getStoredAiConfigRecord(): Promise<StoredAiConfigRecord | null> {
-  const stored = sanitizeAiConfigRecord(
+  return sanitizeAiConfigRecord(
     await storage.primary.settings.get<StoredAiConfigRecord>(APP_SETTING_KEYS.aiConfig),
   );
-  if (stored) {
-    storage.cache.remove(LEGACY_CACHE_KEYS.aiConfig);
-    return stored;
-  }
-
-  return migrateLegacyAiConfig();
 }
 
 async function getStoredAiApiKey(): Promise<string> {
-  const current = await storage.secure.get(SECURE_KEYS.aiApiKey);
-  if (current !== null) {
-    await storage.secure.remove(LEGACY_SECURE_KEYS.aiApiKey);
-    return current;
-  }
-
-  const legacy = await storage.secure.get(LEGACY_SECURE_KEYS.aiApiKey);
-  if (legacy === null) return '';
-  await storage.secure.set(SECURE_KEYS.aiApiKey, legacy);
-  await storage.secure.remove(LEGACY_SECURE_KEYS.aiApiKey);
-  return legacy;
+  return (await storage.secure.get(SECURE_KEYS.aiApiKey)) ?? '';
 }
 
 export async function saveAiConfig(config: RuntimeAiConfig): Promise<void> {
@@ -137,9 +107,6 @@ export async function saveAiConfig(config: RuntimeAiConfig): Promise<void> {
   } else {
     await storage.secure.remove(SECURE_KEYS.aiApiKey);
   }
-
-  storage.cache.remove(LEGACY_CACHE_KEYS.aiConfig);
-  await storage.secure.remove(LEGACY_SECURE_KEYS.aiApiKey);
 }
 
 export async function getAiConfig(): Promise<RuntimeAiConfig | null> {

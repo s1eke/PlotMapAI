@@ -125,7 +125,6 @@ describe('novelRepository', () => {
       chapterIndex: 3,
       mode: 'scroll',
       novelId: id,
-      scrollPosition: 50,
       updatedAt: new Date().toISOString(),
     });
     await db.readerRenderCache.add({

@@ -12,10 +12,8 @@ import {
 
 export interface ReadingProgress {
   chapterIndex: number;
-  scrollPosition: number;
   mode: ReaderMode;
   chapterProgress?: number;
-  locatorVersion?: 1;
   locator?: ReaderLocator;
 }
 
@@ -29,22 +27,18 @@ export async function readReadingProgress(
 
   return sanitizeStoredReaderState({
     chapterIndex: progress.chapterIndex,
-    scrollPosition: progress.scrollPosition,
     mode:
       progress.mode === 'scroll' || progress.mode === 'paged' || progress.mode === 'summary'
         ? progress.mode
         : 'scroll',
     chapterProgress: progress.chapterProgress,
-    locatorVersion: progress.locatorVersion === 1 ? 1 : undefined,
-    locator: progress.locatorVersion === 1 ? progress.locator : undefined,
+    locator: progress.locator,
   });
 }
 
 export function toReadingProgress(state: StoredReaderState): ReadingProgress {
   const canonicalState = buildStoredReaderState(state);
-  const durableMode = canonicalState.mode === 'summary'
-    ? canonicalState.lastContentMode ?? 'scroll'
-    : canonicalState.mode ?? 'scroll';
+  const durableMode = canonicalState.mode ?? 'scroll';
   const usesLocator = shouldUseLocatorAsPrimaryPosition(
     durableMode,
     canonicalState.locator,
@@ -52,12 +46,10 @@ export function toReadingProgress(state: StoredReaderState): ReadingProgress {
 
   return {
     chapterIndex: canonicalState.chapterIndex ?? 0,
-    scrollPosition: usesLocator ? 0 : canonicalState.scrollPosition ?? 0,
     mode: durableMode,
-    chapterProgress: usesLocator
-      ? undefined
-      : clampChapterProgress(canonicalState.chapterProgress),
-    locatorVersion: usesLocator ? 1 : undefined,
+    chapterProgress: durableMode === 'summary'
+      ? clampChapterProgress(canonicalState.chapterProgress)
+      : undefined,
     locator: usesLocator ? canonicalState.locator : undefined,
   };
 }
@@ -74,10 +66,8 @@ export async function replaceReadingProgress(
     id: existing?.id,
     novelId,
     chapterIndex: progress.chapterIndex,
-    scrollPosition: progress.scrollPosition,
     mode: progress.mode,
     chapterProgress: progress.chapterProgress,
-    locatorVersion: progress.locatorVersion,
     locator: progress.locator,
     updatedAt: now,
   });

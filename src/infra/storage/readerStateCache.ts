@@ -42,3 +42,14 @@ export function mergeReaderStateCacheSnapshot(
     ...partial,
   });
 }
+
+export function replaceReaderStateCacheSnapshot(
+  novelId: number,
+  nextSnapshot: Partial<ReaderStateCacheSnapshot>,
+): void {
+  if (!novelId) {
+    return;
+  }
+
+  storage.cache.set(CACHE_KEYS.readerState(novelId), nextSnapshot);
+}

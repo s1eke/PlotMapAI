@@ -118,13 +118,14 @@ describe('db', () => {
     await db.readingProgress.add({
       novelId: 1,
       chapterIndex: 5,
-      scrollPosition: 100,
-      viewMode: 'original',
+      mode: 'summary',
+      chapterProgress: 0.5,
       updatedAt: new Date().toISOString(),
     });
     const progress = await db.readingProgress.where('novelId').equals(1).first();
     expect(progress).toBeDefined();
     expect(progress!.chapterIndex).toBe(5);
+    expect(progress!.mode).toBe('summary');
   });
 
   it('can add analysis jobs', async () => {

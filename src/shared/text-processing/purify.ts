@@ -71,22 +71,6 @@ export function loadRulesFromJson(json: string): PurifyRule[] {
     throw new Error('Rules must be a JSON array');
   }
 
-  const mapping: Record<string, string> = {
-    bookScope: 'book_scope',
-    excludeBookScope: 'exclude_book_scope',
-    group: 'group',
-    id: 'external_id',
-    exclusiveGroup: 'exclusive_group',
-    isEnabled: 'is_enabled',
-    isRegex: 'is_regex',
-    name: 'name',
-    order: 'order',
-    pattern: 'pattern',
-    replacement: 'replacement',
-    scopeContent: 'scope_content',
-    scopeTitle: 'scope_title',
-  };
-
   const validated: PurifyRule[] = [];
   for (let index = 0; index < parsed.length; index += 1) {
     const rule = parsed[index];
@@ -95,19 +79,25 @@ export function loadRulesFromJson(json: string): PurifyRule[] {
     }
 
     const raw = rule as Record<string, unknown>;
-    const mappedRule: Record<string, unknown> = {};
-    for (const [legacyKey, modelKey] of Object.entries(mapping)) {
-      mappedRule[modelKey] = raw[legacyKey] ?? undefined;
-    }
-
-    if (!mappedRule.name) {
-      mappedRule.name = `Imported Rule ${index}`;
-    }
-    if (mappedRule.order == null) {
-      mappedRule.order = 10;
-    }
-
-    validated.push(mappedRule as PurifyRule);
+    validated.push({
+      name: typeof raw.name === 'string' ? raw.name : `Imported Rule ${index}`,
+      group: typeof raw.group === 'string' ? raw.group : undefined,
+      pattern: typeof raw.pattern === 'string' ? raw.pattern : undefined,
+      replacement:
+        typeof raw.replacement === 'string' || raw.replacement === null
+          ? raw.replacement
+          : undefined,
+      is_regex: typeof raw.is_regex === 'boolean' ? raw.is_regex : undefined,
+      is_enabled: typeof raw.is_enabled === 'boolean' ? raw.is_enabled : undefined,
+      order: typeof raw.order === 'number' ? raw.order : 10,
+      scope_title: typeof raw.scope_title === 'boolean' ? raw.scope_title : undefined,
+      scope_content: typeof raw.scope_content === 'boolean' ? raw.scope_content : undefined,
+      book_scope: typeof raw.book_scope === 'string' ? raw.book_scope : undefined,
+      exclude_book_scope:
+        typeof raw.exclude_book_scope === 'string' ? raw.exclude_book_scope : undefined,
+      exclusive_group:
+        typeof raw.exclusive_group === 'string' ? raw.exclusive_group : undefined,
+    });
   }
 
   return validated;

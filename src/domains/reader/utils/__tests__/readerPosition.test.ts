@@ -70,11 +70,6 @@ describe('readerPosition', () => {
     expect(hasReaderRestoreTarget({
       chapterIndex: 0,
       mode: 'scroll',
-      scrollPosition: 0,
-    })).toBe(true);
-    expect(hasReaderRestoreTarget({
-      chapterIndex: 0,
-      mode: 'scroll',
       locator: {
         chapterIndex: 0,
         blockIndex: 1,
@@ -98,17 +93,7 @@ describe('readerPosition', () => {
     expect(shouldKeepReaderRestoreMask({
       chapterIndex: 0,
       mode: 'scroll',
-      scrollPosition: 0,
-    })).toBe(false);
-    expect(shouldKeepReaderRestoreMask({
-      chapterIndex: 0,
-      mode: 'scroll',
       chapterProgress: 0.4,
-    })).toBe(true);
-    expect(shouldKeepReaderRestoreMask({
-      chapterIndex: 0,
-      mode: 'scroll',
-      scrollPosition: 120,
     })).toBe(true);
     expect(shouldKeepReaderRestoreMask({
       chapterIndex: 0,
@@ -118,7 +103,6 @@ describe('readerPosition', () => {
         blockIndex: 1,
         kind: 'text',
       },
-      locatorVersion: 1,
     })).toBe(true);
     expect(shouldKeepReaderRestoreMask({
       chapterIndex: 0,
@@ -142,25 +126,21 @@ describe('readerPosition', () => {
       chapterIndex: 2,
       mode: 'scroll',
       chapterProgress: 0.4,
-    })).toEqual({
-      chapterIndex: 2,
-      mode: 'scroll',
-      chapterProgress: 0.4,
-      locator: undefined,
-      locatorVersion: undefined,
-      scrollPosition: undefined,
-    });
+    })).toBeNull();
     expect(createRestoreTargetFromPersistedState({
       chapterIndex: 2,
       mode: 'paged',
       chapterProgress: 1,
+    })).toBeNull();
+    expect(createRestoreTargetFromPersistedState({
+      chapterIndex: 2,
+      mode: 'summary',
+      chapterProgress: 1,
     })).toEqual({
       chapterIndex: 2,
-      mode: 'paged',
+      mode: 'summary',
       chapterProgress: 1,
       locator: undefined,
-      locatorVersion: undefined,
-      scrollPosition: undefined,
     });
   });
 
@@ -173,7 +153,6 @@ describe('readerPosition', () => {
       mode: 'scroll',
       locatorBoundary: 'start',
       locator: undefined,
-      locatorVersion: undefined,
     });
 
     expect(createRestoreTargetFromNavigationIntent({
@@ -184,7 +163,6 @@ describe('readerPosition', () => {
       mode: 'paged',
       locatorBoundary: 'end',
       locator: undefined,
-      locatorVersion: undefined,
     });
   });
 
