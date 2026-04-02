@@ -50,7 +50,7 @@ interface UseReaderLifecycleControllerParams {
   restoreFlow: ReaderLifecycleControllerRestoreFlow;
 }
 
-interface UseReaderLifecycleControllerResult {
+export interface UseReaderLifecycleControllerResult {
   lifecycleStatus: ReaderLifecycleStatus;
   loadingLabel: string | null;
   readerError: AppError | null;

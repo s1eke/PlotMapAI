@@ -1,5 +1,3 @@
-import type { ReactNode } from 'react';
-import type { ReaderContextValue } from '../../pages/reader-page/ReaderContext';
 import type { ChapterChangeSource } from '../navigationTypes';
 import type { ScrollModeAnchor } from '../useScrollModeChapters';
 import type {
@@ -7,16 +5,10 @@ import type {
   StoredReaderState,
 } from '../useReaderStatePersistence';
 
-import { act, renderHook } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  ReaderContextProvider,
-} from '../../pages/reader-page/ReaderContext';
-import {
-  getReaderSessionSnapshot,
-  resetReaderSessionStoreForTests,
-} from '../sessionStore';
+import { getReaderSessionSnapshot, resetReaderSessionStoreForTests } from '../sessionStore';
 import { useReaderRestoreFlow } from '../useReaderRestoreFlow';
 
 function makeContainer({
@@ -68,47 +60,6 @@ function createRestoreTarget(
   };
 }
 
-function createReaderContextValue(
-  overrides: Partial<ReaderContextValue> = {},
-): ReaderContextValue {
-  const mode = overrides.mode ?? 'scroll';
-
-  return {
-    novelId: 1,
-    chapterIndex: overrides.chapterIndex ?? 5,
-    mode,
-    viewMode: overrides.viewMode ?? (mode === 'summary' ? 'summary' : 'original'),
-    isPagedMode: overrides.isPagedMode ?? mode === 'paged',
-    setChapterIndex: overrides.setChapterIndex ?? vi.fn(),
-    setMode: overrides.setMode ?? vi.fn(),
-    latestReaderStateRef: { current: createStoredState() },
-    hasUserInteractedRef: { current: false },
-    markUserInteracted: vi.fn(),
-    persistReaderState: vi.fn(),
-    loadPersistedReaderState: vi.fn(async () => createStoredState()),
-    contentRef: { current: makeContainer() },
-    pagedViewportRef: { current: null },
-    pageTargetRef: { current: null },
-    wheelDeltaRef: { current: 0 },
-    pageTurnLockedRef: { current: false },
-    chapterCacheRef: { current: new Map() },
-    scrollChapterElementsBridgeRef: { current: new Map() },
-    scrollChapterBodyElementsBridgeRef: { current: new Map() },
-    chapterChangeSourceRef: { current: null as ChapterChangeSource },
-    pagedStateRef: { current: { pageIndex: 0, pageCount: 1 } },
-    restoreSettledHandlerRef: { current: vi.fn() },
-    isScrollSyncSuppressedRef: { current: false },
-    suppressScrollSyncTemporarilyRef: { current: vi.fn() },
-    getCurrentAnchorRef: { current: () => null },
-    handleScrollModeScrollRef: { current: vi.fn() },
-    readingAnchorHandlerRef: { current: vi.fn() },
-    getCurrentOriginalLocatorRef: { current: () => null },
-    getCurrentPagedLocatorRef: { current: () => null },
-    resolveScrollLocatorOffsetRef: { current: () => null },
-    ...overrides,
-  };
-}
-
 function createCurrentChapter(index = 5) {
   return {
     index,
@@ -131,24 +82,56 @@ function createLocator(overrides: Partial<NonNullable<StoredReaderState['locator
   };
 }
 
+function createHookProps(overrides: Partial<Parameters<typeof useReaderRestoreFlow>[0]> = {}) {
+  const mode = overrides.sessionSnapshot?.mode ?? 'scroll';
+  const chapterIndex = overrides.sessionSnapshot?.chapterIndex ?? 5;
+  const lastContentMode = overrides.sessionSnapshot?.lastContentMode ?? 'scroll';
+  const pendingRestoreTarget = overrides.sessionSnapshot?.pendingRestoreTarget ?? null;
+  const viewMode = overrides.sessionSnapshot?.viewMode ?? (mode === 'summary' ? 'summary' : 'original');
+
+  return {
+    currentChapter: createCurrentChapter(),
+    isChapterAnalysisLoading: false,
+    sessionCommands: {
+      latestReaderStateRef: { current: createStoredState() },
+      markUserInteracted: vi.fn(),
+      persistReaderState: vi.fn(),
+      setChapterIndex: vi.fn(),
+      setMode: vi.fn(),
+      ...overrides.sessionCommands,
+    },
+    sessionSnapshot: {
+      chapterIndex,
+      lastContentMode,
+      mode,
+      pendingRestoreTarget,
+      viewMode,
+      ...overrides.sessionSnapshot,
+    },
+    summaryRestoreSignal: null,
+    uiBridge: {
+      chapterChangeSourceRef: { current: null as ChapterChangeSource },
+      contentRef: { current: makeContainer() },
+      getCurrentAnchorRef: { current: () => null },
+      getCurrentOriginalLocatorRef: { current: () => null },
+      getCurrentPagedLocatorRef: { current: () => null },
+      isScrollSyncSuppressedRef: { current: false },
+      preparePersistenceFlushRef: { current: () => undefined },
+      restoreSettledHandlerRef: { current: vi.fn() },
+      suppressScrollSyncTemporarilyRef: { current: vi.fn() },
+      ...overrides.uiBridge,
+    },
+    ...overrides,
+  } satisfies Parameters<typeof useReaderRestoreFlow>[0];
+}
+
 describe('useReaderRestoreFlow', () => {
   beforeEach(() => {
     resetReaderSessionStoreForTests();
   });
 
   it('reuses the shared restorable-position semantics for non-forced pending restore targets', () => {
-    const contextValue = createReaderContextValue();
-
-    const { result } = renderHook(() => useReaderRestoreFlow({
-      currentChapter: createCurrentChapter(),
-      summaryRestoreSignal: null,
-      isChapterAnalysisLoading: false,
-    }), {
-      wrapper: ({ children }: { children: ReactNode }) => ReaderContextProvider({
-        value: contextValue,
-        children,
-      }),
-    });
+    const { result } = renderHook(() => useReaderRestoreFlow(createHookProps()));
 
     act(() => {
       result.current.setPendingRestoreTarget(createRestoreTarget({
@@ -173,18 +156,7 @@ describe('useReaderRestoreFlow', () => {
   });
 
   it('keeps forced chapter-start restore targets so navigation restore still runs', () => {
-    const contextValue = createReaderContextValue();
-
-    const { result } = renderHook(() => useReaderRestoreFlow({
-      currentChapter: createCurrentChapter(),
-      summaryRestoreSignal: null,
-      isChapterAnalysisLoading: false,
-    }), {
-      wrapper: ({ children }: { children: ReactNode }) => ReaderContextProvider({
-        value: contextValue,
-        children,
-      }),
-    });
+    const { result } = renderHook(() => useReaderRestoreFlow(createHookProps()));
 
     act(() => {
       result.current.setPendingRestoreTarget(createRestoreTarget({
@@ -210,31 +182,38 @@ describe('useReaderRestoreFlow', () => {
     const getCurrentAnchorRef = {
       current: () => ({ chapterIndex: 5, chapterProgress: 0.4 } satisfies ScrollModeAnchor),
     };
-    let contextValue = createReaderContextValue({
-      chapterIndex: 5,
-      mode: 'scroll',
-      contentRef,
-      getCurrentAnchorRef,
-      getCurrentOriginalLocatorRef: { current: () => locator },
-      latestReaderStateRef,
-      markUserInteracted,
-      persistReaderState,
-      setChapterIndex,
-      setMode,
+    let hookProps = createHookProps({
+      sessionCommands: {
+        latestReaderStateRef,
+        markUserInteracted,
+        persistReaderState,
+        setChapterIndex,
+        setMode,
+      },
+      sessionSnapshot: {
+        chapterIndex: 5,
+        lastContentMode: 'scroll',
+        mode: 'scroll',
+        pendingRestoreTarget: null,
+        viewMode: 'original',
+      },
+      uiBridge: {
+        chapterChangeSourceRef: { current: null as ChapterChangeSource },
+        contentRef,
+        getCurrentAnchorRef,
+        getCurrentOriginalLocatorRef: { current: () => locator },
+        getCurrentPagedLocatorRef: { current: () => null },
+        isScrollSyncSuppressedRef: { current: false },
+        preparePersistenceFlushRef: { current: () => undefined },
+        restoreSettledHandlerRef: { current: vi.fn() },
+        suppressScrollSyncTemporarilyRef: { current: vi.fn() },
+      },
     });
 
     const { result, rerender } = renderHook(
-      ({ signal }: { signal: number }) => useReaderRestoreFlow({
-        currentChapter: createCurrentChapter(),
-        summaryRestoreSignal: signal,
-        isChapterAnalysisLoading: false,
-      }),
+      (props: Parameters<typeof useReaderRestoreFlow>[0]) => useReaderRestoreFlow(props),
       {
-        initialProps: { signal: 0 },
-        wrapper: ({ children }: { children: ReactNode }) => ReaderContextProvider({
-          value: contextValue,
-          children,
-        }),
+        initialProps: hookProps,
       },
     );
 
@@ -247,18 +226,35 @@ describe('useReaderRestoreFlow', () => {
       scrollHeight: 1000,
       clientHeight: 500,
     });
-    contextValue = createReaderContextValue({
-      chapterIndex: 5,
-      mode: 'summary',
-      contentRef,
-      getCurrentAnchorRef,
-      latestReaderStateRef,
-      markUserInteracted,
-      persistReaderState,
-      setChapterIndex,
-      setMode,
+    hookProps = createHookProps({
+      sessionCommands: {
+        latestReaderStateRef,
+        markUserInteracted,
+        persistReaderState,
+        setChapterIndex,
+        setMode,
+      },
+      sessionSnapshot: {
+        chapterIndex: 5,
+        lastContentMode: 'scroll',
+        mode: 'summary',
+        pendingRestoreTarget: null,
+        viewMode: 'summary',
+      },
+      summaryRestoreSignal: 1,
+      uiBridge: {
+        chapterChangeSourceRef: { current: null as ChapterChangeSource },
+        contentRef,
+        getCurrentAnchorRef,
+        getCurrentOriginalLocatorRef: { current: () => null },
+        getCurrentPagedLocatorRef: { current: () => null },
+        isScrollSyncSuppressedRef: { current: false },
+        preparePersistenceFlushRef: { current: () => undefined },
+        restoreSettledHandlerRef: { current: vi.fn() },
+        suppressScrollSyncTemporarilyRef: { current: vi.fn() },
+      },
     });
-    rerender({ signal: 1 });
+    rerender(hookProps);
 
     act(() => {
       result.current.handleSetViewMode('original');
@@ -276,9 +272,6 @@ describe('useReaderRestoreFlow', () => {
 
   it('prefers the latest persisted reader snapshot when capture runs during navigation', () => {
     const persistReaderState = vi.fn();
-    const chapterChangeSourceRef = {
-      current: 'navigation' as ChapterChangeSource,
-    };
     const latestReaderStateRef = {
       current: createStoredState({
         chapterIndex: 8,
@@ -287,28 +280,33 @@ describe('useReaderRestoreFlow', () => {
         }),
       }),
     };
-    const contextValue = createReaderContextValue({
-      latestReaderStateRef,
-      persistReaderState,
-      chapterChangeSourceRef,
-      getCurrentAnchorRef: {
-        current: () => ({ chapterIndex: 5, chapterProgress: 0.2 } satisfies ScrollModeAnchor),
-      },
-      getCurrentOriginalLocatorRef: {
-        current: () => createLocator(),
-      },
-    });
 
-    const { result } = renderHook(() => useReaderRestoreFlow({
-      currentChapter: createCurrentChapter(),
-      summaryRestoreSignal: null,
-      isChapterAnalysisLoading: false,
-    }), {
-      wrapper: ({ children }: { children: ReactNode }) => ReaderContextProvider({
-        value: contextValue,
-        children,
-      }),
-    });
+    const { result } = renderHook(() => useReaderRestoreFlow(createHookProps({
+      sessionCommands: {
+        latestReaderStateRef,
+        markUserInteracted: vi.fn(),
+        persistReaderState,
+        setChapterIndex: vi.fn(),
+        setMode: vi.fn(),
+      },
+      uiBridge: {
+        chapterChangeSourceRef: {
+          current: 'navigation' as ChapterChangeSource,
+        },
+        contentRef: { current: makeContainer() },
+        getCurrentAnchorRef: {
+          current: () => ({ chapterIndex: 5, chapterProgress: 0.2 } satisfies ScrollModeAnchor),
+        },
+        getCurrentOriginalLocatorRef: {
+          current: () => createLocator(),
+        },
+        getCurrentPagedLocatorRef: { current: () => null },
+        isScrollSyncSuppressedRef: { current: false },
+        preparePersistenceFlushRef: { current: () => undefined },
+        restoreSettledHandlerRef: { current: vi.fn() },
+        suppressScrollSyncTemporarilyRef: { current: vi.fn() },
+      },
+    })));
 
     let capturedState: StoredReaderState | null = null;
     act(() => {
@@ -329,90 +327,77 @@ describe('useReaderRestoreFlow', () => {
     });
   });
 
-  it('flushes the current reading position on pagehide and hidden visibility changes', () => {
+  it('registers a persistence-boundary callback that captures the current reading position', () => {
     const persistReaderState = vi.fn();
     const locator = createLocator();
-    const visibilityStateDescriptor = Object.getOwnPropertyDescriptor(
-      Document.prototype,
-      'visibilityState',
-    );
-    const contextValue = createReaderContextValue({
-      persistReaderState,
-      getCurrentAnchorRef: {
-        current: () => ({ chapterIndex: 5, chapterProgress: 0.6 } satisfies ScrollModeAnchor),
+    const preparePersistenceFlushRef = { current: () => undefined };
+
+    renderHook(() => useReaderRestoreFlow(createHookProps({
+      sessionCommands: {
+        latestReaderStateRef: { current: createStoredState() },
+        markUserInteracted: vi.fn(),
+        persistReaderState,
+        setChapterIndex: vi.fn(),
+        setMode: vi.fn(),
       },
-      getCurrentOriginalLocatorRef: {
-        current: () => locator,
+      uiBridge: {
+        chapterChangeSourceRef: { current: null as ChapterChangeSource },
+        contentRef: { current: makeContainer() },
+        getCurrentAnchorRef: {
+          current: () => ({ chapterIndex: 5, chapterProgress: 0.6 } satisfies ScrollModeAnchor),
+        },
+        getCurrentOriginalLocatorRef: {
+          current: () => locator,
+        },
+        getCurrentPagedLocatorRef: { current: () => null },
+        isScrollSyncSuppressedRef: { current: false },
+        preparePersistenceFlushRef,
+        restoreSettledHandlerRef: { current: vi.fn() },
+        suppressScrollSyncTemporarilyRef: { current: vi.fn() },
       },
+    })));
+
+    act(() => {
+      preparePersistenceFlushRef.current();
     });
 
-    renderHook(() => useReaderRestoreFlow({
-      currentChapter: createCurrentChapter(),
-      summaryRestoreSignal: null,
-      isChapterAnalysisLoading: false,
-    }), {
-      wrapper: ({ children }: { children: ReactNode }) => ReaderContextProvider({
-        value: contextValue,
-        children,
-      }),
-    });
-
-    window.dispatchEvent(new Event('pagehide'));
-
-    Object.defineProperty(Document.prototype, 'visibilityState', {
-      configurable: true,
-      get: () => 'hidden',
-    });
-
-    try {
-      document.dispatchEvent(new Event('visibilitychange'));
-    } finally {
-      if (visibilityStateDescriptor) {
-        Object.defineProperty(Document.prototype, 'visibilityState', visibilityStateDescriptor);
-      } else {
-        Reflect.deleteProperty(Document.prototype, 'visibilityState');
-      }
-    }
-
-    expect(persistReaderState).toHaveBeenNthCalledWith(1, expect.objectContaining({
+    expect(persistReaderState).toHaveBeenCalledWith(expect.objectContaining({
       chapterIndex: 5,
       locator,
       mode: 'scroll',
     }), {
-      flush: true,
-    });
-    expect(persistReaderState).toHaveBeenNthCalledWith(2, expect.objectContaining({
-      chapterIndex: 5,
-      locator,
-      mode: 'scroll',
-    }), {
-      flush: true,
+      flush: undefined,
     });
   });
 
-  it('captures and flushes the current reading position when the reader unmounts', () => {
+  it('captures the current reading position when the hook unmounts', () => {
     const persistReaderState = vi.fn();
     const locator = createLocator();
-    const contextValue = createReaderContextValue({
-      persistReaderState,
-      getCurrentAnchorRef: {
-        current: () => ({ chapterIndex: 5, chapterProgress: 0.55 } satisfies ScrollModeAnchor),
-      },
-      getCurrentOriginalLocatorRef: {
-        current: () => locator,
-      },
-    });
 
-    const { unmount } = renderHook(() => useReaderRestoreFlow({
-      currentChapter: createCurrentChapter(),
-      summaryRestoreSignal: null,
-      isChapterAnalysisLoading: false,
-    }), {
-      wrapper: ({ children }: { children: ReactNode }) => ReaderContextProvider({
-        value: contextValue,
-        children,
-      }),
-    });
+    const { unmount } = renderHook(() => useReaderRestoreFlow(createHookProps({
+      sessionCommands: {
+        latestReaderStateRef: { current: createStoredState() },
+        markUserInteracted: vi.fn(),
+        persistReaderState,
+        setChapterIndex: vi.fn(),
+        setMode: vi.fn(),
+      },
+      uiBridge: {
+        chapterChangeSourceRef: { current: null as ChapterChangeSource },
+        contentRef: { current: makeContainer() },
+        getCurrentAnchorRef: {
+          current: () => ({ chapterIndex: 5, chapterProgress: 0.55 } satisfies ScrollModeAnchor),
+        },
+        getCurrentOriginalLocatorRef: {
+          current: () => locator,
+        },
+        getCurrentPagedLocatorRef: { current: () => null },
+        isScrollSyncSuppressedRef: { current: false },
+        preparePersistenceFlushRef: { current: () => undefined },
+        restoreSettledHandlerRef: { current: vi.fn() },
+        suppressScrollSyncTemporarilyRef: { current: vi.fn() },
+      },
+    })));
 
     unmount();
 
@@ -421,30 +406,37 @@ describe('useReaderRestoreFlow', () => {
       locator,
       mode: 'scroll',
     }), {
-      flush: true,
+      flush: undefined,
     });
   });
 
   it('reports restore settle results when forced summary restore targets are skipped or completed', async () => {
     const onRestoreSettled = vi.fn();
-    const contextValue = createReaderContextValue({
-      mode: 'summary',
-      contentRef: { current: makeContainer() },
-      restoreSettledHandlerRef: { current: onRestoreSettled },
+    const hookProps = createHookProps({
+      sessionSnapshot: {
+        chapterIndex: 5,
+        lastContentMode: 'scroll',
+        mode: 'summary',
+        pendingRestoreTarget: null,
+        viewMode: 'summary',
+      },
+      uiBridge: {
+        chapterChangeSourceRef: { current: null as ChapterChangeSource },
+        contentRef: { current: makeContainer() },
+        getCurrentAnchorRef: { current: () => null },
+        getCurrentOriginalLocatorRef: { current: () => null },
+        getCurrentPagedLocatorRef: { current: () => null },
+        isScrollSyncSuppressedRef: { current: false },
+        preparePersistenceFlushRef: { current: () => undefined },
+        restoreSettledHandlerRef: { current: onRestoreSettled },
+        suppressScrollSyncTemporarilyRef: { current: vi.fn() },
+      },
     });
 
     const { result, rerender } = renderHook(
-      ({ signal }: { signal: number }) => useReaderRestoreFlow({
-        currentChapter: createCurrentChapter(),
-        summaryRestoreSignal: signal,
-        isChapterAnalysisLoading: false,
-      }),
+      (props: Parameters<typeof useReaderRestoreFlow>[0]) => useReaderRestoreFlow(props),
       {
-        initialProps: { signal: 0 },
-        wrapper: ({ children }: { children: ReactNode }) => ReaderContextProvider({
-          value: contextValue,
-          children,
-        }),
+        initialProps: hookProps,
       },
     );
 
@@ -455,11 +447,20 @@ describe('useReaderRestoreFlow', () => {
       }, { force: true });
     });
 
-    await act(async () => {
-      await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+    rerender({
+      ...hookProps,
+      sessionSnapshot: {
+        ...hookProps.sessionSnapshot,
+        pendingRestoreTarget: {
+          chapterIndex: 5,
+          mode: 'summary',
+        },
+      },
     });
 
-    expect(onRestoreSettled).toHaveBeenCalledWith('skipped');
+    await waitFor(() => {
+      expect(onRestoreSettled).toHaveBeenCalledWith('skipped');
+    });
 
     act(() => {
       result.current.setPendingRestoreTarget(createRestoreTarget({
@@ -468,7 +469,17 @@ describe('useReaderRestoreFlow', () => {
       }), { force: true });
     });
 
-    rerender({ signal: 1 });
+    rerender({
+      ...hookProps,
+      sessionSnapshot: {
+        ...hookProps.sessionSnapshot,
+        pendingRestoreTarget: createRestoreTarget({
+          mode: 'summary',
+          chapterProgress: 0.5,
+        }),
+      },
+      summaryRestoreSignal: 1,
+    });
 
     await act(async () => {
       await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));

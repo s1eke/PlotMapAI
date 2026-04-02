@@ -157,25 +157,6 @@ export function useReaderStatePersistence(novelId: number): {
     markUserInteracted();
   }, []);
 
-  useEffect(() => {
-    if (!novelId) return undefined;
-    const handlePageHide = () => {
-      flushReaderState();
-    };
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') {
-        flushReaderState();
-      }
-    };
-    window.addEventListener('pagehide', handlePageHide);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => {
-      window.removeEventListener('pagehide', handlePageHide);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      flushReaderState();
-    };
-  }, [flushReaderState, novelId]);
-
   return {
     latestReaderStateRef,
     hasUserInteractedRef,

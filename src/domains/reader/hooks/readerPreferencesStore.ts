@@ -1,6 +1,10 @@
 import type { ReaderAppearanceState } from '@shared/stores/readerAppearanceStore';
 import type { ReaderPageTurnMode } from '../constants/pageTurnMode';
 
+import { useStore } from 'zustand';
+import { subscribeWithSelector } from 'zustand/middleware';
+import { createStore, type StoreApi } from 'zustand/vanilla';
+
 import { APP_SETTING_KEYS, CACHE_KEYS, storage } from '@infra/storage';
 import { mergeReaderStateCacheSnapshot } from '@infra/storage/readerStateCache';
 import {
@@ -12,9 +16,9 @@ import {
   setReaderAppearanceNovelId,
   setReaderAppearanceTheme,
 } from '@shared/stores/readerAppearanceStore';
-import { useStore } from 'zustand';
-import { subscribeWithSelector } from 'zustand/middleware';
-import { createStore, type StoreApi } from 'zustand/vanilla';
+import {
+  createPersistedRuntime,
+} from '@shared/stores/persistence/createPersistedRuntime';
 
 const DEFAULT_PAGE_TURN_MODE: ReaderPageTurnMode = 'scroll';
 const DEFAULT_FONT_SIZE = 18;
@@ -23,17 +27,17 @@ const DEFAULT_PARAGRAPH_SPACING = 16;
 const PREFERENCE_PERSIST_DELAY_MS = 80;
 
 export interface ReaderPreferencesState {
-  readerTheme: ReaderAppearanceState['readerTheme'];
-  pageTurnMode: ReaderPageTurnMode;
   fontSize: number;
   lineSpacing: number;
+  pageTurnMode: ReaderPageTurnMode;
   paragraphSpacing: number;
+  readerTheme: ReaderAppearanceState['readerTheme'];
 }
 
 interface ReaderPreferenceValues {
-  pageTurnMode: ReaderPageTurnMode;
   fontSize: number;
   lineSpacing: number;
+  pageTurnMode: ReaderPageTurnMode;
   paragraphSpacing: number;
 }
 
@@ -43,12 +47,6 @@ interface ReaderPreferencesStoreState extends ReaderPreferenceValues {
 
 type ReaderPreferencesStore = StoreApi<ReaderPreferencesStoreState>;
 
-let settingsHydrationPromise: Promise<void> | null = null;
-let settingsHydrated = false;
-let settingsPersistQueue: Promise<void> = Promise.resolve();
-let settingsPersistTimerId: number | null = null;
-let preferenceRevision = 0;
-let preferenceStoreEpoch = 0;
 let hasConfiguredPageTurnModePreference =
   storage.cache.getString(CACHE_KEYS.readerPageTurnMode) !== null;
 
@@ -91,6 +89,30 @@ function createInitialReaderPreferencesState(): ReaderPreferencesStoreState {
   };
 }
 
+function mergeReaderPreferencesState(
+  currentState: ReaderPreferencesStoreState,
+  partial: Partial<ReaderPreferencesStoreState>,
+): ReaderPreferencesStoreState {
+  const nextState: ReaderPreferencesStoreState = { ...currentState };
+  const nextStateRecord = nextState as Record<
+    keyof ReaderPreferencesStoreState,
+    ReaderPreferencesStoreState[keyof ReaderPreferencesStoreState]
+  >;
+
+  for (const [key, value] of Object.entries(partial) as Array<
+    [
+      keyof ReaderPreferencesStoreState,
+      ReaderPreferencesStoreState[keyof ReaderPreferencesStoreState],
+    ]
+  >) {
+    if (value !== undefined) {
+      nextStateRecord[key] = value;
+    }
+  }
+
+  return nextState;
+}
+
 export function createReaderPreferencesStore(): ReaderPreferencesStore {
   return createStore<ReaderPreferencesStoreState>()(
     subscribeWithSelector(() => createInitialReaderPreferencesState()),
@@ -119,49 +141,19 @@ function writeReaderPreferencesCache(state: ReaderPreferencesStoreState): void {
   }
 }
 
-function setReaderPreferencesStoreState(
-  partial: Partial<ReaderPreferencesStoreState>,
-  options: { writeCache?: boolean } = {},
-): void {
-  const currentState = readerPreferencesStore.getState();
-  const nextState: ReaderPreferencesStoreState = { ...currentState };
-  const nextStateRecord = nextState as Record<
-    keyof ReaderPreferencesStoreState,
-    ReaderPreferencesStoreState[keyof ReaderPreferencesStoreState]
-  >;
-
-  for (const [key, value] of Object.entries(partial) as Array<
-    [
-      keyof ReaderPreferencesStoreState,
-      ReaderPreferencesStoreState[keyof ReaderPreferencesStoreState],
-    ]
-  >) {
-    if (value !== undefined) {
-      nextStateRecord[key] = value;
-    }
-  }
-
-  readerPreferencesStore.setState(nextState);
-  if (options.writeCache !== false) {
-    writeReaderPreferencesCache(nextState);
-  }
-}
-
-async function persistReaderPreferences(
-  preferences: ReaderPreferenceValues,
-): Promise<void> {
+async function persistReaderPreferences(state: ReaderPreferencesStoreState): Promise<void> {
   await Promise.all([
-    storage.primary.settings.set(APP_SETTING_KEYS.readerPageTurnMode, preferences.pageTurnMode),
-    storage.primary.settings.set(APP_SETTING_KEYS.readerFontSize, preferences.fontSize),
-    storage.primary.settings.set(APP_SETTING_KEYS.readerLineSpacing, preferences.lineSpacing),
+    storage.primary.settings.set(APP_SETTING_KEYS.readerPageTurnMode, state.pageTurnMode),
+    storage.primary.settings.set(APP_SETTING_KEYS.readerFontSize, state.fontSize),
+    storage.primary.settings.set(APP_SETTING_KEYS.readerLineSpacing, state.lineSpacing),
     storage.primary.settings.set(
       APP_SETTING_KEYS.readerParagraphSpacing,
-      preferences.paragraphSpacing,
+      state.paragraphSpacing,
     ),
   ]);
 }
 
-async function loadPrimaryPreferenceState(): Promise<ReaderPreferenceValues> {
+async function loadPrimaryPreferenceState(): Promise<Partial<ReaderPreferencesStoreState>> {
   const cached = readCachedReaderPreferences();
 
   try {
@@ -190,7 +182,15 @@ async function loadPrimaryPreferenceState(): Promise<ReaderPreferenceValues> {
       || lineSpacing === null
       || paragraphSpacing === null
     ) {
-      await persistReaderPreferences(resolved).catch(() => undefined);
+      await Promise.all([
+        storage.primary.settings.set(APP_SETTING_KEYS.readerPageTurnMode, resolved.pageTurnMode),
+        storage.primary.settings.set(APP_SETTING_KEYS.readerFontSize, resolved.fontSize),
+        storage.primary.settings.set(APP_SETTING_KEYS.readerLineSpacing, resolved.lineSpacing),
+        storage.primary.settings.set(
+          APP_SETTING_KEYS.readerParagraphSpacing,
+          resolved.paragraphSpacing,
+        ),
+      ]).catch(() => undefined);
     }
 
     return resolved;
@@ -210,90 +210,30 @@ function getReaderPreferencesSnapshotState(): ReaderPreferenceValues {
   };
 }
 
-function scheduleReaderPreferencesPersistence(): void {
-  if (!isBrowser()) {
-    return;
-  }
-
-  if (settingsPersistTimerId !== null) {
-    window.clearTimeout(settingsPersistTimerId);
-  }
-
-  settingsPersistTimerId = window.setTimeout(() => {
-    settingsPersistTimerId = null;
-    const snapshot = getReaderPreferencesSnapshotState();
-    const revisionAtSchedule = preferenceRevision;
-    const epochAtSchedule = preferenceStoreEpoch;
-    settingsPersistQueue = settingsPersistQueue
-      .then(async () => {
-        if (epochAtSchedule !== preferenceStoreEpoch) {
-          return;
-        }
-        if (revisionAtSchedule !== preferenceRevision) {
-          return;
-        }
-
-        await persistReaderPreferences(snapshot);
-      })
-      .catch(() => undefined);
-  }, PREFERENCE_PERSIST_DELAY_MS);
-}
+const readerPreferencesRuntime = createPersistedRuntime<ReaderPreferencesStoreState>({
+  createInitialState: createInitialReaderPreferencesState,
+  hydrate: async () => loadPrimaryPreferenceState(),
+  isEnabled: isBrowser,
+  mergeState: mergeReaderPreferencesState,
+  onReset: () => {
+    hasConfiguredPageTurnModePreference =
+      readStringCache(CACHE_KEYS.readerPageTurnMode) !== null;
+    resetReaderAppearanceStoreForTests();
+  },
+  persist: persistReaderPreferences,
+  persistDelayMs: PREFERENCE_PERSIST_DELAY_MS,
+  store: readerPreferencesStore,
+  writeCache: writeReaderPreferencesCache,
+});
 
 export async function flushReaderPreferencesPersistence(): Promise<void> {
-  if (settingsPersistTimerId !== null && isBrowser()) {
-    window.clearTimeout(settingsPersistTimerId);
-    settingsPersistTimerId = null;
-    const snapshot = getReaderPreferencesSnapshotState();
-    const epochAtFlush = preferenceStoreEpoch;
-    settingsPersistQueue = settingsPersistQueue
-      .then(async () => {
-        if (epochAtFlush !== preferenceStoreEpoch) {
-          return;
-        }
-        await persistReaderPreferences(snapshot);
-      })
-      .catch(() => undefined);
-  }
-
-  await settingsPersistQueue;
+  await readerPreferencesRuntime.flush();
   await flushReaderAppearancePersistence();
 }
 
 export async function ensureReaderPreferencesHydrated(): Promise<void> {
   await ensureReaderAppearanceHydrated();
-  if (!isBrowser() || settingsHydrated) {
-    return;
-  }
-
-  if (settingsHydrationPromise) {
-    return settingsHydrationPromise;
-  }
-
-  const epochAtStart = preferenceStoreEpoch;
-  const revisionAtStart = preferenceRevision;
-  const hydrationPromise = (async () => {
-    const preferences = await loadPrimaryPreferenceState();
-    if (epochAtStart !== preferenceStoreEpoch) {
-      return;
-    }
-    if (revisionAtStart === preferenceRevision) {
-      setReaderPreferencesStoreState(preferences);
-    }
-    settingsHydrated = true;
-  })().catch(() => {
-    if (epochAtStart === preferenceStoreEpoch) {
-      settingsHydrated = true;
-    }
-  });
-
-  const trackedPromise = hydrationPromise.finally(() => {
-    if (settingsHydrationPromise === trackedPromise) {
-      settingsHydrationPromise = null;
-    }
-  });
-  settingsHydrationPromise = trackedPromise;
-
-  return trackedPromise;
+  await readerPreferencesRuntime.hydrate();
 }
 
 export function setReaderTheme(theme: string): void {
@@ -301,10 +241,11 @@ export function setReaderTheme(theme: string): void {
 }
 
 export function setReaderPageTurnMode(mode: ReaderPageTurnMode): void {
-  preferenceRevision += 1;
   hasConfiguredPageTurnModePreference = true;
-  setReaderPreferencesStoreState({ pageTurnMode: mode });
-  scheduleReaderPreferencesPersistence();
+  readerPreferencesRuntime.patch({ pageTurnMode: mode }, {
+    bumpRevision: true,
+    persist: true,
+  });
 }
 
 export function setTypography(nextState: {
@@ -313,13 +254,14 @@ export function setTypography(nextState: {
   paragraphSpacing?: number;
 }): void {
   const currentState = readerPreferencesStore.getState();
-  preferenceRevision += 1;
-  setReaderPreferencesStoreState({
+  readerPreferencesRuntime.patch({
     fontSize: nextState.fontSize ?? currentState.fontSize,
     lineSpacing: nextState.lineSpacing ?? currentState.lineSpacing,
     paragraphSpacing: nextState.paragraphSpacing ?? currentState.paragraphSpacing,
+  }, {
+    bumpRevision: true,
+    persist: true,
   });
-  scheduleReaderPreferencesPersistence();
 }
 
 export function setReaderPreferencesNovelId(novelId: number): void {
@@ -328,7 +270,7 @@ export function setReaderPreferencesNovelId(novelId: number): void {
     return;
   }
 
-  setReaderPreferencesStoreState({ activeNovelId: novelId }, { writeCache: false });
+  readerPreferencesRuntime.patch({ activeNovelId: novelId }, { writeCache: false });
 }
 
 export function applyHydratedReaderPreferences(
@@ -340,27 +282,16 @@ export function applyHydratedReaderPreferences(
     hasConfiguredPageTurnModePreference = true;
   }
 
-  setReaderPreferencesStoreState(storeState);
+  readerPreferencesRuntime.patch(storeState, {
+    flush: options.persistPrimary,
+    persist: options.persistPrimary,
+  });
+
   if (readerTheme !== undefined) {
     applyHydratedReaderAppearance(readerTheme, {
       persistPrimary: options.persistPrimary,
     });
   }
-
-  if (!options.persistPrimary) {
-    return;
-  }
-
-  const snapshot = getReaderPreferencesSnapshotState();
-  const epochAtSchedule = preferenceStoreEpoch;
-  settingsPersistQueue = settingsPersistQueue
-    .then(async () => {
-      if (epochAtSchedule !== preferenceStoreEpoch) {
-        return;
-      }
-      await persistReaderPreferences(snapshot);
-    })
-    .catch(() => undefined);
 }
 
 export function hasConfiguredReaderPageTurnMode(): boolean {
@@ -381,18 +312,5 @@ export function useReaderPreferencesSelector<T>(
 }
 
 export function resetReaderPreferencesStoreForTests(): void {
-  preferenceStoreEpoch += 1;
-  if (settingsPersistTimerId !== null && isBrowser()) {
-    window.clearTimeout(settingsPersistTimerId);
-    settingsPersistTimerId = null;
-  }
-
-  settingsHydrationPromise = null;
-  settingsHydrated = false;
-  settingsPersistQueue = Promise.resolve();
-  preferenceRevision = 0;
-  hasConfiguredPageTurnModePreference = readStringCache(CACHE_KEYS.readerPageTurnMode) !== null;
-  resetReaderAppearanceStoreForTests();
-
-  readerPreferencesStore.setState(createInitialReaderPreferencesState());
+  readerPreferencesRuntime.reset();
 }

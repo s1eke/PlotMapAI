@@ -119,6 +119,19 @@ import {
 import { createDeterministicScrollLayout } from '../../test/deterministicRenderCacheStub';
 import { useScrollReaderController } from '../useScrollReaderController';
 
+interface ScrollControllerHarness extends ReaderContextValue {
+  chapterIndex: number;
+  hasUserInteractedRef: { current: boolean };
+  latestReaderStateRef: { current: Record<string, unknown> };
+  loadPersistedReaderState: ReturnType<typeof vi.fn>;
+  markUserInteracted: ReturnType<typeof vi.fn>;
+  mode: 'paged' | 'scroll' | 'summary';
+  persistReaderState: ReturnType<typeof vi.fn>;
+  setChapterIndex: ReturnType<typeof vi.fn>;
+  setMode: ReturnType<typeof vi.fn>;
+  viewMode: 'original' | 'summary';
+}
+
 function createAnimationFrameController() {
   const frameCallbacks: Array<FrameRequestCallback | null> = [];
   const requestAnimationFrameSpy = vi
@@ -248,72 +261,98 @@ function makeChapterBodyElement({
 }
 
 function createReaderContextValue(
-  overrides: Partial<ReaderContextValue> = {},
-): ReaderContextValue {
+  overrides: Partial<ScrollControllerHarness> = {},
+): ScrollControllerHarness {
   const mode = overrides.mode ?? 'scroll';
 
   return {
-    novelId: 1,
     chapterIndex: overrides.chapterIndex ?? 1,
-    mode,
-    viewMode: overrides.viewMode ?? (mode === 'summary' ? 'summary' : 'original'),
-    isPagedMode: overrides.isPagedMode ?? mode === 'paged',
-    setChapterIndex: overrides.setChapterIndex ?? vi.fn(),
-    setMode: overrides.setMode ?? vi.fn(),
-    latestReaderStateRef: { current: {} },
-    hasUserInteractedRef: { current: false },
-    markUserInteracted: vi.fn(),
-    persistReaderState: vi.fn(),
-    loadPersistedReaderState: vi.fn(async () => ({})),
-    contentRef: { current: makeContainer() },
-    pagedViewportRef: { current: null },
-    pageTargetRef: { current: null },
-    wheelDeltaRef: { current: 0 },
-    pageTurnLockedRef: { current: false },
     chapterCacheRef: { current: new Map() },
-    scrollChapterElementsBridgeRef: { current: new Map() },
-    scrollChapterBodyElementsBridgeRef: { current: new Map() },
     chapterChangeSourceRef: { current: null as ChapterChangeSource },
-    pagedStateRef: { current: { pageCount: 1, pageIndex: 0 } },
-    restoreSettledHandlerRef: { current: vi.fn() },
-    isScrollSyncSuppressedRef: { current: false },
-    suppressScrollSyncTemporarilyRef: { current: vi.fn() },
+    contentRef: { current: makeContainer() },
     getCurrentAnchorRef: { current: () => null },
-    handleScrollModeScrollRef: { current: vi.fn() },
-    readingAnchorHandlerRef: { current: vi.fn() },
     getCurrentOriginalLocatorRef: { current: () => null },
     getCurrentPagedLocatorRef: { current: () => null },
+    hasUserInteractedRef: { current: false },
+    isScrollSyncSuppressedRef: { current: false },
+    latestReaderStateRef: { current: {} },
+    loadPersistedReaderState: vi.fn(async () => ({})),
+    markUserInteracted: vi.fn(),
+    mode,
+    pagedStateRef: { current: { pageCount: 1, pageIndex: 0 } },
+    pagedViewportRef: { current: null },
+    pageTargetRef: { current: null },
+    pageTurnLockedRef: { current: false },
+    persistReaderState: vi.fn(),
+    preparePersistenceFlushRef: { current: () => undefined },
     resolveScrollLocatorOffsetRef: { current: () => null },
+    restoreSettledHandlerRef: { current: vi.fn() },
+    scrollChapterBodyElementsBridgeRef: { current: new Map() },
+    scrollChapterElementsBridgeRef: { current: new Map() },
+    setChapterIndex: vi.fn(),
+    setMode: vi.fn(),
+    suppressScrollSyncTemporarilyRef: { current: vi.fn() },
+    viewMode: overrides.viewMode ?? (mode === 'summary' ? 'summary' : 'original'),
+    wheelDeltaRef: { current: 0 },
     ...overrides,
   };
 }
 
-function createHookProps(overrides: Partial<Parameters<typeof useScrollReaderController>[0]> = {}) {
-  const chapters = overrides.chapters ?? [
+interface CreateHookPropsOptions extends Partial<Parameters<typeof useScrollReaderController>[0]> {
+  harness?: ScrollControllerHarness;
+}
+
+function createHookProps(overrides: CreateHookPropsOptions = {}) {
+  const {
+    harness = createReaderContextValue(),
+    ...hookOverrides
+  } = overrides;
+  const chapters = hookOverrides.chapters ?? [
     { index: 0, title: 'Chapter 1', wordCount: 100 },
     { index: 1, title: 'Chapter 2', wordCount: 100 },
     { index: 2, title: 'Chapter 3', wordCount: 100 },
     { index: 3, title: 'Chapter 4', wordCount: 100 },
   ];
-  const currentChapter = overrides.currentChapter ?? createChapter(1, chapters.length);
+  const currentChapter = hookOverrides.currentChapter ?? createChapter(1, chapters.length);
 
   return {
     enabled: true,
     chapters,
-    currentChapter,
     contentVersion: 0,
+    currentChapter,
     fetchChapterContent: vi.fn(async (index: number) => createChapter(index, chapters.length)),
-    preloadAdjacent: vi.fn(),
+    novelId: 1,
+    pendingRestoreTarget: null as ReaderRestoreTarget | null,
+    pendingRestoreTargetRef: { current: null as ReaderRestoreTarget | null },
     preferences: {
       fontSize: 18,
       lineSpacing: 1.8,
       paragraphSpacing: 16,
     },
-    pendingRestoreTarget: null as ReaderRestoreTarget | null,
-    pendingRestoreTargetRef: { current: null as ReaderRestoreTarget | null },
-    clearPendingRestoreTarget: vi.fn(),
+    preloadAdjacent: vi.fn(),
+    sessionCommands: {
+      persistReaderState: harness.persistReaderState,
+      setChapterIndex: harness.setChapterIndex,
+    },
+    sessionSnapshot: {
+      chapterIndex: harness.chapterIndex,
+    },
     stopRestoreMask: vi.fn(),
-    ...overrides,
+    clearPendingRestoreTarget: vi.fn(),
+    uiBridge: {
+      chapterCacheRef: harness.chapterCacheRef,
+      chapterChangeSourceRef: harness.chapterChangeSourceRef,
+      contentRef: harness.contentRef,
+      getCurrentAnchorRef: harness.getCurrentAnchorRef,
+      getCurrentOriginalLocatorRef: harness.getCurrentOriginalLocatorRef,
+      isScrollSyncSuppressedRef: harness.isScrollSyncSuppressedRef,
+      resolveScrollLocatorOffsetRef: harness.resolveScrollLocatorOffsetRef,
+      restoreSettledHandlerRef: harness.restoreSettledHandlerRef,
+      scrollChapterBodyElementsBridgeRef: harness.scrollChapterBodyElementsBridgeRef,
+      scrollChapterElementsBridgeRef: harness.scrollChapterElementsBridgeRef,
+      suppressScrollSyncTemporarilyRef: harness.suppressScrollSyncTemporarilyRef,
+    },
+    ...hookOverrides,
   };
 }
 
@@ -345,6 +384,7 @@ describe('useScrollReaderController', () => {
       ],
       currentChapter,
       fetchChapterContent,
+      harness: contextValue,
     });
 
     const { result, rerender } = renderHook(
@@ -416,6 +456,7 @@ describe('useScrollReaderController', () => {
       ],
       currentChapter,
       contentVersion: 0,
+      harness: contextValue,
     });
 
     const { result, rerender } = renderHook(
@@ -493,6 +534,7 @@ describe('useScrollReaderController', () => {
       ],
       currentChapter,
       contentVersion: 0,
+      harness: contextValue,
     });
 
     const { result, rerender } = renderHook(
@@ -548,7 +590,7 @@ describe('useScrollReaderController', () => {
       chapterChangeSourceRef,
       persistReaderState,
     });
-    const props = createHookProps();
+    const props = createHookProps({ harness: contextValue });
 
     renderHook(() => useScrollReaderController(props), {
       wrapper: ({ children }: { children: ReactNode }) => ReaderContextProvider({
@@ -579,7 +621,7 @@ describe('useScrollReaderController', () => {
       persistReaderState,
       isScrollSyncSuppressedRef,
     });
-    const props = createHookProps();
+    const props = createHookProps({ harness: contextValue });
 
     const { result } = renderHook(() => useScrollReaderController(props), {
       wrapper: ({ children }: { children: ReactNode }) => ReaderContextProvider({
@@ -632,6 +674,7 @@ describe('useScrollReaderController', () => {
       },
       clearPendingRestoreTarget,
       stopRestoreMask,
+      harness: contextValue,
     });
 
     try {
@@ -706,6 +749,7 @@ describe('useScrollReaderController', () => {
       },
       clearPendingRestoreTarget,
       stopRestoreMask,
+      harness: contextValue,
     });
 
     try {
@@ -788,6 +832,7 @@ describe('useScrollReaderController', () => {
       },
       clearPendingRestoreTarget,
       stopRestoreMask,
+      harness: contextValue,
     });
 
     try {
@@ -847,6 +892,7 @@ describe('useScrollReaderController', () => {
       pendingRestoreTargetRef,
       clearPendingRestoreTarget,
       stopRestoreMask,
+      harness: contextValue,
     });
 
     try {
@@ -918,6 +964,7 @@ describe('useScrollReaderController', () => {
     const props = createHookProps({
       chapters: [{ index: 0, title: 'Chapter 1', wordCount: 100 }],
       currentChapter,
+      harness: contextValue,
     });
 
     try {
@@ -986,6 +1033,7 @@ describe('useScrollReaderController', () => {
     const props = createHookProps({
       chapters: [{ index: 0, title: 'Chapter 1', wordCount: 100 }],
       currentChapter,
+      harness: contextValue,
     });
 
     try {

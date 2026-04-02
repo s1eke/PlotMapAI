@@ -23,7 +23,22 @@ const HEADER_BG_MAP: Record<string, string> = {
   night: 'bg-[#1a1a1a]',
 };
 
-export function useReaderPreferences() {
+export interface UseReaderPreferencesResult {
+  currentTheme: typeof READER_THEMES.auto;
+  fontSize: number;
+  headerBg: string;
+  lineSpacing: number;
+  pageTurnMode: ReaderPageTurnMode;
+  paragraphSpacing: number;
+  readerTheme: string;
+  setFontSize: (nextFontSize: number) => void;
+  setLineSpacing: (nextLineSpacing: number) => void;
+  setPageTurnMode: (nextPageTurnMode: ReaderPageTurnMode) => void;
+  setParagraphSpacing: (nextParagraphSpacing: number) => void;
+  setReaderTheme: (nextReaderTheme: string) => void;
+}
+
+export function useReaderPreferences(): UseReaderPreferencesResult {
   useEffect(() => {
     const hydratePreferences = async () => {
       await Promise.all([

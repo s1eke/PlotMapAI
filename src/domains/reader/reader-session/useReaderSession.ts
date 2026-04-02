@@ -1,6 +1,6 @@
 import type { ReaderMode, ReaderRestoreTarget, RestoreStatus, StoredReaderState } from '../hooks/readerSessionTypes';
 
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 
 import {
   getReaderSessionSnapshot,
@@ -11,8 +11,6 @@ import {
 } from '../hooks/sessionStore';
 import { useReaderStatePersistence } from '../hooks/useReaderStatePersistence';
 import { getReaderViewMode, isPagedReaderMode } from '../utils/readerMode';
-import { setReaderPreferencesNovelId } from '../hooks/readerPreferencesStore';
-import { setAppThemeNovelId } from '@shared/stores/appThemeStore';
 
 export interface ReaderSessionSnapshot {
   novelId: number;
@@ -57,11 +55,6 @@ export function useReaderSession(novelId: number): UseReaderSessionResult {
   const viewMode = getReaderViewMode(mode);
   const isPagedMode = isPagedReaderMode(mode);
   const contentMode = mode === 'summary' ? lastContentMode : mode;
-
-  useEffect(() => {
-    setReaderPreferencesNovelId(novelId);
-    setAppThemeNovelId(novelId);
-  }, [novelId]);
 
   const setChapterIndex = useCallback((nextState: React.SetStateAction<number>) => {
     const current = getReaderSessionSnapshot().chapterIndex;

@@ -9,7 +9,7 @@ import {
   calculateVisibleScrollBlockRanges,
   resolveCurrentScrollLocator,
   resolveCurrentScrollLocatorOffset,
-} from '../reader-layout';
+} from '../reader-layout/viewportLocators';
 import { useReaderRenderCache } from './useReaderRenderCache';
 import { useScrollModeChapters } from './useScrollModeChapters';
 import { getChapterBoundaryLocator } from '../utils/readerLayout';
@@ -17,7 +17,6 @@ import {
   canSkipReaderRestore,
   SCROLL_READING_ANCHOR_RATIO,
 } from '../utils/readerPosition';
-import { useReaderContext } from '../pages/reader-page/ReaderContext';
 
 interface ScrollReaderControllerPreferences {
   fontSize: number;
@@ -31,12 +30,12 @@ interface UseScrollReaderControllerParams {
   chapters: Chapter[];
   currentChapter: ChapterContent | null;
   contentVersion: number;
-  sessionSnapshot?: Pick<ReaderSessionSnapshot, 'chapterIndex'>;
-  sessionCommands?: Pick<
+  sessionSnapshot: Pick<ReaderSessionSnapshot, 'chapterIndex'>;
+  sessionCommands: Pick<
     ReaderSessionCommands,
     'persistReaderState' | 'setChapterIndex'
   >;
-  uiBridge?: Pick<
+  uiBridge: Pick<
     ReaderUiBridgeValue,
     | 'chapterCacheRef'
     | 'chapterChangeSourceRef'
@@ -161,14 +160,11 @@ export function useScrollReaderController({
   clearPendingRestoreTarget,
   stopRestoreMask,
 }: UseScrollReaderControllerParams): UseScrollReaderControllerResult {
-  const readerContext = useReaderContext();
-  const { chapterIndex } = sessionSnapshot ?? {
-    chapterIndex: readerContext.chapterIndex ?? 0,
-  };
+  const { chapterIndex } = sessionSnapshot;
   const {
-    persistReaderState = () => undefined,
-    setChapterIndex = () => undefined,
-  } = sessionCommands ?? readerContext;
+    persistReaderState,
+    setChapterIndex,
+  } = sessionCommands;
   const {
     chapterCacheRef,
     chapterChangeSourceRef,
@@ -181,7 +177,7 @@ export function useScrollReaderController({
     scrollChapterBodyElementsBridgeRef,
     scrollChapterElementsBridgeRef,
     suppressScrollSyncTemporarilyRef,
-  } = uiBridge ?? readerContext;
+  } = uiBridge;
   const navigationSourceRef = chapterChangeSourceRef;
   const [scrollModeChapters, setScrollModeChapters] = useState<number[]>([]);
   const [visibleScrollBlockRangeByChapter, setVisibleScrollBlockRangeByChapter] =

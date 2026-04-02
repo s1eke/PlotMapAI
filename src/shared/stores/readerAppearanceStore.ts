@@ -6,6 +6,9 @@ import { createStore } from 'zustand/vanilla';
 
 import { APP_SETTING_KEYS, CACHE_KEYS, storage } from '@infra/storage';
 import { mergeReaderStateCacheSnapshot } from '@infra/storage/readerStateCache';
+import {
+  createPersistedRuntime,
+} from '@shared/stores/persistence/createPersistedRuntime';
 
 const DEFAULT_READER_THEME = 'auto';
 const APPEARANCE_PERSIST_DELAY_MS = 80;
@@ -19,13 +22,6 @@ interface ReaderAppearanceStoreState extends ReaderAppearanceState {
 }
 
 type ReaderAppearanceStore = StoreApi<ReaderAppearanceStoreState>;
-
-let appearanceHydrationPromise: Promise<void> | null = null;
-let appearanceHydrated = false;
-let appearancePersistQueue: Promise<void> = Promise.resolve();
-let appearancePersistTimerId: number | null = null;
-let appearanceRevision = 0;
-let appearanceStoreEpoch = 0;
 
 function isBrowser(): boolean {
   return typeof window !== 'undefined';
@@ -63,26 +59,11 @@ function writeReaderAppearanceCache(state: ReaderAppearanceStoreState): void {
   }
 }
 
-function setReaderAppearanceStoreState(
-  partial: Partial<ReaderAppearanceStoreState>,
-  options: { writeCache?: boolean } = {},
-): void {
-  const nextState = {
-    ...readerAppearanceStore.getState(),
-    ...partial,
-  };
-
-  readerAppearanceStore.setState(nextState);
-  if (options.writeCache !== false) {
-    writeReaderAppearanceCache(nextState);
-  }
+async function persistReaderTheme(state: ReaderAppearanceStoreState): Promise<void> {
+  await storage.primary.settings.set(APP_SETTING_KEYS.readerTheme, state.readerTheme);
 }
 
-async function persistReaderTheme(readerTheme: string): Promise<void> {
-  await storage.primary.settings.set(APP_SETTING_KEYS.readerTheme, readerTheme);
-}
-
-async function loadPrimaryReaderTheme(): Promise<string> {
+async function loadPrimaryReaderTheme(): Promise<Partial<ReaderAppearanceStoreState>> {
   const cachedTheme = readCachedReaderTheme();
 
   try {
@@ -92,104 +73,40 @@ async function loadPrimaryReaderTheme(): Promise<string> {
       : cachedTheme;
 
     if (storedTheme === null) {
-      await persistReaderTheme(resolvedTheme).catch(() => undefined);
+      await storage.primary.settings
+        .set(APP_SETTING_KEYS.readerTheme, resolvedTheme)
+        .catch(() => undefined);
     }
 
-    return resolvedTheme;
+    return { readerTheme: resolvedTheme };
   } catch {
-    return cachedTheme;
+    return { readerTheme: cachedTheme };
   }
 }
 
-function scheduleReaderAppearancePersistence(): void {
-  if (!isBrowser()) {
-    return;
-  }
-
-  if (appearancePersistTimerId !== null) {
-    window.clearTimeout(appearancePersistTimerId);
-  }
-
-  appearancePersistTimerId = window.setTimeout(() => {
-    appearancePersistTimerId = null;
-    const snapshot = readerAppearanceStore.getState().readerTheme;
-    const revisionAtSchedule = appearanceRevision;
-    const epochAtSchedule = appearanceStoreEpoch;
-    appearancePersistQueue = appearancePersistQueue
-      .then(async () => {
-        if (epochAtSchedule !== appearanceStoreEpoch) {
-          return;
-        }
-        if (revisionAtSchedule !== appearanceRevision) {
-          return;
-        }
-
-        await persistReaderTheme(snapshot);
-      })
-      .catch(() => undefined);
-  }, APPEARANCE_PERSIST_DELAY_MS);
-}
+const readerAppearanceRuntime = createPersistedRuntime<ReaderAppearanceStoreState>({
+  createInitialState: createInitialReaderAppearanceState,
+  hydrate: async () => loadPrimaryReaderTheme(),
+  isEnabled: isBrowser,
+  persist: persistReaderTheme,
+  persistDelayMs: APPEARANCE_PERSIST_DELAY_MS,
+  store: readerAppearanceStore,
+  writeCache: writeReaderAppearanceCache,
+});
 
 export async function flushReaderAppearancePersistence(): Promise<void> {
-  if (appearancePersistTimerId !== null && isBrowser()) {
-    window.clearTimeout(appearancePersistTimerId);
-    appearancePersistTimerId = null;
-    const snapshot = readerAppearanceStore.getState().readerTheme;
-    const epochAtFlush = appearanceStoreEpoch;
-    appearancePersistQueue = appearancePersistQueue
-      .then(async () => {
-        if (epochAtFlush !== appearanceStoreEpoch) {
-          return;
-        }
-
-        await persistReaderTheme(snapshot);
-      })
-      .catch(() => undefined);
-  }
-
-  await appearancePersistQueue;
+  await readerAppearanceRuntime.flush();
 }
 
 export async function ensureReaderAppearanceHydrated(): Promise<void> {
-  if (!isBrowser() || appearanceHydrated) {
-    return;
-  }
-
-  if (appearanceHydrationPromise) {
-    return appearanceHydrationPromise;
-  }
-
-  const epochAtStart = appearanceStoreEpoch;
-  const revisionAtStart = appearanceRevision;
-  const hydrationPromise = (async () => {
-    const readerTheme = await loadPrimaryReaderTheme();
-    if (epochAtStart !== appearanceStoreEpoch) {
-      return;
-    }
-    if (revisionAtStart === appearanceRevision) {
-      setReaderAppearanceStoreState({ readerTheme });
-    }
-    appearanceHydrated = true;
-  })().catch(() => {
-    if (epochAtStart === appearanceStoreEpoch) {
-      appearanceHydrated = true;
-    }
-  });
-
-  const trackedPromise = hydrationPromise.finally(() => {
-    if (appearanceHydrationPromise === trackedPromise) {
-      appearanceHydrationPromise = null;
-    }
-  });
-  appearanceHydrationPromise = trackedPromise;
-
-  return trackedPromise;
+  await readerAppearanceRuntime.hydrate();
 }
 
 export function setReaderAppearanceTheme(theme: string): void {
-  appearanceRevision += 1;
-  setReaderAppearanceStoreState({ readerTheme: theme });
-  scheduleReaderAppearancePersistence();
+  readerAppearanceRuntime.patch({ readerTheme: theme }, {
+    bumpRevision: true,
+    persist: true,
+  });
 }
 
 export function setReaderAppearanceNovelId(novelId: number): void {
@@ -197,7 +114,7 @@ export function setReaderAppearanceNovelId(novelId: number): void {
     return;
   }
 
-  setReaderAppearanceStoreState({ activeNovelId: novelId }, { writeCache: false });
+  readerAppearanceRuntime.patch({ activeNovelId: novelId }, { writeCache: false });
 }
 
 export function applyHydratedReaderAppearance(
@@ -208,23 +125,10 @@ export function applyHydratedReaderAppearance(
     return;
   }
 
-  setReaderAppearanceStoreState({ readerTheme });
-
-  if (!options.persistPrimary) {
-    return;
-  }
-
-  const snapshot = readerAppearanceStore.getState().readerTheme;
-  const epochAtSchedule = appearanceStoreEpoch;
-  appearancePersistQueue = appearancePersistQueue
-    .then(async () => {
-      if (epochAtSchedule !== appearanceStoreEpoch) {
-        return;
-      }
-
-      await persistReaderTheme(snapshot);
-    })
-    .catch(() => undefined);
+  readerAppearanceRuntime.patch({ readerTheme }, {
+    flush: options.persistPrimary,
+    persist: options.persistPrimary,
+  });
 }
 
 export function getReaderAppearanceSnapshot(): ReaderAppearanceState {
@@ -241,16 +145,5 @@ export function useReaderAppearanceSelector<T>(
 }
 
 export function resetReaderAppearanceStoreForTests(): void {
-  appearanceStoreEpoch += 1;
-  if (appearancePersistTimerId !== null && isBrowser()) {
-    window.clearTimeout(appearancePersistTimerId);
-    appearancePersistTimerId = null;
-  }
-
-  appearanceHydrationPromise = null;
-  appearanceHydrated = false;
-  appearancePersistQueue = Promise.resolve();
-  appearanceRevision = 0;
-
-  readerAppearanceStore.setState(createInitialReaderAppearanceState());
+  readerAppearanceRuntime.reset();
 }

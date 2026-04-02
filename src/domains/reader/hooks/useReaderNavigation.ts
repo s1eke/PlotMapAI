@@ -5,19 +5,18 @@ import type { ReaderSessionCommands, ReaderSessionSnapshot } from '../reader-ses
 import type { ReaderUiBridgeValue } from '../reader-ui';
 import type { UsePagedReaderControllerResult } from './usePagedReaderController';
 import type { PageTarget } from './useReaderStatePersistence';
-import { useReaderContext } from '../pages/reader-page/ReaderContext';
 
 type NavigationDirection = 'next' | 'prev';
 
 interface UseReaderNavigationParams {
   chapters: Chapter[];
   currentChapter: ChapterContent | null;
-  sessionSnapshot?: Pick<ReaderSessionSnapshot, 'chapterIndex' | 'mode'>;
-  sessionCommands?: Pick<
+  sessionSnapshot: Pick<ReaderSessionSnapshot, 'chapterIndex' | 'mode'>;
+  sessionCommands: Pick<
     ReaderSessionCommands,
     'hasUserInteractedRef' | 'persistReaderState' | 'setChapterIndex'
   >;
-  uiBridge?: Pick<ReaderUiBridgeValue, 'chapterChangeSourceRef' | 'pageTargetRef'>;
+  uiBridge: Pick<ReaderUiBridgeValue, 'chapterChangeSourceRef' | 'pageTargetRef'>;
   pagedNavigation: Pick<
     UsePagedReaderControllerResult,
     | 'goToChapter'
@@ -35,7 +34,7 @@ interface UseReaderNavigationParams {
   beforeChapterChange?: () => void;
 }
 
-interface UseReaderNavigationResult {
+export interface UseReaderNavigationResult {
   goToChapter: (targetIndex: number, pageTarget?: PageTarget) => void;
   goToNextPage: () => void;
   goToPrevPage: () => void;
@@ -58,20 +57,16 @@ export function useReaderNavigation({
   pagedNavigation,
   beforeChapterChange,
 }: UseReaderNavigationParams): UseReaderNavigationResult {
-  const readerContext = useReaderContext();
-  const { chapterIndex, mode } = sessionSnapshot ?? {
-    chapterIndex: readerContext.chapterIndex ?? 0,
-    mode: readerContext.mode ?? 'scroll',
-  };
+  const { chapterIndex, mode } = sessionSnapshot;
   const {
-    hasUserInteractedRef = readerContext.hasUserInteractedRef ?? { current: false },
-    persistReaderState = () => undefined,
-    setChapterIndex = () => undefined,
-  } = sessionCommands ?? readerContext;
+    hasUserInteractedRef,
+    persistReaderState,
+    setChapterIndex,
+  } = sessionCommands;
   const {
     chapterChangeSourceRef,
     pageTargetRef,
-  } = uiBridge ?? readerContext;
+  } = uiBridge;
   const userInteractedRef = hasUserInteractedRef;
   const navigationSourceRef = chapterChangeSourceRef;
   const pendingPageTargetRef = pageTargetRef;

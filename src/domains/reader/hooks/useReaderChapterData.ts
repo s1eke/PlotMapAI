@@ -23,7 +23,6 @@ import type {
   ReaderRestoreTarget,
   StoredReaderState,
 } from './useReaderStatePersistence';
-import { useReaderContext } from '../pages/reader-page/ReaderContext';
 
 export interface ReaderHydrateDataResult {
   hasChapters: boolean;
@@ -42,9 +41,9 @@ export interface ReaderLoadActiveChapterResult {
 }
 
 interface UseReaderChapterDataParams {
-  novelId?: number;
-  sessionSnapshot?: Pick<ReaderSessionSnapshot, 'mode'>;
-  sessionCommands?: Pick<
+  novelId: number;
+  sessionSnapshot: Pick<ReaderSessionSnapshot, 'mode'>;
+  sessionCommands: Pick<
     ReaderSessionCommands,
     | 'hasUserInteractedRef'
     | 'latestReaderStateRef'
@@ -52,7 +51,7 @@ interface UseReaderChapterDataParams {
     | 'setChapterIndex'
     | 'setMode'
   >;
-  uiBridge?: Pick<
+  uiBridge: Pick<
     ReaderUiBridgeValue,
     | 'chapterCacheRef'
     | 'chapterChangeSourceRef'
@@ -94,18 +93,15 @@ export function useReaderChapterData({
   onChapterContentResolved,
 }: UseReaderChapterDataParams): UseReaderChapterDataResult {
   const { t } = useTranslation();
-  const readerContext = useReaderContext();
-  const resolvedNovelId = novelId ?? readerContext.novelId ?? 0;
-  const { mode } = sessionSnapshot ?? {
-    mode: readerContext.mode ?? 'scroll',
-  };
+  const resolvedNovelId = novelId;
+  const { mode } = sessionSnapshot;
   const {
-    hasUserInteractedRef = readerContext.hasUserInteractedRef ?? { current: false },
-    latestReaderStateRef = readerContext.latestReaderStateRef ?? { current: {} },
-    loadPersistedReaderState = async (): Promise<StoredReaderState> => ({}),
-    setChapterIndex = () => undefined,
-    setMode = () => undefined,
-  } = sessionCommands ?? readerContext;
+    hasUserInteractedRef,
+    latestReaderStateRef,
+    loadPersistedReaderState,
+    setChapterIndex,
+    setMode,
+  } = sessionCommands;
   const {
     chapterCacheRef,
     chapterChangeSourceRef,
@@ -115,7 +111,7 @@ export function useReaderChapterData({
     pageTurnLockedRef,
     suppressScrollSyncTemporarilyRef,
     wheelDeltaRef,
-  } = uiBridge ?? readerContext;
+  } = uiBridge;
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [currentChapter, setCurrentChapter] = useState<ChapterContent | null>(null);
   const [loadingMessage, setLoadingMessage] = useState<string | null>(null);

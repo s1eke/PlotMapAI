@@ -9,7 +9,3 @@ export type { ReaderAnalysisBridgeController } from './reader-analysis-bridge';
 export {
   clearReaderRenderCacheMemoryForNovel,
 } from './utils/readerRenderCache';
-export {
-  useReaderSessionSelector,
-  resetReaderSessionStoreForTests,
-} from './hooks/sessionStore';

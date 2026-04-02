@@ -1,7 +1,5 @@
-export { usePagedReaderController } from '../hooks/usePagedReaderController';
-export type { UsePagedReaderControllerResult } from '../hooks/usePagedReaderController';
-export { useScrollReaderController } from '../hooks/useScrollReaderController';
-export type { UseScrollReaderControllerResult } from '../hooks/useScrollReaderController';
+export type { ReaderLayoutEngineController } from './useReaderLayoutController';
+export { useReaderLayoutController } from './useReaderLayoutController';
 export {
   calculateVisibleScrollBlockRanges,
   resolveCurrentPagedLocator,

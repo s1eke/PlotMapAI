@@ -15,6 +15,7 @@ export interface ReaderUiBridgeValue {
   contentRef: React.RefObject<HTMLDivElement | null>;
   pagedViewportRef: React.RefObject<HTMLDivElement | null>;
   pageTargetRef: React.MutableRefObject<PageTarget | null>;
+  preparePersistenceFlushRef: React.MutableRefObject<() => void>;
   wheelDeltaRef: React.MutableRefObject<number>;
   pageTurnLockedRef: React.MutableRefObject<boolean>;
   chapterCacheRef: React.MutableRefObject<Map<number, ChapterContent>>;
@@ -61,6 +62,7 @@ export function ReaderUiBridgeProvider({
   const contentRef = useRef<HTMLDivElement>(null);
   const pagedViewportRef = useRef<HTMLDivElement>(null);
   const pageTargetRef = useRef<PageTarget | null>(null);
+  const preparePersistenceFlushRef = useRef<() => void>(() => {});
   const wheelDeltaRef = useRef(0);
   const pageTurnLockedRef = useRef(false);
   const chapterCacheRef = useRef<Map<number, ChapterContent>>(new Map());
@@ -82,6 +84,7 @@ export function ReaderUiBridgeProvider({
     contentRef,
     pagedViewportRef,
     pageTargetRef,
+    preparePersistenceFlushRef,
     wheelDeltaRef,
     pageTurnLockedRef,
     chapterCacheRef,

@@ -1,12 +1,10 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, it, expect, vi } from 'vitest';
-import { resetAppThemeStoreForTests } from '@app/stores/appThemeStore';
 import { CACHE_KEYS, storage } from '@infra/storage';
-import { resetReaderAppearanceStoreForTests } from '@shared/stores/readerAppearanceStore';
-import { resetReaderSessionStoreForTests } from '@domains/reader';
 import Layout from '../Layout';
 import { MemoryRouter } from 'react-router-dom';
 import { ThemeProvider } from '@app/providers/ThemeContext';
+import { resetReaderStoresForTests } from '@test/readerTestUtils';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
@@ -23,9 +21,7 @@ vi.mock('../../components/LanguageSwitcher', () => ({
 describe('Layout component', () => {
   beforeEach(() => {
     localStorage.clear();
-    resetAppThemeStoreForTests();
-    resetReaderAppearanceStoreForTests();
-    resetReaderSessionStoreForTests();
+    resetReaderStoresForTests();
     document.head.querySelector('meta[name="theme-color"]')?.remove();
   });
 

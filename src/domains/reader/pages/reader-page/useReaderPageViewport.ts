@@ -4,4 +4,4 @@ export {
   resolveCurrentScrollLocator,
   resolveCurrentScrollLocatorOffset,
   resolvePagedViewportState,
-} from '../../reader-layout';
+} from '../../reader-layout/viewportLocators';

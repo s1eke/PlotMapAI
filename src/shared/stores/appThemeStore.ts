@@ -1,8 +1,12 @@
-import { APP_SETTING_KEYS, CACHE_KEYS, storage } from '@infra/storage';
-import { mergeReaderStateCacheSnapshot } from '@infra/storage/readerStateCache';
 import { useStore } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { createStore, type StoreApi } from 'zustand/vanilla';
+
+import { APP_SETTING_KEYS, CACHE_KEYS, storage } from '@infra/storage';
+import { mergeReaderStateCacheSnapshot } from '@infra/storage/readerStateCache';
+import {
+  createPersistedRuntime,
+} from '@shared/stores/persistence/createPersistedRuntime';
 
 export type AppTheme = 'light' | 'dark';
 
@@ -14,13 +18,6 @@ interface AppThemeStoreState {
 type AppThemeStore = StoreApi<AppThemeStoreState>;
 
 const APP_THEME_PERSIST_DELAY_MS = 80;
-
-let themeHydrationPromise: Promise<void> | null = null;
-let themeHydrated = false;
-let themePersistQueue: Promise<void> = Promise.resolve();
-let themePersistTimerId: number | null = null;
-let themeRevision = 0;
-let themeStoreEpoch = 0;
 
 function isBrowser(): boolean {
   return typeof window !== 'undefined';
@@ -86,28 +83,11 @@ function writeAppThemeCache(state: AppThemeStoreState): void {
   }
 }
 
-function setAppThemeStoreState(
-  partial: Partial<AppThemeStoreState>,
-  options: { writeCache?: boolean } = {},
-): void {
-  const nextState = {
-    ...appThemeStore.getState(),
-    ...partial,
-  };
-
-  appThemeStore.setState(nextState);
-  applyAppTheme(nextState.theme);
-
-  if (options.writeCache !== false) {
-    writeAppThemeCache(nextState);
-  }
+async function persistAppTheme(state: AppThemeStoreState): Promise<void> {
+  await storage.primary.settings.set(APP_SETTING_KEYS.appTheme, state.theme);
 }
 
-async function persistAppTheme(theme: AppTheme): Promise<void> {
-  await storage.primary.settings.set(APP_SETTING_KEYS.appTheme, theme);
-}
-
-async function loadPrimaryAppTheme(): Promise<AppTheme> {
+async function loadPrimaryAppTheme(): Promise<Partial<AppThemeStoreState>> {
   const cachedTheme = readCachedAppTheme();
 
   try {
@@ -117,103 +97,43 @@ async function loadPrimaryAppTheme(): Promise<AppTheme> {
       : cachedTheme;
 
     if (storedTheme === null) {
-      await persistAppTheme(resolvedTheme).catch(() => undefined);
+      await storage.primary.settings
+        .set(APP_SETTING_KEYS.appTheme, resolvedTheme)
+        .catch(() => undefined);
     }
 
-    return resolvedTheme;
+    return { theme: resolvedTheme };
   } catch {
-    return cachedTheme;
+    return { theme: cachedTheme };
   }
 }
 
-function scheduleAppThemePersistence(): void {
-  if (!isBrowser()) {
-    return;
-  }
-
-  if (themePersistTimerId !== null) {
-    window.clearTimeout(themePersistTimerId);
-  }
-
-  themePersistTimerId = window.setTimeout(() => {
-    themePersistTimerId = null;
-    const snapshot = appThemeStore.getState().theme;
-    const revisionAtSchedule = themeRevision;
-    const epochAtSchedule = themeStoreEpoch;
-    themePersistQueue = themePersistQueue
-      .then(async () => {
-        if (epochAtSchedule !== themeStoreEpoch) {
-          return;
-        }
-        if (revisionAtSchedule !== themeRevision) {
-          return;
-        }
-
-        await persistAppTheme(snapshot);
-      })
-      .catch(() => undefined);
-  }, APP_THEME_PERSIST_DELAY_MS);
-}
+const appThemeRuntime = createPersistedRuntime<AppThemeStoreState>({
+  createInitialState: createInitialAppThemeState,
+  hydrate: async () => loadPrimaryAppTheme(),
+  isEnabled: isBrowser,
+  onStateChange: (state) => {
+    applyAppTheme(state.theme);
+  },
+  persist: persistAppTheme,
+  persistDelayMs: APP_THEME_PERSIST_DELAY_MS,
+  store: appThemeStore,
+  writeCache: writeAppThemeCache,
+});
 
 export async function flushAppThemePersistence(): Promise<void> {
-  if (themePersistTimerId !== null && isBrowser()) {
-    window.clearTimeout(themePersistTimerId);
-    themePersistTimerId = null;
-    const snapshot = appThemeStore.getState().theme;
-    const epochAtFlush = themeStoreEpoch;
-    themePersistQueue = themePersistQueue
-      .then(async () => {
-        if (epochAtFlush !== themeStoreEpoch) {
-          return;
-        }
-        await persistAppTheme(snapshot);
-      })
-      .catch(() => undefined);
-  }
-
-  await themePersistQueue;
+  await appThemeRuntime.flush();
 }
 
 export async function ensureAppThemeHydrated(): Promise<void> {
-  if (!isBrowser() || themeHydrated) {
-    return;
-  }
-
-  if (themeHydrationPromise) {
-    return themeHydrationPromise;
-  }
-
-  const epochAtStart = themeStoreEpoch;
-  const revisionAtStart = themeRevision;
-  const hydrationPromise = (async () => {
-    const theme = await loadPrimaryAppTheme();
-    if (epochAtStart !== themeStoreEpoch) {
-      return;
-    }
-    if (revisionAtStart === themeRevision) {
-      setAppThemeStoreState({ theme });
-    }
-    themeHydrated = true;
-  })().catch(() => {
-    if (epochAtStart === themeStoreEpoch) {
-      themeHydrated = true;
-    }
-  });
-
-  const trackedPromise = hydrationPromise.finally(() => {
-    if (themeHydrationPromise === trackedPromise) {
-      themeHydrationPromise = null;
-    }
-  });
-  themeHydrationPromise = trackedPromise;
-
-  return trackedPromise;
+  await appThemeRuntime.hydrate();
 }
 
 export function setAppTheme(theme: AppTheme): void {
-  themeRevision += 1;
-  setAppThemeStoreState({ theme });
-  scheduleAppThemePersistence();
+  appThemeRuntime.patch({ theme }, {
+    bumpRevision: true,
+    persist: true,
+  });
 }
 
 export function toggleAppTheme(): void {
@@ -226,7 +146,7 @@ export function setAppThemeNovelId(novelId: number): void {
     return;
   }
 
-  setAppThemeStoreState({ activeNovelId: novelId }, { writeCache: false });
+  appThemeRuntime.patch({ activeNovelId: novelId }, { writeCache: false });
 }
 
 export function applyHydratedAppTheme(theme: AppTheme | null | undefined): void {
@@ -234,7 +154,7 @@ export function applyHydratedAppTheme(theme: AppTheme | null | undefined): void 
     return;
   }
 
-  setAppThemeStoreState({ theme });
+  appThemeRuntime.patch({ theme });
 }
 
 export function getAppThemeSnapshot(): AppThemeStoreState {
@@ -246,18 +166,5 @@ export function useAppThemeSelector<T>(selector: (state: AppThemeStoreState) => 
 }
 
 export function resetAppThemeStoreForTests(): void {
-  themeStoreEpoch += 1;
-  if (themePersistTimerId !== null && isBrowser()) {
-    window.clearTimeout(themePersistTimerId);
-    themePersistTimerId = null;
-  }
-
-  themeHydrationPromise = null;
-  themeHydrated = false;
-  themePersistQueue = Promise.resolve();
-  themeRevision = 0;
-
-  const initialState = createInitialAppThemeState();
-  appThemeStore.setState(initialState);
-  applyAppTheme(initialState.theme);
+  appThemeRuntime.reset();
 }

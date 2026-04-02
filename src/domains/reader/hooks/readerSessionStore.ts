@@ -1,6 +1,9 @@
 import {
   resetAppThemeStoreForTests,
 } from '@shared/stores/appThemeStore';
+import {
+  createPersistedRuntime,
+} from '@shared/stores/persistence/createPersistedRuntime';
 import { migrateLegacyReaderStateCacheSnapshot } from '@infra/migrations';
 import { mergeReaderStateCacheSnapshot, readReaderStateCacheSnapshot } from '@infra/storage/readerStateCache';
 import { useStore } from 'zustand';
@@ -71,10 +74,8 @@ type ReaderSessionStore = StoreApi<ReaderSessionInternalState>;
 
 const READER_STATE_SYNC_DELAY_MS = 400;
 
-let syncTimerId: number | null = null;
-let syncQueue: Promise<void> = Promise.resolve();
 let lastSyncedRemoteSnapshot = '';
-let storeEpoch = 0;
+let sessionHydrationEpoch = 0;
 
 function isBrowser(): boolean {
   return typeof window !== 'undefined';
@@ -164,57 +165,41 @@ function writeReaderSessionCache(state: ReaderSessionInternalState): void {
   mergeReaderStateCacheSnapshot(state.novelId, toStoredReaderState(state));
 }
 
-function setReaderSessionStoreState(
-  partial: Partial<ReaderSessionInternalState>,
-  options: { writeCache?: boolean } = {},
-): void {
-  const nextState = {
-    ...readerSessionStore.getState(),
-    ...partial,
-  };
-
-  readerSessionStore.setState(nextState);
-  if (options.writeCache !== false) {
-    writeReaderSessionCache(nextState);
+async function persistRemoteReaderSession(state: ReaderSessionInternalState): Promise<void> {
+  const { novelId } = state;
+  if (!novelId) {
+    return;
   }
-}
 
-function enqueueRemotePersistence(
-  progress: ReadingProgress,
-  novelId = readerSessionStore.getState().novelId,
-): Promise<void> {
-  if (!novelId) return Promise.resolve();
+  const progress = toRemoteProgress(state);
   const snapshot = getRemoteProgressSnapshot(progress);
-  if (snapshot === lastSyncedRemoteSnapshot) return syncQueue;
-
-  syncQueue = syncQueue
-    .then(async () => {
-      if (snapshot === lastSyncedRemoteSnapshot) return;
-      await replaceReadingProgress(novelId, {
-        chapterIndex: progress.chapterIndex,
-        mode: progress.mode,
-        chapterProgress: progress.chapterProgress,
-        locator: progress.locator,
-      });
-      setLastSyncedRemoteSnapshot(snapshot);
-    })
-    .catch(() => undefined);
-
-  return syncQueue;
-}
-
-function scheduleRemotePersistence(): void {
-  const state = readerSessionStore.getState();
-  if (!isBrowser() || !state.novelId) return;
-  if (syncTimerId !== null) {
-    window.clearTimeout(syncTimerId);
+  if (snapshot === lastSyncedRemoteSnapshot) {
+    return;
   }
 
-  syncTimerId = window.setTimeout(() => {
-    syncTimerId = null;
-    enqueueRemotePersistence(toRemoteProgress(readerSessionStore.getState()));
-  }, READER_STATE_SYNC_DELAY_MS);
+  await replaceReadingProgress(novelId, {
+    chapterIndex: progress.chapterIndex,
+    mode: progress.mode,
+    chapterProgress: progress.chapterProgress,
+    locator: progress.locator,
+  });
+  setLastSyncedRemoteSnapshot(snapshot);
 }
+
+const readerSessionRuntime = createPersistedRuntime<ReaderSessionInternalState>({
+  createInitialState: createInitialReaderSessionState,
+  isEnabled: isBrowser,
+  onReset: () => {
+    sessionHydrationEpoch += 1;
+    lastSyncedRemoteSnapshot = '';
+    resetReaderPreferencesStoreForTests();
+    resetAppThemeStoreForTests();
+  },
+  persist: persistRemoteReaderSession,
+  persistDelayMs: READER_STATE_SYNC_DELAY_MS,
+  store: readerSessionStore,
+  writeCache: writeReaderSessionCache,
+});
 
 function updateStoredReaderState(
   nextState: StoredReaderState,
@@ -226,22 +211,18 @@ function updateStoredReaderState(
   const nextLastContentMode = merged.lastContentMode
     ?? resolveLastContentMode(mode, currentState.lastContentMode);
 
-  setReaderSessionStoreState({
+  readerSessionRuntime.patch({
     mode,
     chapterIndex: merged.chapterIndex ?? 0,
     chapterProgress: clampChapterProgress(merged.chapterProgress),
     locator: merged.locator,
     lastContentMode: resolveLastContentMode(mode, nextLastContentMode),
     hasUserInteracted: options.markUserInteracted ?? currentState.hasUserInteracted,
+  }, {
+    bumpRevision: options.persistRemote,
+    flush: options.flush,
+    persist: options.persistRemote,
   });
-
-  if (options.persistRemote) {
-    if (options.flush) {
-      enqueueRemotePersistence(toRemoteProgress(readerSessionStore.getState()));
-    } else {
-      scheduleRemotePersistence();
-    }
-  }
 
   return merged;
 }
@@ -250,11 +231,12 @@ export async function hydrateSession(
   novelId: number,
   options: ReaderSessionHydrationOptions = {},
 ): Promise<StoredReaderState> {
-  storeEpoch += 1;
-  const epochAtStart = storeEpoch;
+  await readerSessionRuntime.flush();
+  sessionHydrationEpoch += 1;
+  const epochAtStart = sessionHydrationEpoch;
   const localState = readLocalSessionState(novelId);
 
-  setReaderSessionStoreState({
+  readerSessionRuntime.patch({
     novelId,
     restoreStatus: 'hydrating',
     pendingRestoreTarget: null,
@@ -276,7 +258,7 @@ export async function hydrateSession(
     remoteState = null;
   }
 
-  if (epochAtStart !== storeEpoch) {
+  if (epochAtStart !== sessionHydrationEpoch) {
     return buildStoredReaderState(remoteState ?? localState);
   }
 
@@ -299,7 +281,7 @@ export async function hydrateSession(
   });
   const pendingRestoreTarget = createRestoreTargetFromPersistedState(hydratedState);
 
-  setReaderSessionStoreState({
+  readerSessionRuntime.patch({
     novelId,
     mode,
     chapterIndex: hydratedState.chapterIndex ?? 0,
@@ -345,11 +327,11 @@ export function setReadingPosition(
 }
 
 export function setPendingRestoreTarget(nextTarget: ReaderRestoreTarget | null): void {
-  setReaderSessionStoreState({ pendingRestoreTarget: nextTarget }, { writeCache: false });
+  readerSessionRuntime.patch({ pendingRestoreTarget: nextTarget }, { writeCache: false });
 }
 
 export function setRestoreStatus(restoreStatus: RestoreStatus): void {
-  setReaderSessionStoreState({ restoreStatus }, { writeCache: false });
+  readerSessionRuntime.patch({ restoreStatus }, { writeCache: false });
 }
 
 export function setSessionNovelId(novelId: number): void {
@@ -357,29 +339,29 @@ export function setSessionNovelId(novelId: number): void {
     return;
   }
 
-  setReaderSessionStoreState({ novelId }, { writeCache: false });
+  readerSessionRuntime.patch({ novelId }, { writeCache: false });
 }
 
 export function beginRestore(nextTarget: ReaderRestoreTarget | null | undefined): void {
-  setReaderSessionStoreState({
+  readerSessionRuntime.patch({
     pendingRestoreTarget: nextTarget ?? null,
     restoreStatus: shouldMaskRestore(nextTarget) ? 'restoring' : 'ready',
   }, { writeCache: false });
 }
 
 export function completeRestore(): void {
-  setReaderSessionStoreState({
+  readerSessionRuntime.patch({
     pendingRestoreTarget: null,
     restoreStatus: 'ready',
   }, { writeCache: false });
 }
 
 export function failRestore(): void {
-  setReaderSessionStoreState({ restoreStatus: 'error' }, { writeCache: false });
+  readerSessionRuntime.patch({ restoreStatus: 'error' }, { writeCache: false });
 }
 
 export function markUserInteracted(): void {
-  setReaderSessionStoreState({ hasUserInteracted: true }, { writeCache: false });
+  readerSessionRuntime.patch({ hasUserInteracted: true }, { writeCache: false });
 }
 
 export function getReaderSessionSnapshot(): ReaderSessionSnapshot {
@@ -406,16 +388,7 @@ export function persistStoredReaderState(
 }
 
 export async function flushPersistence(): Promise<void> {
-  const currentState = readerSessionStore.getState();
-  const { novelId } = currentState;
-  const progress = toRemoteProgress(currentState);
-
-  if (syncTimerId !== null && isBrowser()) {
-    window.clearTimeout(syncTimerId);
-    syncTimerId = null;
-  }
-
-  await enqueueRemotePersistence(progress, novelId);
+  await readerSessionRuntime.flush();
 }
 
 export function useReaderSessionSelector<T>(
@@ -438,16 +411,5 @@ export function useReaderSessionActions(): ReaderSessionActions {
 }
 
 export function resetReaderSessionStoreForTests(): void {
-  storeEpoch += 1;
-  if (syncTimerId !== null && isBrowser()) {
-    window.clearTimeout(syncTimerId);
-    syncTimerId = null;
-  }
-
-  lastSyncedRemoteSnapshot = '';
-  syncQueue = Promise.resolve();
-  resetReaderPreferencesStoreForTests();
-  resetAppThemeStoreForTests();
-  const initialState = createInitialReaderSessionState();
-  readerSessionStore.setState(initialState);
+  readerSessionRuntime.reset();
 }
