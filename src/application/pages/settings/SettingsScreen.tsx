@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import type { ReactElement } from 'react';
+
 import { useTranslation } from 'react-i18next';
 
 import {
@@ -6,21 +7,18 @@ import {
   PurificationSettingsPanel,
   SettingsTabBar,
   TocSettingsPanel,
-  usePurificationSettingsManager,
-  useTocSettingsManager,
-  type SettingsTabId,
 } from '@domains/settings';
 
-import { useAiSettingsManager } from '../hooks/useAiSettingsManager';
+import type { SettingsPageViewModel } from './types';
 
-export default function SettingsPage() {
+interface SettingsScreenProps {
+  viewModel: SettingsPageViewModel;
+}
+
+export default function SettingsScreen({
+  viewModel,
+}: SettingsScreenProps): ReactElement {
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState<SettingsTabId>('toc');
-  const appVersion = typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : '';
-
-  const tocManager = useTocSettingsManager();
-  const purificationManager = usePurificationSettingsManager();
-  const aiManager = useAiSettingsManager();
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col p-4 sm:p-6">
@@ -33,8 +31,8 @@ export default function SettingsPage() {
 
       <div className="mb-8">
         <SettingsTabBar
-          activeTab={activeTab}
-          onChange={setActiveTab}
+          activeTab={viewModel.activeTab}
+          onChange={viewModel.setActiveTab}
           items={[
             { id: 'toc', label: t('settings.tocRules') },
             { id: 'purification', label: t('settings.purificationRules') },
@@ -44,14 +42,16 @@ export default function SettingsPage() {
       </div>
 
       <div className="glass flex-1 rounded-2xl border border-white/5 p-4 shadow-sm sm:p-6 md:p-8">
-        {activeTab === 'toc' && <TocSettingsPanel manager={tocManager} />}
-        {activeTab === 'purification' && <PurificationSettingsPanel manager={purificationManager} />}
-        {activeTab === 'ai' && <AiSettingsPanel manager={aiManager} />}
+        {viewModel.activeTab === 'toc' && <TocSettingsPanel manager={viewModel.tocManager} />}
+        {viewModel.activeTab === 'purification' && (
+          <PurificationSettingsPanel manager={viewModel.purificationManager} />
+        )}
+        {viewModel.activeTab === 'ai' && <AiSettingsPanel manager={viewModel.aiManager} />}
       </div>
 
-      {appVersion ? (
+      {viewModel.appVersion ? (
         <p className="mt-6 text-center text-xs text-text-secondary sm:text-right">
-          {t('settings.versionLabel', { version: appVersion })}
+          {t('settings.versionLabel', { version: viewModel.appVersion })}
         </p>
       ) : null}
     </div>

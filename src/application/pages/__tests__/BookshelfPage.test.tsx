@@ -5,7 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 
 import { novelRepository } from '@domains/library';
 
-import BookshelfPage from '../BookshelfPage';
+import BookshelfPage from '../bookshelf';
 
 const fileHandlingMock = vi.hoisted(() => ({
   consumePendingLaunchFiles: vi.fn(),

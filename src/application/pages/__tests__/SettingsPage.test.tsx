@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 
-import SettingsPage from '../SettingsPage';
+import SettingsPage from '../settings';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -43,7 +43,7 @@ vi.mock('@domains/settings', () => ({
   useTocSettingsManager: () => ({ kind: 'toc' }),
 }));
 
-vi.mock('../../hooks/useAiSettingsManager', () => ({
+vi.mock('../settings/useAiSettingsManager', () => ({
   useAiSettingsManager: () => ({ kind: 'ai' }),
 }));
 

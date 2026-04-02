@@ -1,3 +1,10 @@
+import type { AiSettingsManager } from '@domains/settings';
+import type {
+  AiProviderSettings,
+  AiProviderSettingsPayload,
+  SettingsFeedbackState,
+} from '@domains/settings';
+
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -10,10 +17,6 @@ import {
 import {
   downloadFile,
   getAiProviderSettings,
-  type AiProviderSettings,
-  type AiProviderSettingsPayload,
-  type AiSettingsManager,
-  type SettingsFeedbackState,
 } from '@domains/settings';
 import { DEFAULT_ANALYSIS_PROVIDER_ID } from '@shared/contracts';
 import { translateAppError } from '@shared/errors';
@@ -47,11 +50,11 @@ export function useAiSettingsManager(): AiSettingsManager {
   const [importDialogFeedback, setImportDialogFeedback] =
     useState<SettingsFeedbackState | null>(null);
 
-  const clearFeedback = useCallback(() => {
+  const clearFeedback = useCallback((): void => {
     setFeedback(null);
   }, []);
 
-  const syncForm = useCallback((data: AiProviderSettings) => {
+  const syncForm = useCallback((data: AiProviderSettings): void => {
     setForm({
       providerId: data.providerId,
       apiBaseUrl: data.apiBaseUrl,
@@ -62,8 +65,9 @@ export function useAiSettingsManager(): AiSettingsManager {
     });
   }, []);
 
-  const loadSettings = useCallback(async () => {
+  const loadSettings = useCallback(async (): Promise<void> => {
     setIsLoading(true);
+
     try {
       const data = await getAiProviderSettings();
       setSettings(data);
@@ -82,7 +86,7 @@ export function useAiSettingsManager(): AiSettingsManager {
   }, [syncForm, t]);
 
   useEffect(() => {
-    loadSettings();
+    loadSettings().catch(() => undefined);
   }, [loadSettings]);
 
   const buildPayload = useCallback((): AiProviderSettingsPayload => {
@@ -101,12 +105,12 @@ export function useAiSettingsManager(): AiSettingsManager {
   const updateField = useCallback(<K extends keyof AiProviderSettingsPayload>(
     key: K,
     value: AiProviderSettingsPayload[K],
-  ) => {
+  ): void => {
     setFeedback(null);
     setForm((previous) => ({ ...previous, [key]: value }));
   }, []);
 
-  const saveSettings = useCallback(async () => {
+  const saveSettings = useCallback(async (): Promise<void> => {
     setIsSaving(true);
     setFeedback(null);
 
@@ -131,7 +135,7 @@ export function useAiSettingsManager(): AiSettingsManager {
     }
   }, [buildPayload, syncForm, t]);
 
-  const testSettings = useCallback(async () => {
+  const testSettings = useCallback(async (): Promise<void> => {
     setIsTesting(true);
     setFeedback(null);
 
@@ -158,24 +162,24 @@ export function useAiSettingsManager(): AiSettingsManager {
     }
   }, [buildPayload, t]);
 
-  const openExportModal = useCallback(() => {
+  const openExportModal = useCallback((): void => {
     setExportPassword('');
     setExportDialogFeedback(null);
     setIsExportModalOpen(true);
   }, []);
 
-  const closeExportModal = useCallback(() => {
+  const closeExportModal = useCallback((): void => {
     setIsExportModalOpen(false);
     setExportPassword('');
     setExportDialogFeedback(null);
   }, []);
 
-  const setExportPasswordValue = useCallback((password: string) => {
+  const setExportPasswordValue = useCallback((password: string): void => {
     setExportPassword(password);
     setExportDialogFeedback(null);
   }, []);
 
-  const exportConfig = useCallback(async () => {
+  const exportConfig = useCallback(async (): Promise<void> => {
     if (exportPassword.length < 4) {
       setExportDialogFeedback({
         type: 'error',
@@ -207,27 +211,30 @@ export function useAiSettingsManager(): AiSettingsManager {
     }
   }, [closeExportModal, exportPassword, t]);
 
-  const queueImportFile = useCallback((file: File) => {
+  const queueImportFile = useCallback((file: File): void => {
     setPendingImportFile(file);
     setImportPassword('');
     setImportDialogFeedback(null);
     setIsImportModalOpen(true);
   }, []);
 
-  const closeImportModal = useCallback(() => {
+  const closeImportModal = useCallback((): void => {
     setPendingImportFile(null);
     setImportPassword('');
     setImportDialogFeedback(null);
     setIsImportModalOpen(false);
   }, []);
 
-  const setImportPasswordValue = useCallback((password: string) => {
+  const setImportPasswordValue = useCallback((password: string): void => {
     setImportPassword(password);
     setImportDialogFeedback(null);
   }, []);
 
-  const confirmImport = useCallback(async () => {
-    if (!pendingImportFile) return;
+  const confirmImport = useCallback(async (): Promise<void> => {
+    if (!pendingImportFile) {
+      return;
+    }
+
     if (importPassword.length < 4) {
       setImportDialogFeedback({
         type: 'error',

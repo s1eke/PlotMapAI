@@ -1,19 +1,19 @@
-import { render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
-import {
-  loadCharacterGraphPageData,
-} from '@application/use-cases/library';
 import { refreshAnalysisOverview } from '@application/use-cases/analysis';
-import { createAppError, AppErrorCode } from '@shared/errors';
+import { loadCharacterGraphPageData } from '@application/use-cases/library';
 import { useCharacterGraphCanvasController } from '@domains/character-graph';
+import { AppErrorCode, createAppError } from '@shared/errors';
 
-import CharacterGraphPage from '../character-graph';
+import { useCharacterGraphPageViewModel } from '../useCharacterGraphPageViewModel';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
+}));
+
+vi.mock('@app/debug/service', () => ({
+  reportAppError: vi.fn(),
 }));
 
 vi.mock('@application/use-cases/library', () => ({
@@ -25,40 +25,9 @@ vi.mock('@application/use-cases/analysis', () => ({
 }));
 
 vi.mock('@domains/character-graph', () => ({
+  CharacterGraphStage: () => null,
   useCharacterGraphCanvasController: vi.fn(),
-  CharacterGraphStage: ({
-    actionMessage,
-    canRefreshOverview,
-    novelTitle,
-    onRefreshOverview,
-  }: {
-    actionMessage: string | null;
-    canRefreshOverview: boolean;
-    novelTitle: string;
-    onRefreshOverview: () => void;
-  }) => (
-    <div>
-      <div>{novelTitle}</div>
-      {actionMessage ? <div>{actionMessage}</div> : null}
-      {canRefreshOverview ? (
-        <button type="button" onClick={onRefreshOverview}>
-          characterGraph.refreshGraph
-        </button>
-      ) : null}
-    </div>
-  ),
 }));
-
-function renderPage(initialEntry = '/novel/1/graph') {
-  return render(
-    <MemoryRouter initialEntries={[initialEntry]}>
-      <Routes>
-        <Route path="/" element={<div>bookshelf-home</div>} />
-        <Route path="/novel/:id/graph" element={<CharacterGraphPage />} />
-      </Routes>
-    </MemoryRouter>,
-  );
-}
 
 function createCanvasState() {
   return {
@@ -104,19 +73,42 @@ function createCanvasState() {
   };
 }
 
-describe('application CharacterGraphPage', () => {
+describe('useCharacterGraphPageViewModel', () => {
+  let mediaQueryListener: ((event: { matches: boolean }) => void) | null = null;
+  let mediaQueryMatches = false;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    mediaQueryListener = null;
+    mediaQueryMatches = false;
+
     vi.stubGlobal('matchMedia', vi.fn().mockImplementation((query: string) => ({
-      addEventListener: vi.fn(),
+      addEventListener: vi.fn(
+        (_event: string, listener: (event: { matches: boolean }) => void) => {
+          mediaQueryListener = listener;
+        },
+      ),
       addListener: vi.fn(),
       dispatchEvent: vi.fn(),
-      matches: false,
+      matches: mediaQueryMatches,
       media: query,
       onchange: null,
-      removeEventListener: vi.fn(),
+      removeEventListener: vi.fn(
+        (_event: string, listener: (event: { matches: boolean }) => void) => {
+          if (mediaQueryListener === listener) {
+            mediaQueryListener = null;
+          }
+        },
+      ),
       removeListener: vi.fn(),
     })));
+
+    Object.defineProperty(document, 'fullscreenElement', {
+      configurable: true,
+      value: null,
+      writable: true,
+    });
+
     vi.mocked(loadCharacterGraphPageData).mockResolvedValue({
       graph: {
         edges: [],
@@ -176,19 +168,37 @@ describe('application CharacterGraphPage', () => {
     vi.mocked(useCharacterGraphCanvasController).mockReturnValue(createCanvasState());
   });
 
-  it('loads graph data and refreshes the overview through application use-cases', async () => {
-    const user = userEvent.setup();
+  it('treats invalid novel ids as not-found without loading data', async () => {
+    const { result } = renderHook(() => useCharacterGraphPageViewModel(Number.NaN));
 
-    renderPage();
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
 
-    expect(await screen.findByText('Mock Novel')).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: 'characterGraph.refreshGraph' }));
-
-    expect(refreshAnalysisOverview).toHaveBeenCalledWith(1);
+    expect(loadCharacterGraphPageData).not.toHaveBeenCalled();
+    expect(result.current.error).toMatchObject({
+      code: AppErrorCode.NOVEL_NOT_FOUND,
+    });
   });
 
-  it('surfaces layout errors from the graph canvas controller', async () => {
+  it('loads graph data and refreshes the overview', async () => {
+    const { result } = renderHook(() => useCharacterGraphPageViewModel(1));
+
+    await waitFor(() => {
+      expect(result.current.novel?.title).toBe('Mock Novel');
+    });
+
+    expect(result.current.canRefreshOverview).toBe(true);
+
+    await act(async () => {
+      await result.current.refreshOverview();
+    });
+
+    expect(refreshAnalysisOverview).toHaveBeenCalledWith(1);
+    expect(result.current.actionBannerMessage).toBe('characterGraph.refreshStarted');
+  });
+
+  it('prioritizes canvas layout errors over action messages', async () => {
     vi.mocked(useCharacterGraphCanvasController).mockReturnValue({
       ...createCanvasState(),
       layout: {
@@ -203,10 +213,47 @@ describe('application CharacterGraphPage', () => {
       },
     });
 
-    renderPage();
+    const { result } = renderHook(() => useCharacterGraphPageViewModel(1));
 
     await waitFor(() => {
-      expect(screen.getByText('errors.WORKER_UNAVAILABLE')).toBeInTheDocument();
+      expect(result.current.novel?.title).toBe('Mock Novel');
     });
+
+    await act(async () => {
+      await result.current.refreshOverview();
+    });
+
+    expect(result.current.actionBannerMessage).toBe('errors.WORKER_UNAVAILABLE');
+  });
+
+  it('syncs mobile and fullscreen state from browser events', async () => {
+    const { result } = renderHook(() => useCharacterGraphPageViewModel(1));
+
+    await waitFor(() => {
+      expect(result.current.novel?.title).toBe('Mock Novel');
+    });
+
+    expect(result.current.isMobile).toBe(false);
+    expect(result.current.isFullscreen).toBe(false);
+
+    act(() => {
+      mediaQueryListener?.({ matches: true });
+    });
+
+    expect(result.current.isMobile).toBe(true);
+
+    const fullscreenElement = document.createElement('div');
+
+    act(() => {
+      Object.assign(result.current.fullscreenRef, { current: fullscreenElement });
+      Object.defineProperty(document, 'fullscreenElement', {
+        configurable: true,
+        value: fullscreenElement,
+        writable: true,
+      });
+      document.dispatchEvent(new Event('fullscreenchange'));
+    });
+
+    expect(result.current.isFullscreen).toBe(true);
   });
 });

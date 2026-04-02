@@ -1,59 +1,25 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
+import type { ReactElement, ReactNode } from 'react';
+
 import { Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { reportAppError } from '@app/debug/service';
-import { useFileHandling } from '@app/providers/FileHandlingContext';
+
 import { appPaths } from '@app/router/paths';
-import { BookCard, novelRepository, type NovelView } from '@domains/library';
-import {
-  AppErrorCode,
-  toAppError,
-  translateAppError,
-  type AppError,
-} from '@shared/errors';
+import { BookCard } from '@domains/library';
+import { translateAppError } from '@shared/errors';
 import { cn } from '@shared/utils/cn';
 
-const LazyUploadModal = lazy(() => import('../components/UploadModal'));
+import type { BookshelfPageViewModel } from './types';
 
-export default function BookshelfPage() {
+interface BookshelfScreenProps {
+  uploadModal: ReactNode;
+  viewModel: BookshelfPageViewModel;
+}
+
+export default function BookshelfScreen({
+  uploadModal,
+  viewModel,
+}: BookshelfScreenProps): ReactElement {
   const { t } = useTranslation();
-  const { pendingLaunchFiles, consumePendingLaunchFiles } = useFileHandling();
-  const [novels, setNovels] = useState<NovelView[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<AppError | null>(null);
-  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
-
-  const fetchNovels = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const data = await novelRepository.list();
-      setNovels(data);
-    } catch (err) {
-      const normalized = toAppError(err, {
-        code: AppErrorCode.STORAGE_OPERATION_FAILED,
-        kind: 'storage',
-        source: 'library',
-        userMessageKey: 'bookshelf.loadError',
-      });
-      reportAppError(normalized);
-      setError(normalized);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchNovels();
-  }, [fetchNovels]);
-
-  useEffect(() => {
-    if (!pendingLaunchFiles || pendingLaunchFiles.length === 0) {
-      return;
-    }
-
-    setIsUploadModalOpen(true);
-  }, [pendingLaunchFiles]);
 
   return (
     <div data-testid="bookshelf-scroll-container" className="w-full">
@@ -72,7 +38,8 @@ export default function BookshelfPage() {
               </h1>
             </div>
             <button
-              onClick={() => setIsUploadModalOpen(true)}
+              type="button"
+              onClick={viewModel.openUploadModal}
               className="shrink-0 rounded-full bg-accent px-3.5 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-accent-hover active:scale-[0.98] sm:rounded-lg sm:px-4 sm:text-base"
             >
               {t('common.actions.upload')}
@@ -84,7 +51,7 @@ export default function BookshelfPage() {
         </div>
 
         {(() => {
-          if (isLoading) {
+          if (viewModel.isLoading) {
             return (
               <div className="flex min-h-[42vh] items-center justify-center">
                 <Loader2 className="h-8 w-8 animate-spin text-accent" />
@@ -92,15 +59,18 @@ export default function BookshelfPage() {
             );
           }
 
-          if (error) {
+          if (viewModel.error) {
             return (
               <div className="flex min-h-[42vh] items-center justify-center py-4 sm:py-6">
                 <div className="w-full max-w-md rounded-3xl border border-red-500/15 bg-red-500/6 px-5 py-7 text-center shadow-sm sm:px-8 sm:py-8">
                   <p className="mb-4 text-sm leading-6 text-red-500 sm:text-base">
-                    {translateAppError(error, t, 'bookshelf.loadError')}
+                    {translateAppError(viewModel.error, t, 'bookshelf.loadError')}
                   </p>
                   <button
-                    onClick={fetchNovels}
+                    type="button"
+                    onClick={() => {
+                      viewModel.refreshNovels().catch(() => undefined);
+                    }}
                     className="rounded-full bg-bg-secondary px-4 py-2 text-sm font-medium text-accent shadow-sm transition-colors hover:text-accent-hover"
                   >
                     {t('bookshelf.tryAgain')}
@@ -110,7 +80,7 @@ export default function BookshelfPage() {
             );
           }
 
-          if (novels.length === 0) {
+          if (viewModel.novels.length === 0) {
             return (
               <div className="flex min-h-[42vh] items-center justify-center py-4 sm:py-6">
                 <div className="w-full max-w-md rounded-[2rem] border border-border-color/70 bg-bg-secondary px-5 py-8 text-center shadow-[0_16px_36px_rgba(15,23,42,0.06)] sm:px-8 sm:py-10">
@@ -122,7 +92,8 @@ export default function BookshelfPage() {
                     {t('bookshelf.noBooksHint')}
                   </p>
                   <button
-                    onClick={() => setIsUploadModalOpen(true)}
+                    type="button"
+                    onClick={viewModel.openUploadModal}
                     className="rounded-full bg-brand-700 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-600 sm:rounded-lg sm:px-6 sm:py-3"
                   >
                     {t('common.actions.upload')}
@@ -137,7 +108,7 @@ export default function BookshelfPage() {
               data-testid="bookshelf-grid"
               className="grid grid-cols-[repeat(auto-fill,minmax(6.5rem,1fr))] gap-x-2.5 gap-y-4 sm:grid-cols-[repeat(auto-fill,minmax(9.5rem,1fr))] sm:gap-x-4 sm:gap-y-6"
             >
-              {novels.map((novel) => (
+              {viewModel.novels.map((novel) => (
                 <BookCard key={novel.id} detailHref={appPaths.novel(novel.id)} novel={novel} />
               ))}
             </div>
@@ -145,17 +116,7 @@ export default function BookshelfPage() {
         })()}
       </div>
 
-      {isUploadModalOpen && (
-        <Suspense fallback={null}>
-          <LazyUploadModal
-            isOpen={isUploadModalOpen}
-            onClose={() => setIsUploadModalOpen(false)}
-            onSuccess={fetchNovels}
-            initialFiles={pendingLaunchFiles}
-            onInitialFilesHandled={consumePendingLaunchFiles}
-          />
-        </Suspense>
-      )}
+      {uploadModal}
     </div>
   );
 }

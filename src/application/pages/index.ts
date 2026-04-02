@@ -3,11 +3,11 @@ export function loadBookDetailPage() {
 }
 
 export function loadBookshelfPage() {
-  return import('./BookshelfPage');
+  return import('./bookshelf');
 }
 
 export function loadCharacterGraphPage() {
-  return import('./CharacterGraphPage');
+  return import('./character-graph');
 }
 
 export function loadReaderPage() {
@@ -15,5 +15,5 @@ export function loadReaderPage() {
 }
 
 export function loadSettingsPage() {
-  return import('./SettingsPage');
+  return import('./settings');
 }
