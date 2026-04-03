@@ -5,6 +5,7 @@ import type {
   ChapterAnalysisResult,
   CharacterGraphResponse,
 } from '@shared/contracts';
+import type { Transaction } from 'dexie';
 
 import { debugLog } from '@shared/debug';
 
@@ -206,6 +207,9 @@ export async function getOverview(
   return repository.getOverview(novelId);
 }
 
-export async function deleteAnalysisArtifacts(novelId: number): Promise<void> {
-  await repository.deleteAnalysisArtifacts(novelId);
+export async function deleteAnalysisArtifacts(
+  novelId: number,
+  transaction?: Transaction,
+): Promise<void> {
+  await repository.deleteAnalysisArtifacts(novelId, transaction);
 }

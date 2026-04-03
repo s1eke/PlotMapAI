@@ -1,4 +1,8 @@
 export { novelRepository } from './novelRepository';
+export type {
+  CreateImportedNovelInput,
+  DeleteNovelOptions,
+} from './novelRepository';
 export { default as BookCard } from './components/BookCard';
 export {
   default as BookDetailActionButton,

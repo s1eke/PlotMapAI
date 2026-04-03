@@ -1,14 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { bookLifecycleService } from '@application/services/bookLifecycleService';
 import { analysisService } from '@domains/analysis';
-import { bookImportService } from '@domains/book-import';
 import { novelRepository } from '@domains/library';
-import {
-  deleteReaderArtifacts,
-} from '@domains/reader-content';
 import { ensureDefaultTocRules, tocRuleRepository } from '@domains/settings';
 import { db } from '@infra/db';
-import { CACHE_KEYS, storage } from '@infra/storage';
 
 import {
   deleteNovelAndCleanupArtifacts,
@@ -18,13 +14,13 @@ import {
 
 vi.mock('@domains/analysis', () => ({
   analysisService: {
-    deleteArtifacts: vi.fn(),
     getStatus: vi.fn(),
   },
 }));
 
-vi.mock('@domains/book-import', () => ({
-  bookImportService: {
+vi.mock('@application/services/bookLifecycleService', () => ({
+  bookLifecycleService: {
+    deleteNovel: vi.fn(),
     importBook: vi.fn(),
   },
 }));
@@ -36,9 +32,8 @@ vi.mock('@domains/library', () => ({
   },
 }));
 
-vi.mock('@domains/reader-content', () => ({
-  deleteReaderArtifacts: vi.fn(),
-  loadAndPurifyChapters: vi.fn(),
+vi.mock('@application/services/readerContentController', () => ({
+  loadPurifiedBookChapters: vi.fn(),
 }));
 
 vi.mock('@domains/settings', () => ({
@@ -98,9 +93,8 @@ describe('application library use-cases', () => {
     localStorage.clear();
     await db.delete();
     await db.open();
-    vi.mocked(analysisService.deleteArtifacts).mockResolvedValue(undefined);
-    vi.mocked(deleteReaderArtifacts).mockResolvedValue(undefined);
     vi.mocked(analysisService.getStatus).mockResolvedValue(createStatusResponse());
+    vi.mocked(bookLifecycleService.deleteNovel).mockResolvedValue({ message: 'Novel deleted' });
   });
 
   it('importBookAndRefreshLibrary resolves toc rules before importing and then reloads the created novel', async () => {
@@ -109,8 +103,7 @@ describe('application library use-cases', () => {
     vi.mocked(tocRuleRepository.getEnabledChapterDetectionRules).mockResolvedValue([
       { rule: '^Chapter', source: 'default' },
     ]);
-    vi.mocked(bookImportService.importBook).mockResolvedValue({ novelId: 7 });
-    vi.mocked(novelRepository.get).mockResolvedValue(baseNovel);
+    vi.mocked(bookLifecycleService.importBook).mockResolvedValue(baseNovel);
 
     const novel = await importBookAndRefreshLibrary(file, {
       onProgress: vi.fn(),
@@ -118,7 +111,7 @@ describe('application library use-cases', () => {
 
     expect(ensureDefaultTocRules).toHaveBeenCalledTimes(1);
     expect(tocRuleRepository.getEnabledChapterDetectionRules).toHaveBeenCalledTimes(1);
-    expect(bookImportService.importBook).toHaveBeenCalledWith(
+    expect(bookLifecycleService.importBook).toHaveBeenCalledWith(
       file,
       [{ rule: '^Chapter', source: 'default' }],
       { onProgress: expect.any(Function) },
@@ -157,17 +150,8 @@ describe('application library use-cases', () => {
   });
 
   it('deleteNovelAndCleanupArtifacts clears analysis and reader state before deleting the novel aggregate', async () => {
-    storage.cache.set(CACHE_KEYS.readerState(5), {
-      chapterIndex: 0,
-      mode: 'summary',
-    });
-    vi.mocked(novelRepository.delete).mockResolvedValue({ message: 'Novel deleted' });
-
     await deleteNovelAndCleanupArtifacts(5);
 
-    expect(storage.cache.getJson(CACHE_KEYS.readerState(5))).toBeNull();
-    expect(analysisService.deleteArtifacts).toHaveBeenCalledWith(5);
-    expect(deleteReaderArtifacts).toHaveBeenCalledWith(5);
-    expect(novelRepository.delete).toHaveBeenCalledWith(5);
+    expect(bookLifecycleService.deleteNovel).toHaveBeenCalledWith(5);
   });
 });

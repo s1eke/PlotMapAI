@@ -1,14 +1,7 @@
 import type { ChapterDetectionRule } from '@shared/text-processing';
-import type {
-  ChapterImageRecord,
-  ChapterRecord,
-  CoverImageRecord,
-  NovelImageGalleryEntryRecord,
-  NovelRecord,
-} from '@infra/db/library';
+import type { BookChapter } from '@shared/contracts';
 
 import { debugLog } from '@shared/debug';
-import { db } from '@infra/db';
 import { AppErrorCode, createAppError, toAppError } from '@shared/errors';
 import {
   buildChapterImageGalleryEntries,
@@ -24,8 +17,29 @@ export interface ImportBookOptions {
   onProgress?: (progress: BookImportProgress) => void;
 }
 
-export interface ImportedBookRecord {
-  novelId: number;
+export interface PreparedBookImport {
+  author: string;
+  chapterCount: number;
+  chapters: BookChapter[];
+  coverBlob: Blob | null;
+  description: string;
+  fileHash: string;
+  fileType: string;
+  imageGalleryEntries: Array<{
+    blockIndex: number;
+    chapterIndex: number;
+    imageKey: string;
+    order: number;
+  }>;
+  images: Array<{
+    blob: Blob;
+    imageKey: string;
+  }>;
+  originalEncoding: string;
+  originalFilename: string;
+  tags: string[];
+  title: string;
+  totalWords: number;
 }
 
 function emitProgress(
@@ -36,11 +50,11 @@ function emitProgress(
 }
 
 export const bookImportService = {
-  async importBook(
+  async parseBookImport(
     file: File,
     tocRules: ChapterDetectionRule[],
     options: ImportBookOptions = {},
-  ): Promise<ImportedBookRecord> {
+  ): Promise<PreparedBookImport> {
     const filename = file.name;
     const ext = filename.toLowerCase().split('.').pop();
     if (ext !== 'txt' && ext !== 'epub') {
@@ -78,7 +92,6 @@ export const bookImportService = {
     const normalizedChapters = normalizeImportedChapters(parsed.chapters);
     const totalWords = normalizedChapters.reduce((sum, chapter) => sum + chapter.content.length, 0);
 
-    const now = new Date().toISOString();
     const imageGalleryEntries = sortChapterImageGalleryEntries(
       normalizedChapters.flatMap((chapter, chapterIndex) => {
         options.signal?.throwIfAborted?.();
@@ -89,70 +102,34 @@ export const bookImportService = {
         });
       }),
     );
-    let novelId = 0;
-
     emitProgress(options.onProgress, { progress: 96, stage: 'finalizing' });
-    await db.transaction(
-      'rw',
-      [
-        db.novels,
-        db.chapters,
-        db.coverImages,
-        db.chapterImages,
-        db.novelImageGalleryEntries,
-      ],
-      async () => {
-        const novelRecord = {
-          title: parsed.title,
-          author: parsed.author,
-          description: parsed.description,
-          tags: parsed.tags,
-          fileType: ext,
-          fileHash: parsed.fileHash,
-          coverPath: parsed.coverBlob ? 'has_cover' : '',
-          originalFilename: filename,
-          originalEncoding: parsed.encoding || 'utf-8',
-          totalWords,
-          chapterCount: normalizedChapters.length,
-          createdAt: now,
-        } satisfies Omit<NovelRecord, 'id'>;
-
-        novelId = await db.novels.add(novelRecord);
-        if (parsed.coverBlob) {
-          const coverImageRecord = {
-            novelId,
-            blob: parsed.coverBlob,
-          } satisfies Omit<CoverImageRecord, 'id'>;
-
-          await db.coverImages.add(coverImageRecord);
-        }
-        await db.chapters.bulkAdd(normalizedChapters.map((chapter, chapterIndex) => ({
-          novelId,
-          title: chapter.title,
-          content: chapter.content,
-          chapterIndex,
-          wordCount: chapter.content.length,
-        } satisfies Omit<ChapterRecord, 'id'>)));
-        if (parsed.images.length > 0) {
-          await db.chapterImages.bulkAdd(parsed.images.map((image) => ({
-            novelId,
-            imageKey: image.imageKey,
-            blob: image.blob,
-          } satisfies Omit<ChapterImageRecord, 'id'>)));
-        }
-        if (imageGalleryEntries.length > 0) {
-          await db.novelImageGalleryEntries.bulkAdd(imageGalleryEntries.map((entry) => ({
-            novelId,
-            chapterIndex: entry.chapterIndex,
-            blockIndex: entry.blockIndex,
-            imageKey: entry.imageKey,
-            order: entry.order,
-          } satisfies Omit<NovelImageGalleryEntryRecord, 'id'>)));
-        }
-      },
-    );
-
     emitProgress(options.onProgress, { progress: 100, stage: 'finalizing' });
-    return { novelId };
+
+    return {
+      title: parsed.title,
+      author: parsed.author,
+      description: parsed.description,
+      tags: parsed.tags,
+      fileType: ext,
+      fileHash: parsed.fileHash,
+      coverBlob: parsed.coverBlob,
+      originalFilename: filename,
+      originalEncoding: parsed.encoding || 'utf-8',
+      totalWords,
+      chapterCount: normalizedChapters.length,
+      chapters: normalizedChapters.map((chapter, chapterIndex) => ({
+        chapterIndex,
+        title: chapter.title,
+        content: chapter.content,
+        wordCount: chapter.content.length,
+      })),
+      images: parsed.images.map((image) => ({
+        imageKey: image.imageKey,
+        blob: image.blob,
+      })),
+      imageGalleryEntries,
+    };
   },
 };
+
+export type ImportedBookRecord = PreparedBookImport;

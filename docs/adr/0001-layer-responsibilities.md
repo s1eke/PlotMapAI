@@ -58,6 +58,7 @@
 - 需要被多个 domain 复用且不含业务语义时放进 `shared`
 - 只要代码开始依赖路由壳、PWA 壳、应用入口生命周期，就应放进 `app`
 - 一旦某层需要暴露给外部消费，必须通过明确公共 API，而不是穿透内部目录
+- Dexie 表 ownership 也是领域边界的一部分；`@infra/db` 只提供存储实现，不自动把所有表变成“公共接口”
 
 ## Guardrails
 
@@ -65,3 +66,4 @@
 - `domains` 不得导入 `@app/*` 或 `@application/*`
 - `shared`、`infra` 不得导入 domain
 - 新增公共能力时，先判断它属于 domain、shared 还是 infra，再决定目录
+- 跨 domain 读取某张表时，先确认 owner domain，并通过 owner API 或 application 读模型访问，不能把表结构当成领域契约

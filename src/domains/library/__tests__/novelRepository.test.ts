@@ -124,76 +124,48 @@ describe('novelRepository', () => {
     });
   });
 
-  it('backfills missing chapterCount values in list() and persists them', async () => {
-    const legacyNovelId = await db.table('novels').add(createLegacyNovelRecordFixture({
-      createdAt: '2026-04-03T00:00:00.000Z',
-      fileHash: 'legacy-list-hash',
-      originalFilename: 'legacy-list.txt',
-      title: 'Legacy List Novel',
-    })) as number;
-    await db.chapters.bulkAdd([
-      {
-        chapterIndex: 0,
-        content: 'c1',
-        novelId: legacyNovelId,
-        title: 'Chapter 1',
-        wordCount: 2,
-      },
-      {
-        chapterIndex: 1,
-        content: 'c2',
-        novelId: legacyNovelId,
-        title: 'Chapter 2',
-        wordCount: 2,
-      },
-    ]);
+  it('createImportedNovel persists the shell aggregate with stored chapterCount', async () => {
+    const coverBlob = new Blob(['cover']);
 
-    const novels = await novelRepository.list();
-    const storedNovel = await db.novels.get(legacyNovelId);
-
-    expect(novels[0]).toMatchObject({
-      id: legacyNovelId,
+    const novelId = await novelRepository.createImportedNovel({
+      title: 'Imported Novel',
+      author: 'Imported Author',
+      description: 'Imported Description',
+      tags: ['fiction'],
+      fileType: 'txt',
+      fileHash: 'imported-hash',
+      originalFilename: 'imported.txt',
+      originalEncoding: 'utf-8',
+      totalWords: 42,
       chapterCount: 2,
-      title: 'Legacy List Novel',
+      coverBlob,
     });
-    expect(storedNovel?.chapterCount).toBe(2);
+    const storedNovel = await db.novels.get(novelId);
+    const storedCover = await db.coverImages.where('novelId').equals(novelId).first();
+
+    expect(storedNovel).toMatchObject({
+      author: 'Imported Author',
+      chapterCount: 2,
+      coverPath: 'has_cover',
+      description: 'Imported Description',
+      fileHash: 'imported-hash',
+      originalFilename: 'imported.txt',
+      title: 'Imported Novel',
+      totalWords: 42,
+    });
+    expect(storedCover).toMatchObject({
+      novelId,
+    });
   });
 
-  it('backfills missing chapterCount in get() and persists it', async () => {
+  it('getNovelTitle returns the stored novel title', async () => {
     const legacyNovelId = await db.table('novels').add(createLegacyNovelRecordFixture({
       fileHash: 'legacy-get-hash',
       originalFilename: 'legacy-get.txt',
       title: 'Legacy Get Novel',
     })) as number;
-    await db.chapters.bulkAdd([
-      {
-        chapterIndex: 0,
-        content: 'c1',
-        novelId: legacyNovelId,
-        title: 'Chapter 1',
-        wordCount: 2,
-      },
-      {
-        chapterIndex: 1,
-        content: 'c2',
-        novelId: legacyNovelId,
-        title: 'Chapter 2',
-        wordCount: 2,
-      },
-      {
-        chapterIndex: 2,
-        content: 'c3',
-        novelId: legacyNovelId,
-        title: 'Chapter 3',
-        wordCount: 2,
-      },
-    ]);
 
-    const novel = await novelRepository.get(legacyNovelId);
-    const storedNovel = await db.novels.get(legacyNovelId);
-
-    expect(novel.chapterCount).toBe(3);
-    expect(storedNovel?.chapterCount).toBe(3);
+    await expect(novelRepository.getNovelTitle(legacyNovelId)).resolves.toBe('Legacy Get Novel');
   });
 
   it('deletes only the library aggregate and leaves reader and analysis state alone', async () => {
@@ -262,10 +234,10 @@ describe('novelRepository', () => {
     await novelRepository.delete(id);
 
     await expect(db.novels.count()).resolves.toBe(0);
-    await expect(db.chapters.count()).resolves.toBe(0);
+    await expect(db.chapters.count()).resolves.toBe(1);
     await expect(db.coverImages.count()).resolves.toBe(0);
-    await expect(db.chapterImages.count()).resolves.toBe(0);
-    await expect(db.novelImageGalleryEntries.count()).resolves.toBe(0);
+    await expect(db.chapterImages.count()).resolves.toBe(1);
+    await expect(db.novelImageGalleryEntries.count()).resolves.toBe(1);
     await expect(db.readingProgress.count()).resolves.toBe(1);
     await expect(db.readerRenderCache.count()).resolves.toBe(1);
   });

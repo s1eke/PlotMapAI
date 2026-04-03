@@ -5,6 +5,7 @@ import type {
   ChapterAnalysisResult,
   CharacterGraphResponse,
 } from '@shared/contracts';
+import type { Transaction } from 'dexie';
 
 import type { RuntimeAnalysisConfig } from './services/types';
 import {
@@ -87,7 +88,7 @@ export const analysisService = {
     return startAnalysis(input);
   },
 
-  deleteArtifacts: async (novelId: number): Promise<void> => {
-    return deletePersistedAnalysisArtifacts(novelId);
+  deleteArtifacts: async (novelId: number, transaction?: Transaction): Promise<void> => {
+    return deletePersistedAnalysisArtifacts(novelId, transaction);
   },
 };

@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { loadPurifiedBookChapters } from '@application/services/readerContentController';
 import { analysisService, buildRuntimeAnalysisConfig } from '@domains/analysis';
 import { novelRepository } from '@domains/library';
-import { loadAndPurifyChapters } from '@domains/reader-content';
 import { getAiConfig } from '@domains/settings';
 
 import { startNovelAnalysis } from '../analysis';
@@ -20,8 +20,8 @@ vi.mock('@domains/library', () => ({
   },
 }));
 
-vi.mock('@domains/reader-content', () => ({
-  loadAndPurifyChapters: vi.fn(),
+vi.mock('@application/services/readerContentController', () => ({
+  loadPurifiedBookChapters: vi.fn(),
 }));
 
 vi.mock('@domains/settings', () => ({
@@ -51,7 +51,7 @@ describe('application analysis use-cases', () => {
       title: 'Mock Novel',
       totalWords: 100,
     });
-    vi.mocked(loadAndPurifyChapters).mockResolvedValue([
+    vi.mocked(loadPurifiedBookChapters).mockResolvedValue([
       {
         chapterIndex: 0,
         content: 'chapter content',

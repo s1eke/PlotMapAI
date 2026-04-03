@@ -1,3 +1,5 @@
+import type { Transaction } from 'dexie';
+
 import { db } from '@infra/db';
 
 import type { StoredReaderState } from '@shared/contracts/reader';
@@ -32,4 +34,15 @@ export async function replaceReadingProgress(
   const { id: _unusedId, ...record } = progressRecord;
 
   await db.readingProgress.put(existing ? progressRecord : record);
+}
+
+export async function deleteReadingProgress(
+  novelId: number,
+  transaction?: Transaction,
+): Promise<void> {
+  const readingProgressTable = transaction
+    ? transaction.table('readingProgress')
+    : db.readingProgress;
+
+  await readingProgressTable.where('novelId').equals(novelId).delete();
 }

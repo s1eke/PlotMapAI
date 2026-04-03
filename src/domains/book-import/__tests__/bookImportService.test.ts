@@ -1,7 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { db } from '@infra/db';
-
 import { bookImportService } from '../bookImportService';
 import { parseBook } from '../services/bookParser';
 
@@ -12,9 +10,7 @@ vi.mock('../services/bookParser', () => ({
 const tocRules = [{ rule: '^Chapter', source: 'default' as const }];
 
 describe('bookImportService', () => {
-  beforeEach(async () => {
-    await db.delete();
-    await db.open();
+  beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(parseBook).mockResolvedValue({
       author: 'Parsed Author',
@@ -34,20 +30,38 @@ describe('bookImportService', () => {
     });
   });
 
-  it('stores imported novels and chapters and returns the created novel id', async () => {
+  it('returns prepared book content and metadata for application persistence', async () => {
     const file = new File(['content'], 'test.txt', { type: 'text/plain' });
 
-    const result = await bookImportService.importBook(file, tocRules);
+    const result = await bookImportService.parseBookImport(file, tocRules);
 
-    expect(result).toEqual({ novelId: 1 });
-    await expect(db.novels.get(result.novelId)).resolves.toMatchObject({
-      chapterCount: 2,
+    expect(result).toMatchObject({
       title: 'Parsed Novel',
+      author: 'Parsed Author',
+      chapterCount: 2,
+      fileHash: 'parsedhash',
+      fileType: 'txt',
+      originalFilename: 'test.txt',
+      originalEncoding: 'utf-8',
+      totalWords: 18,
     });
-    await expect(db.chapters.where('novelId').equals(result.novelId).count()).resolves.toBe(2);
+    expect(result.chapters).toEqual([
+      {
+        chapterIndex: 0,
+        title: 'Ch1',
+        content: 'Content 1',
+        wordCount: 9,
+      },
+      {
+        chapterIndex: 1,
+        title: 'Ch2',
+        content: 'Content 2',
+        wordCount: 9,
+      },
+    ]);
   });
 
-  it('builds and stores the full-book image index during import', async () => {
+  it('builds the full-book image index during parsing', async () => {
     vi.mocked(parseBook).mockResolvedValueOnce({
       author: 'Parsed Author',
       chapters: [
@@ -72,30 +86,16 @@ describe('bookImportService', () => {
     });
     const file = new File(['content'], 'illustrated.txt', { type: 'text/plain' });
 
-    const result = await bookImportService.importBook(file, tocRules);
-    const storedEntries = (await db.novelImageGalleryEntries
-      .where('novelId')
-      .equals(result.novelId)
-      .toArray())
-      .sort((left, right) => (
-        left.chapterIndex - right.chapterIndex
-        || left.order - right.order
-        || left.blockIndex - right.blockIndex
-      ));
+    const result = await bookImportService.parseBookImport(file, tocRules);
 
-    expect(storedEntries.map((entry) => ({
-      blockIndex: entry.blockIndex,
-      chapterIndex: entry.chapterIndex,
-      imageKey: entry.imageKey,
-      order: entry.order,
-    }))).toEqual([
+    expect(result.imageGalleryEntries).toEqual([
       { blockIndex: 1, chapterIndex: 0, imageKey: 'cover', order: 0 },
       { blockIndex: 3, chapterIndex: 0, imageKey: 'map', order: 1 },
       { blockIndex: 2, chapterIndex: 1, imageKey: 'diagram', order: 0 },
     ]);
   });
 
-  it('stores chapter content without a duplicated leading title line', async () => {
+  it('normalizes chapter content without a duplicated leading title line', async () => {
     vi.mocked(parseBook).mockResolvedValueOnce({
       author: 'Parsed Author',
       chapters: [
@@ -114,26 +114,18 @@ describe('bookImportService', () => {
     });
     const file = new File(['content'], 'normalized.txt', { type: 'text/plain' });
 
-    const result = await bookImportService.importBook(file, tocRules);
-    const storedChapters = await db.chapters
-      .where('novelId')
-      .equals(result.novelId)
-      .sortBy('chapterIndex');
+    const result = await bookImportService.parseBookImport(file, tocRules);
 
-    expect(storedChapters.map((chapter) => ({
-      content: chapter.content,
-      title: chapter.title,
-      wordCount: chapter.wordCount,
-    }))).toEqual([
-      { content: 'Body 1', title: 'Ch1', wordCount: 6 },
-      { content: 'Body 2', title: 'Ch2', wordCount: 6 },
+    expect(result.chapters).toEqual([
+      { chapterIndex: 0, content: 'Body 1', title: 'Ch1', wordCount: 6 },
+      { chapterIndex: 1, content: 'Body 2', title: 'Ch2', wordCount: 6 },
     ]);
   });
 
   it('rejects unsupported file types', async () => {
     const file = new File(['data'], 'test.pdf', { type: 'application/pdf' });
 
-    await expect(bookImportService.importBook(file, tocRules)).rejects.toThrow(
+    await expect(bookImportService.parseBookImport(file, tocRules)).rejects.toThrow(
       'Only .txt and .epub files are supported',
     );
   });
@@ -141,7 +133,7 @@ describe('bookImportService', () => {
   it('passes application-selected toc rules to parseBook unchanged', async () => {
     const file = new File(['content'], 'test.txt', { type: 'text/plain' });
 
-    await bookImportService.importBook(file, [
+    await bookImportService.parseBookImport(file, [
       { rule: '^第\\d+章', source: 'default' },
       { rule: '^\\d+[.、:：]\\s*.+$', source: 'custom' },
     ]);

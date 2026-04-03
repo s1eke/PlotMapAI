@@ -1,5 +1,5 @@
 import { debugLog } from '@shared/debug';
-import { loadRulesFromJson } from '@shared/text-processing';
+import { loadRulesFromJson, type PurifyRule } from '@shared/text-processing';
 import { db } from '@infra/db';
 import { AppErrorCode, createAppError } from '@shared/errors';
 import { mapPurificationRuleRecordToDomain } from './persistenceMappers';
@@ -19,6 +19,23 @@ export const purificationRuleRepository = {
   getPurificationRules: async (): Promise<PurificationRule[]> => {
     const rules = await db.purificationRules.orderBy('order').toArray();
     return rules.map(mapPurificationRuleRecordToDomain);
+  },
+
+  getEnabledPurificationRules: async (): Promise<PurifyRule[]> => {
+    const rules = await db.purificationRules.filter((rule) => rule.isEnabled).sortBy('order');
+    return rules.map((rule) => ({
+      name: rule.name,
+      pattern: rule.pattern,
+      replacement: rule.replacement,
+      is_regex: rule.isRegex,
+      is_enabled: rule.isEnabled,
+      order: rule.order,
+      scope_title: rule.scopeTitle,
+      scope_content: rule.scopeContent,
+      book_scope: rule.bookScope,
+      exclude_book_scope: rule.excludeBookScope,
+      exclusive_group: rule.exclusiveGroup,
+    }));
   },
 
   createPurificationRule: async (data: Partial<PurificationRule>): Promise<PurificationRule> => {

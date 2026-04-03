@@ -1,257 +1,82 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { db } from '@infra/db';
-import { readerContentService, loadAndPurifyChapters } from '../readerContentService';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import {
+  registerReaderContentController,
+  resetReaderContentControllerForTests,
+} from '../readerContentController';
+import { readerContentService } from '../readerContentService';
 
 describe('readerContentService', () => {
-  beforeEach(async () => {
-    await db.delete();
-    await db.open();
-    // Seed a novel
-    await db.novels.add({
-      title: 'Reader Novel',
-      author: 'Author',
-      description: '',
-      tags: [],
-      fileType: 'txt',
-      fileHash: 'rh',
-      coverPath: '',
-      originalFilename: 'r.txt',
-      originalEncoding: 'utf-8',
-      totalWords: 300,
-      chapterCount: 3,
-      createdAt: new Date().toISOString(),
+  const controller = {
+    getChapters: vi.fn(),
+    getChapterContent: vi.fn(),
+    getImageBlob: vi.fn(),
+    getImageGalleryEntries: vi.fn(),
+    loadPurifiedBookChapters: vi.fn(),
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetReaderContentControllerForTests();
+    registerReaderContentController(controller);
+  });
+
+  it('delegates chapter list reads to the registered controller', async () => {
+    controller.getChapters.mockResolvedValueOnce([
+      { index: 0, title: 'Chapter 1', wordCount: 12 },
+    ]);
+
+    await expect(readerContentService.getChapters(1)).resolves.toEqual([
+      { index: 0, title: 'Chapter 1', wordCount: 12 },
+    ]);
+    expect(controller.getChapters).toHaveBeenCalledWith(1, {});
+  });
+
+  it('delegates chapter content reads to the registered controller', async () => {
+    controller.getChapterContent.mockResolvedValueOnce({
+      index: 1,
+      title: 'Chapter 2',
+      content: 'Body',
+      wordCount: 4,
+      totalChapters: 2,
+      hasPrev: true,
+      hasNext: false,
     });
-    const novel = await db.novels.orderBy('id').last();
-    const novelId = novel!.id;
-    await db.chapters.bulkAdd([
-      { novelId, title: 'Ch1', content: 'Content one', chapterIndex: 0, wordCount: 11 },
-      { novelId, title: 'Ch2', content: 'Content two', chapterIndex: 1, wordCount: 11 },
-      { novelId, title: 'Ch3', content: 'Content three', chapterIndex: 2, wordCount: 13 },
+
+    await expect(readerContentService.getChapterContent(1, 1)).resolves.toEqual({
+      index: 1,
+      title: 'Chapter 2',
+      content: 'Body',
+      wordCount: 4,
+      totalChapters: 2,
+      hasPrev: true,
+      hasNext: false,
+    });
+    expect(controller.getChapterContent).toHaveBeenCalledWith(1, 1, {});
+  });
+
+  it('delegates image blob and gallery reads to the registered controller', async () => {
+    const blob = new Blob(['image']);
+    controller.getImageBlob.mockResolvedValueOnce(blob);
+    controller.getImageGalleryEntries.mockResolvedValueOnce([
+      { chapterIndex: 0, blockIndex: 1, imageKey: 'map', order: 0 },
+    ]);
+
+    await expect(readerContentService.getImageBlob(1, 'map')).resolves.toBe(blob);
+    await expect(readerContentService.getImageGalleryEntries(1)).resolves.toEqual([
+      { chapterIndex: 0, blockIndex: 1, imageKey: 'map', order: 0 },
     ]);
   });
 
-  async function getNovelId(): Promise<number> {
-    const novel = await db.novels.orderBy('id').last();
-    return novel!.id;
-  }
+  it('creates object URLs from delegated image blobs', async () => {
+    const blob = new Blob(['image']);
+    const originalCreateObjectURL = URL.createObjectURL;
+    URL.createObjectURL = vi.fn(() => 'blob:test') as typeof URL.createObjectURL;
+    controller.getImageBlob.mockResolvedValueOnce(blob);
 
-  it('getChapters returns chapter list', async () => {
-    const novelId = await getNovelId();
-    const chapters = await readerContentService.getChapters(novelId);
-    expect(chapters.length).toBe(3);
-    expect(chapters[0].title).toBe('Ch1');
-    expect(chapters[0].index).toBe(0);
-  });
+    await expect(readerContentService.getImageUrl(1, 'map')).resolves.toBe('blob:test');
+    expect(URL.createObjectURL).toHaveBeenCalledWith(blob);
 
-  it('getChapterContent returns content with navigation info', async () => {
-    const novelId = await getNovelId();
-    const ch = await readerContentService.getChapterContent(novelId, 1);
-    expect(ch.title).toBe('Ch2');
-    expect(ch.content).toBe('Content two');
-    expect(ch.hasPrev).toBe(true);
-    expect(ch.hasNext).toBe(true);
-    expect(ch.totalChapters).toBe(3);
-  });
-
-  it('getChapterContent marks first chapter hasPrev=false', async () => {
-    const novelId = await getNovelId();
-    const ch = await readerContentService.getChapterContent(novelId, 0);
-    expect(ch.hasPrev).toBe(false);
-    expect(ch.hasNext).toBe(true);
-  });
-
-  it('getChapterContent marks last chapter hasNext=false', async () => {
-    const novelId = await getNovelId();
-    const ch = await readerContentService.getChapterContent(novelId, 2);
-    expect(ch.hasPrev).toBe(true);
-    expect(ch.hasNext).toBe(false);
-  });
-
-  it('getChapterContent throws for non-existent chapter', async () => {
-    const novelId = await getNovelId();
-    await expect(readerContentService.getChapterContent(novelId, 99)).rejects.toThrow('Chapter not found');
-  });
-
-  it('getImageUrl returns null for non-existent image', async () => {
-    const novelId = await getNovelId();
-    const result = await readerContentService.getImageUrl(novelId, 'nonexistent');
-    expect(result).toBeNull();
-  });
-
-  it('getImageBlob returns the stored chapter image blob', async () => {
-    const novelId = await getNovelId();
-    const blob = new Blob(['chapter-image'], { type: 'image/png' });
-    await db.chapterImages.add({
-      novelId,
-      imageKey: 'cover',
-      blob,
-    });
-
-    const result = await readerContentService.getImageBlob(novelId, 'cover');
-
-    expect(result).not.toBeNull();
-  });
-
-  it('getImageGalleryEntries returns the stored full-book image order', async () => {
-    const novelId = await getNovelId();
-    await db.novelImageGalleryEntries.bulkAdd([
-      {
-        novelId,
-        chapterIndex: 1,
-        blockIndex: 5,
-        imageKey: 'late',
-        order: 1,
-      },
-      {
-        novelId,
-        chapterIndex: 0,
-        blockIndex: 3,
-        imageKey: 'first',
-        order: 0,
-      },
-      {
-        novelId,
-        chapterIndex: 1,
-        blockIndex: 2,
-        imageKey: 'second',
-        order: 0,
-      },
-    ]);
-
-    const result = await readerContentService.getImageGalleryEntries(novelId);
-
-    expect(result).toEqual([
-      { blockIndex: 3, chapterIndex: 0, imageKey: 'first', order: 0 },
-      { blockIndex: 2, chapterIndex: 1, imageKey: 'second', order: 0 },
-      { blockIndex: 5, chapterIndex: 1, imageKey: 'late', order: 1 },
-    ]);
-  });
-});
-
-describe('loadAndPurifyChapters', () => {
-  beforeEach(async () => {
-    await db.delete();
-    await db.open();
-    await db.novels.add({
-      title: 'Purify Novel',
-      author: '',
-      description: '',
-      tags: [],
-      fileType: 'txt',
-      fileHash: 'ph',
-      coverPath: '',
-      originalFilename: 'p.txt',
-      originalEncoding: 'utf-8',
-      totalWords: 100,
-      chapterCount: 1,
-      createdAt: new Date().toISOString(),
-    });
-    const novel = await db.novels.orderBy('id').last();
-    await db.chapters.add({
-      novelId: novel!.id,
-      title: 'Chapter One',
-      content: 'Hello world',
-      chapterIndex: 0,
-      wordCount: 11,
-    });
-  });
-
-  it('returns raw chapters when no purification rules', async () => {
-    const novel = await db.novels.orderBy('id').last();
-    const chapters = await loadAndPurifyChapters(novel!.id);
-    expect(chapters.length).toBe(1);
-    expect(chapters[0].title).toBe('Chapter One');
-    expect(chapters[0].content).toBe('Hello world');
-  });
-
-  it('applies purification rules when enabled', async () => {
-    await db.purificationRules.add({
-      externalId: null,
-      name: 'Replace Hello',
-      group: 'test',
-      pattern: 'Hello',
-      replacement: 'Hi',
-      isRegex: false,
-      isEnabled: true,
-      order: 10,
-      scopeTitle: true,
-      scopeContent: true,
-      bookScope: '',
-      excludeBookScope: '',
-      timeoutMs: 3000,
-      isDefault: false,
-      createdAt: new Date().toISOString(),
-    });
-    const novel = await db.novels.orderBy('id').last();
-    const chapters = await loadAndPurifyChapters(novel!.id);
-    expect(chapters[0].content).toBe('Hi world');
-  });
-
-  it('does not apply disabled rules', async () => {
-    await db.purificationRules.add({
-      externalId: null,
-      name: 'Disabled Rule',
-      group: 'test',
-      pattern: 'Hello',
-      replacement: 'REPLACED',
-      isRegex: false,
-      isEnabled: false,
-      order: 10,
-      scopeTitle: true,
-      scopeContent: true,
-      bookScope: '',
-      excludeBookScope: '',
-      timeoutMs: 3000,
-      isDefault: false,
-      createdAt: new Date().toISOString(),
-    });
-    const novel = await db.novels.orderBy('id').last();
-    const chapters = await loadAndPurifyChapters(novel!.id);
-    expect(chapters[0].content).toBe('Hello world');
-  });
-
-  it('respects order precedence for mutually exclusive rules', async () => {
-    await db.purificationRules.bulkAdd([
-      {
-        externalId: null,
-        name: 'Indent Two',
-        group: 'formatting',
-        pattern: '(^|\\n)[ \\t　]*(?=\\S)',
-        replacement: '$1　　',
-        isRegex: true,
-        isEnabled: true,
-        order: 0,
-        scopeTitle: false,
-        scopeContent: true,
-        bookScope: '',
-        excludeBookScope: '',
-        exclusiveGroup: 'indentation',
-        isDefault: false,
-        timeoutMs: 3000,
-        createdAt: new Date().toISOString(),
-      },
-      {
-        externalId: null,
-        name: 'Flush Left',
-        group: 'formatting',
-        pattern: '(^|\\n)[ \\t　]+(?=\\S)',
-        replacement: '$1',
-        isRegex: true,
-        isEnabled: true,
-        order: 1,
-        scopeTitle: false,
-        scopeContent: true,
-        bookScope: '',
-        excludeBookScope: '',
-        exclusiveGroup: 'indentation',
-        isDefault: false,
-        timeoutMs: 3000,
-        createdAt: new Date().toISOString(),
-      },
-    ]);
-    const novel = await db.novels.orderBy('id').last();
-    const chapters = await loadAndPurifyChapters(novel!.id);
-
-    expect(chapters[0].content).toBe('　　Hello world');
+    URL.createObjectURL = originalCreateObjectURL;
   });
 });

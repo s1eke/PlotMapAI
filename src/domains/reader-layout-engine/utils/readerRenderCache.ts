@@ -1,3 +1,5 @@
+import type { Transaction } from 'dexie';
+
 import type { ReaderRenderCacheRecord as PersistedReaderRenderCacheRecord } from '@infra/db/reader';
 import type { ChapterContent } from '../readerContentService';
 import type { ReaderImageDimensions } from './readerImageResourceCache';
@@ -414,6 +416,17 @@ export function clearReaderRenderCacheMemoryForNovel(novelId: number): void {
       memoryRenderCache.delete(cacheKey);
     }
   }
+}
+
+export async function deletePersistedReaderRenderCache(
+  novelId: number,
+  transaction?: Transaction,
+): Promise<void> {
+  const readerRenderCacheTable = transaction
+    ? transaction.table('readerRenderCache')
+    : db.readerRenderCache;
+
+  await readerRenderCacheTable.where('novelId').equals(novelId).delete();
 }
 
 export function coercePagedTree(

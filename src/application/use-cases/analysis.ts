@@ -6,14 +6,15 @@ import {
   type AnalysisExecutionContext,
 } from '@domains/analysis';
 import { novelRepository } from '@domains/library';
-import { loadAndPurifyChapters } from '@domains/reader-content';
 import { getAiConfig } from '@domains/settings';
+
+import { loadPurifiedBookChapters } from '@application/services/readerContentController';
 
 async function loadAnalysisExecutionContext(novelId: number): Promise<AnalysisExecutionContext> {
   const [storedConfig, novel, chapters] = await Promise.all([
     getAiConfig(),
     novelRepository.get(novelId),
-    loadAndPurifyChapters(novelId),
+    loadPurifiedBookChapters(novelId),
   ]);
 
   return {

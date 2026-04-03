@@ -1,6 +1,10 @@
-export { readerContentService, loadAndPurifyChapters } from './readerContentService';
+export {
+  registerReaderContentController,
+  type ReaderContentController,
+  type ReaderTextProcessingOptions,
+} from './readerContentController';
+export { readerContentService } from './readerContentService';
 export type { Chapter, ChapterContent } from '@shared/contracts/reader';
-export { deleteReaderArtifacts } from './readerArtifactsService';
 export { useReaderChapterData } from './hooks/useReaderChapterData';
 export type {
   ReaderChapterCacheApi,

@@ -24,6 +24,7 @@ export {
   shouldUseLocatorAsPrimaryPosition,
 } from './state';
 export {
+  deleteReadingProgress,
   readReadingProgress,
   replaceReadingProgress,
   toReadingProgress,

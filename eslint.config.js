@@ -70,6 +70,40 @@ export default defineConfig([
     },
   },
   {
+    files: ['src/domains/book-import/**/*.{ts,tsx}'],
+    ignores: ['src/domains/book-import/**/__tests__/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['@infra/db', '@infra/db/*'],
+              message: 'book-import is parse-only and must not access Dexie directly.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['src/domains/reader-content/**/*.{ts,tsx}'],
+    ignores: ['src/domains/reader-content/**/__tests__/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['@infra/db', '@infra/db/*'],
+              message: 'reader-content must consume application-registered read models instead of Dexie directly.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ['src/domains/reader-*/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-imports': [

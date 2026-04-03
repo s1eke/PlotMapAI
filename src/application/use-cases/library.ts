@@ -3,12 +3,12 @@ import type { NovelView } from '@domains/library';
 import type { AppError } from '@shared/errors';
 
 import { analysisService } from '@domains/analysis';
-import { bookImportService } from '@domains/book-import';
 import { novelRepository } from '@domains/library';
-import { deleteReaderArtifacts, loadAndPurifyChapters } from '@domains/reader-content';
 import { ensureDefaultTocRules, tocRuleRepository } from '@domains/settings';
-import { CACHE_KEYS, storage } from '@infra/storage';
 import { AppErrorCode, toAppError } from '@shared/errors';
+
+import { bookLifecycleService } from '@application/services/bookLifecycleService';
+import { loadPurifiedBookChapters } from '@application/services/readerContentController';
 
 export interface BookDetailAnalysisData {
   analysisStatus: Awaited<ReturnType<typeof analysisService.getStatus>> | null;
@@ -27,13 +27,7 @@ export interface CharacterGraphPageData {
 export async function deleteNovelAndCleanupArtifacts(
   novelId: number,
 ): Promise<{ message: string }> {
-  await Promise.all([
-    analysisService.deleteArtifacts(novelId),
-    deleteReaderArtifacts(novelId),
-  ]);
-  await novelRepository.delete(novelId);
-  storage.cache.remove(CACHE_KEYS.readerState(novelId));
-  return { message: 'Novel deleted' };
+  return bookLifecycleService.deleteNovel(novelId);
 }
 
 export async function importBookAndRefreshLibrary(
@@ -42,9 +36,7 @@ export async function importBookAndRefreshLibrary(
 ): Promise<NovelView> {
   await ensureDefaultTocRules();
   const tocRules = await tocRuleRepository.getEnabledChapterDetectionRules();
-  const { novelId } = await bookImportService.importBook(file, tocRules, options);
-  storage.cache.remove(CACHE_KEYS.readerState(novelId));
-  return novelRepository.get(novelId);
+  return bookLifecycleService.importBook(file, tocRules, options);
 }
 
 export async function loadBookDetailAnalysisStatus(
@@ -86,7 +78,7 @@ export async function loadCharacterGraphPageData(
 ): Promise<CharacterGraphPageData> {
   const [novel, chapters] = await Promise.all([
     novelRepository.get(novelId),
-    loadAndPurifyChapters(novelId),
+    loadPurifiedBookChapters(novelId),
   ]);
 
   return {

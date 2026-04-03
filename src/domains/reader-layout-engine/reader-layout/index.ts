@@ -1,6 +1,9 @@
 export type { ReaderLayoutEngineController } from './useReaderLayoutController';
 export { useReaderLayoutController } from './useReaderLayoutController';
-export { clearReaderRenderCacheMemoryForNovel } from '../utils/readerRenderCache';
+export {
+  clearReaderRenderCacheMemoryForNovel,
+  deletePersistedReaderRenderCache,
+} from '../utils/readerRenderCache';
 export {
   calculateVisibleScrollBlockRanges,
   resolveCurrentPagedLocator,

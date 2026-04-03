@@ -1,4 +1,6 @@
-import type { NovelRecord } from '@infra/db/library';
+import type { Transaction } from 'dexie';
+
+import type { CoverImageRecord, NovelRecord } from '@infra/db/library';
 
 import { db } from '@infra/db';
 import { AppErrorCode, createAppError } from '@shared/errors';
@@ -21,81 +23,90 @@ export interface NovelView {
   createdAt: string;
 }
 
-interface LegacyNovelRecord extends Omit<NovelRecord, 'chapterCount'> {
-  chapterCount?: number;
+export interface CreateImportedNovelInput {
+  author: string;
+  chapterCount: number;
+  coverBlob: Blob | null;
+  description: string;
+  fileHash: string;
+  fileType: string;
+  originalEncoding: string;
+  originalFilename: string;
+  tags: string[];
+  title: string;
+  totalWords: number;
 }
 
-function hasStoredChapterCount(novel: LegacyNovelRecord): novel is NovelRecord {
-  return Number.isFinite(novel.chapterCount);
+export interface DeleteNovelOptions {
+  releaseCoverResources?: boolean;
+  transaction?: Transaction;
 }
 
-async function buildChapterCountMap(novelIds: number[]): Promise<Map<number, number>> {
-  const counts = new Map<number, number>();
-  for (const novelId of novelIds) {
-    counts.set(novelId, 0);
-  }
-
-  if (novelIds.length === 0) {
-    return counts;
-  }
-
-  const chapters = await db.chapters.where('novelId').anyOf(novelIds).toArray();
-  for (const chapter of chapters) {
-    counts.set(chapter.novelId, (counts.get(chapter.novelId) ?? 0) + 1);
-  }
-
-  return counts;
+function getNovelTable(transaction?: Transaction) {
+  return transaction
+    ? transaction.table<NovelRecord, number>('novels') as typeof db.novels
+    : db.novels;
 }
 
-async function persistChapterCounts(counts: Map<number, number>): Promise<void> {
-  if (counts.size === 0) {
-    return;
-  }
-
-  await Promise.all(Array.from(counts.entries()).map(async ([novelId, chapterCount]) => {
-    await db.novels.update(novelId, { chapterCount });
-  }));
+function getCoverImageTable(transaction?: Transaction) {
+  return transaction
+    ? transaction.table<CoverImageRecord, number>('coverImages') as typeof db.coverImages
+    : db.coverImages;
 }
 
-async function ensureStoredChapterCounts(
-  novels: LegacyNovelRecord[],
-): Promise<NovelRecord[]> {
-  const missingIds = novels
-    .filter((novel) => !hasStoredChapterCount(novel))
-    .map((novel) => novel.id);
+async function createImportedNovelRecord(
+  input: CreateImportedNovelInput,
+  transaction?: Transaction,
+): Promise<number> {
+  const novelTable = getNovelTable(transaction);
+  const coverImageTable = getCoverImageTable(transaction);
+  const createdAt = new Date().toISOString();
+  const novelId = await novelTable.add({
+    title: input.title,
+    author: input.author,
+    description: input.description,
+    tags: input.tags,
+    fileType: input.fileType,
+    fileHash: input.fileHash,
+    coverPath: input.coverBlob ? 'has_cover' : '',
+    originalFilename: input.originalFilename,
+    originalEncoding: input.originalEncoding,
+    totalWords: input.totalWords,
+    chapterCount: input.chapterCount,
+    createdAt,
+  } satisfies Omit<NovelRecord, 'id'>);
 
-  if (missingIds.length === 0) {
-    return novels.map((novel) => ({
-      ...novel,
-      chapterCount: novel.chapterCount ?? 0,
-    }));
+  if (input.coverBlob) {
+    await coverImageTable.add({
+      novelId,
+      blob: input.coverBlob,
+    } satisfies Omit<CoverImageRecord, 'id'>);
   }
 
-  const counts = await buildChapterCountMap(missingIds);
-  await persistChapterCounts(counts);
+  return novelId;
+}
 
-  return novels.map((novel) => {
-    if (hasStoredChapterCount(novel)) {
-      return novel;
-    }
+async function deleteNovelRecord(
+  id: number,
+  transaction?: Transaction,
+): Promise<void> {
+  const novelTable = getNovelTable(transaction);
+  const coverImageTable = getCoverImageTable(transaction);
 
-    return {
-      ...novel,
-      chapterCount: counts.get(novel.id) ?? 0,
-    };
-  });
+  await Promise.all([
+    novelTable.delete(id),
+    coverImageTable.where('novelId').equals(id).delete(),
+  ]);
 }
 
 export const novelRepository = {
   async list(): Promise<NovelView[]> {
-    const novels = await db.novels.orderBy('createdAt').reverse().toArray();
-    const normalizedNovels = await ensureStoredChapterCounts(novels);
-
-    return normalizedNovels.map((novel) => mapNovelRecordToView(novel));
+    return (await db.novels.orderBy('createdAt').reverse().toArray())
+      .map((novel) => mapNovelRecordToView(novel));
   },
 
   async get(id: number): Promise<NovelView> {
-    const novel = await db.novels.get(id) as LegacyNovelRecord | undefined;
+    const novel = await db.novels.get(id);
     if (!novel) {
       throw createAppError({
         code: AppErrorCode.NOVEL_NOT_FOUND,
@@ -107,39 +118,57 @@ export const novelRepository = {
       });
     }
 
-    if (hasStoredChapterCount(novel)) {
-      return mapNovelRecordToView(novel);
-    }
-
-    const chapterCount = await db.chapters.where('novelId').equals(id).count();
-    await db.novels.update(id, { chapterCount });
-
-    return mapNovelRecordToView({
-      ...novel,
-      chapterCount,
-    });
+    return mapNovelRecordToView(novel);
   },
 
-  async delete(id: number): Promise<{ message: string }> {
-    await db.transaction(
-      'rw',
-      [
-        db.novels,
-        db.chapters,
-        db.coverImages,
-        db.chapterImages,
-        db.novelImageGalleryEntries,
-      ],
-      async () => {
-        await db.novels.delete(id);
-        await db.chapters.where('novelId').equals(id).delete();
-        await db.coverImages.where('novelId').equals(id).delete();
-        await db.chapterImages.where('novelId').equals(id).delete();
-        await db.novelImageGalleryEntries.where('novelId').equals(id).delete();
-      },
-    );
+  async getNovelTitle(id: number): Promise<string> {
+    const novel = await db.novels.get(id);
+    if (!novel) {
+      throw createAppError({
+        code: AppErrorCode.NOVEL_NOT_FOUND,
+        kind: 'not-found',
+        source: 'library',
+        userMessageKey: 'errors.NOVEL_NOT_FOUND',
+        debugMessage: 'Novel not found',
+        details: { novelId: id },
+      });
+    }
 
-    clearNovelCoverResourcesForNovel(id);
+    return novel.title;
+  },
+
+  async createImportedNovel(
+    input: CreateImportedNovelInput,
+    transaction?: Transaction,
+  ): Promise<number> {
+    if (transaction) {
+      return createImportedNovelRecord(input, transaction);
+    }
+
+    let novelId = 0;
+    await db.transaction('rw', [db.novels, db.coverImages], async () => {
+      novelId = await createImportedNovelRecord(input);
+    });
+    return novelId;
+  },
+
+  async delete(id: number, options: DeleteNovelOptions = {}): Promise<{ message: string }> {
+    const {
+      releaseCoverResources = options.transaction == null,
+      transaction,
+    } = options;
+
+    if (transaction) {
+      await deleteNovelRecord(id, transaction);
+    } else {
+      await db.transaction('rw', [db.novels, db.coverImages], async () => {
+        await deleteNovelRecord(id);
+      });
+    }
+
+    if (releaseCoverResources) {
+      clearNovelCoverResourcesForNovel(id);
+    }
 
     return { message: 'Novel deleted' };
   },

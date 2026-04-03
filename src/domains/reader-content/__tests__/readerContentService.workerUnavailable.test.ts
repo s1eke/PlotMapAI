@@ -1,65 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { db } from '@infra/db';
 import { AppErrorCode, createAppError } from '@shared/errors';
 
-const runPurifyChapterTask = vi.hoisted(() => vi.fn());
-const runPurifyChaptersTask = vi.hoisted(() => vi.fn());
-const runPurifyTitlesTask = vi.hoisted(() => vi.fn());
-
-vi.mock('@shared/text-processing', () => ({
-  runPurifyChapterTask,
-  runPurifyChaptersTask,
-  runPurifyTitlesTask,
-}));
+import {
+  registerReaderContentController,
+  resetReaderContentControllerForTests,
+} from '../readerContentController';
+import { readerContentService } from '../readerContentService';
 
 describe('readerContentService worker unavailable handling', () => {
-  beforeEach(async () => {
+  beforeEach(() => {
     vi.clearAllMocks();
-    await db.delete();
-    await db.open();
-    await db.novels.add({
-      title: 'Reader Novel',
-      author: 'Author',
-      description: '',
-      tags: [],
-      fileType: 'txt',
-      fileHash: 'reader-hash',
-      coverPath: '',
-      originalFilename: 'reader.txt',
-      originalEncoding: 'utf-8',
-      totalWords: 120,
-      chapterCount: 1,
-      createdAt: new Date().toISOString(),
-    });
-    const novel = await db.novels.orderBy('id').last();
-    await db.chapters.add({
-      novelId: novel!.id,
-      title: 'Chapter 1',
-      content: 'Chapter content',
-      chapterIndex: 0,
-      wordCount: 15,
-    });
-    await db.purificationRules.add({
-      externalId: null,
-      name: 'Enabled Rule',
-      group: 'test',
-      pattern: 'Chapter',
-      replacement: 'Section',
-      isRegex: false,
-      isEnabled: true,
-      order: 1,
-      scopeTitle: true,
-      scopeContent: true,
-      bookScope: '',
-      excludeBookScope: '',
-      timeoutMs: 3000,
-      isDefault: false,
-      createdAt: new Date().toISOString(),
-    });
+    resetReaderContentControllerForTests();
   });
 
-  it('propagates WORKER_UNAVAILABLE when title purification cannot start', async () => {
+  it('propagates WORKER_UNAVAILABLE from the registered controller', async () => {
     const unavailableError = createAppError({
       code: AppErrorCode.WORKER_UNAVAILABLE,
       kind: 'unsupported',
@@ -67,12 +22,16 @@ describe('readerContentService worker unavailable handling', () => {
       userMessageKey: 'errors.WORKER_UNAVAILABLE',
       debugMessage: 'Title purification worker is unavailable.',
     });
-    runPurifyTitlesTask.mockRejectedValueOnce(unavailableError);
-    vi.resetModules();
-    const { readerContentService } = await import('../readerContentService');
-    const novel = await db.novels.orderBy('id').last();
 
-    await expect(readerContentService.getChapters(novel!.id)).rejects.toMatchObject({
+    registerReaderContentController({
+      getChapters: vi.fn().mockRejectedValueOnce(unavailableError),
+      getChapterContent: vi.fn(),
+      getImageBlob: vi.fn(),
+      getImageGalleryEntries: vi.fn(),
+      loadPurifiedBookChapters: vi.fn(),
+    });
+
+    await expect(readerContentService.getChapters(1)).rejects.toMatchObject({
       code: AppErrorCode.WORKER_UNAVAILABLE,
       userMessageKey: 'errors.WORKER_UNAVAILABLE',
     });

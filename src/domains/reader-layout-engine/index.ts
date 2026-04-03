@@ -6,6 +6,7 @@ export { default as SummaryReaderContent } from './components/reader/SummaryRead
 export {
   calculateVisibleScrollBlockRanges,
   clearReaderRenderCacheMemoryForNovel,
+  deletePersistedReaderRenderCache,
   resolveCurrentPagedLocator,
   resolveCurrentScrollLocator,
   resolveCurrentScrollLocatorOffset,

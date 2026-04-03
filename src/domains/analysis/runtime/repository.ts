@@ -5,6 +5,7 @@ import type {
   ChapterAnalysisResult,
   CharacterGraphResponse,
 } from '@shared/contracts';
+import type { Transaction } from 'dexie';
 
 import { db } from '@infra/db';
 
@@ -61,7 +62,7 @@ export interface AnalysisRuntimeRepository {
   resetIncompleteCompletedChunks: (novelId: number) => Promise<void>;
   resetChunksForResume: (novelId: number) => Promise<void>;
   clearOverview: (novelId: number) => Promise<void>;
-  deleteAnalysisArtifacts: (novelId: number) => Promise<void>;
+  deleteAnalysisArtifacts: (novelId: number, transaction?: Transaction) => Promise<void>;
   markChunkRunning: (novelId: number, chunkIndex: number) => Promise<void>;
   markChunkFailed: (novelId: number, chunkIndex: number, errorMessage: string) => Promise<void>;
   saveChunkAnalysisResult: (
@@ -91,12 +92,11 @@ function nowISO(): string {
 
 export function createDexieAnalysisRuntimeRepository(): AnalysisRuntimeRepository {
   async function loadStatusState(novelId: number): Promise<LoadedAnalysisRuntimeState> {
-    const [job, overview, chunks, chapterRows, totalChapterCount] = await Promise.all([
+    const [job, overview, chunks, chapterRows] = await Promise.all([
       db.analysisJobs.where('novelId').equals(novelId).first(),
       db.analysisOverviews.where('novelId').equals(novelId).first(),
       db.analysisChunks.where('novelId').equals(novelId).sortBy('chunkIndex'),
       db.chapterAnalyses.where('novelId').equals(novelId).sortBy('chapterIndex'),
-      db.chapters.where('novelId').equals(novelId).count(),
     ]);
 
     return {
@@ -104,7 +104,7 @@ export function createDexieAnalysisRuntimeRepository(): AnalysisRuntimeRepositor
       overview: overview ? toStoredAnalysisOverview(overview) : undefined,
       chunks: chunks.map(toAnalysisChunkState),
       chapterRows: chapterRows.map(toStoredChapterAnalysis),
-      totalChapterCount,
+      totalChapterCount: 0,
     };
   }
 
@@ -294,7 +294,34 @@ export function createDexieAnalysisRuntimeRepository(): AnalysisRuntimeRepositor
       const overview = await loadOverview(novelId);
       if (overview) await db.analysisOverviews.delete(overview.id);
     },
-    deleteAnalysisArtifacts: async (novelId) => {
+    deleteAnalysisArtifacts: async (novelId, transaction) => {
+      const analysisJobTable = transaction
+        ? transaction.table('analysisJobs')
+        : db.analysisJobs;
+      const analysisChunkTable = transaction
+        ? transaction.table('analysisChunks')
+        : db.analysisChunks;
+      const chapterAnalysisTable = transaction
+        ? transaction.table('chapterAnalyses')
+        : db.chapterAnalyses;
+      const analysisOverviewTable = transaction
+        ? transaction.table('analysisOverviews')
+        : db.analysisOverviews;
+
+      const deleteArtifacts = async (): Promise<void> => {
+        await Promise.all([
+          analysisJobTable.where('novelId').equals(novelId).delete(),
+          analysisChunkTable.where('novelId').equals(novelId).delete(),
+          chapterAnalysisTable.where('novelId').equals(novelId).delete(),
+          analysisOverviewTable.where('novelId').equals(novelId).delete(),
+        ]);
+      };
+
+      if (transaction) {
+        await deleteArtifacts();
+        return;
+      }
+
       await db.transaction(
         'rw',
         [
@@ -304,10 +331,7 @@ export function createDexieAnalysisRuntimeRepository(): AnalysisRuntimeRepositor
           db.chapterAnalyses,
         ],
         async () => {
-          await db.analysisJobs.where('novelId').equals(novelId).delete();
-          await db.analysisChunks.where('novelId').equals(novelId).delete();
-          await db.chapterAnalyses.where('novelId').equals(novelId).delete();
-          await db.analysisOverviews.where('novelId').equals(novelId).delete();
+          await deleteArtifacts();
         },
       );
     },

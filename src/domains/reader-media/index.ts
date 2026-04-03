@@ -3,5 +3,6 @@ export type { ReaderImageViewerProps } from './components/reader/ReaderImageView
 export { useReaderPageImageOverlay } from './pages/useReaderPageImageOverlay';
 export {
   areReaderImageResourcesReady,
+  clearReaderImageResourcesForNovel,
   preloadReaderImageResources,
 } from './utils/readerImageResourceCache';
