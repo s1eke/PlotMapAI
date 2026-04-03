@@ -9,6 +9,7 @@
 | `novels` | `@domains/library` | `library`, `application` orchestration | `novelRepository.list/get/getNovelTitle/createImportedNovel/delete` |
 | `coverImages` | `@domains/library` | `library`, `application` orchestration | `novelRepository.createImportedNovel/delete`, `acquireNovelCoverResource` |
 | `chapters` | `@domains/book-content` | `book-content`, `application` orchestration | `bookContentRepository.listNovelChapters/getNovelChapter/countNovelChapters/replaceNovelContent/deleteNovelContent` |
+| `chapterRichContents` | `@domains/book-content` | `book-content`, `application` orchestration | `chapterRichContentRepository.replaceNovelChapterRichContents/listNovelChapterRichContents/getNovelChapterRichContent/deleteNovelChapterRichContents` |
 | `chapterImages` | `@domains/book-content` | `book-content`, `application` orchestration | `bookContentRepository.getChapterImageBlob/replaceNovelContent/deleteNovelContent` |
 | `novelImageGalleryEntries` | `@domains/book-content` | `book-content`, `application` orchestration | `bookContentRepository.listNovelImageGalleryEntries/replaceNovelContent/deleteNovelContent` |
 | `tocRules` | `@domains/settings` | `settings` | `tocRuleRepository.*` |
@@ -21,13 +22,7 @@
 | `readingProgress` | `@domains/reader-session` | `reader-session`, `application` orchestration | `readReadingProgress/replaceReadingProgress/deleteReadingProgress` |
 | `readerRenderCache` | `@domains/reader-layout-engine` | `reader-layout-engine`, `application` orchestration | render cache utils, `deletePersistedReaderRenderCache` |
 
-## Planned / Reserved Tables
-
-以下表为已规划预占位，不代表当前 Dexie schema 中已经存在。
-
-| Table | Owner | Allowed Direct Access | Public API | Note |
-|------|------|------|------|------|
-| `chapterRichContents` | `@domains/book-content` | `book-content`, `application` orchestration | future `chapterRichContentRepository` via owner domain | Planned for PR-03. Not present in current Dexie schema. |
+旧书如果没有 `chapterRichContents` 行，表示它们仍处于 plain-only 兼容状态；调用方必须允许 rich 读取结果为空，而不是把“无 rich row”当作损坏数据。
 
 ## Rules
 

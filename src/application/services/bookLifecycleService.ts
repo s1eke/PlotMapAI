@@ -1,7 +1,10 @@
 import Dexie, { type Transaction } from 'dexie';
 
 import { analysisService } from '@domains/analysis';
-import { bookContentRepository } from '@domains/book-content';
+import {
+  bookContentRepository,
+  chapterRichContentRepository,
+} from '@domains/book-content';
 import { bookImportService, type ImportBookOptions } from '@domains/book-import';
 import {
   clearNovelCoverResourcesForNovel,
@@ -41,6 +44,7 @@ export const bookLifecycleService = {
       [
         db.novels,
         db.coverImages,
+        db.chapterRichContents,
         db.chapters,
         db.chapterImages,
         db.novelImageGalleryEntries,
@@ -85,6 +89,7 @@ export const bookLifecycleService = {
         db.readerRenderCache,
         db.novels,
         db.coverImages,
+        db.chapterRichContents,
         db.chapters,
         db.chapterImages,
         db.novelImageGalleryEntries,
@@ -94,6 +99,7 @@ export const bookLifecycleService = {
         await analysisService.deleteArtifacts(novelId, transaction);
         await deleteReadingProgress(novelId, transaction);
         await deletePersistedReaderRenderCache(novelId, transaction);
+        await chapterRichContentRepository.deleteNovelChapterRichContents(novelId, transaction);
         await bookContentRepository.deleteNovelContent(novelId, transaction);
         await novelRepository.delete(novelId, {
           transaction,

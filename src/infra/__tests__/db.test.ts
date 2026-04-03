@@ -19,6 +19,7 @@ describe('db', () => {
       'appSettings',
       'chapterAnalyses',
       'chapterImages',
+      'chapterRichContents',
       'chapters',
       'coverImages',
       'novelImageGalleryEntries',
@@ -75,6 +76,44 @@ describe('db', () => {
     const chapters = await db.chapters.where('novelId').equals(novelId).toArray();
     expect(chapters.length).toBe(1);
     expect(chapters[0].title).toBe('Chapter 1');
+  });
+
+  it('can add and retrieve chapter rich contents', async () => {
+    await db.chapterRichContents.add({
+      novelId: 1,
+      chapterIndex: 0,
+      contentRich: [
+        {
+          type: 'paragraph',
+          children: [{
+            type: 'text',
+            text: 'Rich content',
+          }],
+        },
+      ],
+      contentPlain: 'Rich content',
+      contentFormat: 'rich',
+      contentVersion: 1,
+      importFormatVersion: 1,
+      updatedAt: new Date().toISOString(),
+    });
+
+    const richContent = await db.chapterRichContents
+      .where('[novelId+chapterIndex]')
+      .equals([1, 0])
+      .first();
+
+    expect(richContent).toBeDefined();
+    expect(richContent?.contentFormat).toBe('rich');
+    expect(richContent?.contentRich).toEqual([
+      {
+        type: 'paragraph',
+        children: [{
+          type: 'text',
+          text: 'Rich content',
+        }],
+      },
+    ]);
   });
 
   it('can add and retrieve purification rules', async () => {

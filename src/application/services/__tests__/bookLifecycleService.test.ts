@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { bookLifecycleService } from '@application/services/bookLifecycleService';
-import { CACHE_KEYS, storage } from '@infra/storage';
-import { db } from '@infra/db';
 import { bookContentRepository } from '@domains/book-content';
 import { bookImportService } from '@domains/book-import';
 import { novelRepository } from '@domains/library';
+import { db } from '@infra/db';
+import { CACHE_KEYS, storage } from '@infra/storage';
 
 vi.mock('@domains/book-import', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@domains/book-import')>();
@@ -119,6 +119,24 @@ describe('bookLifecycleService', () => {
         },
       ],
     });
+    await db.chapterRichContents.add({
+      novelId,
+      chapterIndex: 0,
+      contentRich: [
+        {
+          type: 'paragraph',
+          children: [{
+            type: 'text',
+            text: 'Rich content',
+          }],
+        },
+      ],
+      contentPlain: 'Rich content',
+      contentFormat: 'rich',
+      contentVersion: 1,
+      importFormatVersion: 1,
+      updatedAt: new Date().toISOString(),
+    });
     await db.analysisJobs.add({
       novelId,
       status: 'completed',
@@ -180,17 +198,20 @@ describe('bookLifecycleService', () => {
       state: { chapterIndex: 0, mode: 'summary' },
     });
 
+    expect(await db.chapterRichContents.count()).toBe(1);
+
     await bookLifecycleService.deleteNovel(novelId);
 
-    await expect(db.novels.count()).resolves.toBe(0);
-    await expect(db.coverImages.count()).resolves.toBe(0);
-    await expect(db.chapters.count()).resolves.toBe(0);
-    await expect(db.chapterImages.count()).resolves.toBe(0);
-    await expect(db.novelImageGalleryEntries.count()).resolves.toBe(0);
-    await expect(db.analysisJobs.count()).resolves.toBe(0);
-    await expect(db.chapterAnalyses.count()).resolves.toBe(0);
-    await expect(db.readingProgress.count()).resolves.toBe(0);
-    await expect(db.readerRenderCache.count()).resolves.toBe(0);
+    expect(await db.novels.count()).toBe(0);
+    expect(await db.coverImages.count()).toBe(0);
+    expect(await db.chapters.count()).toBe(0);
+    expect(await db.chapterRichContents.count()).toBe(0);
+    expect(await db.chapterImages.count()).toBe(0);
+    expect(await db.novelImageGalleryEntries.count()).toBe(0);
+    expect(await db.analysisJobs.count()).toBe(0);
+    expect(await db.chapterAnalyses.count()).toBe(0);
+    expect(await db.readingProgress.count()).toBe(0);
+    expect(await db.readerRenderCache.count()).toBe(0);
     expect(storage.cache.getJson(CACHE_KEYS.readerBootstrap(novelId))).toBeNull();
   });
 });
