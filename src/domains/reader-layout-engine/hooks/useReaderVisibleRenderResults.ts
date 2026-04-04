@@ -67,8 +67,12 @@ export function useReaderVisibleRenderResults({
       const memoryEntry = getReaderRenderCacheEntryFromMemory({
         chapterIndex: target.chapter.index,
         contentHash: target.contentHash,
+        contentFormat: target.contentFormat,
+        contentVersion: target.contentVersion,
+        layoutFeatureSet: target.layoutFeatureSet,
         layoutKey: target.layoutKey,
         novelId,
+        rendererVersion: target.rendererVersion,
         variantFamily: target.variantFamily,
       });
 
@@ -206,8 +210,18 @@ export function useReaderVisibleRenderResults({
   }, [visibleResults]);
 
   const layoutSnapshot = useMemo(() => {
+    const activeTarget = visibleTargets.find(
+      (target) => target.chapter.index === currentChapterIndex,
+    )
+      ?? visibleTargets[0]
+      ?? null;
+
     return {
       activeVariant,
+      activeContentFormat: activeTarget?.contentFormat ?? null,
+      activeContentVersion: activeTarget?.contentVersion ?? null,
+      activeLayoutFeatureSet: activeTarget?.layoutFeatureSet ?? null,
+      activeRendererVersion: activeTarget?.rendererVersion ?? null,
       cacheModel: 'layered-render-cache' as const,
       currentPagedPageCount: layoutMetrics.currentPagedPageCount,
       currentPagedPageItemCount: layoutMetrics.currentPagedPageItemCount,
@@ -221,6 +235,7 @@ export function useReaderVisibleRenderResults({
     };
   }, [
     activeVariant,
+    currentChapterIndex,
     layoutMetrics.currentPagedPageCount,
     layoutMetrics.currentPagedPageItemCount,
     layoutMetrics.scrollBlockCount,
@@ -228,6 +243,7 @@ export function useReaderVisibleRenderResults({
     layoutMetrics.visibleCacheSources.dexie,
     layoutMetrics.visibleCacheSources.memory,
     scrollChapterCount,
+    visibleTargets,
   ]);
 
   return {

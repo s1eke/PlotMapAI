@@ -122,8 +122,8 @@ describe('readerRenderCachePlanning', () => {
       plainText: '[IMG:cover]\n[IMG:portrait]\n[IMG:map]',
     };
 
-    expect(buildChapterImageLayoutKey(7, chapter, 'base-layout', 'rich')).toBe(
-      'base-layout::scroll:rich::img:cover:pending,portrait:missing,map:1000x250',
+    expect(buildChapterImageLayoutKey(7, chapter, 'base-layout')).toBe(
+      'base-layout::img:cover:pending,portrait:missing,map:1000x250',
     );
   });
 
@@ -148,8 +148,18 @@ describe('readerRenderCachePlanning', () => {
     }));
   });
 
-  it('separates scroll layout keys for rich and legacy plain render modes', () => {
-    const chapter = createChapter(0, 1);
+  it('keeps layout keys stable while separating scroll render identities', () => {
+    const chapter = {
+      ...createChapter(0, 1),
+      contentFormat: 'rich' as const,
+      richBlocks: [{
+        type: 'paragraph' as const,
+        children: [{
+          type: 'text' as const,
+          text: 'Rich paragraph',
+        }],
+      }],
+    };
 
     const richTargets = buildVisibleRenderTargets({
       currentChapter: chapter,
@@ -172,9 +182,10 @@ describe('readerRenderCachePlanning', () => {
       viewMode: 'original',
     });
 
-    expect(richTargets[0]?.layoutKey).toContain('::scroll:rich');
-    expect(legacyTargets[0]?.layoutKey).toContain('::scroll:legacy-plain');
-    expect(richTargets[0]?.layoutKey).not.toBe(legacyTargets[0]?.layoutKey);
+    expect(richTargets[0]?.layoutKey).toBe(legacyTargets[0]?.layoutKey);
+    expect(richTargets[0]?.layoutFeatureSet).toBe('scroll-rich-inline');
+    expect(legacyTargets[0]?.layoutFeatureSet).toBe('scroll-legacy-plain');
+    expect(richTargets[0]?.exactKey).not.toBe(legacyTargets[0]?.exactKey);
   });
 
   it('builds preheat targets in the current order without duplicates', () => {

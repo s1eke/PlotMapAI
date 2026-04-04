@@ -19,6 +19,7 @@ export interface ReaderLocator {
   startCursor?: LayoutCursor;
   endCursor?: LayoutCursor;
   edge?: 'start' | 'end';
+  pageIndex?: number;
 }
 
 export interface ReaderBlock {
@@ -91,7 +92,9 @@ export interface VirtualBlockMetrics {
   captionFont?: string;
   captionFontSizePx?: number;
   captionHeight?: number;
+  captionLines?: ReaderMeasuredLine[];
   captionLineHeightPx?: number;
+  captionSpacing?: number;
   contentHeight: number;
   displayHeight?: number;
   displayWidth?: number;
@@ -116,24 +119,41 @@ export interface MeasuredChapterLayout {
 }
 
 export interface ReaderTextPageItem {
+  align?: RichTextAlign;
+  blockquoteDepth?: number;
   blockIndex: number;
   chapterIndex: number;
+  container?: PaginationContainer;
   contentHeight: number;
   font: string;
   fontSizePx: number;
+  headingLevel?: 1 | 2 | 3 | 4 | 5 | 6;
   height: number;
+  indent?: number;
   key: string;
   kind: 'heading' | 'text';
   lineHeightPx: number;
   lineStartIndex: number;
   lines: ReaderMeasuredLine[];
+  listContext?: PaginationListContext;
   marginAfter: number;
   marginBefore: number;
+  originalTag?: string;
+  renderRole?: 'hr' | 'plain' | 'rich-text' | 'unsupported';
+  showListMarker?: boolean;
+  sourceBlockType?: RichBlock['type'];
   text: string;
 }
 
 export interface ReaderImagePageItem {
+  align?: RichTextAlign;
   blockIndex: number;
+  captionFont?: string;
+  captionFontSizePx?: number;
+  captionHeight?: number;
+  captionLineHeightPx?: number;
+  captionLines?: ReaderMeasuredLine[];
+  captionSpacing?: number;
   chapterIndex: number;
   displayHeight: number;
   displayWidth: number;
@@ -144,6 +164,7 @@ export interface ReaderImagePageItem {
   kind: 'image';
   marginAfter: number;
   marginBefore: number;
+  sourceBlockType?: RichBlock['type'];
 }
 
 export interface ReaderBlankPageItem {

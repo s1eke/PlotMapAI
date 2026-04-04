@@ -2,7 +2,7 @@ import type { PageTarget, ReaderRestoreTarget } from '@shared/contracts/reader';
 import type { PaginatedChapterLayout } from '../utils/readerLayout';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { findPageIndexForLocator, getChapterBoundaryLocator } from '../utils/readerLayout';
-import { getPageIndexFromProgress, resolvePagedTargetPage } from '@shared/utils/readerPosition';
+import { resolvePagedTargetPage } from '@shared/utils/readerPosition';
 
 const TWO_COLUMN_GAP = 48;
 const MIN_COLUMN_WIDTH = 260;
@@ -239,14 +239,12 @@ export function usePagedReaderLayout({
         hasRestorableTarget && resolvedPendingLocator && currentPagedLayout
           ? findPageIndexForLocator(currentPagedLayout, resolvedPendingLocator)
           : null;
-      const hasRestorableProgress = hasRestorableTarget
-        && typeof pendingRestoreTarget?.chapterProgress === 'number';
+      const locatorPageIndex = hasRestorableTarget
+        ? pendingRestoreTarget?.locator?.pageIndex
+        : null;
       let resolvedTargetPage: number | null = restoredPageIndex;
-      if (resolvedTargetPage === null && hasRestorableProgress) {
-        resolvedTargetPage = getPageIndexFromProgress(
-          pendingRestoreTarget?.chapterProgress,
-          nextPageCount,
-        );
+      if (resolvedTargetPage === null && typeof locatorPageIndex === 'number') {
+        resolvedTargetPage = Math.max(0, Math.min(nextPageCount - 1, locatorPageIndex));
       }
       if (resolvedTargetPage === null && pendingPageTarget) {
         resolvedTargetPage = resolvePagedTargetPage(

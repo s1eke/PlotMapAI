@@ -8,11 +8,17 @@ import type {
 
 import { useTranslation } from 'react-i18next';
 
+import { cn } from '@shared/utils/cn';
+
 import { useReaderImageResource } from '../../hooks/useReaderImageResource';
 import type {
   ReaderImageActivationPayload,
   ReaderImageGalleryEntry,
 } from '../../utils/readerImageGallery';
+import {
+  formatRichScrollListMarker,
+  resolveRichScrollBlockInsets,
+} from '../../utils/richScroll';
 
 interface ReaderFlowBlockProps {
   chapterTitle?: string;
@@ -28,7 +34,13 @@ interface ReaderFlowBlockProps {
 }
 
 interface RenderImageItem {
+  align?: 'left' | 'center' | 'right';
   blockIndex: number;
+  captionFont?: string;
+  captionFontSizePx?: number;
+  captionLineHeightPx?: number;
+  captionLines?: StaticTextLine[];
+  captionSpacing?: number;
   chapterIndex: number;
   displayHeight: number;
   displayWidth: number | string;
@@ -39,14 +51,25 @@ interface RenderImageItem {
 }
 
 interface RenderTextItem {
+  align?: 'left' | 'center' | 'right';
+  blockIndex: number;
+  blockquoteDepth?: number;
+  container?: ReaderTextPageItem['container'];
   font: string;
   fontSizePx: number;
   height: number;
+  headingLevel?: 1 | 2 | 3 | 4 | 5 | 6;
+  indent?: number;
   kind: 'heading' | 'text';
   lineHeightPx: number;
+  lineStartIndex: number;
   lines: StaticTextLine[];
+  listContext?: ReaderTextPageItem['listContext'];
   marginAfter: number;
   marginBefore: number;
+  originalTag?: string;
+  renderRole?: ReaderTextPageItem['renderRole'];
+  showListMarker?: boolean;
   text: string;
 }
 
@@ -89,6 +112,50 @@ function ReaderLayoutImage({
   );
 }
 
+function resolveTextAlignClass(align: 'left' | 'center' | 'right' | undefined): string {
+  if (align === 'center') {
+    return 'text-center';
+  }
+
+  if (align === 'right') {
+    return 'text-right';
+  }
+
+  return 'text-left';
+}
+
+function resolveImageJustifyClass(align: 'left' | 'center' | 'right' | undefined): string {
+  if (align === 'center') {
+    return 'justify-center';
+  }
+
+  if (align === 'right') {
+    return 'justify-end';
+  }
+
+  return 'justify-start';
+}
+
+function getHeadingTagName(level: number | undefined): 'h2' | 'h3' | 'h4' | 'h5' | 'h6' {
+  if (!level || level <= 2) {
+    return 'h2';
+  }
+
+  if (level === 3) {
+    return 'h3';
+  }
+
+  if (level === 4) {
+    return 'h4';
+  }
+
+  if (level === 5) {
+    return 'h5';
+  }
+
+  return 'h6';
+}
+
 export default function ReaderFlowBlock({
   chapterTitle,
   imageRenderMode,
@@ -109,7 +176,13 @@ export default function ReaderFlowBlock({
 
     if (item.block.kind === 'image') {
       imageItem = {
+        align: item.block.align,
         blockIndex: item.block.blockIndex,
+        captionFont: item.captionFont,
+        captionFontSizePx: item.captionFontSizePx,
+        captionLineHeightPx: item.captionLineHeightPx,
+        captionLines: item.captionLines,
+        captionSpacing: item.captionSpacing,
         chapterIndex: item.block.chapterIndex,
         displayHeight: item.displayHeight ?? item.contentHeight,
         displayWidth: item.displayWidth ?? '100%',
@@ -120,14 +193,25 @@ export default function ReaderFlowBlock({
       };
     } else {
       textItem = {
+        align: item.block.align,
+        blockIndex: item.block.blockIndex,
+        blockquoteDepth: item.block.blockquoteDepth,
+        container: item.block.container,
         font: item.font,
         fontSizePx: item.fontSizePx,
         height: item.height,
+        headingLevel: item.block.headingLevel,
+        indent: item.block.indent,
         kind: item.block.kind,
         lineHeightPx: item.lineHeightPx,
+        lineStartIndex: 0,
         lines: item.lines,
+        listContext: item.block.listContext,
         marginAfter: item.marginAfter,
         marginBefore: item.marginBefore,
+        originalTag: item.block.originalTag,
+        renderRole: item.block.renderRole,
+        showListMarker: item.block.showListMarker,
         text: item.block.text ?? '',
       };
     }
@@ -139,7 +223,13 @@ export default function ReaderFlowBlock({
     if (item.kind === 'image') {
       const pageImageItem = item as ReaderImagePageItem;
       imageItem = {
+        align: pageImageItem.align,
         blockIndex: pageImageItem.blockIndex,
+        captionFont: pageImageItem.captionFont,
+        captionFontSizePx: pageImageItem.captionFontSizePx,
+        captionLineHeightPx: pageImageItem.captionLineHeightPx,
+        captionLines: pageImageItem.captionLines,
+        captionSpacing: pageImageItem.captionSpacing,
         chapterIndex: pageImageItem.chapterIndex,
         displayHeight: pageImageItem.displayHeight,
         displayWidth: pageImageItem.displayWidth,
@@ -151,23 +241,37 @@ export default function ReaderFlowBlock({
     } else {
       const pageTextItem = item as ReaderTextPageItem;
       textItem = {
+        align: pageTextItem.align,
+        blockIndex: pageTextItem.blockIndex,
+        blockquoteDepth: pageTextItem.blockquoteDepth,
+        container: pageTextItem.container,
         font: pageTextItem.font,
         fontSizePx: pageTextItem.fontSizePx,
         height: pageTextItem.height,
+        headingLevel: pageTextItem.headingLevel,
+        indent: pageTextItem.indent,
         kind: pageTextItem.kind,
         lineHeightPx: pageTextItem.lineHeightPx,
+        lineStartIndex: pageTextItem.lineStartIndex,
         lines: pageTextItem.lines,
+        listContext: pageTextItem.listContext,
         marginAfter: pageTextItem.marginAfter,
         marginBefore: pageTextItem.marginBefore,
+        originalTag: pageTextItem.originalTag,
+        renderRole: pageTextItem.renderRole,
+        showListMarker: pageTextItem.showListMarker,
         text: pageTextItem.text,
       };
     }
   }
 
   if (imageItem) {
+    const serializedCaption = serializeTextLines(imageItem.captionLines ?? []);
+    const hasCaption = Boolean(imageItem.captionLines && imageItem.captionLines.length > 0);
+
     return (
       <div
-        className="flex items-center justify-center overflow-visible"
+        className={cn('flex items-center overflow-visible', resolveImageJustifyClass(imageItem.align))}
         style={{
           ...positionStyle,
           height: imageItem.height,
@@ -176,47 +280,80 @@ export default function ReaderFlowBlock({
         }}
       >
         <div
-          className="relative inline-flex items-center justify-center"
+          className={cn('relative inline-flex max-w-full flex-col', resolveImageJustifyClass(imageItem.align))}
           style={{
-            height: imageItem.displayHeight,
             maxWidth: '100%',
             width: imageItem.displayWidth,
           }}
         >
-          <ReaderLayoutImage
-            imageKey={imageItem.imageKey}
-            imageRenderMode={imageRenderMode}
-            novelId={novelId}
+          <div
+            className={cn('relative inline-flex', resolveImageJustifyClass(imageItem.align))}
             style={{
               height: imageItem.displayHeight,
               maxWidth: '100%',
               width: imageItem.displayWidth,
             }}
-          />
-          {onImageActivate ? (
-            <button
-              ref={(element) => onRegisterImageElement?.({
-                blockIndex: imageItem.blockIndex,
-                chapterIndex: imageItem.chapterIndex,
-                imageKey: imageItem.imageKey,
-              }, element)}
-              type="button"
-              aria-label={t('reader.imageViewer.title')}
-              className="absolute -inset-3 z-10 cursor-zoom-in rounded-2xl bg-transparent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
-              onClick={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                onImageActivate({
+          >
+            <ReaderLayoutImage
+              imageKey={imageItem.imageKey}
+              imageRenderMode={imageRenderMode}
+              novelId={novelId}
+              style={{
+                height: imageItem.displayHeight,
+                maxWidth: '100%',
+                width: imageItem.displayWidth,
+              }}
+            />
+            {onImageActivate ? (
+              <button
+                ref={(element) => onRegisterImageElement?.({
                   blockIndex: imageItem.blockIndex,
                   chapterIndex: imageItem.chapterIndex,
                   imageKey: imageItem.imageKey,
-                  sourceElement: event.currentTarget,
-                });
+                }, element)}
+                type="button"
+                aria-label={t('reader.imageViewer.title')}
+                className="absolute -inset-3 z-10 cursor-zoom-in rounded-2xl bg-transparent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onImageActivate({
+                    blockIndex: imageItem.blockIndex,
+                    chapterIndex: imageItem.chapterIndex,
+                    imageKey: imageItem.imageKey,
+                    sourceElement: event.currentTarget,
+                  });
+                }}
+                onPointerDownCapture={(event) => {
+                  event.stopPropagation();
+                }}
+              />
+            ) : null}
+          </div>
+          {hasCaption ? (
+            <figcaption
+              data-testid="reader-flow-image-caption"
+              className={cn(
+                'w-full text-sm text-text-secondary',
+                imageItem.captionSpacing ? 'mt-2' : undefined,
+                resolveTextAlignClass(imageItem.align),
+              )}
+              style={{
+                font: imageItem.captionFont,
+                fontSize: imageItem.captionFontSizePx
+                  ? `${imageItem.captionFontSizePx}px`
+                  : undefined,
+                lineHeight: imageItem.captionLineHeightPx
+                  ? `${imageItem.captionLineHeightPx}px`
+                  : undefined,
+                minHeight: imageItem.captionLines && imageItem.captionLineHeightPx
+                  ? `${imageItem.captionLines.length * imageItem.captionLineHeightPx}px`
+                  : undefined,
+                whiteSpace: 'pre',
               }}
-              onPointerDownCapture={(event) => {
-                event.stopPropagation();
-              }}
-            />
+            >
+              {serializedCaption}
+            </figcaption>
           ) : null}
         </div>
       </div>
@@ -232,24 +369,57 @@ export default function ReaderFlowBlock({
     fontSize: `${textItem.fontSizePx}px`,
     lineHeight: `${textItem.lineHeightPx}px`,
   } satisfies CSSProperties;
+  const insets = resolveRichScrollBlockInsets({
+    blockquoteDepth: textItem.blockquoteDepth,
+    container: textItem.container,
+    listContext: textItem.listContext,
+  });
+  const showListMarker = Boolean(
+    textItem.listContext
+    && textItem.showListMarker
+    && textItem.lineStartIndex === 0,
+  );
+  const listMarker = showListMarker
+    ? formatRichScrollListMarker({ listContext: textItem.listContext })
+    : null;
+  const listPaddingStart = textItem.listContext
+    ? Math.max(0, insets.listInset - insets.markerWidth - insets.markerGap) + insets.poemInset
+    : insets.poemInset;
   const serializedText = serializeTextLines(textItem.lines);
-  const renderedText = textItem.kind === 'heading'
-    ? chapterTitle ?? textItem.text
-    : serializedText;
+  let renderedText = serializedText;
+  if (textItem.kind === 'heading') {
+    renderedText = textItem.blockIndex === 0
+      ? chapterTitle ?? textItem.text
+      : textItem.text;
+  }
 
-  return (
-    <div
-      style={{
-        ...positionStyle,
-        height: textItem.height,
-        paddingBottom: textItem.marginAfter,
-        paddingTop: textItem.marginBefore,
-      }}
-    >
-      {textItem.kind === 'heading' ? (
-        <h2
+  if (textItem.renderRole === 'hr') {
+    return (
+      <div
+        style={{
+          ...positionStyle,
+          height: textItem.height,
+          paddingBottom: textItem.marginAfter,
+          paddingTop: textItem.marginBefore,
+        }}
+      >
+        <div className="flex h-full items-center">
+          <div
+            data-testid="reader-flow-hr"
+            className="w-full border-t border-border-color/40"
+          />
+        </div>
+      </div>
+    );
+  }
+
+  let content = textItem.kind === 'heading'
+    ? (() => {
+      const TagName = getHeadingTagName(textItem.headingLevel);
+      return (
+        <TagName
           data-testid="reader-flow-text-fragment"
-          className="text-center"
+          className={cn('break-words font-semibold tracking-tight', resolveTextAlignClass(textItem.align))}
           style={{
             ...textStyle,
             overflow: 'hidden',
@@ -258,20 +428,91 @@ export default function ReaderFlowBlock({
           }}
         >
           {renderedText}
-        </h2>
-      ) : (
+        </TagName>
+      );
+    })()
+    : (
+      <div
+        data-testid="reader-flow-text-fragment"
+        className={cn(
+          'opacity-90',
+          resolveTextAlignClass(textItem.align),
+          textItem.renderRole === 'unsupported' ? 'text-text-secondary' : undefined,
+        )}
+        style={{
+          ...textStyle,
+          overflow: 'hidden',
+          textIndent: typeof textItem.indent === 'number' && textItem.lineStartIndex === 0
+            ? `${textItem.indent}em`
+            : undefined,
+          whiteSpace: 'pre',
+        }}
+      >
+        {renderedText}
+      </div>
+    );
+
+  if (textItem.renderRole === 'unsupported' && textItem.originalTag === 'table') {
+    content = (
+      <div
+        data-testid="reader-flow-table-fallback"
+        className="rounded-xl border border-border-color/40 bg-surface/60 px-4 py-3 shadow-sm"
+      >
+        {content}
+      </div>
+    );
+  }
+
+  if (textItem.listContext) {
+    content = (
+      <div className="flex h-full min-w-0 items-start" style={{ paddingLeft: `${listPaddingStart}px` }}>
         <div
-          data-testid="reader-flow-text-fragment"
-          className="opacity-90"
+          aria-hidden="true"
+          className="shrink-0 text-right text-text-secondary"
           style={{
-            ...textStyle,
-            overflow: 'hidden',
-            whiteSpace: 'pre',
+            fontSize: `${textItem.fontSizePx}px`,
+            lineHeight: `${textItem.lineHeightPx}px`,
+            paddingRight: `${insets.markerGap}px`,
+            width: `${insets.markerWidth}px`,
           }}
         >
-          {renderedText}
+          {listMarker}
         </div>
-      )}
+        <div className="min-w-0 flex-1">{content}</div>
+      </div>
+    );
+  } else if (insets.poemInset > 0) {
+    content = (
+      <div style={{ paddingLeft: `${insets.poemInset}px` }}>
+        {content}
+      </div>
+    );
+  }
+
+  if ((textItem.blockquoteDepth ?? 0) > 0) {
+    content = (
+      <div
+        className="h-full border-l border-border-color/40"
+        style={{
+          paddingLeft: `${Math.max(0, insets.quoteInset - 1)}px`,
+        }}
+      >
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      style={{
+        ...positionStyle,
+        height: textItem.height,
+        paddingBottom: textItem.marginAfter,
+        paddingRight: insets.end,
+        paddingTop: textItem.marginBefore,
+      }}
+    >
+      {content}
     </div>
   );
 }

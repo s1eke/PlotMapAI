@@ -32,6 +32,7 @@ import {
   toPersistedReaderRenderCacheRecord,
 } from './readerRenderCacheMapper';
 import { preloadReaderImageResources } from './readerImageResourceCache';
+import { shouldUseRichScrollBlocks } from './richScroll';
 
 const MEMORY_CACHE_LIMIT = 36;
 const READER_RENDER_CACHE_CLEANUP_INTERVAL_MS = 60 * 60 * 1000;
@@ -40,14 +41,24 @@ export const READER_RENDER_CACHE_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 
 export type ReaderRenderCacheSource = 'memory' | 'dexie' | 'built';
 export type ReaderRenderStorageKind = 'render-tree' | 'manifest';
+export type ReaderLayoutFeatureSet =
+  | 'scroll-legacy-plain'
+  | 'scroll-rich-inline'
+  | 'paged-pagination-block'
+  | 'summary-shell';
+export const READER_RENDERER_VERSION = 2;
 
 interface ReaderRenderCacheRecordBase {
   chapterIndex: number;
   contentHash: string;
+  contentFormat: ChapterContent['contentFormat'];
+  contentVersion: number;
+  layoutFeatureSet: ReaderLayoutFeatureSet;
   layoutKey: string;
   layoutSignature: ReaderLayoutSignature;
   novelId: number;
   queryManifest: ReaderRenderQueryManifest;
+  rendererVersion: number;
   storageKind: ReaderRenderStorageKind;
   updatedAt: string;
   variantFamily: ReaderRenderVariant;
@@ -74,8 +85,12 @@ export type ReaderRenderCacheRecord<
 interface ReaderRenderCacheLookupParams {
   chapterIndex: number;
   contentHash: string;
+  contentFormat: ChapterContent['contentFormat'];
+  contentVersion: number;
+  layoutFeatureSet: ReaderLayoutFeatureSet;
   layoutKey: string;
   novelId: number;
+  rendererVersion: number;
   variantFamily: ReaderRenderVariant;
 }
 
@@ -90,8 +105,37 @@ function buildFamilyKey(params: {
   return `${params.novelId}:${params.chapterIndex}:${params.variantFamily}`;
 }
 
+export function resolveReaderLayoutFeatureSet(params: {
+  chapter: Pick<ChapterContent, 'contentFormat' | 'richBlocks'>;
+  preferRichScrollRendering?: boolean;
+  variantFamily: ReaderRenderVariant;
+}): ReaderLayoutFeatureSet {
+  if (params.variantFamily === 'summary-shell') {
+    return 'summary-shell';
+  }
+
+  if (params.variantFamily === 'original-paged') {
+    return 'paged-pagination-block';
+  }
+
+  return shouldUseRichScrollBlocks(
+    params.chapter,
+    params.preferRichScrollRendering,
+  )
+    ? 'scroll-rich-inline'
+    : 'scroll-legacy-plain';
+}
+
 export function buildReaderRenderCacheKey(params: ReaderRenderCacheLookupParams): string {
-  return `${buildFamilyKey(params)}:${params.layoutKey}:${params.contentHash}`;
+  return [
+    buildFamilyKey(params),
+    params.contentFormat,
+    params.contentVersion,
+    params.rendererVersion,
+    params.layoutFeatureSet,
+    params.layoutKey,
+    params.contentHash,
+  ].join(':');
 }
 
 function getReaderRenderCacheTimestampMs(timestamp: string): number {
@@ -213,8 +257,12 @@ export async function getReaderRenderCacheRecordFromDexie<TTree extends StaticCh
   }
 
   if (
-    familyRecord.layoutKey !== params.layoutKey
+    familyRecord.contentFormat !== params.contentFormat
+    || familyRecord.contentVersion !== params.contentVersion
+    || familyRecord.layoutFeatureSet !== params.layoutFeatureSet
+    || familyRecord.layoutKey !== params.layoutKey
     || familyRecord.contentHash !== params.contentHash
+    || familyRecord.rendererVersion !== params.rendererVersion
   ) {
     return null;
   }
@@ -266,6 +314,7 @@ export async function persistReaderRenderCacheEntry<TTree extends StaticChapterR
 
 export function createReaderRenderCacheEntry<TTree extends StaticChapterRenderTree>(params: {
   chapter: ChapterContent;
+  layoutFeatureSet: ReaderLayoutFeatureSet;
   layoutKey?: string;
   layoutSignature: ReaderLayoutSignature;
   tree: TTree;
@@ -274,10 +323,14 @@ export function createReaderRenderCacheEntry<TTree extends StaticChapterRenderTr
   return {
     chapterIndex: params.chapter.index,
     contentHash: createChapterContentHash(params.chapter),
+    contentFormat: params.chapter.contentFormat,
+    contentVersion: params.chapter.contentVersion,
+    layoutFeatureSet: params.layoutFeatureSet,
     layoutKey: params.layoutKey ?? serializeReaderLayoutSignature(params.layoutSignature),
     layoutSignature: params.layoutSignature,
     novelId: 0,
     queryManifest: createReaderRenderQueryManifest(params.variantFamily, params.tree),
+    rendererVersion: READER_RENDERER_VERSION,
     storageKind: 'render-tree',
     tree: params.tree,
     updatedAt: new Date().toISOString(),
@@ -286,7 +339,11 @@ export function createReaderRenderCacheEntry<TTree extends StaticChapterRenderTr
 }
 
 export function createReaderRenderCacheManifestEntry(params: {
-  chapter: Pick<ChapterContent, 'contentFormat' | 'index' | 'plainText' | 'richBlocks' | 'title'>;
+  chapter: Pick<
+    ChapterContent,
+    'contentFormat' | 'contentVersion' | 'index' | 'plainText' | 'richBlocks' | 'title'
+  >;
+  layoutFeatureSet: ReaderLayoutFeatureSet;
   layoutKey?: string;
   layoutSignature: ReaderLayoutSignature;
   novelId: number;
@@ -296,10 +353,14 @@ export function createReaderRenderCacheManifestEntry(params: {
   return {
     chapterIndex: params.chapter.index,
     contentHash: createChapterContentHash(params.chapter),
+    contentFormat: params.chapter.contentFormat,
+    contentVersion: params.chapter.contentVersion,
+    layoutFeatureSet: params.layoutFeatureSet,
     layoutKey: params.layoutKey ?? serializeReaderLayoutSignature(params.layoutSignature),
     layoutSignature: params.layoutSignature,
     novelId: params.novelId,
     queryManifest: params.queryManifest,
+    rendererVersion: READER_RENDERER_VERSION,
     storageKind: 'manifest',
     tree: null,
     updatedAt: new Date().toISOString(),
@@ -317,6 +378,11 @@ export function buildStaticRenderTree(params: {
   typography: ReaderTypographyMetrics;
   variantFamily: ReaderRenderVariant;
 }): ReaderRenderCacheEntry {
+  const layoutFeatureSet = resolveReaderLayoutFeatureSet({
+    chapter: params.chapter,
+    preferRichScrollRendering: params.preferRichScrollRendering,
+    variantFamily: params.variantFamily,
+  });
   let tree: StaticChapterRenderTree;
   if (params.variantFamily === 'original-scroll') {
     tree = buildStaticScrollChapterTree(
@@ -347,6 +413,7 @@ export function buildStaticRenderTree(params: {
 
   const entry = createReaderRenderCacheEntry({
     chapter: params.chapter,
+    layoutFeatureSet,
     layoutKey: params.layoutKey,
     layoutSignature: params.layoutSignature,
     tree,
@@ -365,10 +432,14 @@ export function createReaderRenderCacheManifestFromEntry<TTree extends StaticCha
   return {
     chapterIndex: entry.chapterIndex,
     contentHash: entry.contentHash,
+    contentFormat: entry.contentFormat,
+    contentVersion: entry.contentVersion,
+    layoutFeatureSet: entry.layoutFeatureSet,
     layoutKey: entry.layoutKey,
     layoutSignature: entry.layoutSignature,
     novelId: entry.novelId,
     queryManifest: entry.queryManifest,
+    rendererVersion: entry.rendererVersion,
     storageKind: 'manifest',
     tree: null,
     updatedAt: entry.updatedAt,
@@ -386,8 +457,14 @@ export function buildStaticRenderManifest(params: {
   typography: ReaderTypographyMetrics;
   variantFamily: ReaderRenderVariant;
 }): ReaderRenderCacheManifestEntry {
+  const layoutFeatureSet = resolveReaderLayoutFeatureSet({
+    chapter: params.chapter,
+    preferRichScrollRendering: params.preferRichScrollRendering,
+    variantFamily: params.variantFamily,
+  });
   return createReaderRenderCacheManifestEntry({
     chapter: params.chapter,
+    layoutFeatureSet,
     layoutKey: params.layoutKey,
     layoutSignature: params.layoutSignature,
     novelId: params.novelId,

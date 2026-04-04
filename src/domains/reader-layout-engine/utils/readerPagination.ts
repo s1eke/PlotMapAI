@@ -25,18 +25,25 @@ import {
   getItemStartLocator,
 } from './readerLocator';
 import {
+  buildPagedReaderBlocks,
   buildReaderBlocks,
   getApproximateMaxCharsPerLine,
   resolveReaderImageSize,
 } from './readerLayoutShared';
 import {
-  measureReaderChapterLayout,
+  measurePagedReaderChapterLayout,
   measureScrollReaderChapterLayout,
 } from './readerMeasurement';
-import { shouldUseRichScrollBlocks } from './richScroll';
+import {
+  getRichScrollHorizontalTextWidth,
+  shouldUseRichScrollBlocks,
+} from './richScroll';
+import { getRichInlinePlainText } from '@shared/text-processing';
 
 interface EstimatedReaderBlockMetric {
   block: ReaderBlock;
+  captionHeight?: number;
+  captionSpacing?: number;
   contentHeight: number;
   displayHeight?: number;
   displayWidth?: number;
@@ -99,9 +106,9 @@ function finalizePageLocators(page: PageSlice): void {
   for (const column of pageSlice.columns) {
     for (const item of column.items) {
       if (!startLocator) {
-        startLocator = getItemStartLocator(item);
+        startLocator = getItemStartLocator(item, pageSlice.pageIndex);
       }
-      endLocator = getItemEndLocator(item);
+      endLocator = getItemEndLocator(item, pageSlice.pageIndex);
     }
   }
 
@@ -142,12 +149,18 @@ function getMinimumRenderableHeight(
   pageHeight: number,
 ): number {
   if (metric.block.kind === 'image') {
+    const captionHeight = metric.captionHeight ?? 0;
+    const captionSpacing = captionHeight > 0 ? (metric.captionSpacing ?? 0) : 0;
     const displayHeight = metric.displayHeight ?? metric.contentHeight;
-    const maxImageHeight = pageHeight - metric.marginBefore - metric.marginAfter;
+    const maxImageHeight = pageHeight
+      - metric.marginBefore
+      - metric.marginAfter
+      - captionSpacing
+      - captionHeight;
     const resolvedDisplayHeight = displayHeight > maxImageHeight && maxImageHeight > 0
       ? maxImageHeight
       : displayHeight;
-    return metric.marginBefore + resolvedDisplayHeight;
+    return metric.marginBefore + resolvedDisplayHeight + captionSpacing + captionHeight;
   }
 
   return metric.marginBefore + metric.lineHeightPx;
@@ -158,12 +171,18 @@ function getEstimatedMinimumRenderableHeight(
   pageHeight: number,
 ): number {
   if (metric.block.kind === 'image') {
+    const captionHeight = metric.captionHeight ?? 0;
+    const captionSpacing = captionHeight > 0 ? (metric.captionSpacing ?? 0) : 0;
     const displayHeight = metric.displayHeight ?? metric.contentHeight;
-    const maxImageHeight = pageHeight - metric.marginBefore - metric.marginAfter;
+    const maxImageHeight = pageHeight
+      - metric.marginBefore
+      - metric.marginAfter
+      - captionSpacing
+      - captionHeight;
     const resolvedDisplayHeight = displayHeight > maxImageHeight && maxImageHeight > 0
       ? maxImageHeight
       : displayHeight;
-    return metric.marginBefore + resolvedDisplayHeight;
+    return metric.marginBefore + resolvedDisplayHeight + captionSpacing + captionHeight;
   }
 
   return metric.marginBefore + metric.lineHeightPx;
@@ -246,15 +265,25 @@ export function composePaginatedChapterLayout(
     }
 
     if (metric.block.kind === 'image') {
+      const captionHeight = metric.captionHeight ?? 0;
+      const captionSpacing = captionHeight > 0 ? (metric.captionSpacing ?? 0) : 0;
       let displayHeight = metric.displayHeight ?? metric.contentHeight;
       let displayWidth = metric.displayWidth ?? measuredLayout.textWidth;
-      const maxImageHeight = safeColumnHeight - metric.marginBefore - metric.marginAfter;
+      const maxImageHeight = safeColumnHeight
+        - metric.marginBefore
+        - metric.marginAfter
+        - captionSpacing
+        - captionHeight;
       if (displayHeight > maxImageHeight && maxImageHeight > 0) {
         const scale = maxImageHeight / displayHeight;
         displayHeight *= scale;
         displayWidth *= scale;
       }
-      const imageContentHeight = metric.marginBefore + displayHeight;
+      const imageContentHeight =
+        metric.marginBefore
+        + displayHeight
+        + captionSpacing
+        + captionHeight;
       ensureRoom(imageContentHeight);
       let remainingHeight = safeColumnHeight - currentColumnHeight;
       if (remainingHeight <= 0) {
@@ -282,7 +311,14 @@ export function composePaginatedChapterLayout(
 
       const imageHeight = imageContentHeight + marginAfter;
       const item = {
+        align: metric.block.align,
         blockIndex: metric.block.blockIndex,
+        captionFont: metric.captionFont,
+        captionFontSizePx: metric.captionFontSizePx,
+        captionHeight,
+        captionLineHeightPx: metric.captionLineHeightPx,
+        captionLines: metric.captionLines,
+        captionSpacing,
         chapterIndex: metric.block.chapterIndex,
         displayHeight,
         displayWidth,
@@ -293,6 +329,7 @@ export function composePaginatedChapterLayout(
         kind: 'image' as const,
         marginAfter,
         marginBefore: metric.marginBefore,
+        sourceBlockType: metric.block.sourceBlockType,
       };
       getCurrentColumn().items.push(item);
       getCurrentColumn().height += imageHeight;
@@ -342,19 +379,29 @@ export function composePaginatedChapterLayout(
 
       const lines = metric.lines.slice(lineIndex, lineIndex + lineCount);
       const item = {
+        align: metric.block.align,
+        blockquoteDepth: metric.block.blockquoteDepth,
         blockIndex: metric.block.blockIndex,
         chapterIndex: metric.block.chapterIndex,
+        container: metric.block.container,
         contentHeight: lines.length * metric.lineHeightPx,
         font: metric.font,
         fontSizePx: metric.fontSizePx,
+        headingLevel: metric.block.headingLevel,
         height: fragmentContentHeight + marginAfter,
+        indent: metric.block.indent,
         key: `${metric.block.key}:${lineIndex}`,
         kind: metric.block.kind,
         lineHeightPx: metric.lineHeightPx,
         lineStartIndex: lineIndex,
         lines,
+        listContext: metric.block.listContext,
         marginAfter,
         marginBefore,
+        originalTag: metric.block.originalTag,
+        renderRole: metric.block.renderRole,
+        showListMarker: metric.block.showListMarker,
+        sourceBlockType: metric.block.sourceBlockType,
         text: metric.block.text ?? '',
       };
       getCurrentColumn().items.push(item);
@@ -389,12 +436,11 @@ export function buildStaticPagedChapterTree(
   imageDimensionsByKey: Map<string, ReaderImageDimensions | null | undefined>,
   textLayoutEngine?: ReaderTextLayoutEngine,
 ): StaticPagedChapterTree {
-  const measuredLayout = measureReaderChapterLayout(
+  const measuredLayout = measurePagedReaderChapterLayout(
     chapter,
     columnWidth,
     typography,
     imageDimensionsByKey,
-    undefined,
     textLayoutEngine,
   );
 
@@ -430,17 +476,25 @@ function estimateReaderBlockMetric(
   width: number,
   typography: ReaderTypographyMetrics,
   imageDimensionsByKey: Map<string, ReaderImageDimensions | null | undefined>,
+  richAware = false,
   imageLayoutConstraints?: ReaderImageLayoutConstraints,
 ): EstimatedReaderBlockMetric {
   if (block.kind === 'heading' || block.kind === 'text') {
+    const maxWidth = richAware
+      ? getRichScrollHorizontalTextWidth(block, width)
+      : width;
     const fontSizePx = block.kind === 'heading'
       ? typography.headingFontSize
       : typography.bodyFontSize;
     const lineHeightPx = block.kind === 'heading'
       ? typography.headingLineHeightPx
       : typography.bodyLineHeightPx;
-    const lineCount = estimateTextLineCount(block.text ?? '', width, fontSizePx);
-    const contentHeight = lineCount * lineHeightPx;
+    const lineCount = block.renderRole === 'hr'
+      ? 0
+      : estimateTextLineCount(block.text ?? '', maxWidth, fontSizePx);
+    const contentHeight = block.renderRole === 'hr'
+      ? 1
+      : lineCount * lineHeightPx;
     return {
       block,
       contentHeight,
@@ -453,21 +507,37 @@ function estimateReaderBlockMetric(
   }
 
   if (block.kind === 'image') {
+    const availableWidth = richAware
+      ? getRichScrollHorizontalTextWidth(block, width)
+      : width;
     const resolvedImageSize = resolveReaderImageSize(
-      width,
+      availableWidth,
       block.imageKey,
       imageDimensionsByKey,
       imageLayoutConstraints,
     );
     const displayWidth = resolvedImageSize.width;
     const displayHeight = resolvedImageSize.height;
+    const captionHeight = estimateTextLineCount(
+      getRichInlinePlainText(block.imageCaption ?? []),
+      availableWidth,
+      typography.bodyFontSize,
+    ) * typography.bodyLineHeightPx;
+    const captionSpacing = captionHeight > 0 ? 8 : 0;
 
     return {
       block,
-      contentHeight: displayHeight,
+      captionHeight,
+      captionSpacing,
+      contentHeight: displayHeight + captionSpacing + captionHeight,
       displayHeight,
       displayWidth,
-      height: block.marginBefore + displayHeight + block.marginAfter,
+      height:
+        block.marginBefore
+        + displayHeight
+        + captionSpacing
+        + captionHeight
+        + block.marginAfter,
       lineCount: 0,
       lineHeightPx: typography.bodyLineHeightPx,
       marginAfter: block.marginAfter,
@@ -597,13 +667,23 @@ function estimatePaginatedManifestPageCount(
     }
 
     if (metric.block.kind === 'image') {
+      const captionHeight = metric.captionHeight ?? 0;
+      const captionSpacing = captionHeight > 0 ? (metric.captionSpacing ?? 0) : 0;
       let displayHeight = metric.displayHeight ?? metric.contentHeight;
-      const maxImageHeight = safeColumnHeight - metric.marginBefore - metric.marginAfter;
+      const maxImageHeight = safeColumnHeight
+        - metric.marginBefore
+        - metric.marginAfter
+        - captionSpacing
+        - captionHeight;
       if (displayHeight > maxImageHeight && maxImageHeight > 0) {
         displayHeight = maxImageHeight;
       }
 
-      const imageContentHeight = metric.marginBefore + displayHeight;
+      const imageContentHeight =
+        metric.marginBefore
+        + displayHeight
+        + captionSpacing
+        + captionHeight;
       ensureRoom(imageContentHeight);
       let remainingHeight = safeColumnHeight - currentColumnHeight;
       if (remainingHeight <= 0) {
@@ -723,7 +803,12 @@ export function estimateReaderRenderQueryManifest(params: {
     return createReaderRenderQueryManifest('original-scroll', scrollTree);
   }
 
-  const blocks = buildReaderBlocks(params.chapter, params.typography.paragraphSpacing);
+  const richAwarePaged =
+    params.variantFamily === 'original-paged'
+    && shouldUseRichScrollBlocks(params.chapter);
+  const blocks = params.variantFamily === 'original-paged'
+    ? buildPagedReaderBlocks(params.chapter, params.typography.paragraphSpacing)
+    : buildReaderBlocks(params.chapter, params.typography.paragraphSpacing);
   const scrollImageLayoutConstraints = params.variantFamily === 'original-scroll'
     ? createScrollImageLayoutConstraints(
       params.layoutSignature.textWidth,
@@ -735,6 +820,7 @@ export function estimateReaderRenderQueryManifest(params: {
     params.layoutSignature.textWidth,
     params.typography,
     params.imageDimensionsByKey,
+    richAwarePaged,
     scrollImageLayoutConstraints,
   ));
   const firstMeaningfulMetric = estimatedMetrics.find((metric) => metric.block.kind !== 'blank');

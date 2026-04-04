@@ -79,6 +79,12 @@ async function migratePurificationRulesToVersionTwo(transaction: Transaction): P
     });
 }
 
+async function clearReaderRenderCacheForIdentityUpgrade(
+  transaction: Transaction,
+): Promise<void> {
+  await transaction.table('readerRenderCache').clear();
+}
+
 export const DB_SCHEMA_MIGRATIONS: readonly DbSchemaMigration[] = [{
   version: 1,
   scope: 'db-schema',
@@ -113,6 +119,15 @@ export const DB_SCHEMA_MIGRATIONS: readonly DbSchemaMigration[] = [{
   },
   stores: CURRENT_DB_SCHEMA,
   upgrade: migratePurificationRulesToVersionTwo,
+}, {
+  version: 5,
+  scope: 'db-schema',
+  description: 'Clear readerRenderCache so render identity upgrades rebuild paged and scroll layouts.',
+  retireWhen: {
+    condition: 'Keep while any supported client may still open a version 4 database.',
+  },
+  stores: CURRENT_DB_SCHEMA,
+  upgrade: clearReaderRenderCacheForIdentityUpgrade,
 }] as const;
 
 export const CURRENT_DB_SCHEMA_VERSION = DB_SCHEMA_MIGRATIONS.at(-1)?.version ?? 1;

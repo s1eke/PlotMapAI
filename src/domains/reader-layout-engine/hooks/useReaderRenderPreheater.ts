@@ -26,6 +26,8 @@ import {
   isMaterializedReaderRenderCacheEntry,
   persistReaderRenderCacheEntry,
   primeReaderRenderCacheEntry,
+  READER_RENDERER_VERSION,
+  resolveReaderLayoutFeatureSet,
   warmReaderRenderImages,
 } from '../utils/readerRenderCache';
 import {
@@ -38,7 +40,10 @@ interface UseReaderRenderPreheaterParams {
   fetchChapterContent: UseReaderRenderCacheParams['fetchChapterContent'];
   loadedChaptersRef: MutableRefObject<Map<number, ChapterContent>>;
   novelId: number;
-  onMaterializedEntry: () => void;
+  onMaterializedEntry: (entry: {
+    chapterIndex: number;
+    variantFamily: ReaderRenderVariant;
+  }) => void;
   preheatTargets: ReaderRenderPreheatTarget[];
   preferRichScrollRendering: boolean;
   readerTelemetryEnabled: boolean;
@@ -158,22 +163,26 @@ export function useReaderRenderPreheater({
           }
 
           const contentHash = createChapterContentHash(chapter);
-          let scrollRenderMode: 'legacy-plain' | 'rich' | undefined;
-          if (target.variantFamily === 'original-scroll') {
-            scrollRenderMode = preferRichScrollRendering ? 'rich' : 'legacy-plain';
-          }
+          const layoutFeatureSet = resolveReaderLayoutFeatureSet({
+            chapter,
+            preferRichScrollRendering,
+            variantFamily: target.variantFamily,
+          });
           const layoutKey = buildChapterImageLayoutKey(
             novelId,
             chapter,
             serializeReaderLayoutSignature(signature),
-            scrollRenderMode,
           );
 
           const lookup = {
             chapterIndex: chapter.index,
             contentHash,
+            contentFormat: chapter.contentFormat,
+            contentVersion: chapter.contentVersion,
+            layoutFeatureSet,
             layoutKey,
             novelId,
+            rendererVersion: READER_RENDERER_VERSION,
             variantFamily: target.variantFamily,
           } as const;
 
@@ -212,7 +221,10 @@ export function useReaderRenderPreheater({
               && target.storageKind === 'render-tree'
               && isMaterializedReaderRenderCacheEntry(dexieRecord)
             ) {
-              onMaterializedEntryRef.current();
+              onMaterializedEntryRef.current({
+                chapterIndex: chapter.index,
+                variantFamily: target.variantFamily,
+              });
             }
 
             return;
@@ -271,7 +283,10 @@ export function useReaderRenderPreheater({
           await persistReaderRenderCacheEntry(builtEntry);
 
           if (!cancelled) {
-            onMaterializedEntryRef.current();
+            onMaterializedEntryRef.current({
+              chapterIndex: chapter.index,
+              variantFamily: target.variantFamily,
+            });
           }
         } catch (error) {
           debugLog('READER', 'Reader render preheat failed', {

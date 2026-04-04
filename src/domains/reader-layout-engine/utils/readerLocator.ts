@@ -93,13 +93,17 @@ export function createMetricEndLocator(metric: VirtualBlockMetrics): ReaderLocat
   };
 }
 
-export function getItemStartLocator(item: ReaderPageItem): ReaderLocator | null {
+export function getItemStartLocator(
+  item: ReaderPageItem,
+  pageIndex?: number,
+): ReaderLocator | null {
   if (item.kind === 'image') {
     return {
       blockIndex: item.blockIndex,
       chapterIndex: item.chapterIndex,
       edge: 'start',
       kind: 'image',
+      pageIndex,
     };
   }
 
@@ -114,17 +118,22 @@ export function getItemStartLocator(item: ReaderPageItem): ReaderLocator | null 
     endCursor: line?.end,
     kind: item.kind,
     lineIndex: item.lineStartIndex,
+    pageIndex,
     startCursor: line?.start,
   };
 }
 
-export function getItemEndLocator(item: ReaderPageItem): ReaderLocator | null {
+export function getItemEndLocator(
+  item: ReaderPageItem,
+  pageIndex?: number,
+): ReaderLocator | null {
   if (item.kind === 'image') {
     return {
       blockIndex: item.blockIndex,
       chapterIndex: item.chapterIndex,
       edge: 'end',
       kind: 'image',
+      pageIndex,
     };
   }
 
@@ -139,8 +148,38 @@ export function getItemEndLocator(item: ReaderPageItem): ReaderLocator | null {
     endCursor: line?.end,
     kind: item.kind,
     lineIndex: item.lineStartIndex + Math.max(0, item.lines.length - 1),
+    pageIndex,
     startCursor: line?.start,
   };
+}
+
+function pageContainsLocator(page: PageSlice | null | undefined, locator: ReaderLocator): boolean {
+  if (!page) {
+    return false;
+  }
+
+  for (const column of page.columns) {
+    for (const item of column.items) {
+      if (item.chapterIndex !== locator.chapterIndex || item.blockIndex !== locator.blockIndex) {
+        continue;
+      }
+
+      if (item.kind === 'image' && locator.kind === 'image') {
+        return true;
+      }
+
+      if ((item.kind === 'heading' || item.kind === 'text') && locator.kind === item.kind) {
+        const lineIndex = locator.lineIndex ?? 0;
+        const startLineIndex = item.lineStartIndex;
+        const endLineIndex = item.lineStartIndex + item.lines.length;
+        if (lineIndex >= startLineIndex && lineIndex < endLineIndex) {
+          return true;
+        }
+      }
+    }
+  }
+
+  return false;
 }
 
 export function findPageIndexForLocator(
@@ -151,6 +190,13 @@ export function findPageIndexForLocator(
     return null;
   }
 
+  if (typeof locator.pageIndex === 'number') {
+    const directPage = paginatedLayout.pageSlices[locator.pageIndex];
+    if (directPage && pageContainsLocator(directPage, locator)) {
+      return directPage.pageIndex;
+    }
+  }
+
   for (const page of paginatedLayout.pageSlices) {
     if (areLocatorsEquivalent(page.startLocator, locator)) {
       return page.pageIndex;
@@ -158,23 +204,8 @@ export function findPageIndexForLocator(
   }
 
   for (const page of paginatedLayout.pageSlices) {
-    for (const column of page.columns) {
-      for (const item of column.items) {
-        if (item.chapterIndex !== locator.chapterIndex || item.blockIndex !== locator.blockIndex) {
-          continue;
-        }
-        if (item.kind === 'image' && locator.kind === 'image') {
-          return page.pageIndex;
-        }
-        if ((item.kind === 'heading' || item.kind === 'text') && locator.kind === item.kind) {
-          const lineIndex = locator.lineIndex ?? 0;
-          const startLineIndex = item.lineStartIndex;
-          const endLineIndex = item.lineStartIndex + item.lines.length;
-          if (lineIndex >= startLineIndex && lineIndex < endLineIndex) {
-            return page.pageIndex;
-          }
-        }
-      }
+    if (pageContainsLocator(page, locator)) {
+      return page.pageIndex;
     }
   }
 

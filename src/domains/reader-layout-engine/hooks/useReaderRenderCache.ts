@@ -152,9 +152,20 @@ export function useReaderRenderCache({
     currentChapterIndex,
   }), [activeVariant, chapters.length, currentChapterIndex]);
 
-  const handleMaterializedEntry = useCallback(() => {
+  const visibleTargetKeys = useMemo(() => new Set(
+    visibleTargets.map((target) => `${target.chapter.index}:${target.variantFamily}`),
+  ), [visibleTargets]);
+
+  const handleMaterializedEntry = useCallback((entry: {
+    chapterIndex: number;
+    variantFamily: string;
+  }) => {
+    if (!visibleTargetKeys.has(`${entry.chapterIndex}:${entry.variantFamily}`)) {
+      return;
+    }
+
     setCacheRevision((previous) => previous + 1);
-  }, []);
+  }, [visibleTargetKeys]);
 
   const { isPreheating, pendingPreheatCount } = useReaderRenderPreheater({
     currentChapterIndex,

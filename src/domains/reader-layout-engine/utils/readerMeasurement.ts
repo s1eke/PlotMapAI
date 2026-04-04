@@ -15,6 +15,7 @@ import {
 } from '@chenglou/pretext';
 
 import {
+  buildPagedReaderBlocks,
   buildReaderBlocks,
   getApproximateMaxCharsPerLine,
   resolveReaderImageSize,
@@ -25,6 +26,7 @@ import {
   getRichScrollRuleHeight,
   shouldUseRichScrollBlocks,
 } from './richScroll';
+import { getRichInlinePlainText } from '@shared/text-processing';
 
 const MAX_PRETEXT_CACHE_SIZE = 256;
 const PRETEXT_CACHE = new Map<string, PreparedTextWithSegments | null>();
@@ -185,70 +187,146 @@ export function createReaderTypographyMetrics(
   };
 }
 
-export function measureReaderChapterLayout(
-  chapter: ChapterContent,
-  width: number,
-  typography: ReaderTypographyMetrics,
-  imageDimensionsByKey: Map<string, ReaderImageDimensions | null | undefined>,
-  imageLayoutConstraints?: ReaderImageLayoutConstraints,
-  textLayoutEngine: ReaderTextLayoutEngine = browserReaderTextLayoutEngine,
-): MeasuredChapterLayout {
-  const blocks = buildReaderBlocks(chapter, typography.paragraphSpacing);
+function measureCaptionLines(params: {
+  captionText: string;
+  lineHeightPx: number;
+  maxWidth: number;
+  textLayoutEngine: ReaderTextLayoutEngine;
+  typography: ReaderTypographyMetrics;
+}): Pick<
+  VirtualBlockMetrics,
+  | 'captionFont'
+  | 'captionFontSizePx'
+  | 'captionHeight'
+  | 'captionLineHeightPx'
+  | 'captionLines'
+  | 'captionSpacing'
+> {
+  const captionLines = params.captionText.length > 0
+    ? params.textLayoutEngine.layoutLines({
+      font: params.typography.bodyFont,
+      fontSizePx: params.typography.bodyFontSize,
+      lineHeightPx: params.lineHeightPx,
+      maxWidth: params.maxWidth,
+      text: params.captionText,
+    })
+    : [];
+  const captionHeight = captionLines.length * params.lineHeightPx;
+
+  return {
+    captionFont: params.typography.bodyFont,
+    captionFontSizePx: params.typography.bodyFontSize,
+    captionHeight,
+    captionLineHeightPx: params.lineHeightPx,
+    captionLines,
+    captionSpacing: captionLines.length > 0 ? 8 : 0,
+  };
+}
+
+function measureReaderBlocks(params: {
+  blocks: ReturnType<typeof buildReaderBlocks>;
+  chapterIndex: number;
+  imageDimensionsByKey: Map<string, ReaderImageDimensions | null | undefined>;
+  imageLayoutConstraints?: ReaderImageLayoutConstraints;
+  renderMode: MeasuredChapterLayout['renderMode'];
+  richAware: boolean;
+  textLayoutEngine: ReaderTextLayoutEngine;
+  typography: ReaderTypographyMetrics;
+  width: number;
+}): MeasuredChapterLayout {
   const metrics: VirtualBlockMetrics[] = [];
   let offsetTop = 0;
 
-  for (const block of blocks) {
+  for (const block of params.blocks) {
     let blockMetrics: VirtualBlockMetrics;
-    if (block.kind === 'heading' || block.kind === 'text') {
-      const font = block.kind === 'heading' ? typography.headingFont : typography.bodyFont;
-      const fontSizePx = block.kind === 'heading'
-        ? typography.headingFontSize
-        : typography.bodyFontSize;
-      const lineHeightPx = block.kind === 'heading'
-        ? typography.headingLineHeightPx
-        : typography.bodyLineHeightPx;
-      const lines = textLayoutEngine.layoutLines({
-        font,
-        fontSizePx,
-        lineHeightPx,
-        maxWidth: width,
-        text: block.text ?? '',
-      });
-      const contentHeight = lines.length * lineHeightPx;
 
-      blockMetrics = {
-        block,
-        contentHeight,
-        font,
-        fontSizePx,
-        fontWeight: block.kind === 'heading' ? 700 : 400,
-        height: block.marginBefore + contentHeight + block.marginAfter,
-        lineHeightPx,
-        lines,
-        marginAfter: block.marginAfter,
-        marginBefore: block.marginBefore,
-        top: offsetTop,
-      };
+    if (block.kind === 'heading' || block.kind === 'text') {
+      const font = block.kind === 'heading'
+        ? params.typography.headingFont
+        : params.typography.bodyFont;
+      const fontSizePx = block.kind === 'heading'
+        ? params.typography.headingFontSize
+        : params.typography.bodyFontSize;
+      const lineHeightPx = block.kind === 'heading'
+        ? params.typography.headingLineHeightPx
+        : params.typography.bodyLineHeightPx;
+      const maxWidth = params.richAware
+        ? getRichScrollHorizontalTextWidth(block, params.width)
+        : params.width;
+
+      if (block.renderRole === 'hr') {
+        blockMetrics = {
+          block,
+          contentHeight: getRichScrollRuleHeight(),
+          font,
+          fontSizePx,
+          fontWeight: 400,
+          height: block.marginBefore + getRichScrollRuleHeight() + block.marginAfter,
+          lineHeightPx,
+          lines: [],
+          marginAfter: block.marginAfter,
+          marginBefore: block.marginBefore,
+          top: offsetTop,
+        };
+      } else {
+        const lines = params.textLayoutEngine.layoutLines({
+          font,
+          fontSizePx,
+          lineHeightPx,
+          maxWidth,
+          text: block.text ?? '',
+        });
+        const contentHeight = lines.length * lineHeightPx;
+
+        blockMetrics = {
+          block,
+          contentHeight,
+          font,
+          fontSizePx,
+          fontWeight: block.kind === 'heading' ? 700 : 400,
+          height: block.marginBefore + contentHeight + block.marginAfter,
+          lineHeightPx,
+          lines,
+          marginAfter: block.marginAfter,
+          marginBefore: block.marginBefore,
+          top: offsetTop,
+        };
+      }
     } else if (block.kind === 'image') {
+      const availableWidth = params.richAware
+        ? getRichScrollHorizontalTextWidth(block, params.width)
+        : params.width;
       const resolvedImageSize = resolveReaderImageSize(
-        width,
+        availableWidth,
         block.imageKey,
-        imageDimensionsByKey,
-        imageLayoutConstraints,
+        params.imageDimensionsByKey,
+        params.imageLayoutConstraints,
       );
       const displayWidth = resolvedImageSize.width;
       const displayHeight = resolvedImageSize.height;
+      const captionMetrics = measureCaptionLines({
+        captionText: getRichInlinePlainText(block.imageCaption ?? []),
+        lineHeightPx: params.typography.bodyLineHeightPx,
+        maxWidth: availableWidth,
+        textLayoutEngine: params.textLayoutEngine,
+        typography: params.typography,
+      });
+      const contentHeight =
+        displayHeight
+        + (captionMetrics.captionSpacing ?? 0)
+        + (captionMetrics.captionHeight ?? 0);
 
       blockMetrics = {
         block,
-        contentHeight: displayHeight,
+        ...captionMetrics,
+        contentHeight,
         displayHeight,
         displayWidth,
-        font: typography.bodyFont,
-        fontSizePx: typography.bodyFontSize,
+        font: params.typography.bodyFont,
+        fontSizePx: params.typography.bodyFontSize,
         fontWeight: 400,
-        height: block.marginBefore + displayHeight + block.marginAfter,
-        lineHeightPx: typography.bodyLineHeightPx,
+        height: block.marginBefore + contentHeight + block.marginAfter,
+        lineHeightPx: params.typography.bodyLineHeightPx,
         lines: [],
         marginAfter: block.marginAfter,
         marginBefore: block.marginBefore,
@@ -258,11 +336,11 @@ export function measureReaderChapterLayout(
       blockMetrics = {
         block,
         contentHeight: 0,
-        font: typography.bodyFont,
-        fontSizePx: typography.bodyFontSize,
+        font: params.typography.bodyFont,
+        fontSizePx: params.typography.bodyFontSize,
         fontWeight: 400,
         height: block.marginAfter,
-        lineHeightPx: typography.bodyLineHeightPx,
+        lineHeightPx: params.typography.bodyLineHeightPx,
         lines: [],
         marginAfter: block.marginAfter,
         marginBefore: 0,
@@ -275,13 +353,55 @@ export function measureReaderChapterLayout(
   }
 
   return {
-    blockCount: blocks.length,
-    chapterIndex: chapter.index,
+    blockCount: params.blocks.length,
+    chapterIndex: params.chapterIndex,
     metrics,
-    renderMode: 'legacy-plain',
-    textWidth: width,
+    renderMode: params.renderMode,
+    textWidth: params.width,
     totalHeight: offsetTop,
   };
+}
+
+export function measureReaderChapterLayout(
+  chapter: ChapterContent,
+  width: number,
+  typography: ReaderTypographyMetrics,
+  imageDimensionsByKey: Map<string, ReaderImageDimensions | null | undefined>,
+  imageLayoutConstraints?: ReaderImageLayoutConstraints,
+  textLayoutEngine: ReaderTextLayoutEngine = browserReaderTextLayoutEngine,
+): MeasuredChapterLayout {
+  return measureReaderBlocks({
+    blocks: buildReaderBlocks(chapter, typography.paragraphSpacing),
+    chapterIndex: chapter.index,
+    imageDimensionsByKey,
+    imageLayoutConstraints,
+    renderMode: 'legacy-plain',
+    richAware: false,
+    textLayoutEngine,
+    typography,
+    width,
+  });
+}
+
+export function measurePagedReaderChapterLayout(
+  chapter: ChapterContent,
+  width: number,
+  typography: ReaderTypographyMetrics,
+  imageDimensionsByKey: Map<string, ReaderImageDimensions | null | undefined>,
+  textLayoutEngine: ReaderTextLayoutEngine = browserReaderTextLayoutEngine,
+): MeasuredChapterLayout {
+  const richAware = shouldUseRichScrollBlocks(chapter);
+
+  return measureReaderBlocks({
+    blocks: buildPagedReaderBlocks(chapter, typography.paragraphSpacing),
+    chapterIndex: chapter.index,
+    imageDimensionsByKey,
+    renderMode: richAware ? 'rich' : 'legacy-plain',
+    richAware,
+    textLayoutEngine,
+    typography,
+    width,
+  });
 }
 
 export function measureScrollReaderChapterLayout(
@@ -304,154 +424,17 @@ export function measureScrollReaderChapterLayout(
     );
   }
 
-  const blocks = buildRichScrollReaderBlocks(chapter, typography.paragraphSpacing);
-  const metrics: VirtualBlockMetrics[] = [];
-  let offsetTop = 0;
-
-  for (const block of blocks) {
-    let blockMetrics: VirtualBlockMetrics;
-
-    if (block.kind === 'heading' || block.kind === 'text') {
-      const font = block.kind === 'heading' ? typography.headingFont : typography.bodyFont;
-      const fontSizePx = block.kind === 'heading'
-        ? typography.headingFontSize
-        : typography.bodyFontSize;
-      const lineHeightPx = block.kind === 'heading'
-        ? typography.headingLineHeightPx
-        : typography.bodyLineHeightPx;
-      const textWidth = getRichScrollHorizontalTextWidth(block, width);
-
-      if (block.renderRole === 'hr') {
-        blockMetrics = {
-          block,
-          contentHeight: getRichScrollRuleHeight(),
-          font,
-          fontSizePx,
-          fontWeight: 400,
-          height: block.marginBefore + getRichScrollRuleHeight() + block.marginAfter,
-          lineHeightPx,
-          lines: [],
-          marginAfter: block.marginAfter,
-          marginBefore: block.marginBefore,
-          top: offsetTop,
-        };
-      } else {
-        const lines = textLayoutEngine.layoutLines({
-          font,
-          fontSizePx,
-          lineHeightPx,
-          maxWidth: textWidth,
-          text: block.text ?? '',
-        });
-        const contentHeight = lines.length * lineHeightPx;
-
-        blockMetrics = {
-          block,
-          contentHeight,
-          font,
-          fontSizePx,
-          fontWeight: block.kind === 'heading' ? 700 : 400,
-          height: block.marginBefore + contentHeight + block.marginAfter,
-          lineHeightPx,
-          lines,
-          marginAfter: block.marginAfter,
-          marginBefore: block.marginBefore,
-          top: offsetTop,
-        };
-      }
-    } else if (block.kind === 'image') {
-      const availableWidth = getRichScrollHorizontalTextWidth(block, width);
-      const resolvedImageSize = resolveReaderImageSize(
-        availableWidth,
-        block.imageKey,
-        imageDimensionsByKey,
-        imageLayoutConstraints,
-      );
-      const displayWidth = resolvedImageSize.width;
-      const displayHeight = resolvedImageSize.height;
-      const captionText = block.imageCaption?.map((inline) => {
-        if (inline.type === 'text') {
-          return inline.text;
-        }
-
-        if (inline.type === 'lineBreak') {
-          return '\n';
-        }
-
-        return inline.children.map((child) => {
-          if (child.type === 'text') {
-            return child.text;
-          }
-
-          if (child.type === 'lineBreak') {
-            return '\n';
-          }
-
-          return '';
-        }).join('');
-      }).join('') ?? '';
-      const captionFontSizePx = typography.bodyFontSize;
-      const captionLineHeightPx = typography.bodyLineHeightPx;
-      const captionLines = captionText.length > 0
-        ? textLayoutEngine.layoutLines({
-          font: typography.bodyFont,
-          fontSizePx: captionFontSizePx,
-          lineHeightPx: captionLineHeightPx,
-          maxWidth: availableWidth,
-          text: captionText,
-        })
-        : [];
-      const captionHeight = captionLines.length * captionLineHeightPx;
-      const captionSpacing = captionLines.length > 0 ? 8 : 0;
-      const contentHeight = displayHeight + captionSpacing + captionHeight;
-
-      blockMetrics = {
-        block,
-        captionFont: typography.bodyFont,
-        captionFontSizePx,
-        captionHeight,
-        captionLineHeightPx,
-        contentHeight,
-        displayHeight,
-        displayWidth,
-        font: typography.bodyFont,
-        fontSizePx: typography.bodyFontSize,
-        fontWeight: 400,
-        height: block.marginBefore + contentHeight + block.marginAfter,
-        lineHeightPx: typography.bodyLineHeightPx,
-        lines: [],
-        marginAfter: block.marginAfter,
-        marginBefore: block.marginBefore,
-        top: offsetTop,
-      };
-    } else {
-      blockMetrics = {
-        block,
-        contentHeight: 0,
-        font: typography.bodyFont,
-        fontSizePx: typography.bodyFontSize,
-        fontWeight: 400,
-        height: block.marginAfter,
-        lineHeightPx: typography.bodyLineHeightPx,
-        lines: [],
-        marginAfter: block.marginAfter,
-        marginBefore: 0,
-        top: offsetTop,
-      };
-    }
-
-    metrics.push(blockMetrics);
-    offsetTop += blockMetrics.height;
-  }
-
-  return {
-    blockCount: blocks.length,
+  return measureReaderBlocks({
+    blocks: buildRichScrollReaderBlocks(chapter, typography.paragraphSpacing),
     chapterIndex: chapter.index,
-    metrics,
+    imageDimensionsByKey,
+    imageLayoutConstraints,
     renderMode: 'rich',
-    textWidth: width,
-    totalHeight: offsetTop,
-  };
+    richAware: true,
+    textLayoutEngine,
+    typography,
+    width,
+  });
 }
 
 function resolveReaderFontFamily(): string {

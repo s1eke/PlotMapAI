@@ -9,6 +9,11 @@ import type {
 
 import { buildChapterBlockSequence } from '@shared/text-processing/chapterBlocks';
 
+import {
+  buildRichScrollReaderBlocks,
+  shouldUseRichScrollBlocks,
+} from './richScroll';
+
 const DEFAULT_IMAGE_ASPECT_RATIO = 4 / 3;
 const IMAGE_BLOCK_MARGIN_PX = 16;
 const HEADING_TOP_MARGIN_PX = 8;
@@ -163,12 +168,26 @@ export function buildReaderBlocks(
   return blocks;
 }
 
+export function buildPagedReaderBlocks(
+  chapter: ChapterContent,
+  paragraphSpacing: number,
+): ReaderBlock[] {
+  if (shouldUseRichScrollBlocks(chapter)) {
+    return buildRichScrollReaderBlocks(chapter, paragraphSpacing);
+  }
+
+  return buildReaderBlocks(chapter, paragraphSpacing);
+}
+
 export function createChapterContentHash(
-  chapter: Pick<ChapterContent, 'contentFormat' | 'index' | 'plainText' | 'richBlocks' | 'title'>,
+  chapter: Pick<
+    ChapterContent,
+    'contentFormat' | 'contentVersion' | 'index' | 'plainText' | 'richBlocks' | 'title'
+  >,
 ): string {
   const source = chapter.contentFormat === 'rich'
-    ? `${chapter.index}\u0000${chapter.title}\u0000${chapter.plainText}\u0000${chapter.contentFormat}\u0000${JSON.stringify(chapter.richBlocks)}`
-    : `${chapter.index}\u0000${chapter.title}\u0000${chapter.plainText}\u0000${chapter.contentFormat}`;
+    ? `${chapter.index}\u0000${chapter.title}\u0000${chapter.plainText}\u0000${chapter.contentFormat}\u0000${chapter.contentVersion}\u0000${JSON.stringify(chapter.richBlocks)}`
+    : `${chapter.index}\u0000${chapter.title}\u0000${chapter.plainText}\u0000${chapter.contentFormat}\u0000${chapter.contentVersion}`;
   let hashA = 0x811c9dc5;
   let hashB = 0x01000193;
   const UINT32_MOD = 0x1_0000_0000;
