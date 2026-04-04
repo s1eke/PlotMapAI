@@ -1,18 +1,82 @@
 import JSZip from 'jszip';
-import { computeHash } from '@shared/text-processing';
-import { stripLeadingChapterTitle } from '@shared/text-processing';
-import type { ParsedBook } from '../bookParser';
+import type { RichBlock } from '@shared/contracts';
+import type { ParsedBook, ParsedChapter } from '../bookParser';
 import type { BookImportProgress } from '../progress';
+import type { ManifestItem } from './types';
+
+import { computeHash, stripLeadingChapterTitle } from '@shared/text-processing';
 import { buildTocMap } from './toc';
+import { epubDomToRichBlocks, getRichBlockText } from './epubDomToRichBlocks';
+import { sanitizeEpubHtml } from './epubHtmlSanitizer';
 import { htmlToText } from './htmlToText';
 import { extractChapterImages, extractCoverBlob } from './imageExtractor';
 import { extractBookMetadata, extractTitleFromHtml, isNonContentPage } from './metadata';
 import { loadOpfPackage, resolveOpfPath } from './opf';
-import type { ManifestItem } from './types';
+import { normalizeRichBlocks } from './richTextNormalizer';
+import { richTextToPlainText } from './richTextToPlainText';
 
 export interface ParseEpubOptions {
   signal?: AbortSignal;
   onProgress?: (progress: BookImportProgress) => void;
+}
+
+function normalizeBlockText(value: string): string {
+  return value.replace(/[^\S\n]+/gu, ' ').trim();
+}
+
+function shouldStripLeadingTitleBlock(block: RichBlock, title: string): boolean {
+  if (block.type !== 'heading' && block.type !== 'paragraph') {
+    return false;
+  }
+
+  return normalizeBlockText(getRichBlockText(block)) === normalizeBlockText(title);
+}
+
+function stripLeadingTitleBlocks(blocks: RichBlock[], title: string): RichBlock[] {
+  const normalizedTitle = normalizeBlockText(title);
+  if (normalizedTitle.length === 0) {
+    return blocks;
+  }
+
+  let index = 0;
+  while (index < blocks.length && shouldStripLeadingTitleBlock(blocks[index], normalizedTitle)) {
+    index += 1;
+  }
+
+  return blocks.slice(index);
+}
+
+function createFallbackChapter(title: string, html: string): ParsedChapter | null {
+  const content = stripLeadingChapterTitle(htmlToText(html), title);
+  if (!content) {
+    return null;
+  }
+
+  return {
+    title,
+    content,
+    contentFormat: 'plain',
+    richBlocks: [],
+  };
+}
+
+function createRichChapter(title: string, html: string): ParsedChapter | null {
+  const sanitizedRoot = sanitizeEpubHtml(html);
+  const richBlocks = normalizeRichBlocks(stripLeadingTitleBlocks(
+    epubDomToRichBlocks(sanitizedRoot),
+    title,
+  ));
+  const content = stripLeadingChapterTitle(richTextToPlainText(richBlocks), title);
+  if (!content) {
+    return null;
+  }
+
+  return {
+    title,
+    content,
+    contentFormat: 'rich',
+    richBlocks,
+  };
 }
 
 function emitProgress(
@@ -49,7 +113,7 @@ export async function parseEpubCore(
   emitProgress(onProgress, { progress: 42, stage: 'toc' });
   const tocMap = await buildTocMap(opfPackage);
 
-  const chapters: Array<{ title: string; content: string }> = [];
+  const chapters: ParsedChapter[] = [];
   const images: Array<{ imageKey: string; blob: Blob }> = [];
   let chapterIndex = 0;
 
@@ -83,11 +147,6 @@ export async function parseEpubCore(
 
     const extracted = await extractChapterImages(html, zip, opfPackage.opfDir);
     images.push(...extracted.images);
-    const text = htmlToText(extracted.html);
-    if (!text) {
-      continue;
-    }
-
     const hrefBase = item.href.split('#')[0];
     let chapterTitle = tocMap.get(hrefBase) || extractTitleFromHtml(extracted.html);
     if (!chapterTitle) {
@@ -97,12 +156,17 @@ export async function parseEpubCore(
     if (isNonContentPage(chapterTitle, item.href)) {
       continue;
     }
-    const content = stripLeadingChapterTitle(text, chapterTitle);
-    if (!content) {
-      continue;
+
+    let chapter: ParsedChapter | null = null;
+    try {
+      chapter = createRichChapter(chapterTitle, extracted.html);
+    } catch {
+      chapter = createFallbackChapter(chapterTitle, extracted.html);
     }
 
-    chapters.push({ title: chapterTitle, content });
+    if (chapter) {
+      chapters.push(chapter);
+    }
   }
 
   throwIfAborted(signal);

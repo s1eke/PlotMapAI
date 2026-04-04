@@ -1,5 +1,9 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import JSZip from 'jszip';
+
+const { mockEpubDomToRichBlocks } = vi.hoisted(() => ({
+  mockEpubDomToRichBlocks: vi.fn(),
+}));
 
 const mockDigest = vi.fn().mockResolvedValue(new ArrayBuffer(32));
 Object.defineProperty(globalThis, 'crypto', {
@@ -7,6 +11,16 @@ Object.defineProperty(globalThis, 'crypto', {
   writable: true,
 });
 
+vi.mock('../epub/epubDomToRichBlocks', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../epub/epubDomToRichBlocks')>();
+  mockEpubDomToRichBlocks.mockImplementation(actual.epubDomToRichBlocks);
+  return {
+    ...actual,
+    epubDomToRichBlocks: mockEpubDomToRichBlocks,
+  };
+});
+
+import { parseEpubCore } from '../epub/core';
 import { parseEpub } from '../epub/parser';
 
 async function makeEpubFile(zip: JSZip, name: string): Promise<File> {
@@ -15,6 +29,10 @@ async function makeEpubFile(zip: JSZip, name: string): Promise<File> {
 }
 
 describe('parseEpub', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('throws when container.xml is missing', async () => {
     const zip = new JSZip();
     zip.file('dummy.txt', 'not an epub');
@@ -56,6 +74,17 @@ describe('parseEpub', () => {
     expect(result).toHaveProperty('tags');
     expect(result).toHaveProperty('images');
     expect(result.fileHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(result.chapters[0]).toMatchObject({
+      content: 'Some text content.',
+      contentFormat: 'rich',
+      richBlocks: [{
+        type: 'paragraph',
+        children: [{
+          type: 'text',
+          text: 'Some text content.',
+        }],
+      }],
+    });
   });
 
   it('falls back to filename when title cannot be extracted', async () => {
@@ -150,7 +179,71 @@ describe('parseEpub', () => {
       {
         title: 'Chapter 1',
         content: 'Body paragraph.',
+        contentFormat: 'rich',
+        richBlocks: [{
+          type: 'paragraph',
+          children: [{
+            type: 'text',
+            text: 'Body paragraph.',
+          }],
+        }],
       },
     ]);
+  });
+
+  it('falls back to plain chapter projection when rich parsing throws for a chapter', async () => {
+    const zip = new JSZip();
+    zip.file('META-INF/container.xml', `<?xml version="1.0"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <rootfiles>
+    <rootfile full-path="content.opf" media-type="application/oebps-package+xml"/>
+  </rootfiles>
+</container>`);
+    zip.file('content.opf', `<?xml version="1.0"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="uid">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:title id="uid">Fallback Book</dc:title>
+  </metadata>
+  <manifest>
+    <item id="ch1" href="ch1.xhtml" media-type="application/xhtml+xml"/>
+  </manifest>
+  <spine>
+    <itemref idref="ch1"/>
+  </spine>
+</package>`);
+    zip.file('ch1.xhtml', `<?xml version="1.0"?>
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <body>
+    <p>Fallback paragraph.</p>
+  </body>
+</html>`);
+
+    const file = await makeEpubFile(zip, 'fallback.epub');
+    const originalDomParser = globalThis.DOMParser;
+    Object.defineProperty(globalThis, 'DOMParser', {
+      configurable: true,
+      value: class MockDomParser {
+        parseFromString(): never {
+          throw new Error('boom');
+        }
+      },
+    });
+
+    let result;
+    try {
+      result = await parseEpubCore(file);
+    } finally {
+      Object.defineProperty(globalThis, 'DOMParser', {
+        configurable: true,
+        value: originalDomParser,
+      });
+    }
+
+    expect(result.chapters).toEqual([{
+      title: 'ch1.xhtml',
+      content: 'Fallback paragraph.',
+      contentFormat: 'plain',
+      richBlocks: [],
+    }]);
   });
 });

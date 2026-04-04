@@ -33,6 +33,10 @@ describe('parseTxt', () => {
     expect(result.totalWords).toBeGreaterThan(0);
     expect(result.fileHash).toBeDefined();
     expect(result.encoding).toBeDefined();
+    expect(result.chapters[0]).toMatchObject({
+      contentFormat: 'plain',
+      richBlocks: [],
+    });
   });
 
   it('strips .txt extension from title', async () => {

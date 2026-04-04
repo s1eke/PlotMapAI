@@ -15,8 +15,8 @@ describe('bookImportService', () => {
     vi.mocked(parseBook).mockResolvedValue({
       author: 'Parsed Author',
       chapters: [
-        { content: 'Content 1', title: 'Ch1' },
-        { content: 'Content 2', title: 'Ch2' },
+        { content: 'Content 1', title: 'Ch1', contentFormat: 'plain', richBlocks: [] },
+        { content: 'Content 2', title: 'Ch2', contentFormat: 'plain', richBlocks: [] },
       ],
       coverBlob: null,
       description: 'Parsed desc',
@@ -68,10 +68,14 @@ describe('bookImportService', () => {
         {
           content: 'Ch1\n[IMG:cover]\nBody\n[IMG:map]',
           title: 'Ch1',
+          contentFormat: 'plain',
+          richBlocks: [],
         },
         {
           content: 'Body\n[IMG:diagram]',
           title: 'Ch2',
+          contentFormat: 'plain',
+          richBlocks: [],
         },
       ],
       coverBlob: null,
@@ -99,8 +103,8 @@ describe('bookImportService', () => {
     vi.mocked(parseBook).mockResolvedValueOnce({
       author: 'Parsed Author',
       chapters: [
-        { content: 'Ch1\n\nBody 1', title: 'Ch1' },
-        { content: 'Body 2', title: 'Ch2' },
+        { content: 'Ch1\n\nBody 1', title: 'Ch1', contentFormat: 'plain', richBlocks: [] },
+        { content: 'Body 2', title: 'Ch2', contentFormat: 'plain', richBlocks: [] },
       ],
       coverBlob: null,
       description: 'Parsed desc',

@@ -1,15 +1,26 @@
+import type {
+  RichBlock,
+  RichContentFormat,
+} from '@shared/contracts';
 import type { ChapterDetectionRule } from '@shared/text-processing';
 import type { BookImportProgress } from './progress';
 
 import { parseEpub } from './epub/parser';
 import { parseTxt } from './txtParser';
 
+export interface ParsedChapter {
+  title: string;
+  content: string;
+  contentFormat: RichContentFormat;
+  richBlocks: RichBlock[];
+}
+
 export interface ParsedBook {
   title: string;
   author: string;
   description: string;
   coverBlob: Blob | null;
-  chapters: Array<{ title: string; content: string }>;
+  chapters: ParsedChapter[];
   rawText: string;
   encoding: string;
   totalWords: number;

@@ -1,9 +1,10 @@
 import type { ParsedBook } from './bookParser';
-import { debugLog } from '@shared/debug';
 import type { WorkerTaskOptions } from '@infra/workers';
-import { runParseTxtTask } from '@shared/text-processing';
 import type { ChapterDetectionRule, ParsedTextDocument } from '@shared/text-processing';
 import type { BookImportProgress } from './progress';
+
+import { debugLog } from '@shared/debug';
+import { runParseTxtTask } from '@shared/text-processing';
 
 function mapParsedDocument(document: ParsedTextDocument): ParsedBook {
   return {
@@ -11,7 +12,12 @@ function mapParsedDocument(document: ParsedTextDocument): ParsedBook {
     author: '',
     description: '',
     coverBlob: null,
-    chapters: document.chapters,
+    chapters: document.chapters.map((chapter) => ({
+      title: chapter.title,
+      content: chapter.content,
+      contentFormat: 'plain',
+      richBlocks: [],
+    })),
     rawText: document.rawText,
     encoding: document.encoding,
     totalWords: document.totalWords,
