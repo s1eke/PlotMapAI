@@ -1,13 +1,15 @@
 import JSZip from 'jszip';
 import type { RichBlock } from '@shared/contracts';
+import type { PurifyRule } from '@shared/text-processing';
 import type { ParsedBook, ParsedChapter } from '../bookParser';
 import type { BookImportProgress } from '../progress';
 import type { ManifestItem } from './types';
 
-import { computeHash, stripLeadingChapterTitle } from '@shared/text-processing';
+import { computeHash, purify, stripLeadingChapterTitle } from '@shared/text-processing';
 import { buildTocMap } from './toc';
 import { epubDomToRichBlocks, getRichBlockText } from './epubDomToRichBlocks';
 import { sanitizeEpubHtml } from './epubHtmlSanitizer';
+import { purifyEpubDom } from './epubPreAstPurifier';
 import { htmlToText } from './htmlToText';
 import { extractChapterImages, extractCoverBlob } from './imageExtractor';
 import { extractBookMetadata, extractTitleFromHtml, isNonContentPage } from './metadata';
@@ -16,6 +18,7 @@ import { normalizeRichBlocks } from './richTextNormalizer';
 import { richTextToPlainText } from './richTextToPlainText';
 
 export interface ParseEpubOptions {
+  purificationRules?: PurifyRule[];
   signal?: AbortSignal;
   onProgress?: (progress: BookImportProgress) => void;
 }
@@ -46,8 +49,19 @@ function stripLeadingTitleBlocks(blocks: RichBlock[], title: string): RichBlock[
   return blocks.slice(index);
 }
 
-function createFallbackChapter(title: string, html: string): ParsedChapter | null {
-  const content = stripLeadingChapterTitle(htmlToText(html), title);
+function createFallbackChapter(
+  title: string,
+  html: string,
+  purificationRules: PurifyRule[],
+  bookTitle: string,
+): ParsedChapter | null {
+  const content = purify(
+    stripLeadingChapterTitle(htmlToText(html), title),
+    purificationRules,
+    'text',
+    bookTitle,
+    'pre-ast',
+  );
   if (!content) {
     return null;
   }
@@ -60,8 +74,14 @@ function createFallbackChapter(title: string, html: string): ParsedChapter | nul
   };
 }
 
-function createRichChapter(title: string, html: string): ParsedChapter | null {
+function createRichChapter(
+  title: string,
+  html: string,
+  purificationRules: PurifyRule[],
+  bookTitle: string,
+): ParsedChapter | null {
   const sanitizedRoot = sanitizeEpubHtml(html);
+  purifyEpubDom(sanitizedRoot, purificationRules, bookTitle);
   const richBlocks = normalizeRichBlocks(stripLeadingTitleBlocks(
     epubDomToRichBlocks(sanitizedRoot),
     title,
@@ -94,7 +114,11 @@ export async function parseEpubCore(
   file: File,
   options: ParseEpubOptions = {},
 ): Promise<ParsedBook> {
-  const { onProgress, signal } = options;
+  const {
+    onProgress,
+    purificationRules = [],
+    signal,
+  } = options;
 
   emitProgress(onProgress, { progress: 5, stage: 'hashing' });
   const fileBuffer = await file.arrayBuffer();
@@ -153,15 +177,22 @@ export async function parseEpubCore(
       chapterIndex += 1;
       chapterTitle = `Chapter ${chapterIndex}`;
     }
+    chapterTitle = purify(
+      chapterTitle,
+      purificationRules,
+      'heading',
+      title,
+      'pre-ast',
+    );
     if (isNonContentPage(chapterTitle, item.href)) {
       continue;
     }
 
     let chapter: ParsedChapter | null = null;
     try {
-      chapter = createRichChapter(chapterTitle, extracted.html);
+      chapter = createRichChapter(chapterTitle, extracted.html, purificationRules, title);
     } catch {
-      chapter = createFallbackChapter(chapterTitle, extracted.html);
+      chapter = createFallbackChapter(chapterTitle, extracted.html, purificationRules, title);
     }
 
     if (chapter) {

@@ -1,4 +1,8 @@
 import type { EntityTable } from 'dexie';
+import type {
+  PurificationExecutionStage,
+  PurificationTargetScope,
+} from '@shared/text-processing';
 
 export interface TocRuleRecord {
   id: number;
@@ -21,8 +25,11 @@ export interface PurificationRuleRecord {
   isRegex: boolean;
   isEnabled: boolean;
   order: number;
-  scopeTitle: boolean;
-  scopeContent: boolean;
+  targetScope: PurificationTargetScope;
+  executionStage: PurificationExecutionStage;
+  ruleVersion: number;
+  scopeTitle?: boolean;
+  scopeContent?: boolean;
   bookScope: string;
   excludeBookScope: string;
   exclusiveGroup: string;

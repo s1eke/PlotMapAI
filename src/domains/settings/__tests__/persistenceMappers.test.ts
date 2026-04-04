@@ -43,8 +43,9 @@ describe('settings persistence mappers', () => {
       isRegex: true,
       isEnabled: true,
       order: 10,
-      scopeTitle: true,
-      scopeContent: true,
+      targetScope: 'all',
+      executionStage: 'post-ast',
+      ruleVersion: 2,
       bookScope: '',
       excludeBookScope: '',
       exclusiveGroup: '',
@@ -61,6 +62,9 @@ describe('settings persistence mappers', () => {
       replacement: 'bar',
       isRegex: true,
       isEnabled: true,
+      targetScope: 'all',
+      executionStage: 'post-ast',
+      ruleVersion: 2,
     });
   });
 });

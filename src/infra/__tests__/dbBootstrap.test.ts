@@ -138,10 +138,10 @@ describe('prepareDatabase', () => {
     mockReportAppError.mockReset();
   });
 
-  it('opens the formal v3 baseline schema in a fresh environment', async () => {
+  it('opens the formal v4 baseline schema in a fresh environment', async () => {
     await prepareDatabase();
 
-    expect(db.verno).toBe(3);
+    expect(db.verno).toBe(4);
     expect(db.tables.map((table) => table.name).sort()).toEqual([
       'analysisChunks',
       'analysisJobs',
@@ -171,7 +171,7 @@ describe('prepareDatabase', () => {
     await expect(readObjectStoreNames()).resolves.toContain('legacyStore');
     expect(mockDebugLog).toHaveBeenCalledWith('Storage', 'Database recovery required', expect.objectContaining({
       databaseName: PLOTMAPAI_DB_NAME,
-      targetVersion: 3,
+      targetVersion: 4,
     }));
     expect(mockReportAppError).toHaveBeenCalledTimes(1);
   });
@@ -185,7 +185,7 @@ describe('prepareDatabase', () => {
     await resetDatabaseForRecovery();
     await prepareDatabase();
 
-    expect(db.verno).toBe(3);
+    expect(db.verno).toBe(4);
     expect(db.tables.some((table) => table.name === 'legacyStore')).toBe(false);
     expect(db.tables.some((table) => table.name === 'novels')).toBe(true);
   });
@@ -197,7 +197,7 @@ describe('prepareDatabase', () => {
 
     const novel = await db.novels.get(1);
 
-    expect(db.verno).toBe(3);
+    expect(db.verno).toBe(4);
     expect(novel).toMatchObject({
       chapterCount: 2,
       title: 'Legacy DB Novel',
@@ -212,7 +212,7 @@ describe('prepareDatabase', () => {
 
     const novel = await db.novels.get(1);
 
-    expect(db.verno).toBe(3);
+    expect(db.verno).toBe(4);
     expect(novel).toMatchObject({
       chapterCount: 1,
       title: 'Legacy V2 Novel',

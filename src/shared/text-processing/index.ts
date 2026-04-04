@@ -20,6 +20,7 @@ export {
   sortChapterImageGalleryEntries,
 } from './imageGallery';
 export type { ChapterImageGalleryEntry } from './imageGallery';
+export { purifyRichBlocks } from './richPurify';
 export {
   buildRichPaginationBlockSequence,
   getPaginationBlockPlainText,
@@ -27,7 +28,16 @@ export {
   projectRichBlocksToPaginationBlocks,
 } from './richPagination';
 export type { RichPaginationBlockSequenceEntry } from './richPagination';
-export { loadRulesFromJson, purify, purifyChapter, purifyChapters, purifyTitles } from './purify';
+export { richTextToPlainText } from './richTextPlain';
+export {
+  CURRENT_PURIFICATION_RULE_VERSION,
+  hasPurifyRulesForExecutionStage,
+  loadRulesFromJson,
+  purify,
+  purifyChapter,
+  purifyChapters,
+  purifyTitles,
+} from './purify';
 export { parseTxtDocument } from './txt';
 export {
   runParseTxtTask,
@@ -43,6 +53,8 @@ export type {
   PurifiedChapter,
   PurifiedTitle,
   PurifyRule,
+  PurificationExecutionStage,
+  PurificationTargetScope,
   SplitChapter,
 } from './types';
 export type { TextProcessingProgress } from './workerTypes';

@@ -15,7 +15,8 @@ describe('purify', () => {
           is_enabled: true,
           order: 0,
           exclusive_group: 'greeting',
-          scope_content: true,
+          target_scope: 'text',
+          execution_stage: 'plain-text-only',
         },
         {
           name: 'Second',
@@ -25,7 +26,8 @@ describe('purify', () => {
           is_enabled: true,
           order: 1,
           exclusive_group: 'greeting',
-          scope_content: true,
+          target_scope: 'text',
+          execution_stage: 'plain-text-only',
         },
         {
           name: 'Third',
@@ -34,11 +36,13 @@ describe('purify', () => {
           is_regex: false,
           is_enabled: true,
           order: 2,
-          scope_content: true,
+          target_scope: 'text',
+          execution_stage: 'plain-text-only',
         },
       ],
-      'content',
+      'text',
       'Test Book',
+      'plain-text-only',
     );
 
     expect(result).toBe('Hi!');

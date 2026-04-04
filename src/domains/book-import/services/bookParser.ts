@@ -2,7 +2,7 @@ import type {
   RichBlock,
   RichContentFormat,
 } from '@shared/contracts';
-import type { ChapterDetectionRule } from '@shared/text-processing';
+import type { ChapterDetectionRule, PurifyRule } from '@shared/text-processing';
 import type { BookImportProgress } from './progress';
 
 import { parseEpub } from './epub/parser';
@@ -31,6 +31,7 @@ export interface ParsedBook {
 
 export interface ParseContext {
   tocRules: ChapterDetectionRule[];
+  purificationRules?: PurifyRule[];
   signal?: AbortSignal;
   onProgress?: (progress: BookImportProgress) => void;
 }
@@ -45,11 +46,12 @@ const parsers: BookParser[] = [
     canHandle: (file) => file.name.toLowerCase().endsWith('.epub'),
     parse: (file, context) => {
       if (!context.signal && !context.onProgress) {
-        return parseEpub(file);
+        return parseEpub(file, { purificationRules: context.purificationRules });
       }
       return parseEpub(file, {
         signal: context.signal,
         onProgress: context.onProgress,
+        purificationRules: context.purificationRules,
       });
     },
   },
@@ -75,6 +77,7 @@ export async function parseBook(
   file: File,
   tocRules: ChapterDetectionRule[],
   options: {
+    purificationRules?: PurifyRule[];
     signal?: AbortSignal;
     onProgress?: (progress: BookImportProgress) => void;
   } = {},
@@ -85,6 +88,9 @@ export async function parseBook(
   }
   if (options.onProgress) {
     context.onProgress = options.onProgress;
+  }
+  if (options.purificationRules) {
+    context.purificationRules = options.purificationRules;
   }
   const parser = parsers.find((p) => p.canHandle(file));
   if (!parser) {

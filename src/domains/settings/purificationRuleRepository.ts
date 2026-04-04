@@ -1,10 +1,31 @@
 import { debugLog } from '@shared/debug';
-import { loadRulesFromJson, type PurifyRule } from '@shared/text-processing';
+import {
+  CURRENT_PURIFICATION_RULE_VERSION,
+  loadRulesFromJson,
+  type PurifyRule,
+} from '@shared/text-processing';
 import { db } from '@infra/db';
 import { AppErrorCode, createAppError } from '@shared/errors';
 import { mapPurificationRuleRecordToDomain } from './persistenceMappers';
 import { dumpYaml, loadYaml } from './services/yaml';
 import type { PurificationRule } from './types';
+
+interface PurificationRulesYamlV2 {
+  version: 2;
+  kind: 'purification-rules';
+  rules: unknown[];
+}
+
+function isPurificationRulesYamlV2(value: unknown): value is PurificationRulesYamlV2 {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return false;
+  }
+
+  const candidate = value as Record<string, unknown>;
+  return candidate.version === 2
+    && candidate.kind === 'purification-rules'
+    && Array.isArray(candidate.rules);
+}
 
 function unescapeReplacement(raw: string): string {
   return raw.replace(/\\([nrt\\])/g, (_, ch: string) => {
@@ -15,6 +36,36 @@ function unescapeReplacement(raw: string): string {
   });
 }
 
+function toPersistedPurifyRule(rule: PurificationRule): PurifyRule {
+  return {
+    name: rule.name,
+    group: rule.group,
+    pattern: rule.pattern,
+    replacement: rule.replacement,
+    is_regex: rule.isRegex,
+    is_enabled: rule.isEnabled,
+    order: rule.order,
+    target_scope: rule.targetScope,
+    execution_stage: rule.executionStage,
+    rule_version: rule.ruleVersion,
+    book_scope: rule.bookScope,
+    exclude_book_scope: rule.excludeBookScope,
+    exclusive_group: rule.exclusiveGroup,
+  };
+}
+
+function extractImportedRules(loaded: unknown): unknown[] {
+  if (Array.isArray(loaded)) {
+    return loaded;
+  }
+
+  if (isPurificationRulesYamlV2(loaded)) {
+    return loaded.rules;
+  }
+
+  return [];
+}
+
 export const purificationRuleRepository = {
   getPurificationRules: async (): Promise<PurificationRule[]> => {
     const rules = await db.purificationRules.orderBy('order').toArray();
@@ -23,19 +74,7 @@ export const purificationRuleRepository = {
 
   getEnabledPurificationRules: async (): Promise<PurifyRule[]> => {
     const rules = await db.purificationRules.filter((rule) => rule.isEnabled).sortBy('order');
-    return rules.map((rule) => ({
-      name: rule.name,
-      pattern: rule.pattern,
-      replacement: rule.replacement,
-      is_regex: rule.isRegex,
-      is_enabled: rule.isEnabled,
-      order: rule.order,
-      scope_title: rule.scopeTitle,
-      scope_content: rule.scopeContent,
-      book_scope: rule.bookScope,
-      exclude_book_scope: rule.excludeBookScope,
-      exclusive_group: rule.exclusiveGroup,
-    }));
+    return rules.map((rule) => toPersistedPurifyRule(mapPurificationRuleRecordToDomain(rule)));
   },
 
   createPurificationRule: async (data: Partial<PurificationRule>): Promise<PurificationRule> => {
@@ -48,6 +87,7 @@ export const purificationRuleRepository = {
         debugMessage: 'Missing field: name or pattern',
       });
     }
+
     const now = new Date().toISOString();
     const id = await db.purificationRules.add({
       externalId: null,
@@ -58,8 +98,9 @@ export const purificationRuleRepository = {
       isRegex: data.isRegex ?? true,
       isEnabled: data.isEnabled ?? true,
       order: data.order ?? 10,
-      scopeTitle: data.scopeTitle ?? true,
-      scopeContent: data.scopeContent ?? true,
+      targetScope: data.targetScope ?? 'all',
+      executionStage: data.executionStage ?? 'post-ast',
+      ruleVersion: data.ruleVersion ?? CURRENT_PURIFICATION_RULE_VERSION,
       bookScope: data.bookScope || '',
       excludeBookScope: data.excludeBookScope || '',
       exclusiveGroup: data.exclusiveGroup || '',
@@ -67,6 +108,7 @@ export const purificationRuleRepository = {
       timeoutMs: data.timeoutMs ?? 3000,
       createdAt: now,
     });
+
     const rule = await db.purificationRules.get(id);
     return mapPurificationRuleRecordToDomain(rule!);
   },
@@ -83,19 +125,25 @@ export const purificationRuleRepository = {
       'isRegex',
       'isEnabled',
       'order',
-      'scopeTitle',
-      'scopeContent',
+      'targetScope',
+      'executionStage',
+      'ruleVersion',
       'bookScope',
       'excludeBookScope',
       'exclusiveGroup',
       'timeoutMs',
     ] as const;
+
     for (const field of fields) {
-      if (data[field] !== undefined) updates[field] = data[field];
+      if (data[field] !== undefined) {
+        updates[field] = data[field];
+      }
     }
+
     if (data.replacement !== undefined) {
       updates.replacement = unescapeReplacement(data.replacement);
     }
+
     await db.purificationRules.update(id, updates);
     const rule = await db.purificationRules.get(id);
     if (!rule) {
@@ -107,6 +155,7 @@ export const purificationRuleRepository = {
         debugMessage: 'Rule not found',
       });
     }
+
     return mapPurificationRuleRecordToDomain(rule);
   },
 
@@ -121,6 +170,7 @@ export const purificationRuleRepository = {
         debugMessage: 'Rule not found',
       });
     }
+
     if (rule.isDefault) {
       throw createAppError({
         code: AppErrorCode.CANNOT_DELETE_DEFAULT_RULE,
@@ -130,6 +180,7 @@ export const purificationRuleRepository = {
         debugMessage: 'Cannot delete default rules',
       });
     }
+
     await db.purificationRules.delete(id);
     return { message: 'Rule deleted' };
   },
@@ -142,10 +193,10 @@ export const purificationRuleRepository = {
   uploadPurificationRulesYaml: async (file: File): Promise<PurificationRule[]> => {
     const text = await file.text();
     debugLog('Settings', `upload purify rules file: ${file.name}, size=${file.size}, text length=${text.length}`);
-    let parsed: unknown[];
+
+    let loaded: unknown;
     try {
-      const loaded = await loadYaml(text);
-      parsed = Array.isArray(loaded) ? loaded : [];
+      loaded = await loadYaml(text);
     } catch (error) {
       throw createAppError({
         code: AppErrorCode.INVALID_YAML_FILE,
@@ -156,12 +207,15 @@ export const purificationRuleRepository = {
         cause: error,
       });
     }
-    const importedRules = loadRulesFromJson(JSON.stringify(parsed));
+
+    const importedRules = loadRulesFromJson(JSON.stringify(extractImportedRules(loaded)));
     debugLog('Settings', `parsed ${importedRules.length} rules`);
+
     const existing = await db.purificationRules.toArray();
     const existingKeys = new Set(existing.map((rule) => `${rule.pattern}\u0000${rule.isRegex}`));
     const now = new Date().toISOString();
     let added = 0;
+
     for (const rule of importedRules) {
       const pattern = rule.pattern || '';
       const isRegex = rule.is_regex ?? true;
@@ -172,6 +226,7 @@ export const purificationRuleRepository = {
         debugLog('Settings', `    skip duplicate: "${name}"`);
         continue;
       }
+
       existingKeys.add(key);
       await db.purificationRules.add({
         externalId: null,
@@ -182,8 +237,9 @@ export const purificationRuleRepository = {
         isRegex,
         isEnabled: rule.is_enabled ?? true,
         order: rule.order ?? 10,
-        scopeTitle: rule.scope_title ?? true,
-        scopeContent: rule.scope_content ?? true,
+        targetScope: rule.target_scope ?? 'all',
+        executionStage: rule.execution_stage ?? 'post-ast',
+        ruleVersion: rule.rule_version ?? CURRENT_PURIFICATION_RULE_VERSION,
         bookScope: rule.book_scope || '',
         excludeBookScope: rule.exclude_book_scope || '',
         exclusiveGroup,
@@ -193,26 +249,33 @@ export const purificationRuleRepository = {
       });
       added += 1;
     }
-    debugLog('Settings', `uploadPurificationRulesYaml: ${parsed.length} parsed, ${added} added`);
+
+    debugLog('Settings', `uploadPurificationRulesYaml: ${importedRules.length} parsed, ${added} added`);
     return purificationRuleRepository.getPurificationRules();
   },
 
   exportPurificationRulesYaml: async (): Promise<string> => {
     const rules = await db.purificationRules.orderBy('order').toArray();
-    const exportData = rules.map((rule) => ({
-      name: rule.name,
-      group: rule.group || 'Purification',
-      pattern: rule.pattern,
-      replacement: rule.replacement,
-      is_regex: rule.isRegex,
-      is_enabled: rule.isEnabled,
-      order: rule.order,
-      scope_title: rule.scopeTitle,
-      scope_content: rule.scopeContent,
-      book_scope: rule.bookScope || '',
-      exclude_book_scope: rule.excludeBookScope || '',
-      exclusive_group: rule.exclusiveGroup || '',
-    }));
+    const exportData = {
+      version: 2 as const,
+      kind: 'purification-rules' as const,
+      rules: rules.map((rule) => ({
+        name: rule.name,
+        group: rule.group || 'Purification',
+        pattern: rule.pattern,
+        replacement: rule.replacement,
+        is_regex: rule.isRegex,
+        is_enabled: rule.isEnabled,
+        order: rule.order,
+        target_scope: rule.targetScope,
+        execution_stage: rule.executionStage,
+        rule_version: rule.ruleVersion,
+        book_scope: rule.bookScope || '',
+        exclude_book_scope: rule.excludeBookScope || '',
+        exclusive_group: rule.exclusiveGroup || '',
+      })),
+    };
+
     return dumpYaml(exportData, { lineWidth: 200, noRefs: true });
   },
 };

@@ -1,4 +1,4 @@
-import type { ChapterDetectionRule } from '@shared/text-processing';
+import type { ChapterDetectionRule, PurifyRule } from '@shared/text-processing';
 import type {
   BookChapter,
   RichBlock,
@@ -32,6 +32,7 @@ export interface PreparedChapterRichContent {
 export interface ImportBookOptions {
   signal?: AbortSignal;
   onProgress?: (progress: BookImportProgress) => void;
+  purificationRules?: PurifyRule[];
 }
 
 export interface PreparedBookImport {
@@ -148,6 +149,7 @@ export const bookImportService = {
       parsed = await parseBook(file, tocRules, {
         signal: options.signal,
         onProgress: options.onProgress,
+        purificationRules: options.purificationRules,
       });
     } catch (error) {
       throw toAppError(error, {

@@ -191,6 +191,104 @@ describe('parseEpub', () => {
     ]);
   });
 
+  it('applies pre-ast purification rules during epub parsing', async () => {
+    const zip = new JSZip();
+    zip.file('META-INF/container.xml', `<?xml version="1.0"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <rootfiles>
+    <rootfile full-path="content.opf" media-type="application/oebps-package+xml"/>
+  </rootfiles>
+</container>`);
+    zip.file('content.opf', `<?xml version="1.0"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="uid">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:title id="uid">Test Book</dc:title>
+  </metadata>
+  <manifest>
+    <item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>
+    <item id="ch1" href="ch1.xhtml" media-type="application/xhtml+xml"/>
+  </manifest>
+  <spine toc="ncx">
+    <itemref idref="ch1"/>
+  </spine>
+</package>`);
+    zip.file('toc.ncx', `<?xml version="1.0" encoding="utf-8"?>
+<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1">
+  <navMap>
+    <navPoint id="navPoint-1" playOrder="1">
+      <navLabel><text>Chapter 1</text></navLabel>
+      <content src="ch1.xhtml"/>
+    </navPoint>
+  </navMap>
+</ncx>`);
+    zip.file(
+      'ch1.xhtml',
+      `<?xml version="1.0"?>
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <body>
+    <h1>Chapter 1</h1>
+    <p>foo body</p>
+    <figure>
+      <img data-plotmapai-image-key="img_1" />
+      <figcaption>Caption text</figcaption>
+    </figure>
+  </body>
+</html>`,
+    );
+
+    const file = await makeEpubFile(zip, 'pre-ast.epub');
+    const result = await parseEpubCore(file, {
+      purificationRules: [
+        {
+          pattern: 'Chapter',
+          replacement: 'Section',
+          is_regex: false,
+          target_scope: 'heading',
+          execution_stage: 'pre-ast',
+        },
+        {
+          pattern: 'foo',
+          replacement: 'bar',
+          is_regex: false,
+          target_scope: 'text',
+          execution_stage: 'pre-ast',
+        },
+        {
+          pattern: 'Caption',
+          replacement: 'Legend',
+          is_regex: false,
+          target_scope: 'caption',
+          execution_stage: 'pre-ast',
+        },
+      ],
+    });
+
+    expect(result.chapters).toEqual([
+      {
+        title: 'Section 1',
+        content: 'bar body\n\nLegend text',
+        contentFormat: 'rich',
+        richBlocks: [
+          {
+            type: 'paragraph',
+            children: [{
+              type: 'text',
+              text: 'bar body',
+            }],
+          },
+          {
+            type: 'image',
+            key: 'img_1',
+            caption: [{
+              type: 'text',
+              text: 'Legend text',
+            }],
+          },
+        ],
+      },
+    ]);
+  });
+
   it('falls back to plain chapter projection when rich parsing throws for a chapter', async () => {
     const zip = new JSZip();
     zip.file('META-INF/container.xml', `<?xml version="1.0"?>

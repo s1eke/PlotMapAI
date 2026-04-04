@@ -106,8 +106,8 @@ export default function PurificationSettingsPanel({ manager }: PurificationSetti
                   isDefault={rule.isDefault}
                   type={rule.isRegex ? 'regex' : 'text'}
                   scopes={[
-                    rule.scopeTitle ? t('settings.purification.scopeTitle') : '',
-                    rule.scopeContent ? t('settings.purification.scopeContent') : '',
+                    t(`settings.purification.scopeLabel.${rule.targetScope}`),
+                    t(`settings.purification.stageLabel.${rule.executionStage}`),
                   ].filter(Boolean)}
                   onToggle={(checked) => manager.toggleRule(rule.id, checked)}
                   onEdit={() => manager.openEditRule(rule)}

@@ -1,11 +1,22 @@
 import { createWorkerTaskRunner } from '@infra/workers';
 import type { WorkerTaskOptions } from '@infra/workers';
 import { AppErrorCode } from '@shared/errors';
+import type { PurifyRule } from '@shared/text-processing';
 import type { ParsedBook } from '../services/bookParser';
 import type { BookImportProgress } from '../services/progress';
 
-const runParseEpubWorkerTask = createWorkerTaskRunner<File, ParsedBook, BookImportProgress>({
-  createWorker: () => new Worker(new URL('./epub.worker.ts', import.meta.url), { type: 'module' }),
+export interface ParseEpubPayload {
+  file: File;
+  purificationRules?: PurifyRule[];
+}
+
+const runParseEpubWorkerTask = createWorkerTaskRunner<
+  ParseEpubPayload,
+  ParsedBook,
+  BookImportProgress
+>({
+  createWorker: () =>
+    new Worker(new URL('./epub.worker.ts', import.meta.url), { type: 'module' }),
   task: 'parse-epub',
   unavailableError: {
     code: AppErrorCode.WORKER_UNAVAILABLE,
@@ -17,8 +28,8 @@ const runParseEpubWorkerTask = createWorkerTaskRunner<File, ParsedBook, BookImpo
 });
 
 export function runParseEpubTask(
-  file: File,
+  payload: ParseEpubPayload,
   options: WorkerTaskOptions<BookImportProgress> = {},
 ): Promise<ParsedBook> {
-  return runParseEpubWorkerTask(file, options);
+  return runParseEpubWorkerTask(payload, options);
 }

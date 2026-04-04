@@ -1,4 +1,5 @@
 import type { ChapterRecord, NovelRecord } from '@infra/db/library';
+import type { PurificationRuleRecord } from '@infra/db/settings';
 import type { DbSchemaMigration } from './types';
 
 import Dexie, { type Transaction } from 'dexie';
@@ -49,6 +50,35 @@ async function backfillNovelChapterCounts(transaction: Transaction): Promise<voi
     });
 }
 
+async function migratePurificationRulesToVersionTwo(transaction: Transaction): Promise<void> {
+  await transaction
+    .table<PurificationRuleRecord, 'id'>('purificationRules')
+    .toCollection()
+    .modify((rule) => {
+      if (rule.targetScope && rule.executionStage && rule.ruleVersion) {
+        return;
+      }
+
+      const legacyRule = rule;
+      const hasContentScope = rule.scopeContent ?? false;
+      const hasTitleScope = rule.scopeTitle ?? false;
+      let targetScope: 'all' | 'heading' | 'text' = 'text';
+      if (hasContentScope) {
+        targetScope = 'all';
+      } else if (hasTitleScope) {
+        targetScope = 'heading';
+      }
+
+      legacyRule.targetScope = targetScope;
+      legacyRule.executionStage = 'post-ast';
+      legacyRule.ruleVersion = 2;
+
+      if (!hasContentScope && !hasTitleScope) {
+        legacyRule.isEnabled = false;
+      }
+    });
+}
+
 export const DB_SCHEMA_MIGRATIONS: readonly DbSchemaMigration[] = [{
   version: 1,
   scope: 'db-schema',
@@ -74,6 +104,15 @@ export const DB_SCHEMA_MIGRATIONS: readonly DbSchemaMigration[] = [{
     condition: 'Keep while any supported client may still open a version 2 database.',
   },
   stores: CURRENT_DB_SCHEMA,
+}, {
+  version: 4,
+  scope: 'db-schema',
+  description: 'Migrate purification rules to targetScope/executionStage/ruleVersion model.',
+  retireWhen: {
+    condition: 'Keep while any supported client may still open a version 3 database.',
+  },
+  stores: CURRENT_DB_SCHEMA,
+  upgrade: migratePurificationRulesToVersionTwo,
 }] as const;
 
 export const CURRENT_DB_SCHEMA_VERSION = DB_SCHEMA_MIGRATIONS.at(-1)?.version ?? 1;

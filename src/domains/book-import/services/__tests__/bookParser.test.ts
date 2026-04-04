@@ -69,7 +69,7 @@ describe('parseBook', () => {
     const result = await parseBook(file, []);
     expect(result.title).toBe('MockEpub');
     expect(result.author).toBe('Author');
-    expect(mockParseEpub).toHaveBeenCalledWith(file);
+    expect(mockParseEpub).toHaveBeenCalledWith(file, { purificationRules: undefined });
   });
 
   it('throws for unsupported file types', async () => {

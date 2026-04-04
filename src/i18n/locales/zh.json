@@ -298,8 +298,27 @@
       "useRegex": "正则表达式",
       "isEnabled": "已启用",
       "scope": "作用范围",
+      "scopeText": "正文文本",
+      "scopeHeading": "标题文本",
+      "scopeCaption": "图片说明",
+      "scopeAll": "全部文本位",
+      "scopeLabel": {
+        "text": "正文文本",
+        "heading": "标题文本",
+        "caption": "图片说明",
+        "all": "全部文本位"
+      },
       "scopeTitle": "标题",
       "scopeContent": "正文",
+      "executionStage": "执行阶段",
+      "stagePreAst": "导入期 pre-ast",
+      "stagePostAst": "阅读期 post-ast",
+      "stagePlainTextOnly": "纯文本投影",
+      "stageLabel": {
+        "pre-ast": "pre-ast",
+        "post-ast": "post-ast",
+        "plain-text-only": "plain-text-only"
+      },
       "bookScope": "仅限书名",
       "excludeBookScope": "排除书名",
       "order": "执行顺序",

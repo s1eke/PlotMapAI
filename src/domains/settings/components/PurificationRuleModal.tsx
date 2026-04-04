@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Loader2 } from 'lucide-react';
 import Modal from '@shared/components/Modal';
 import Toggle from '@shared/components/Toggle';
+import { CURRENT_PURIFICATION_RULE_VERSION } from '@shared/text-processing';
 import type { PurificationRule } from '../types';
 
 interface PurificationRuleModalProps {
@@ -26,8 +27,9 @@ function createInitialFormData(
     isRegex: rule?.isRegex ?? true,
     isEnabled: rule?.isEnabled ?? true,
     order: rule?.order ?? 10,
-    scopeTitle: rule?.scopeTitle ?? true,
-    scopeContent: rule?.scopeContent ?? true,
+    targetScope: rule?.targetScope ?? 'all',
+    executionStage: rule?.executionStage ?? 'post-ast',
+    ruleVersion: rule?.ruleVersion ?? CURRENT_PURIFICATION_RULE_VERSION,
     bookScope: rule?.bookScope ?? '',
     excludeBookScope: rule?.excludeBookScope ?? '',
     exclusiveGroup: rule?.exclusiveGroup ?? '',
@@ -155,28 +157,40 @@ export default function PurificationRuleModal({
           </div>
         </div>
 
-        {/* Scopes */}
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-text-primary px-1">{t('settings.purification.scope')}</label>
-          <div className="flex gap-4">
-            <label className="flex items-center gap-2 cursor-pointer group">
-              <input
-                type="checkbox"
-                checked={formData.scopeTitle ?? true}
-                onChange={(e) => setFormData({ ...formData, scopeTitle: e.target.checked })}
-                className="w-4 h-4 rounded border-white/20 bg-white/5 text-accent focus:ring-accent focus:ring-offset-0"
-              />
-              <span className="text-sm text-text-secondary group-hover:text-text-primary transition-colors">{t('settings.purification.scopeTitle')}</span>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer group">
-              <input
-                type="checkbox"
-                checked={formData.scopeContent ?? true}
-                onChange={(e) => setFormData({ ...formData, scopeContent: e.target.checked })}
-                className="w-4 h-4 rounded border-white/20 bg-white/5 text-accent focus:ring-accent focus:ring-offset-0"
-              />
-              <span className="text-sm text-text-secondary group-hover:text-text-primary transition-colors">{t('settings.purification.scopeContent')}</span>
-            </label>
+        {/* Scope & Stage */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-text-primary px-1">{t('settings.purification.scope')}</label>
+            <select
+              value={formData.targetScope ?? 'all'}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  targetScope: e.target.value as PurificationRule['targetScope'],
+                })}
+              className="w-full bg-muted-bg border border-white/10 rounded-xl px-4 py-2.5 text-text-primary focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-all"
+            >
+              <option value="text">{t('settings.purification.scopeText')}</option>
+              <option value="heading">{t('settings.purification.scopeHeading')}</option>
+              <option value="caption">{t('settings.purification.scopeCaption')}</option>
+              <option value="all">{t('settings.purification.scopeAll')}</option>
+            </select>
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-text-primary px-1">{t('settings.purification.executionStage')}</label>
+            <select
+              value={formData.executionStage ?? 'post-ast'}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  executionStage: e.target.value as PurificationRule['executionStage'],
+                })}
+              className="w-full bg-muted-bg border border-white/10 rounded-xl px-4 py-2.5 text-text-primary focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-all"
+            >
+              <option value="pre-ast">{t('settings.purification.stagePreAst')}</option>
+              <option value="post-ast">{t('settings.purification.stagePostAst')}</option>
+              <option value="plain-text-only">{t('settings.purification.stagePlainTextOnly')}</option>
+            </select>
           </div>
         </div>
 

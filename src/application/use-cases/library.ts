@@ -4,7 +4,12 @@ import type { AppError } from '@shared/errors';
 
 import { analysisService } from '@domains/analysis';
 import { novelRepository } from '@domains/library';
-import { ensureDefaultTocRules, tocRuleRepository } from '@domains/settings';
+import {
+  ensureDefaultPurificationRules,
+  ensureDefaultTocRules,
+  purificationRuleRepository,
+  tocRuleRepository,
+} from '@domains/settings';
 import { AppErrorCode, toAppError } from '@shared/errors';
 
 import { bookLifecycleService } from '@application/services/bookLifecycleService';
@@ -34,9 +39,18 @@ export async function importBookAndRefreshLibrary(
   file: File,
   options: import('@domains/book-import').ImportBookOptions = {},
 ): Promise<NovelView> {
-  await ensureDefaultTocRules();
-  const tocRules = await tocRuleRepository.getEnabledChapterDetectionRules();
-  return bookLifecycleService.importBook(file, tocRules, options);
+  await Promise.all([
+    ensureDefaultTocRules(),
+    ensureDefaultPurificationRules(),
+  ]);
+  const [tocRules, purificationRules] = await Promise.all([
+    tocRuleRepository.getEnabledChapterDetectionRules(),
+    purificationRuleRepository.getEnabledPurificationRules(),
+  ]);
+  return bookLifecycleService.importBook(file, tocRules, {
+    ...options,
+    purificationRules,
+  });
 }
 
 export async function loadBookDetailAnalysisStatus(

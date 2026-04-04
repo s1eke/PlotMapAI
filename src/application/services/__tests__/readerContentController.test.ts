@@ -1,8 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { db } from '@infra/db';
-import { AppErrorCode, createAppError } from '@shared/errors';
-import * as textProcessing from '@shared/text-processing';
+import { AppErrorCode } from '@shared/errors';
 
 import {
   applicationReaderContentController,
@@ -150,8 +149,9 @@ describe('applicationReaderContentController', () => {
       isRegex: false,
       isEnabled: true,
       order: 1,
-      scopeTitle: true,
-      scopeContent: true,
+      targetScope: 'all',
+      executionStage: 'post-ast',
+      ruleVersion: 2,
       bookScope: '',
       excludeBookScope: '',
       exclusiveGroup: '',
@@ -198,8 +198,9 @@ describe('applicationReaderContentController', () => {
       isRegex: false,
       isEnabled: true,
       order: 1,
-      scopeTitle: true,
-      scopeContent: true,
+      targetScope: 'all',
+      executionStage: 'post-ast',
+      ruleVersion: 2,
       bookScope: '',
       excludeBookScope: '',
       exclusiveGroup: '',
@@ -237,18 +238,19 @@ describe('applicationReaderContentController', () => {
     });
   });
 
-  it('propagates worker availability failures from title purification', async () => {
+  it('applies heading-scoped post-ast rules to chapter list titles', async () => {
     await db.purificationRules.add({
       externalId: null,
-      name: 'Replace Hello',
+      name: 'Rename chapters',
       group: 'test',
-      pattern: 'Hello',
-      replacement: 'Hi',
+      pattern: 'Chapter',
+      replacement: 'Section',
       isRegex: false,
       isEnabled: true,
       order: 1,
-      scopeTitle: true,
-      scopeContent: true,
+      targetScope: 'heading',
+      executionStage: 'post-ast',
+      ruleVersion: 2,
       bookScope: '',
       excludeBookScope: '',
       exclusiveGroup: '',
@@ -256,17 +258,10 @@ describe('applicationReaderContentController', () => {
       timeoutMs: 3000,
       createdAt: new Date().toISOString(),
     });
-    vi.spyOn(textProcessing, 'runPurifyTitlesTask').mockRejectedValueOnce(createAppError({
-      code: AppErrorCode.WORKER_UNAVAILABLE,
-      kind: 'unsupported',
-      source: 'worker',
-      userMessageKey: 'errors.WORKER_UNAVAILABLE',
-      debugMessage: 'Reader worker unavailable.',
-    }));
 
-    await expect(applicationReaderContentController.getChapters(1)).rejects.toMatchObject({
-      code: AppErrorCode.WORKER_UNAVAILABLE,
-      userMessageKey: 'errors.WORKER_UNAVAILABLE',
-    });
+    await expect(applicationReaderContentController.getChapters(1)).resolves.toEqual([
+      { index: 0, title: 'Section 1', wordCount: 11 },
+      { index: 1, title: 'Section 2', wordCount: 10 },
+    ]);
   });
 });

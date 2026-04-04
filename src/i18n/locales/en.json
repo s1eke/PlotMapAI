@@ -298,8 +298,27 @@
       "useRegex": "Use Regex",
       "isEnabled": "Enabled",
       "scope": "Scope",
+      "scopeText": "Body Text",
+      "scopeHeading": "Heading Text",
+      "scopeCaption": "Caption Text",
+      "scopeAll": "All Text Nodes",
+      "scopeLabel": {
+        "text": "Body Text",
+        "heading": "Heading Text",
+        "caption": "Caption Text",
+        "all": "All Text Nodes"
+      },
       "scopeTitle": "Title",
       "scopeContent": "Content",
+      "executionStage": "Execution Stage",
+      "stagePreAst": "Import-time pre-ast",
+      "stagePostAst": "Reader-time post-ast",
+      "stagePlainTextOnly": "Plain-text projection",
+      "stageLabel": {
+        "pre-ast": "pre-ast",
+        "post-ast": "post-ast",
+        "plain-text-only": "plain-text-only"
+      },
       "bookScope": "Book Whitelist",
       "excludeBookScope": "Book Blacklist",
       "order": "Execution Order",
