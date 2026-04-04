@@ -22,7 +22,10 @@ function createChapter(index: number, totalChapters: number): ChapterContent {
   return {
     index,
     title: `Chapter ${index + 1}`,
-    content: `Content for chapter ${index + 1}`,
+    plainText: `Content for chapter ${index + 1}`,
+    richBlocks: [],
+    contentFormat: 'plain',
+    contentVersion: 1,
     wordCount: 120,
     totalChapters,
     hasPrev: index > 0,
@@ -78,15 +81,15 @@ describe('readerRenderCachePlanning', () => {
   it('collects loaded image keys once and keeps them sorted', () => {
     const currentChapter = {
       ...createChapter(0, 3),
-      content: 'A\n[IMG:cover]\nB\n[IMG:map]',
+      plainText: 'A\n[IMG:cover]\nB\n[IMG:map]',
     };
     const pagedChapter = {
       ...createChapter(1, 3),
-      content: 'C\n[IMG:cover]\nD',
+      plainText: 'C\n[IMG:cover]\nD',
     };
     const scrollChapter = {
       ...createChapter(2, 3),
-      content: 'E\n[IMG:appendix]\nF',
+      plainText: 'E\n[IMG:appendix]\nF',
     };
 
     expect(collectLoadedImageKeys({
@@ -116,7 +119,7 @@ describe('readerRenderCachePlanning', () => {
 
     const chapter = {
       ...createChapter(0, 1),
-      content: '[IMG:cover]\n[IMG:portrait]\n[IMG:map]',
+      plainText: '[IMG:cover]\n[IMG:portrait]\n[IMG:map]',
     };
 
     expect(buildChapterImageLayoutKey(7, chapter, 'base-layout')).toBe(

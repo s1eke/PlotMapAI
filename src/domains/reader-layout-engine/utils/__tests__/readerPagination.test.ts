@@ -236,10 +236,13 @@ describe('readerPagination', () => {
     const chapter = {
       index: 0,
       title: 'Chapter 1',
-      content: Array.from(
+      plainText: Array.from(
         { length: 18 },
         (_, paragraphIndex) => `Paragraph ${paragraphIndex + 1} ${'alpha beta gamma delta '.repeat(6)}`,
       ).join('\n'),
+      richBlocks: [],
+      contentFormat: 'plain' as const,
+      contentVersion: 1,
       wordCount: 2400,
       totalChapters: 1,
       hasPrev: false,

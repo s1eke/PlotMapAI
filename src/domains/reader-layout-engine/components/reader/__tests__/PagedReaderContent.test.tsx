@@ -28,18 +28,41 @@ vi.mock('../../../utils/readerImageResourceCache', async (importOriginal) => {
   };
 });
 
+function createChapter({
+  index = 0,
+  title = `Chapter ${index + 1}`,
+  plainText = 'Text',
+  wordCount = 100,
+  totalChapters = 1,
+  hasPrev = index > 0,
+  hasNext = index < totalChapters - 1,
+}: {
+  hasNext?: boolean;
+  hasPrev?: boolean;
+  index?: number;
+  plainText?: string;
+  title?: string;
+  totalChapters?: number;
+  wordCount?: number;
+} = {}) {
+  return {
+    index,
+    title,
+    plainText,
+    richBlocks: [],
+    contentFormat: 'plain' as const,
+    contentVersion: 1,
+    wordCount,
+    totalChapters,
+    hasPrev,
+    hasNext,
+  };
+}
+
 function renderPagedContent(
   overrides: Partial<React.ComponentProps<typeof PagedReaderContent>> = {},
 ) {
-  const chapter = overrides.chapter ?? {
-    index: 0,
-    title: 'Chapter 1',
-    content: 'Text',
-    wordCount: 100,
-    totalChapters: 1,
-    hasPrev: false,
-    hasNext: false,
-  };
+  const chapter = overrides.chapter ?? createChapter();
   const viewportMetrics = createReaderViewportMetrics(720, 1200, 720, 1200, 18);
   const typography = createReaderTypographyMetrics(18, 1.8, 24, viewportMetrics.pagedViewportWidth);
   const measuredLayout = measureReaderChapterLayout(
@@ -80,18 +103,13 @@ function renderPagedContent(
 }
 
 function buildMultiPageLayout() {
-  const chapter = {
-    index: 0,
-    title: 'Chapter 1',
-    content: Array.from(
+  const chapter = createChapter({
+    plainText: Array.from(
       { length: 14 },
       (_, paragraphIndex) => `Paragraph ${paragraphIndex + 1} ${'alpha beta gamma delta epsilon '.repeat(8)}`,
     ).join('\n'),
     wordCount: 1600,
-    totalChapters: 1,
-    hasPrev: false,
-    hasNext: false,
-  };
+  });
   const viewportMetrics = createReaderViewportMetrics(720, 1200, 720, 1200, 18);
   const typography = createReaderTypographyMetrics(18, 1.8, 24, viewportMetrics.pagedViewportWidth);
   const measuredLayout = measureReaderChapterLayout(
@@ -120,15 +138,7 @@ function buildMultiPageLayout() {
 }
 
 function buildPagedLayoutForTypography(
-  chapter: {
-    content: string;
-    hasNext: boolean;
-    hasPrev: boolean;
-    index: number;
-    title: string;
-    totalChapters: number;
-    wordCount: number;
-  },
+  chapter: ReturnType<typeof createChapter>,
   typographyOptions: {
     fontSize: number;
     lineSpacing: number;
@@ -188,15 +198,7 @@ describe('PagedReaderContent', () => {
   });
 
   it('renders the body heading from chapter.title even when the page item heading text is stale', () => {
-    const chapter = {
-      index: 0,
-      title: 'Chapter 1',
-      content: 'Text',
-      wordCount: 100,
-      totalChapters: 1,
-      hasPrev: false,
-      hasNext: false,
-    };
+    const chapter = createChapter();
     const viewportMetrics = createReaderViewportMetrics(720, 1200, 720, 1200, 18);
     const typography = createReaderTypographyMetrics(
       18,
@@ -247,15 +249,7 @@ describe('PagedReaderContent', () => {
 
   it('applies an opaque page background to animated layers', () => {
     const { container } = renderPagedContent({
-      chapter: {
-        index: 0,
-        title: 'Chapter 1',
-        content: 'Text',
-        wordCount: 100,
-        totalChapters: 1,
-        hasPrev: false,
-        hasNext: true,
-      },
+      chapter: createChapter({ hasNext: true }),
     });
 
     const interactiveLayer = container.querySelector('[data-testid="paged-reader-interactive"]');
@@ -268,15 +262,7 @@ describe('PagedReaderContent', () => {
 
   it('renders the animated page as a full-page frame instead of only animating the text column', () => {
     const { container } = renderPagedContent({
-      chapter: {
-        index: 0,
-        title: 'Chapter 1',
-        content: 'Text',
-        wordCount: 100,
-        totalChapters: 1,
-        hasPrev: false,
-        hasNext: true,
-      },
+      chapter: createChapter({ hasNext: true }),
       textClassName: 'text-text-primary',
       headerBgClassName: 'bg-bg-primary',
     });
@@ -304,18 +290,13 @@ describe('PagedReaderContent', () => {
       get: () => 1200,
     });
 
-    const chapter = {
-      index: 0,
-      title: 'Chapter 1',
-      content: Array.from(
+    const chapter = createChapter({
+      plainText: Array.from(
         { length: 12 },
         (_, paragraphIndex) => `Paragraph ${paragraphIndex + 1} ${'alpha beta gamma delta epsilon '.repeat(6)}`,
       ).join('\n'),
       wordCount: 1200,
-      totalChapters: 1,
-      hasPrev: false,
-      hasNext: false,
-    };
+    });
     const viewportMetrics = createReaderViewportMetrics(720, 1200, 720, 1200, 18);
     const typography = createReaderTypographyMetrics(
       18,
@@ -475,33 +456,30 @@ describe('PagedReaderContent', () => {
 
   it('preloads image keys from the current and adjacent preview chapters', () => {
     renderPagedContent({
-      chapter: {
+      chapter: createChapter({
         index: 1,
         title: 'Chapter 2',
-        content: 'Current [IMG:current] [IMG:shared]',
-        wordCount: 100,
+        plainText: 'Current [IMG:current] [IMG:shared]',
         totalChapters: 3,
         hasPrev: true,
         hasNext: true,
-      },
-      previousChapterPreview: {
+      }),
+      previousChapterPreview: createChapter({
         index: 0,
         title: 'Chapter 1',
-        content: 'Prev [IMG:shared] [IMG:prev]',
-        wordCount: 100,
+        plainText: 'Prev [IMG:shared] [IMG:prev]',
         totalChapters: 3,
         hasPrev: false,
         hasNext: true,
-      },
-      nextChapterPreview: {
+      }),
+      nextChapterPreview: createChapter({
         index: 2,
         title: 'Chapter 3',
-        content: 'Next [IMG:next]',
-        wordCount: 100,
+        plainText: 'Next [IMG:next]',
         totalChapters: 3,
         hasPrev: true,
         hasNext: false,
-      },
+      }),
     });
 
     expect(preloadReaderImageResourcesSpy).toHaveBeenCalledWith(1, ['current', 'shared', 'prev', 'next']);

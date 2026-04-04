@@ -14,7 +14,10 @@ describe('readerLayout facade', () => {
     const blocks = buildReaderBlocks({
       index: 0,
       title: 'Chapter 1',
-      content: 'Intro text [IMG:cover] tail text\nSecond paragraph',
+      plainText: 'Intro text [IMG:cover] tail text\nSecond paragraph',
+      richBlocks: [],
+      contentFormat: 'plain',
+      contentVersion: 1,
       wordCount: 100,
       totalChapters: 1,
       hasPrev: false,
@@ -40,7 +43,10 @@ describe('readerLayout facade', () => {
     const blocks = buildReaderBlocks({
       index: 0,
       title: 'Chapter 1',
-      content: 'First paragraph\n\n\nSecond paragraph\n',
+      plainText: 'First paragraph\n\n\nSecond paragraph\n',
+      richBlocks: [],
+      contentFormat: 'plain',
+      contentVersion: 1,
       wordCount: 100,
       totalChapters: 1,
       hasPrev: false,
@@ -62,7 +68,10 @@ describe('readerLayout facade', () => {
     const chapter = {
       index: 0,
       title: 'Chapter 1',
-      content: 'Intro text [IMG:cover] tail text\n\nBody [IMG:map]',
+      plainText: 'Intro text [IMG:cover] tail text\n\nBody [IMG:map]',
+      richBlocks: [],
+      contentFormat: 'plain' as const,
+      contentVersion: 1,
       wordCount: 100,
       totalChapters: 1,
       hasPrev: false,
@@ -71,7 +80,11 @@ describe('readerLayout facade', () => {
 
     const blocks = buildReaderBlocks(chapter, 16)
       .filter((block) => block.kind === 'image');
-    const galleryEntries = buildChapterImageGalleryEntries(chapter);
+    const galleryEntries = buildChapterImageGalleryEntries({
+      content: chapter.plainText,
+      index: chapter.index,
+      title: chapter.title,
+    });
 
     expect(galleryEntries).toEqual(blocks.map((block, order) => ({
       blockIndex: block.blockIndex,

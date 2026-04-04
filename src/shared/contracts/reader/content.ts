@@ -1,3 +1,6 @@
+import type { RichBlock } from '../rich-content';
+import type { RichContentFormat } from '../rich-content-projection';
+
 export interface Chapter {
   index: number;
   title: string;
@@ -5,8 +8,11 @@ export interface Chapter {
 }
 
 export interface ChapterContent extends Chapter {
-  content: string;
-  totalChapters: number;
   hasPrev: boolean;
   hasNext: boolean;
+  contentFormat: RichContentFormat;
+  contentVersion: number;
+  plainText: string;
+  richBlocks: RichBlock[];
+  totalChapters: number;
 }

@@ -34,7 +34,7 @@ interface UseScrollReaderControllerParams {
   novelId: number;
   chapters: Chapter[];
   currentChapter: ChapterContent | null;
-  contentVersion: number;
+  chapterDataRevision: number;
   sessionSnapshot: Pick<ReaderSessionSnapshot, 'chapterIndex'>;
   sessionCommands: Pick<
     ReaderSessionCommands,
@@ -143,7 +143,7 @@ export function useScrollReaderController({
   novelId,
   chapters,
   currentChapter,
-  contentVersion,
+  chapterDataRevision,
   sessionSnapshot,
   sessionCommands,
   cache,
@@ -286,7 +286,7 @@ export function useScrollReaderController({
     preloadAdjacent,
     scrollModeChapters,
     setScrollModeChapters,
-    contentVersion,
+    chapterDataRevision,
     handleReadingAnchorChange,
   );
   const {
@@ -301,7 +301,7 @@ export function useScrollReaderController({
     return layoutQueries.registerCurrentAnchorResolver(getCurrentAnchor);
   }, [getCurrentAnchor, layoutQueries]);
 
-  const scrollReaderChapterCacheVersion = contentVersion;
+  const scrollReaderChapterCacheVersion = chapterDataRevision;
   const scrollReaderChapters = useMemo(() => {
     if (!enabled) {
       return EMPTY_SCROLL_READER_CHAPTERS;

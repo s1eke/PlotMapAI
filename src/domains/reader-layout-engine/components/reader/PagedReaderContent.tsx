@@ -28,7 +28,7 @@ import {
   shouldClearPendingCommittedPageOverride,
   type PendingCommittedPageOverride,
 } from '../../utils/pagedDragRenderState';
-import { extractImageKeysFromText } from '../../utils/chapterImages';
+import { extractImageKeysFromChapter } from '../../utils/chapterImages';
 import { preloadReaderImageResources } from '../../utils/readerImageResourceCache';
 import { PAGED_VIEWPORT_TOP_PADDING_PX } from '../../utils/readerLayout';
 import ReaderFlowBlock from './ReaderFlowBlock';
@@ -311,7 +311,7 @@ export default function PagedReaderContent({
       if (!renderableChapter) {
         continue;
       }
-      for (const imageKey of extractImageKeysFromText(renderableChapter.content)) {
+      for (const imageKey of extractImageKeysFromChapter(renderableChapter)) {
         imageKeys.add(imageKey);
       }
     }

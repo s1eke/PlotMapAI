@@ -8,7 +8,7 @@ import type {
 
 import { useEffect, useMemo, useState } from 'react';
 
-import { extractImageKeysFromText } from '../utils/chapterImages';
+import { extractImageKeysFromChapter } from '../utils/chapterImages';
 import {
   peekReaderImageDimensions,
   preloadReaderImageResources,
@@ -141,12 +141,12 @@ export function useReaderLayoutEngine({
   const imageKeys = useMemo(() => {
     const keys = new Set<string>();
     for (const renderableChapter of pagedChapters) {
-      for (const imageKey of extractImageKeysFromText(renderableChapter.content)) {
+      for (const imageKey of extractImageKeysFromChapter(renderableChapter)) {
         keys.add(imageKey);
       }
     }
     for (const renderableChapter of scrollChapters) {
-      for (const imageKey of extractImageKeysFromText(renderableChapter.chapter.content)) {
+      for (const imageKey of extractImageKeysFromChapter(renderableChapter.chapter)) {
         keys.add(imageKey);
       }
     }

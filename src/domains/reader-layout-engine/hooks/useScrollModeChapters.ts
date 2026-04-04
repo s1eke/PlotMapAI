@@ -15,7 +15,7 @@ export function useScrollModeChapters(
   preloadAdjacent: (idx: number, prune?: boolean) => void,
   scrollModeChapters: number[],
   setScrollModeChapters: React.Dispatch<React.SetStateAction<number[]>>,
-  contentVersion: number,
+  chapterDataRevision: number,
   onReadingAnchorChange?: (anchor: ScrollModeAnchor) => void,
 ): {
     scrollChapterElementsRef: React.MutableRefObject<Map<number, HTMLDivElement>>;
@@ -229,7 +229,7 @@ export function useScrollModeChapters(
       cancelled = true;
       cancelAnimationFrame(frameId);
     };
-  }, [appendNextChapter, contentRef, contentVersion, enabled, scrollModeChapters]);
+  }, [appendNextChapter, chapterDataRevision, contentRef, enabled, scrollModeChapters]);
 
   useEffect(() => {
     if (!enabled) {
@@ -237,7 +237,7 @@ export function useScrollModeChapters(
     }
 
     syncViewportState({ force: true });
-  }, [contentVersion, enabled, scrollModeChapters, syncViewportState]);
+  }, [chapterDataRevision, enabled, scrollModeChapters, syncViewportState]);
 
   useEffect(() => {
     return () => {

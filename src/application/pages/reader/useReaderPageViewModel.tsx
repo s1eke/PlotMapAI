@@ -66,9 +66,9 @@ export function useReaderPageViewModel(novelId: number): ReaderPageViewModel {
     mode,
     viewMode,
   } = sessionSnapshot;
-  const [chapterContentVersion, setChapterContentVersion] = useState(0);
+  const [chapterDataRevision, setChapterDataRevision] = useState(0);
   const handleChapterContentResolved = useCallback((): void => {
-    setChapterContentVersion((previousVersion) => previousVersion + 1);
+    setChapterDataRevision((previousVersion) => previousVersion + 1);
   }, []);
   const resetInteractionState = useCallback((): void => {
     wheelDeltaRef.current = 0;
@@ -109,7 +109,7 @@ export function useReaderPageViewModel(novelId: number): ReaderPageViewModel {
   });
   const layoutController = useReaderLayoutController({
     analysis,
-    chapterContentVersion,
+    chapterDataRevision,
     chapterData,
     novelId,
     preferences,

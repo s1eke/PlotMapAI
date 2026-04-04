@@ -28,24 +28,71 @@ describe('bookLifecycleService', () => {
   });
 
   it('imports a parsed book by coordinating library and book-content owners', async () => {
+    await db.readerRenderCache.add({
+      novelId: 1,
+      chapterIndex: 0,
+      variantFamily: 'summary-shell',
+      layoutKey: 'stale-layout',
+      layoutSignature: {
+        textWidth: 320,
+        pageHeight: 720,
+        columnCount: 1,
+        columnGap: 0,
+        fontSize: 18,
+        lineSpacing: 1.6,
+        paragraphSpacing: 16,
+      },
+      contentHash: 'stale-hash',
+      queryManifest: {
+        blockCount: 1,
+      },
+      storageKind: 'manifest',
+      tree: null,
+      updatedAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    });
+    storage.cache.set(CACHE_KEYS.readerBootstrap(1), {
+      version: 1,
+      state: { chapterIndex: 0, mode: 'summary' },
+    });
+
     vi.mocked(bookImportService.parseBookImport).mockResolvedValue({
       title: 'Imported Novel',
       author: 'Author',
       description: 'Description',
       tags: ['fiction'],
-      fileType: 'txt',
+      fileType: 'epub',
       fileHash: 'import-hash',
       coverBlob: new Blob(['cover']),
-      originalFilename: 'novel.txt',
+      originalFilename: 'novel.epub',
       originalEncoding: 'utf-8',
-      totalWords: 9,
+      totalWords: 17,
       chapterCount: 1,
       chapters: [
         {
           chapterIndex: 0,
           title: 'Chapter 1',
-          content: 'Content 1',
+          content: 'World map',
           wordCount: 9,
+        },
+      ],
+      chapterRichContents: [
+        {
+          chapterIndex: 0,
+          richBlocks: [
+            {
+              type: 'image',
+              key: 'map',
+              caption: [{
+                type: 'text',
+                text: 'World map',
+              }],
+            },
+          ],
+          plainText: 'World map',
+          contentFormat: 'rich',
+          contentVersion: 1,
+          importFormatVersion: 1,
         },
       ],
       images: [
@@ -57,7 +104,7 @@ describe('bookLifecycleService', () => {
       imageGalleryEntries: [
         {
           chapterIndex: 0,
-          blockIndex: 2,
+          blockIndex: 1,
           imageKey: 'map',
           order: 0,
         },
@@ -65,7 +112,7 @@ describe('bookLifecycleService', () => {
     });
 
     const novel = await bookLifecycleService.importBook(
-      new File(['content'], 'novel.txt', { type: 'text/plain' }),
+      new File(['content'], 'novel.epub', { type: 'application/epub+zip' }),
       [{ rule: '^Chapter', source: 'default' }],
     );
 
@@ -77,8 +124,29 @@ describe('bookLifecycleService', () => {
     await expect(db.novels.count()).resolves.toBe(1);
     await expect(db.coverImages.count()).resolves.toBe(1);
     await expect(db.chapters.count()).resolves.toBe(1);
+    await expect(db.chapterRichContents.count()).resolves.toBe(1);
     await expect(db.chapterImages.count()).resolves.toBe(1);
     await expect(db.novelImageGalleryEntries.count()).resolves.toBe(1);
+    await expect(
+      db.chapterRichContents.where('[novelId+chapterIndex]').equals([1, 0]).first(),
+    ).resolves.toMatchObject({
+      contentRich: [
+        {
+          type: 'image',
+          key: 'map',
+          caption: [{
+            type: 'text',
+            text: 'World map',
+          }],
+        },
+      ],
+      contentPlain: 'World map',
+      contentFormat: 'rich',
+      contentVersion: 1,
+      importFormatVersion: 1,
+    });
+    await expect(db.readerRenderCache.count()).resolves.toBe(0);
+    expect(storage.cache.getJson(CACHE_KEYS.readerBootstrap(1))).toBeNull();
   });
 
   it('deletes all persisted artifacts for a novel through coordinated owner APIs', async () => {

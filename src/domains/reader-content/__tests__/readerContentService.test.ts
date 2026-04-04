@@ -36,7 +36,16 @@ describe('readerContentService', () => {
     controller.getChapterContent.mockResolvedValueOnce({
       index: 1,
       title: 'Chapter 2',
-      content: 'Body',
+      plainText: 'Body',
+      richBlocks: [{
+        type: 'paragraph',
+        children: [{
+          type: 'text',
+          text: 'Body',
+        }],
+      }],
+      contentFormat: 'plain',
+      contentVersion: 1,
       wordCount: 4,
       totalChapters: 2,
       hasPrev: true,
@@ -46,7 +55,16 @@ describe('readerContentService', () => {
     await expect(readerContentService.getChapterContent(1, 1)).resolves.toEqual({
       index: 1,
       title: 'Chapter 2',
-      content: 'Body',
+      plainText: 'Body',
+      richBlocks: [{
+        type: 'paragraph',
+        children: [{
+          type: 'text',
+          text: 'Body',
+        }],
+      }],
+      contentFormat: 'plain',
+      contentVersion: 1,
       wordCount: 4,
       totalChapters: 2,
       hasPrev: true,

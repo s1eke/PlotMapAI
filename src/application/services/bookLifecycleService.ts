@@ -48,6 +48,7 @@ export const bookLifecycleService = {
         db.chapters,
         db.chapterImages,
         db.novelImageGalleryEntries,
+        db.readerRenderCache,
       ],
       async () => {
         const transaction = getRequiredTransaction();
@@ -70,9 +71,14 @@ export const bookLifecycleService = {
           images: prepared.images,
           imageGalleryEntries: prepared.imageGalleryEntries,
         }, transaction);
+        await chapterRichContentRepository.replaceNovelChapterRichContents(novelId, {
+          chapters: prepared.chapterRichContents,
+        }, transaction);
+        await deletePersistedReaderRenderCache(novelId, transaction);
       },
     );
 
+    clearReaderRenderCacheMemoryForNovel(novelId);
     clearReaderBootstrapSnapshot(novelId);
     return novelRepository.get(novelId);
   },

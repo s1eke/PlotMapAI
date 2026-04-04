@@ -28,7 +28,7 @@ import {
   preloadReaderImageResources,
 } from '@domains/reader-media';
 import { readerContentService } from '../readerContentService';
-import { extractImageKeysFromText } from '../utils/chapterImages';
+import { extractImageKeysFromChapter } from '../utils/chapterImages';
 
 export interface ReaderHydrateDataResult {
   hasChapters: boolean;
@@ -139,7 +139,7 @@ export function useReaderChapterData({
       return cachedKeys;
     }
 
-    const nextKeys = extractImageKeysFromText(chapter.content);
+    const nextKeys = extractImageKeysFromChapter(chapter);
     chapterImageKeysRef.current.set(chapter.index, nextKeys);
     return nextKeys;
   }, []);

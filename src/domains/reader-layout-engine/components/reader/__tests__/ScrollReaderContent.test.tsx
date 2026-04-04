@@ -14,7 +14,10 @@ function createScrollChapterLayout(content: string) {
   const chapter = {
     index: 0,
     title: 'Chapter 1',
-    content,
+    plainText: content,
+    richBlocks: [],
+    contentFormat: 'plain' as const,
+    contentVersion: 1,
     wordCount: 100,
     totalChapters: 1,
     hasPrev: false,

@@ -1,7 +1,15 @@
-import type { BookChapter } from '@shared/contracts';
+import type {
+  BookChapter,
+  RichBlock,
+  RichContentFormat,
+  RichInline,
+} from '@shared/contracts';
 import type { Chapter, ChapterContent } from '@shared/contracts/reader';
 
-import { bookContentRepository } from '@domains/book-content';
+import {
+  bookContentRepository,
+  chapterRichContentRepository,
+} from '@domains/book-content';
 import { novelRepository } from '@domains/library';
 import type {
   ReaderContentController,
@@ -15,6 +23,58 @@ import {
   runPurifyChaptersTask,
   runPurifyTitlesTask,
 } from '@shared/text-processing';
+
+function createPlainTextRichInlines(paragraph: string): RichInline[] {
+  const lines = paragraph.split('\n');
+  const children: RichInline[] = [];
+
+  lines.forEach((line, index) => {
+    if (line.length > 0) {
+      children.push({
+        type: 'text',
+        text: line,
+      });
+    }
+
+    if (index < lines.length - 1) {
+      children.push({ type: 'lineBreak' });
+    }
+  });
+
+  return children;
+}
+
+function projectPlainTextToRichBlocks(plainText: string): RichBlock[] {
+  const normalizedPlainText = plainText.replace(/\r\n/gu, '\n').trim();
+  if (normalizedPlainText.length === 0) {
+    return [];
+  }
+
+  return normalizedPlainText
+    .split(/\n\s*\n+/gu)
+    .map((paragraph) => paragraph.trim())
+    .filter((paragraph) => paragraph.length > 0)
+    .map((paragraph) => ({
+      type: 'paragraph',
+      children: createPlainTextRichInlines(paragraph),
+    }));
+}
+
+function resolveReaderRichBlocks(params: {
+  contentFormat: RichContentFormat;
+  plainText: string;
+  richBlocks: RichBlock[];
+}): RichBlock[] {
+  if (params.contentFormat === 'rich') {
+    return params.richBlocks;
+  }
+
+  if (params.richBlocks.length > 0) {
+    return params.richBlocks;
+  }
+
+  return projectPlainTextToRichBlocks(params.plainText);
+}
 
 function toBookChapter(chapter: BookChapter): BookChapter {
   return {
@@ -104,9 +164,10 @@ export const applicationReaderContentController: ReaderContentController = {
     chapterIndex: number,
     options: ReaderTextProcessingOptions = {},
   ): Promise<ChapterContent> {
-    const [bookTitle, chapter, totalChapters, rules] = await Promise.all([
+    const [bookTitle, chapter, chapterRichContent, totalChapters, rules] = await Promise.all([
       novelRepository.getNovelTitle(novelId),
       bookContentRepository.getNovelChapter(novelId, chapterIndex),
+      chapterRichContentRepository.getNovelChapterRichContent(novelId, chapterIndex),
       bookContentRepository.countNovelChapters(novelId),
       purificationRuleRepository.getEnabledPurificationRules(),
     ]);
@@ -122,7 +183,23 @@ export const applicationReaderContentController: ReaderContentController = {
       });
     }
 
-    let { title, content } = chapter;
+    if (!chapterRichContent) {
+      throw createAppError({
+        code: AppErrorCode.CHAPTER_MISSING,
+        kind: 'storage',
+        source: 'reader',
+        userMessageKey: 'reader.loadError',
+        debugMessage: 'Structured chapter content is missing for the requested chapter.',
+        details: {
+          chapterIndex,
+          novelId,
+          missingTable: 'chapterRichContents',
+        },
+      });
+    }
+
+    let { title } = chapter;
+    let { plainText } = chapterRichContent;
 
     if (rules.length > 0) {
       const purified = await runPurifyChapterTask(
@@ -130,7 +207,7 @@ export const applicationReaderContentController: ReaderContentController = {
           chapter: {
             chapterIndex: chapter.chapterIndex,
             title,
-            content,
+            content: plainText,
             wordCount: chapter.wordCount,
           },
           rules,
@@ -138,17 +215,25 @@ export const applicationReaderContentController: ReaderContentController = {
         },
         options,
       );
-      ({ title, content } = purified);
+      title = purified.title;
+      plainText = purified.content;
     }
 
     return {
       index: chapter.chapterIndex,
       title,
-      content,
       wordCount: chapter.wordCount,
       totalChapters,
       hasPrev: chapterIndex > 0,
       hasNext: chapterIndex < totalChapters - 1,
+      plainText,
+      richBlocks: resolveReaderRichBlocks({
+        contentFormat: chapterRichContent.contentFormat,
+        plainText,
+        richBlocks: chapterRichContent.richBlocks,
+      }),
+      contentFormat: chapterRichContent.contentFormat,
+      contentVersion: chapterRichContent.contentVersion,
     };
   },
 

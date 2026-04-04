@@ -43,7 +43,7 @@ interface UsePagedReaderControllerParams {
   novelId: number;
   chapters: Chapter[];
   currentChapter: ChapterContent | null;
-  contentVersion: number;
+  chapterDataRevision: number;
   sessionSnapshot: Pick<ReaderSessionSnapshot, 'chapterIndex'>;
   sessionCommands: Pick<
     ReaderSessionCommands,
@@ -94,7 +94,7 @@ export function usePagedReaderController({
   novelId,
   chapters,
   currentChapter,
-  contentVersion,
+  chapterDataRevision,
   sessionSnapshot,
   sessionCommands,
   cache,
@@ -142,7 +142,7 @@ export function usePagedReaderController({
       novelId,
       snapshot: cache.snapshotCachedChapters(),
     });
-  }, [cache, contentVersion, novelId]);
+  }, [cache, chapterDataRevision, novelId]);
 
   useEffect(() => {
     if (enabled) {

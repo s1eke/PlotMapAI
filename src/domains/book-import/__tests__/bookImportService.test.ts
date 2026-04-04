@@ -59,6 +59,24 @@ describe('bookImportService', () => {
         wordCount: 9,
       },
     ]);
+    expect(result.chapterRichContents).toEqual([
+      {
+        chapterIndex: 0,
+        richBlocks: [],
+        plainText: 'Content 1',
+        contentFormat: 'plain',
+        contentVersion: 1,
+        importFormatVersion: 1,
+      },
+      {
+        chapterIndex: 1,
+        richBlocks: [],
+        plainText: 'Content 2',
+        contentFormat: 'plain',
+        contentVersion: 1,
+        importFormatVersion: 1,
+      },
+    ]);
   });
 
   it('builds the full-book image index during parsing', async () => {
@@ -99,6 +117,81 @@ describe('bookImportService', () => {
     ]);
   });
 
+  it('builds image gallery entries from rich chapter blocks for epub imports', async () => {
+    vi.mocked(parseBook).mockResolvedValueOnce({
+      author: 'Parsed Author',
+      chapters: [
+        {
+          content: 'Intro\n\nWorld map',
+          title: 'Illustrated Ch1',
+          contentFormat: 'rich',
+          richBlocks: [
+            {
+              type: 'paragraph',
+              children: [{
+                type: 'text',
+                text: 'Intro',
+              }],
+            },
+            {
+              type: 'image',
+              key: 'map',
+              caption: [{
+                type: 'text',
+                text: 'World map',
+              }],
+            },
+          ],
+        },
+      ],
+      coverBlob: null,
+      description: 'Parsed desc',
+      encoding: 'utf-8',
+      fileHash: 'epub-rich-hash',
+      images: [{
+        imageKey: 'map',
+        blob: new Blob(['image']),
+      }],
+      rawText: 'raw',
+      tags: ['fiction'],
+      title: 'Illustrated Novel',
+      totalWords: 20,
+    });
+    const file = new File(['content'], 'illustrated.epub', { type: 'application/epub+zip' });
+
+    const result = await bookImportService.parseBookImport(file, tocRules);
+
+    expect(result.imageGalleryEntries).toEqual([
+      { blockIndex: 2, chapterIndex: 0, imageKey: 'map', order: 0 },
+    ]);
+    expect(result.chapterRichContents).toEqual([
+      {
+        chapterIndex: 0,
+        richBlocks: [
+          {
+            type: 'paragraph',
+            children: [{
+              type: 'text',
+              text: 'Intro',
+            }],
+          },
+          {
+            type: 'image',
+            key: 'map',
+            caption: [{
+              type: 'text',
+              text: 'World map',
+            }],
+          },
+        ],
+        plainText: 'Intro\n\nWorld map',
+        contentFormat: 'rich',
+        contentVersion: 1,
+        importFormatVersion: 1,
+      },
+    ]);
+  });
+
   it('normalizes chapter content without a duplicated leading title line', async () => {
     vi.mocked(parseBook).mockResolvedValueOnce({
       author: 'Parsed Author',
@@ -123,6 +216,24 @@ describe('bookImportService', () => {
     expect(result.chapters).toEqual([
       { chapterIndex: 0, content: 'Body 1', title: 'Ch1', wordCount: 6 },
       { chapterIndex: 1, content: 'Body 2', title: 'Ch2', wordCount: 6 },
+    ]);
+    expect(result.chapterRichContents).toEqual([
+      {
+        chapterIndex: 0,
+        richBlocks: [],
+        plainText: 'Body 1',
+        contentFormat: 'plain',
+        contentVersion: 1,
+        importFormatVersion: 1,
+      },
+      {
+        chapterIndex: 1,
+        richBlocks: [],
+        plainText: 'Body 2',
+        contentFormat: 'plain',
+        contentVersion: 1,
+        importFormatVersion: 1,
+      },
     ]);
   });
 

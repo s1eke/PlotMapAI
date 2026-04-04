@@ -16,7 +16,7 @@ import type {
 
 import { db } from '@infra/db';
 
-import { extractImageKeysFromText } from './chapterImages';
+import { extractImageKeysFromChapter } from './chapterImages';
 import {
   buildStaticPagedChapterTree,
   buildStaticScrollChapterTree,
@@ -286,7 +286,7 @@ export function createReaderRenderCacheEntry<TTree extends StaticChapterRenderTr
 }
 
 export function createReaderRenderCacheManifestEntry(params: {
-  chapter: Pick<ChapterContent, 'content' | 'index' | 'title'>;
+  chapter: Pick<ChapterContent, 'index' | 'plainText' | 'title'>;
   layoutKey?: string;
   layoutSignature: ReaderLayoutSignature;
   novelId: number;
@@ -400,9 +400,9 @@ export function buildStaticRenderManifest(params: {
 
 export async function warmReaderRenderImages(
   novelId: number,
-  chapter: Pick<ChapterContent, 'content'>,
+  chapter: Pick<ChapterContent, 'contentFormat' | 'plainText' | 'richBlocks'>,
 ): Promise<void> {
-  const imageKeys = extractImageKeysFromText(chapter.content);
+  const imageKeys = extractImageKeysFromChapter(chapter);
   if (imageKeys.length === 0) {
     return;
   }

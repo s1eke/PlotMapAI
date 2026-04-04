@@ -113,7 +113,11 @@ export function buildReaderBlocks(
     paragraphIndex: -1,
   }];
 
-  blocks.push(...buildChapterBlockSequence(chapter).map((block): ReaderBlock => {
+  blocks.push(...buildChapterBlockSequence({
+    content: chapter.plainText,
+    index: chapter.index,
+    title: chapter.title,
+  }).map((block): ReaderBlock => {
     if (block.kind === 'blank') {
       return {
         chapterIndex: block.chapterIndex,
@@ -157,9 +161,9 @@ export function buildReaderBlocks(
 }
 
 export function createChapterContentHash(
-  chapter: Pick<ChapterContent, 'content' | 'index' | 'title'>,
+  chapter: Pick<ChapterContent, 'index' | 'plainText' | 'title'>,
 ): string {
-  const source = `${chapter.index}\u0000${chapter.title}\u0000${chapter.content}`;
+  const source = `${chapter.index}\u0000${chapter.title}\u0000${chapter.plainText}`;
   let hashA = 0x811c9dc5;
   let hashB = 0x01000193;
   const UINT32_MOD = 0x1_0000_0000;

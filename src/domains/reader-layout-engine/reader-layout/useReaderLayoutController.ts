@@ -40,7 +40,7 @@ interface UseReaderLayoutControllerParams {
     ReaderAnalysisBridgeState,
     'isChapterAnalysisLoading' | 'summaryPanel' | 'summaryRestoreSignal'
   >;
-  chapterContentVersion: number;
+  chapterDataRevision: number;
   chapterData: UseReaderChapterDataResult;
   novelId: number;
   preferences: Pick<
@@ -167,7 +167,7 @@ function buildSummaryContentProps(
 
 export function useReaderLayoutController({
   analysis,
-  chapterContentVersion,
+  chapterDataRevision,
   chapterData,
   novelId,
   preferences,
@@ -182,7 +182,7 @@ export function useReaderLayoutController({
     novelId,
     chapters: chapterData.chapters,
     currentChapter: chapterData.currentChapter,
-    contentVersion: chapterContentVersion,
+    chapterDataRevision,
     sessionSnapshot,
     sessionCommands,
     cache: chapterData.cache,
@@ -204,7 +204,7 @@ export function useReaderLayoutController({
     novelId,
     chapters: chapterData.chapters,
     currentChapter: chapterData.currentChapter,
-    contentVersion: chapterContentVersion,
+    chapterDataRevision,
     sessionSnapshot,
     sessionCommands,
     cache: chapterData.cache,

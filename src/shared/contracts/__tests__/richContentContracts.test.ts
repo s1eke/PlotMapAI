@@ -229,14 +229,23 @@ describe('rich content shared contracts', () => {
     const existingReaderChapter = {
       index: 0,
       title: 'Reader chapter',
-      content: 'Plain content',
       wordCount: 13,
-      totalChapters: 1,
       hasPrev: false,
       hasNext: false,
+      plainText: 'Plain content',
+      richBlocks: [{
+        type: 'paragraph',
+        children: [{
+          type: 'text',
+          text: 'Plain content',
+        }],
+      }],
+      contentFormat: 'plain',
+      contentVersion: 1,
+      totalChapters: 1,
     } satisfies ChapterContent;
 
-    expect(existingReaderChapter.content).toBe('Plain content');
+    expect(existingReaderChapter.plainText).toBe('Plain content');
     expect(readerContracts).not.toHaveProperty('PaginationBlock');
     expect(readerContracts).not.toHaveProperty('RichBlock');
     expect(readerContracts).not.toHaveProperty('ReaderChapterRichContent');

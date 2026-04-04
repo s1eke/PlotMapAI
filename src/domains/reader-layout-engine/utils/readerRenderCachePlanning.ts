@@ -12,7 +12,7 @@ import type {
   ReaderRenderStorageKind,
 } from './readerRenderCache';
 
-import { extractImageKeysFromText } from './chapterImages';
+import { extractImageKeysFromChapter } from './chapterImages';
 import {
   createChapterContentHash,
   serializeReaderLayoutSignature,
@@ -65,19 +65,19 @@ export function collectLoadedImageKeys(params: {
   const keys = new Set<string>();
 
   if (params.currentChapter) {
-    for (const imageKey of extractImageKeysFromText(params.currentChapter.content)) {
+    for (const imageKey of extractImageKeysFromChapter(params.currentChapter)) {
       keys.add(imageKey);
     }
   }
 
   for (const chapter of params.pagedChapters) {
-    for (const imageKey of extractImageKeysFromText(chapter.content)) {
+    for (const imageKey of extractImageKeysFromChapter(chapter)) {
       keys.add(imageKey);
     }
   }
 
   for (const renderableChapter of params.scrollChapters) {
-    for (const imageKey of extractImageKeysFromText(renderableChapter.chapter.content)) {
+    for (const imageKey of extractImageKeysFromChapter(renderableChapter.chapter)) {
       keys.add(imageKey);
     }
   }
@@ -87,11 +87,11 @@ export function collectLoadedImageKeys(params: {
 
 export function buildChapterImageDimensionsMap(
   novelId: number,
-  chapter: Pick<ChapterContent, 'content'>,
+  chapter: Pick<ChapterContent, 'contentFormat' | 'plainText' | 'richBlocks'>,
 ): Map<string, ReaderImageDimensions | null | undefined> {
   const dimensions = new Map<string, ReaderImageDimensions | null | undefined>();
 
-  for (const imageKey of extractImageKeysFromText(chapter.content)) {
+  for (const imageKey of extractImageKeysFromChapter(chapter)) {
     dimensions.set(imageKey, peekReaderImageDimensions(novelId, imageKey));
   }
 
@@ -100,10 +100,10 @@ export function buildChapterImageDimensionsMap(
 
 export function buildChapterImageLayoutKey(
   novelId: number,
-  chapter: Pick<ChapterContent, 'content'>,
+  chapter: Pick<ChapterContent, 'contentFormat' | 'plainText' | 'richBlocks'>,
   baseLayoutKey: string,
 ): string {
-  const imageKeys = extractImageKeysFromText(chapter.content);
+  const imageKeys = extractImageKeysFromChapter(chapter);
   if (imageKeys.length === 0) {
     return baseLayoutKey;
   }
@@ -292,4 +292,3 @@ export function countPageItems(tree: StaticPagedChapterTree): number {
     pageTotal + page.columns.reduce((columnTotal, column) => columnTotal + column.items.length, 0)
   ), 0);
 }
-

@@ -189,7 +189,10 @@ function createChapter(index: number, totalChapters: number): ChapterContent {
   return {
     index,
     title: `Chapter ${index + 1}`,
-    content: `Content for chapter ${index + 1}`,
+    plainText: `Content for chapter ${index + 1}`,
+    richBlocks: [],
+    contentFormat: 'plain',
+    contentVersion: 1,
     wordCount: 120,
     totalChapters,
     hasPrev: index > 0,
@@ -376,7 +379,7 @@ describe('useReaderRenderCache', () => {
   it('rebuilds visible image chapters when decoded image dimensions become available', async () => {
     const currentChapter = {
       ...createChapter(0, 1),
-      content: 'Before image\n[IMG:cover]\nAfter image',
+      plainText: 'Before image\n[IMG:cover]\nAfter image',
     };
     const preload = createDeferred<undefined>();
 
@@ -440,7 +443,7 @@ describe('useReaderRenderCache', () => {
   it('does not retrigger image preload forever when chapter arrays get recreated on rerender', async () => {
     const currentChapter = {
       ...createChapter(0, 1),
-      content: 'Before image\n[IMG:cover]\nAfter image',
+      plainText: 'Before image\n[IMG:cover]\nAfter image',
     };
     const viewport = createViewport();
     const contentRef = { current: viewport };

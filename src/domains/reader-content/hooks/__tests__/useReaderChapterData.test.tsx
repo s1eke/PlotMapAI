@@ -33,7 +33,16 @@ function createChapter(index: number, totalChapters: number) {
   return {
     index,
     title: `Chapter ${index + 1}`,
-    content: `Content ${index + 1}`,
+    plainText: `Content ${index + 1}`,
+    richBlocks: [{
+      type: 'paragraph',
+      children: [{
+        type: 'text',
+        text: `Content ${index + 1}`,
+      }],
+    }],
+    contentFormat: 'plain' as const,
+    contentVersion: 1,
     wordCount: 120,
     totalChapters,
     hasPrev: index > 0,

@@ -14,7 +14,10 @@ const chapters: Chapter[] = [
 const makeChapterContent = (index: number): ChapterContent => ({
   index,
   title: `Ch ${index + 1}`,
-  content: `Content for chapter ${index + 1}`,
+  plainText: `Content for chapter ${index + 1}`,
+  richBlocks: [],
+  contentFormat: 'plain',
+  contentVersion: 1,
   wordCount: 100,
   totalChapters: chapters.length,
   hasPrev: index > 0,
@@ -51,7 +54,7 @@ function setupHook(opts: {
   scrollModeChapters?: number[];
   fetchChapterContent?: Mock;
   preloadAdjacent?: Mock;
-  contentVersion?: number;
+  chapterDataRevision?: number;
   contentElement?: HTMLDivElement;
   onReadingAnchorChange?: Mock;
 } = {}) {
@@ -72,7 +75,7 @@ function setupHook(opts: {
       preloadAdjacent,
       scrollModeChapters,
       setScrollModeChapters,
-      opts.contentVersion ?? 0,
+      opts.chapterDataRevision ?? 0,
       onReadingAnchorChange,
     ));
 

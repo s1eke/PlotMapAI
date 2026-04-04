@@ -57,6 +57,14 @@ function createTextLocator(
   };
 }
 
+function toChapterBlockSource(chapter: ChapterContent) {
+  return {
+    content: chapter.plainText,
+    index: chapter.index,
+    title: chapter.title,
+  };
+}
+
 function createScrollMetric(
   chapter: ChapterContent,
   block: ReturnType<typeof buildChapterBlockSequence>[number],
@@ -125,7 +133,7 @@ export function createDeterministicScrollLayout(
   const metrics: VirtualBlockMetrics[] = [];
   let top = 0;
 
-  for (const block of buildChapterBlockSequence(chapter)) {
+  for (const block of buildChapterBlockSequence(toChapterBlockSource(chapter))) {
     const metric = createScrollMetric(chapter, block, top);
     if (!metric) {
       top += BLOCK_MARGIN_AFTER;
@@ -147,7 +155,7 @@ export function createDeterministicScrollLayout(
 export function createDeterministicPagedLayout(
   chapter: ChapterContent,
 ): StaticPagedChapterTree {
-  const pageItems = buildChapterBlockSequence(chapter)
+  const pageItems = buildChapterBlockSequence(toChapterBlockSource(chapter))
     .filter((block) => block.kind !== 'blank')
     .map((block) => {
       const key = `${chapter.index}:${block.blockIndex}`;

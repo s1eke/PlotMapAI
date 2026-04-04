@@ -103,7 +103,10 @@ function createChapter(index: number, totalChapters: number): ChapterContent {
   return {
     index,
     title: `Chapter ${index + 1}`,
-    content: `Content for chapter ${index + 1}`,
+    plainText: `Content for chapter ${index + 1}`,
+    richBlocks: [],
+    contentFormat: 'plain',
+    contentVersion: 1,
     wordCount: 120,
     totalChapters,
     hasPrev: index > 0,

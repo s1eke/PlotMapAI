@@ -67,7 +67,10 @@ function createCurrentChapter(index = 5) {
   return {
     index,
     title: `Chapter ${index + 1}`,
-    content: 'content',
+    plainText: 'content',
+    richBlocks: [],
+    contentFormat: 'plain' as const,
+    contentVersion: 1,
     wordCount: 100,
     totalChapters: 10,
     hasPrev: true,
