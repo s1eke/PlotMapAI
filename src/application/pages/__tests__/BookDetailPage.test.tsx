@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
 import { analysisService } from '@domains/analysis';
+import { chapterRichContentRepository } from '@domains/book-content';
 import { novelRepository, useNovelCoverResource } from '@domains/library';
 import type { AnalysisStatusResponse } from '@shared/contracts';
 
@@ -49,6 +50,12 @@ vi.mock('@application/use-cases/library', async () => {
 vi.mock('@domains/analysis', () => ({
   analysisService: {
     getStatus: vi.fn(),
+  },
+}));
+
+vi.mock('@domains/book-content', () => ({
+  chapterRichContentRepository: {
+    listNovelChapterRichContents: vi.fn(),
   },
 }));
 
@@ -140,6 +147,7 @@ describe('application BookDetailPage', () => {
       writable: true,
     });
     vi.mocked(novelRepository.get).mockResolvedValue(baseNovel);
+    vi.mocked(chapterRichContentRepository.listNovelChapterRichContents).mockResolvedValue([]);
     vi.mocked(useNovelCoverResource).mockReturnValue('blob:cover');
     vi.mocked(analysisService.getStatus).mockResolvedValue(createStatusResponse());
     vi.mocked(startNovelAnalysis).mockResolvedValue(

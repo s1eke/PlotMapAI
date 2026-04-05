@@ -28,12 +28,24 @@ export interface DebugErrorEntry {
 
 export type DebugEntry = DebugLogEntry | DebugErrorEntry;
 
+export interface DebugSnapshotEntry<TValue = unknown> {
+  key: string;
+  time: number;
+  value: TValue;
+}
+
 type LogListener = (entry: DebugEntry) => void;
 type FeatureListener = (flags: DebugFeatureFlags) => void;
+type SnapshotListener = (
+  entries: DebugSnapshotEntry[],
+  updatedKey: string | null,
+) => void;
 
 const logs: DebugEntry[] = [];
 const listeners = new Set<LogListener>();
 const featureListeners = new Set<FeatureListener>();
+const snapshotEntries = new Map<string, DebugSnapshotEntry>();
+const snapshotListeners = new Set<SnapshotListener>();
 const debugFeatureFlags: DebugFeatureFlags = {
   readerLegacyPlainScroll: false,
   readerTelemetry: false,
@@ -102,6 +114,67 @@ export function getRecentLogs(): DebugEntry[] {
 
 export function clearLogs(): void {
   logs.length = 0;
+}
+
+function notifySnapshotListeners(updatedKey: string | null): void {
+  const entries = getDebugSnapshots();
+  for (const listener of snapshotListeners) {
+    listener(entries, updatedKey);
+  }
+}
+
+export function setDebugSnapshot<TValue>(key: string, value: TValue): void {
+  if (!isDebug) {
+    return;
+  }
+
+  snapshotEntries.set(key, {
+    key,
+    time: Date.now(),
+    value,
+  });
+  notifySnapshotListeners(key);
+}
+
+export function getDebugSnapshot<TValue = unknown>(
+  key: string,
+): DebugSnapshotEntry<TValue> | null {
+  const entry = snapshotEntries.get(key);
+  if (!entry) {
+    return null;
+  }
+
+  return {
+    key: entry.key,
+    time: entry.time,
+    value: entry.value as TValue,
+  };
+}
+
+export function getDebugSnapshots(): DebugSnapshotEntry[] {
+  return Array.from(snapshotEntries.values())
+    .sort((left, right) => left.key.localeCompare(right.key))
+    .map((entry) => ({
+      key: entry.key,
+      time: entry.time,
+      value: entry.value,
+    }));
+}
+
+export function clearDebugSnapshots(): void {
+  if (snapshotEntries.size === 0) {
+    return;
+  }
+
+  snapshotEntries.clear();
+  notifySnapshotListeners(null);
+}
+
+export function debugSnapshotSubscribe(listener: SnapshotListener): () => void {
+  snapshotListeners.add(listener);
+  return () => {
+    snapshotListeners.delete(listener);
+  };
 }
 
 function notifyFeatureListeners(): void {

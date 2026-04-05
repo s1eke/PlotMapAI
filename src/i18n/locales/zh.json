@@ -112,7 +112,18 @@
     "pausingAnalysis": "暂停中...",
     "resumeAnalysis": "继续分析",
     "restartAnalysis": "重新开始分析",
-    "characterGraphEntry": "人物图谱"
+    "characterGraphEntry": "人物图谱",
+    "contentFormat": "内容格式",
+    "contentFormatPlain": "纯文本",
+    "contentFormatRich": "富文本",
+    "contentVersion": "内容版本",
+    "importFormatVersion": "导入格式版本",
+    "lastParsedAt": "最近解析时间",
+    "reparseAction": "重新解析源文件",
+    "reparseHint": "请重新选择原始源文件，当前书籍的解析内容、插图和分析产物会被直接覆盖。",
+    "reparseSucceeded": "已重新解析并覆盖当前书籍内容。",
+    "reparseFailed": "重新解析源文件失败。",
+    "reparseFileTypeMismatch": "请选择与当前书籍相同类型的源文件。"
   },
   "characterGraph": {
     "title": "人物图谱",

@@ -35,6 +35,7 @@ import { preloadReaderImageResources } from './readerImageResourceCache';
 import { shouldUseRichScrollBlocks } from './richScroll';
 
 const MEMORY_CACHE_LIMIT = 36;
+export const READER_RENDER_CACHE_PERSISTED_LIMIT = 240;
 const READER_RENDER_CACHE_CLEANUP_INTERVAL_MS = 60 * 60 * 1000;
 const READER_RENDER_CACHE_TOUCH_INTERVAL_MS = 24 * 60 * 60 * 1000;
 export const READER_RENDER_CACHE_TTL_MS = 14 * 24 * 60 * 60 * 1000;
@@ -187,6 +188,25 @@ async function refreshPersistedReaderRenderCacheIfNeeded(
   };
 }
 
+async function prunePersistedReaderRenderCacheIfNeeded(
+  readerRenderCacheTable: typeof db.readerRenderCache = db.readerRenderCache,
+): Promise<void> {
+  const overflow = await readerRenderCacheTable.count() - READER_RENDER_CACHE_PERSISTED_LIMIT;
+  if (overflow <= 0) {
+    return;
+  }
+
+  const oldestIds = await readerRenderCacheTable
+    .orderBy('updatedAt')
+    .limit(overflow)
+    .primaryKeys();
+  if (oldestIds.length === 0) {
+    return;
+  }
+
+  await readerRenderCacheTable.bulkDelete(oldestIds as number[]);
+}
+
 function evictMemoryRenderCacheIfNeeded(): void {
   while (memoryRenderCache.size > MEMORY_CACHE_LIMIT) {
     const oldestKey = memoryRenderCache.keys().next().value;
@@ -309,6 +329,7 @@ export async function persistReaderRenderCacheEntry<TTree extends StaticChapterR
         createReaderRenderCacheExpiresAt(entry.updatedAt),
       ),
     );
+    await prunePersistedReaderRenderCacheIfNeeded(db.readerRenderCache);
   });
 }
 

@@ -273,4 +273,70 @@ describe('readerRenderCache', () => {
     expect(record).toBeNull();
     expect(await db.readerRenderCache.toArray()).toEqual([]);
   });
+
+  it('prunes the oldest persisted cache entries when the global cap is exceeded', async () => {
+    const { db } = await import('@infra/db');
+    const {
+      READER_RENDER_CACHE_PERSISTED_LIMIT,
+      buildStaticRenderManifest,
+      persistReaderRenderCacheEntry,
+    } = await import('../readerRenderCache');
+    const {
+      createReaderLayoutSignature,
+      createReaderTypographyMetrics,
+    } = await import('../readerLayout');
+
+    await db.delete();
+    await db.open();
+
+    const layoutSignature = createReaderLayoutSignature({
+      columnCount: 1,
+      columnGap: 0,
+      fontSize: 18,
+      lineSpacing: 1.6,
+      pageHeight: 720,
+      paragraphSpacing: 16,
+      textWidth: 360,
+    });
+    const typography = createReaderTypographyMetrics(18, 1.6, 16, 360);
+
+    for (let index = 0; index < READER_RENDER_CACHE_PERSISTED_LIMIT + 2; index += 1) {
+      const entry = buildStaticRenderManifest({
+        chapter: {
+          index,
+          title: `Chapter ${index + 1}`,
+          plainText: `Content ${index + 1}`,
+          richBlocks: [],
+          contentFormat: 'plain',
+          contentVersion: 1,
+          hasNext: true,
+          hasPrev: index > 0,
+          totalChapters: READER_RENDER_CACHE_PERSISTED_LIMIT + 2,
+          wordCount: 80,
+        },
+        imageDimensionsByKey: new Map(),
+        layoutSignature,
+        novelId: 77,
+        typography,
+        variantFamily: 'summary-shell',
+      });
+
+      await persistReaderRenderCacheEntry({
+        ...entry,
+        updatedAt: new Date(Date.UTC(2026, 3, 1, 0, index, 0)).toISOString(),
+      });
+    }
+
+    const persistedEntries = await db.readerRenderCache.orderBy('updatedAt').toArray();
+
+    expect(persistedEntries).toHaveLength(READER_RENDER_CACHE_PERSISTED_LIMIT);
+    expect(persistedEntries[0]).toMatchObject({
+      chapterIndex: 2,
+      novelId: 77,
+    });
+    expect(persistedEntries.at(-1)).toMatchObject({
+      chapterIndex: READER_RENDER_CACHE_PERSISTED_LIMIT + 1,
+      novelId: 77,
+    });
+  });
 });

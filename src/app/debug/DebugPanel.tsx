@@ -1,17 +1,23 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { ArrowLeft, Bug, ChevronDown, Download, RefreshCw, RotateCcw, Smartphone, Trash2 } from 'lucide-react';
 import {
+  clearDebugSnapshots,
   clearLogs,
   debugFeatureSubscribe,
+  debugSnapshotSubscribe,
   debugSubscribe,
   getDebugFeatureFlags,
   getRecentLogs,
+  getDebugSnapshots,
   MAX_LOGS,
+  setDebugSnapshot,
   setDebugFeatureEnabled,
   type DebugEntry,
+  type DebugSnapshotEntry,
 } from '@shared/debug';
 import Toggle from '@shared/components/Toggle';
 import { cn } from '@shared/utils/cn';
+import { db } from '@infra/db';
 
 import {
   triggerDebugInstallPrompt,
@@ -43,13 +49,109 @@ const CATEGORY_COLORS: Record<string, string> = {
   'character-graph': 'text-cyan-300',
 };
 
+const SNAPSHOT_LABELS: Record<string, string> = {
+  'book-import': 'Import Diagnostics',
+  'reader-layout': 'Reader Diagnostics',
+  storage: 'Storage Diagnostics',
+};
+const SNAPSHOT_ORDER = ['reader-layout', 'book-import', 'storage'];
+
+interface ReaderLayoutDiagnosticSnapshot {
+  novelId: number | null;
+}
+
+interface StorageDiagnosticSnapshot {
+  chapterImagesCount: number;
+  chapterRichContentsCount: number;
+  currentNovelRenderCacheCount: number | null;
+  novelId: number | null;
+  quota: number | null;
+  readerRenderCacheCount: number;
+  usage: number | null;
+}
+
 function getDebugEntryKey(entry: DebugEntry): string {
   return `${entry.kind}:${entry.time}:${entry.category}:${entry.message}`;
+}
+
+function getDebugSnapshotKey(entry: DebugSnapshotEntry): string {
+  return `${entry.key}:${entry.time}`;
+}
+
+function formatDiagnosticTime(ts: number): string {
+  const d = new Date(ts);
+  return `${d.getMinutes().toString().padStart(2, '0')}:${d.getSeconds().toString().padStart(2, '0')}.${d.getMilliseconds().toString().padStart(3, '0')}`;
+}
+
+function formatBytes(value: number | null): string {
+  if (value == null || Number.isNaN(value)) {
+    return '-';
+  }
+
+  if (value < 1024) {
+    return `${value} B`;
+  }
+
+  if (value < 1024 * 1024) {
+    return `${(value / 1024).toFixed(1)} KB`;
+  }
+
+  if (value < 1024 * 1024 * 1024) {
+    return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  return `${(value / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+}
+
+function buildSnapshotPreview(snapshot: DebugSnapshotEntry): string[] {
+  if (snapshot.key === 'storage') {
+    const value = snapshot.value as Partial<StorageDiagnosticSnapshot>;
+    return [
+      `usage ${formatBytes(value.usage ?? null)} / ${formatBytes(value.quota ?? null)}`,
+      `render cache ${value.readerRenderCacheCount ?? 0} · rich ${value.chapterRichContentsCount ?? 0} · images ${value.chapterImagesCount ?? 0}`,
+      `current novel cache ${value.currentNovelRenderCacheCount ?? 0}`,
+    ];
+  }
+
+  if (snapshot.key === 'reader-layout') {
+    const value = snapshot.value as Record<string, unknown>;
+    return [
+      `format ${String(value.contentFormat ?? value.activeContentFormat ?? '-')}`,
+      `layout ${String(value.layoutFeatureSet ?? value.activeLayoutFeatureSet ?? '-')}`,
+      `pending preheat ${String(value.pendingPreheatCount ?? 0)}`,
+    ];
+  }
+
+  if (snapshot.key === 'book-import') {
+    const value = snapshot.value as Record<string, unknown>;
+    const progress = typeof value.progress === 'object' && value.progress ? value.progress as Record<string, unknown> : null;
+    return [
+      `operation ${String(value.operation ?? '-')}`,
+      `file ${String(value.currentFileName ?? '-')}`,
+      `stage ${String(progress?.stage ?? '-')}`,
+    ];
+  }
+
+  return [];
+}
+
+async function getStorageEstimate(): Promise<{ quota?: number; usage?: number } | null> {
+  const estimate = navigator.storage?.estimate;
+  if (!estimate) {
+    return null;
+  }
+
+  try {
+    return await estimate.call(navigator.storage);
+  } catch {
+    return null;
+  }
 }
 
 export default function DebugPanel() {
   const [isOpen, setIsOpen] = useState(false);
   const [logs, setLogs] = useState<DebugEntry[]>(() => getRecentLogs());
+  const [snapshots, setSnapshots] = useState<DebugSnapshotEntry[]>(() => getDebugSnapshots());
   const [filter, setFilter] = useState<'all' | 'errors' | 'logs'>('all');
   const [featureFlags, setFeatureFlags] = useState(() => getDebugFeatureFlags());
   const listRef = useRef<HTMLDivElement>(null);
@@ -72,6 +174,12 @@ export default function DebugPanel() {
   }, []);
 
   useEffect(() => {
+    return debugSnapshotSubscribe((entries) => {
+      setSnapshots(entries);
+    });
+  }, []);
+
+  useEffect(() => {
     if (autoScrollRef.current && listRef.current) {
       listRef.current.scrollTop = listRef.current.scrollHeight;
     }
@@ -85,14 +193,82 @@ export default function DebugPanel() {
 
   const handleClear = useCallback(() => {
     clearLogs();
+    clearDebugSnapshots();
     setLogs([]);
+    setSnapshots([]);
   }, []);
+
+  const readerSnapshot = useMemo(() => {
+    return snapshots.find((entry) => entry.key === 'reader-layout')?.value as ReaderLayoutDiagnosticSnapshot | undefined;
+  }, [snapshots]);
+  const readerNovelId = typeof readerSnapshot?.novelId === 'number'
+    ? readerSnapshot.novelId
+    : null;
+
+  const refreshStorageDiagnostics = useCallback(async (): Promise<void> => {
+    const estimate = await getStorageEstimate();
+    const [
+      readerRenderCacheCount,
+      chapterRichContentsCount,
+      chapterImagesCount,
+      currentNovelRenderCacheCount,
+    ] = await Promise.all([
+      db.readerRenderCache.count(),
+      db.chapterRichContents.count(),
+      db.chapterImages.count(),
+      readerNovelId == null
+        ? Promise.resolve(null)
+        : db.readerRenderCache.where('novelId').equals(readerNovelId).count(),
+    ]);
+
+    setDebugSnapshot('storage', {
+      chapterImagesCount,
+      chapterRichContentsCount,
+      currentNovelRenderCacheCount,
+      novelId: readerNovelId,
+      quota: estimate?.quota ?? null,
+      readerRenderCacheCount,
+      usage: estimate?.usage ?? null,
+    } satisfies StorageDiagnosticSnapshot);
+  }, [readerNovelId]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const refreshDiagnostics = (): void => {
+      refreshStorageDiagnostics().catch(() => undefined);
+    };
+
+    refreshDiagnostics();
+    const timer = window.setInterval(() => {
+      refreshDiagnostics();
+    }, 10_000);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [isOpen, refreshStorageDiagnostics]);
 
   const visibleLogs = logs.filter((entry) => {
     if (filter === 'errors') return entry.kind === 'error';
     if (filter === 'logs') return entry.kind === 'log';
     return true;
   });
+
+  const orderedSnapshots = useMemo(() => {
+    const rankByKey = new Map(SNAPSHOT_ORDER.map((key, index) => [key, index]));
+    return [...snapshots].sort((left, right) => {
+      const leftRank = rankByKey.get(left.key) ?? SNAPSHOT_ORDER.length;
+      const rightRank = rankByKey.get(right.key) ?? SNAPSHOT_ORDER.length;
+      if (leftRank !== rightRank) {
+        return leftRank - rightRank;
+      }
+
+      return right.time - left.time;
+    });
+  }, [snapshots]);
 
   const formatTime = (ts: number) => {
     const d = new Date(ts);
@@ -229,6 +405,48 @@ export default function DebugPanel() {
           <RotateCcw className="h-3.5 w-3.5" />
           Reset PWA
         </button>
+      </div>
+      <div className="border-b border-border-color/50 p-2">
+        <div className="mb-2 flex items-center justify-between">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-text-secondary/80">
+            Diagnostics
+          </span>
+          <span className="text-[10px] text-text-secondary/60">
+            {orderedSnapshots.length}
+          </span>
+        </div>
+        <div className="space-y-2">
+          {orderedSnapshots.length === 0 && (
+            <div className="rounded-lg border border-white/5 bg-black/10 px-3 py-2 text-[11px] text-text-secondary">
+              No diagnostics yet
+            </div>
+          )}
+          {orderedSnapshots.map((snapshot) => (
+            <section
+              key={getDebugSnapshotKey(snapshot)}
+              className="rounded-lg border border-white/5 bg-black/10 px-3 py-2"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-[11px] font-semibold text-text-primary">
+                  {SNAPSHOT_LABELS[snapshot.key] ?? snapshot.key}
+                </span>
+                <span className="shrink-0 text-[10px] text-text-secondary/60">
+                  {formatDiagnosticTime(snapshot.time)}
+                </span>
+              </div>
+              <div className="mt-2 space-y-1">
+                {buildSnapshotPreview(snapshot).map((line) => (
+                  <div key={line} className="text-[10px] text-text-secondary/90">
+                    {line}
+                  </div>
+                ))}
+              </div>
+              <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-all rounded bg-black/15 p-2 text-[10px] text-text-secondary/90">
+                {JSON.stringify(snapshot.value, null, 2)}
+              </pre>
+            </section>
+          ))}
+        </div>
       </div>
       <div ref={listRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-2 space-y-0.5 text-[11px] font-mono leading-relaxed custom-scrollbar">
         {visibleLogs.length === 0 && (

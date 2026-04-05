@@ -29,12 +29,14 @@ vi.mock('react-router-dom', async () => {
 
 vi.mock('@shared/debug', () => ({
   reportAppError: vi.fn(),
+  setDebugSnapshot: vi.fn(),
 }));
 
 vi.mock('@application/use-cases/library', () => ({
   deleteNovelAndCleanupArtifacts: vi.fn(),
   loadBookDetailAnalysisStatus: vi.fn(),
   loadBookDetailPageData: vi.fn(),
+  reparseBookAndRefreshDetail: vi.fn(),
 }));
 
 vi.mock('@application/use-cases/analysis', () => ({
@@ -108,6 +110,12 @@ describe('useBookDetailPageViewModel', () => {
     vi.mocked(loadBookDetailPageData).mockResolvedValue({
       analysisStatus: createStatusResponse(),
       analysisStatusError: null,
+      contentSummary: {
+        contentFormat: 'plain',
+        contentVersion: null,
+        importFormatVersion: null,
+        lastParsedAt: null,
+      },
       novel: baseNovel,
     });
     vi.mocked(loadBookDetailAnalysisStatus).mockResolvedValue({
@@ -161,6 +169,12 @@ describe('useBookDetailPageViewModel', () => {
         },
       },
       analysisStatusError: null,
+      contentSummary: {
+        contentFormat: 'rich',
+        contentVersion: 4,
+        importFormatVersion: 2,
+        lastParsedAt: '2026-04-03T00:00:00.000Z',
+      },
       novel: {
         ...baseNovel,
         hasCover: true,
@@ -176,6 +190,12 @@ describe('useBookDetailPageViewModel', () => {
 
     expect(useNovelCoverResource).toHaveBeenCalledWith(1, true);
     expect(result.current.coverUrl).toBe('blob:cover');
+    expect(result.current.contentSummary).toEqual({
+      contentFormat: 'rich',
+      contentVersion: 4,
+      importFormatVersion: 2,
+      lastParsedAt: '2026-04-03T00:00:00.000Z',
+    });
     expect(result.current.introText).toBe('Line one\nLine two');
     expect(result.current.introParagraphs.map((item) => item.paragraph)).toEqual(['Line one', 'Line two']);
     expect(result.current.characterChartData).toHaveLength(5);
@@ -230,6 +250,12 @@ describe('useBookDetailPageViewModel', () => {
         status: 'running',
       }),
       analysisStatusError: null,
+      contentSummary: {
+        contentFormat: 'plain',
+        contentVersion: null,
+        importFormatVersion: null,
+        lastParsedAt: null,
+      },
       novel: baseNovel,
     });
     vi.mocked(loadBookDetailAnalysisStatus).mockResolvedValue({

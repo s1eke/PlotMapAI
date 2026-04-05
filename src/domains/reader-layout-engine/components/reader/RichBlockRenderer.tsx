@@ -104,6 +104,12 @@ function getHeadingTagName(level: number): 'h2' | 'h3' | 'h4' | 'h5' | 'h6' {
 function renderRichContent(metric: StaticScrollBlockNode, chapterTitle?: string) {
   const { block } = metric;
   const richChildren = block.richChildren ?? [];
+  let textFragmentTestId = 'reader-rich-text-fragment';
+  if (block.renderRole === 'unsupported' && block.originalTag === 'table') {
+    textFragmentTestId = 'reader-flow-table-fallback';
+  } else if (block.renderRole === 'unsupported') {
+    textFragmentTestId = 'reader-flow-text-fragment';
+  }
 
   if (block.kind === 'heading') {
     const TagName = getHeadingTagName(block.blockIndex === 0 ? 2 : (block.headingLevel ?? 2));
@@ -146,7 +152,7 @@ function renderRichContent(metric: StaticScrollBlockNode, chapterTitle?: string)
 
   return (
     <div
-      data-testid="reader-rich-text-fragment"
+      data-testid={textFragmentTestId}
       className={cn(
         'break-words whitespace-pre-wrap',
         resolveTextAlignClass(block.align),
@@ -220,6 +226,7 @@ export default function RichBlockRenderer({
             />
             {metric.captionHeight && metric.captionHeight > 0 ? (
               <figcaption
+                data-testid="reader-flow-image-caption"
                 className={cn(
                   'mt-2 w-full text-sm text-text-secondary',
                   resolveTextAlignClass(block.align),

@@ -54,10 +54,19 @@ export interface ReaderVisibleLayoutSnapshot {
   activeLayoutFeatureSet: ReaderLayoutFeatureSet | null;
   activeRendererVersion: number | null;
   cacheModel: 'layered-render-cache';
+  contentFormat: ChapterContent['contentFormat'] | null;
+  contentVersion: number | null;
   currentPagedPageCount: number;
   currentPagedPageItemCount: number;
+  layoutFeatureSet: ReaderLayoutFeatureSet | null;
+  novelId: number;
+  pagedDowngradeCount: number;
+  pagedFallbackCount: number;
+  rendererVersion: number | null;
+  richBlockCount: number;
   scrollBlockCount: number;
   scrollChapterCount: number;
+  unsupportedBlockCount: number;
   visibleCacheSources: Record<ReaderRenderCacheSource, number>;
 }
 

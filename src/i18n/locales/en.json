@@ -112,7 +112,18 @@
     "pausingAnalysis": "Pausing...",
     "resumeAnalysis": "Resume Analysis",
     "restartAnalysis": "Restart Analysis",
-    "characterGraphEntry": "Character Graph"
+    "characterGraphEntry": "Character Graph",
+    "contentFormat": "Content Format",
+    "contentFormatPlain": "Plain",
+    "contentFormatRich": "Rich",
+    "contentVersion": "Content Version",
+    "importFormatVersion": "Import Format Version",
+    "lastParsedAt": "Last Parsed",
+    "reparseAction": "Reparse Source File",
+    "reparseHint": "Select the original source file again to overwrite the current parsed content, images, and analysis artifacts.",
+    "reparseSucceeded": "The book has been reparsed and overwritten.",
+    "reparseFailed": "Failed to reparse the source file.",
+    "reparseFileTypeMismatch": "Please select the same file type as the current book."
   },
   "characterGraph": {
     "title": "Character Graph",

@@ -7,6 +7,8 @@ node_modules/
 
 # Coverage
 coverage/
+playwright-report/
+test-results/
 
 # Environment
 .env

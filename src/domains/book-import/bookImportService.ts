@@ -192,8 +192,20 @@ export const bookImportService = {
         });
       }),
     );
-    emitProgress(options.onProgress, { progress: 96, stage: 'finalizing' });
-    emitProgress(options.onProgress, { progress: 100, stage: 'finalizing' });
+    emitProgress(options.onProgress, {
+      progress: 96,
+      stage: 'finalizing',
+      detail: 'Building gallery index',
+      current: normalizedChapters.length,
+      total: normalizedChapters.length,
+    });
+    emitProgress(options.onProgress, {
+      progress: 100,
+      stage: 'finalizing',
+      detail: 'Prepared import payload',
+      current: normalizedChapters.length,
+      total: normalizedChapters.length,
+    });
 
     return {
       title: parsed.title,

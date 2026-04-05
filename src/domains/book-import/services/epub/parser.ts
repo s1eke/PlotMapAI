@@ -2,7 +2,7 @@ import type { WorkerTaskOptions } from '@infra/workers';
 import type { PurifyRule } from '@shared/text-processing';
 import type { ParsedBook } from '../bookParser';
 import type { BookImportProgress } from '../progress';
-import { runParseEpubTask } from '../../workers/epubClient';
+import { parseEpubCore } from './core';
 
 export { parseEpubCore } from './core';
 
@@ -12,8 +12,9 @@ export function parseEpub(
     purificationRules?: PurifyRule[];
   } = {},
 ): Promise<ParsedBook> {
-  return runParseEpubTask({
-    file,
+  return parseEpubCore(file, {
+    signal: options.signal,
+    onProgress: options.onProgress,
     purificationRules: options.purificationRules,
-  }, options);
+  });
 }

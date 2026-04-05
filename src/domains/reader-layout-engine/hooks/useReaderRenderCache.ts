@@ -10,6 +10,7 @@ import {
   debugFeatureSubscribe,
   debugLog,
   isDebugFeatureEnabled,
+  setDebugSnapshot,
 } from '@shared/debug';
 
 import { clearReaderRenderCacheMemoryForNovel } from '../utils/readerRenderCache';
@@ -203,16 +204,16 @@ export function useReaderRenderCache({
   });
 
   useEffect(() => {
-    if (!readerTelemetryEnabled) {
-      return;
-    }
-
     const snapshot: ReaderLayoutSnapshot = {
       ...layoutSnapshot,
+      novelId,
       pendingPreheatCount: pendingPreheatCountRef.current,
     };
-    debugLog('READER', 'Reader layout snapshot', snapshot);
-  }, [layoutSnapshot, readerTelemetryEnabled]);
+    setDebugSnapshot('reader-layout', snapshot);
+    if (readerTelemetryEnabled) {
+      debugLog('READER', 'Reader layout snapshot', snapshot);
+    }
+  }, [layoutSnapshot, novelId, readerTelemetryEnabled]);
 
   useEffect(() => {
     return () => {

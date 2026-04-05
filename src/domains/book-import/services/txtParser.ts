@@ -38,8 +38,11 @@ export async function parseTxt(
       signal: options.signal,
       onProgress: (progress) => {
         options.onProgress?.({
+          current: progress.current,
+          detail: progress.detail,
           progress: progress.progress,
           stage: progress.stage as BookImportProgress['stage'],
+          total: progress.total,
         });
       },
     },

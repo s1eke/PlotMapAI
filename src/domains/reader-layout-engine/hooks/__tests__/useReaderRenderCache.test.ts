@@ -2,6 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const debugLogMock = vi.hoisted(() => vi.fn());
+const setDebugSnapshotMock = vi.hoisted(() => vi.fn());
 const debugFeatureState = vi.hoisted(() => {
   const listeners = new Set<(featureFlags: {
     readerLegacyPlainScroll: boolean;
@@ -294,6 +295,7 @@ vi.mock('@shared/debug', () => ({
   debugFeatureSubscribe: debugFeatureState.subscribe,
   debugLog: debugLogMock,
   isDebugFeatureEnabled: debugFeatureState.isEnabled,
+  setDebugSnapshot: setDebugSnapshotMock,
 }));
 
 vi.mock('../../utils/readerImageResourceCache', () => imageCacheMock);
@@ -709,16 +711,34 @@ describe('useReaderRenderCache', () => {
     });
 
     await waitFor(() => {
+      expect(setDebugSnapshotMock).toHaveBeenCalledWith(
+        'reader-layout',
+        expect.objectContaining({
+          contentFormat: 'plain',
+          layoutFeatureSet: 'scroll-legacy-plain',
+          novelId: 1,
+          pendingPreheatCount: expect.any(Number),
+          richBlockCount: 0,
+          unsupportedBlockCount: 0,
+        }),
+      );
       expect(debugLogMock).toHaveBeenCalledWith(
         'READER',
         'Reader layout snapshot',
         expect.objectContaining({
           activeVariant: 'original-scroll',
           cacheModel: 'layered-render-cache',
+          contentFormat: 'plain',
           currentPagedPageCount: 0,
           currentPagedPageItemCount: 0,
+          layoutFeatureSet: 'scroll-legacy-plain',
+          novelId: 1,
+          pagedDowngradeCount: 0,
+          pagedFallbackCount: 0,
+          richBlockCount: 0,
           scrollBlockCount: 0,
           scrollChapterCount: 1,
+          unsupportedBlockCount: 0,
           visibleCacheSources: {
             built: 1,
             dexie: 0,

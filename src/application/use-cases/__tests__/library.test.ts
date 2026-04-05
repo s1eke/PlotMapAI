@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { bookLifecycleService } from '@application/services/bookLifecycleService';
 import { analysisService } from '@domains/analysis';
+import { chapterRichContentRepository } from '@domains/book-content';
 import { novelRepository } from '@domains/library';
 import {
   ensureDefaultPurificationRules,
@@ -15,6 +16,7 @@ import {
   deleteNovelAndCleanupArtifacts,
   importBookAndRefreshLibrary,
   loadBookDetailPageData,
+  reparseBookAndRefreshDetail,
 } from '../library';
 
 vi.mock('@domains/analysis', () => ({
@@ -27,6 +29,7 @@ vi.mock('@application/services/bookLifecycleService', () => ({
   bookLifecycleService: {
     deleteNovel: vi.fn(),
     importBook: vi.fn(),
+    reparseBook: vi.fn(),
   },
 }));
 
@@ -37,8 +40,10 @@ vi.mock('@domains/library', () => ({
   },
 }));
 
-vi.mock('@application/services/readerContentController', () => ({
-  loadPurifiedBookChapters: vi.fn(),
+vi.mock('@domains/book-content', () => ({
+  chapterRichContentRepository: {
+    listNovelChapterRichContents: vi.fn(),
+  },
 }));
 
 vi.mock('@domains/settings', () => ({
@@ -103,6 +108,7 @@ describe('application library use-cases', () => {
     await db.delete();
     await db.open();
     vi.mocked(analysisService.getStatus).mockResolvedValue(createStatusResponse());
+    vi.mocked(chapterRichContentRepository.listNovelChapterRichContents).mockResolvedValue([]);
     vi.mocked(bookLifecycleService.deleteNovel).mockResolvedValue({ message: 'Novel deleted' });
   });
 
@@ -150,19 +156,83 @@ describe('application library use-cases', () => {
       code: 'ANALYSIS_EXECUTION_FAILED',
       userMessageKey: 'bookDetail.analysisLoadError',
     });
+    expect(data.contentSummary).toEqual({
+      contentFormat: 'plain',
+      contentVersion: null,
+      importFormatVersion: null,
+      lastParsedAt: null,
+    });
   });
 
-  it('loadBookDetailPageData returns novel and analysis data without touching cover resources', async () => {
+  it('loadBookDetailPageData returns novel, analysis data, and rich content summary', async () => {
     vi.mocked(novelRepository.get).mockResolvedValue({
       ...baseNovel,
       hasCover: true,
     });
+    vi.mocked(chapterRichContentRepository.listNovelChapterRichContents).mockResolvedValue([
+      {
+        chapterIndex: 0,
+        contentFormat: 'plain',
+        contentVersion: 1,
+        importFormatVersion: 1,
+        plainText: 'Chapter one',
+        richBlocks: [],
+        updatedAt: '2026-04-01T10:00:00.000Z',
+      },
+      {
+        chapterIndex: 1,
+        contentFormat: 'rich',
+        contentVersion: 4,
+        importFormatVersion: 3,
+        plainText: 'Chapter two',
+        richBlocks: [],
+        updatedAt: '2026-04-02T12:30:00.000Z',
+      },
+    ]);
 
     const data = await loadBookDetailPageData(7);
 
     expect(novelRepository.get).toHaveBeenCalledWith(7);
+    expect(chapterRichContentRepository.listNovelChapterRichContents).toHaveBeenCalledWith(7);
     expect(data.analysisStatus).toEqual(createStatusResponse());
     expect(data.analysisStatusError).toBeNull();
+    expect(data.contentSummary).toEqual({
+      contentFormat: 'rich',
+      contentVersion: 4,
+      importFormatVersion: 3,
+      lastParsedAt: '2026-04-02T12:30:00.000Z',
+    });
+  });
+
+  it('reparseBookAndRefreshDetail resolves rules before overwriting the existing novel', async () => {
+    const file = new File(['book'], 'book.txt', { type: 'text/plain' });
+    vi.mocked(ensureDefaultTocRules).mockResolvedValue(undefined);
+    vi.mocked(ensureDefaultPurificationRules).mockResolvedValue(undefined);
+    vi.mocked(tocRuleRepository.getEnabledChapterDetectionRules).mockResolvedValue([
+      { rule: '^Chapter', source: 'default' },
+    ]);
+    vi.mocked(purificationRuleRepository.getEnabledPurificationRules).mockResolvedValue([]);
+    vi.mocked(bookLifecycleService.reparseBook).mockResolvedValue(baseNovel);
+
+    const novel = await reparseBookAndRefreshDetail(7, file, {
+      onProgress: vi.fn(),
+    });
+
+    expect(ensureDefaultTocRules).toHaveBeenCalledTimes(1);
+    expect(ensureDefaultPurificationRules).toHaveBeenCalledTimes(1);
+    expect(bookLifecycleService.reparseBook).toHaveBeenCalledWith(
+      7,
+      file,
+      [{ rule: '^Chapter', source: 'default' }],
+      {
+        onProgress: expect.any(Function),
+        purificationRules: [],
+      },
+    );
+    expect(novel).toMatchObject({
+      id: 7,
+      title: 'Imported Novel',
+    });
   });
 
   it('deleteNovelAndCleanupArtifacts clears analysis and reader state before deleting the novel aggregate', async () => {

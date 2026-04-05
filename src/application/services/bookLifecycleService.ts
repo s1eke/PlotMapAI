@@ -18,6 +18,7 @@ import {
 import { clearReaderImageResourcesForNovel } from '@domains/reader-media';
 import { deleteReadingProgress } from '@domains/reader-session';
 import type { ChapterDetectionRule } from '@shared/text-processing';
+import { AppErrorCode, createAppError } from '@shared/errors';
 import { db } from '@infra/db';
 import { clearReaderBootstrapSnapshot } from '@infra/storage/readerStateCache';
 
@@ -80,6 +81,85 @@ export const bookLifecycleService = {
 
     clearReaderRenderCacheMemoryForNovel(novelId);
     clearReaderBootstrapSnapshot(novelId);
+    return novelRepository.get(novelId);
+  },
+
+  async reparseBook(
+    novelId: number,
+    file: File,
+    tocRules: ChapterDetectionRule[],
+    options: ImportBookOptions = {},
+  ): Promise<NovelView> {
+    const existingNovel = await novelRepository.get(novelId);
+    const nextFileType = file.name.toLowerCase().split('.').pop();
+    if (!nextFileType || nextFileType !== existingNovel.fileType.toLowerCase()) {
+      throw createAppError({
+        code: AppErrorCode.UNSUPPORTED_FILE_TYPE,
+        kind: 'validation',
+        source: 'book-import',
+        userMessageKey: 'bookDetail.reparseFileTypeMismatch',
+        debugMessage: 'Selected reparse file type does not match the imported novel type.',
+        details: {
+          expectedFileType: existingNovel.fileType,
+          filename: file.name,
+          novelId,
+          receivedFileType: nextFileType ?? '',
+        },
+      });
+    }
+
+    const prepared = await bookImportService.parseBookImport(file, tocRules, options);
+
+    await db.transaction(
+      'rw',
+      [
+        db.analysisJobs,
+        db.analysisChunks,
+        db.analysisOverviews,
+        db.chapterAnalyses,
+        db.readingProgress,
+        db.readerRenderCache,
+        db.novels,
+        db.coverImages,
+        db.chapterRichContents,
+        db.chapters,
+        db.chapterImages,
+        db.novelImageGalleryEntries,
+      ],
+      async () => {
+        const transaction = getRequiredTransaction();
+        await analysisService.deleteArtifacts(novelId, transaction);
+        await deleteReadingProgress(novelId, transaction);
+        await novelRepository.replaceImportedNovel(novelId, {
+          title: prepared.title,
+          author: prepared.author,
+          description: prepared.description,
+          tags: prepared.tags,
+          fileType: prepared.fileType,
+          fileHash: prepared.fileHash,
+          originalFilename: prepared.originalFilename,
+          originalEncoding: prepared.originalEncoding,
+          totalWords: prepared.totalWords,
+          chapterCount: prepared.chapterCount,
+          coverBlob: prepared.coverBlob,
+        }, transaction);
+        await bookContentRepository.replaceNovelContent(novelId, {
+          chapters: prepared.chapters,
+          images: prepared.images,
+          imageGalleryEntries: prepared.imageGalleryEntries,
+        }, transaction);
+        await chapterRichContentRepository.replaceNovelChapterRichContents(novelId, {
+          chapters: prepared.chapterRichContents,
+        }, transaction);
+        await deletePersistedReaderRenderCache(novelId, transaction);
+      },
+    );
+
+    clearNovelCoverResourcesForNovel(novelId);
+    clearReaderRenderCacheMemoryForNovel(novelId);
+    clearReaderImageResourcesForNovel(novelId);
+    clearReaderBootstrapSnapshot(novelId);
+
     return novelRepository.get(novelId);
   },
 

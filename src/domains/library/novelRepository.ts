@@ -37,6 +37,8 @@ export interface CreateImportedNovelInput {
   totalWords: number;
 }
 
+export interface ReplaceImportedNovelInput extends CreateImportedNovelInput {}
+
 export interface DeleteNovelOptions {
   releaseCoverResources?: boolean;
   transaction?: Transaction;
@@ -84,6 +86,51 @@ async function createImportedNovelRecord(
   }
 
   return novelId;
+}
+
+async function replaceImportedNovelRecord(
+  id: number,
+  input: ReplaceImportedNovelInput,
+  transaction?: Transaction,
+): Promise<void> {
+  const novelTable = getNovelTable(transaction);
+  const coverImageTable = getCoverImageTable(transaction);
+  const existingNovel = await novelTable.get(id);
+
+  if (!existingNovel) {
+    throw createAppError({
+      code: AppErrorCode.NOVEL_NOT_FOUND,
+      kind: 'not-found',
+      source: 'library',
+      userMessageKey: 'errors.NOVEL_NOT_FOUND',
+      debugMessage: 'Novel not found',
+      details: { novelId: id },
+    });
+  }
+
+  await novelTable.put({
+    ...existingNovel,
+    title: input.title,
+    author: input.author,
+    description: input.description,
+    tags: input.tags,
+    fileType: input.fileType,
+    fileHash: input.fileHash,
+    coverPath: input.coverBlob ? 'has_cover' : '',
+    originalFilename: input.originalFilename,
+    originalEncoding: input.originalEncoding,
+    totalWords: input.totalWords,
+    chapterCount: input.chapterCount,
+  });
+
+  await coverImageTable.where('novelId').equals(id).delete();
+
+  if (input.coverBlob) {
+    await coverImageTable.add({
+      novelId: id,
+      blob: input.coverBlob,
+    } satisfies Omit<CoverImageRecord, 'id'>);
+  }
 }
 
 async function deleteNovelRecord(
@@ -150,6 +197,21 @@ export const novelRepository = {
       novelId = await createImportedNovelRecord(input);
     });
     return novelId;
+  },
+
+  async replaceImportedNovel(
+    id: number,
+    input: ReplaceImportedNovelInput,
+    transaction?: Transaction,
+  ): Promise<void> {
+    if (transaction) {
+      await replaceImportedNovelRecord(id, input, transaction);
+      return;
+    }
+
+    await db.transaction('rw', [db.novels, db.coverImages], async () => {
+      await replaceImportedNovelRecord(id, input);
+    });
   },
 
   async delete(id: number, options: DeleteNovelOptions = {}): Promise<{ message: string }> {

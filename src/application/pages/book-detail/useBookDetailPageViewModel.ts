@@ -13,9 +13,14 @@ import { useNovelCoverResource } from '@domains/library';
 import { reportAppError } from '@shared/debug';
 import { AppErrorCode, toAppError } from '@shared/errors';
 
-import type { BookDetailPageViewModel, BookDetailParagraph } from './types';
+import type {
+  BookDetailContentSummary,
+  BookDetailPageViewModel,
+  BookDetailParagraph,
+} from './types';
 import { useBookDetailAnalysisController } from './useBookDetailAnalysisController';
 import { useBookDetailDeleteFlow } from './useBookDetailDeleteFlow';
+import { useBookDetailReparseController } from './useBookDetailReparseController';
 
 function isValidNovelId(novelId: number): boolean {
   return Number.isFinite(novelId) && novelId > 0;
@@ -76,12 +81,24 @@ function createInvalidNovelError(): AppError {
   });
 }
 
+function createEmptyContentSummary(): BookDetailContentSummary {
+  return {
+    contentFormat: 'plain',
+    contentVersion: null,
+    importFormatVersion: null,
+    lastParsedAt: null,
+  };
+}
+
 export function useBookDetailPageViewModel(novelId: number): BookDetailPageViewModel {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [novel, setNovel] = useState<NovelView | null>(null);
   const [analysisStatus, setAnalysisStatus] = useState<AnalysisStatusResponse | null>(null);
   const [analysisStatusError, setAnalysisStatusError] = useState<AppError | null>(null);
+  const [contentSummary, setContentSummary] = useState<BookDetailContentSummary>(
+    createEmptyContentSummary,
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [isAnalysisLoading, setIsAnalysisLoading] = useState(true);
   const [error, setError] = useState<AppError | null>(null);
@@ -92,6 +109,7 @@ export function useBookDetailPageViewModel(novelId: number): BookDetailPageViewM
       setNovel(null);
       setAnalysisStatus(null);
       setAnalysisStatusError(null);
+      setContentSummary(createEmptyContentSummary());
       setError(createInvalidNovelError());
       setIsLoading(false);
       setIsAnalysisLoading(false);
@@ -107,6 +125,7 @@ export function useBookDetailPageViewModel(novelId: number): BookDetailPageViewM
       setNovel(data.novel);
       setAnalysisStatus(data.analysisStatus);
       setAnalysisStatusError(data.analysisStatusError);
+      setContentSummary(data.contentSummary);
       if (data.analysisStatusError) {
         reportAppError(data.analysisStatusError);
       }
@@ -122,6 +141,7 @@ export function useBookDetailPageViewModel(novelId: number): BookDetailPageViewM
       setNovel(null);
       setAnalysisStatus(null);
       setAnalysisStatusError(null);
+      setContentSummary(createEmptyContentSummary());
     } finally {
       setIsLoading(false);
       setIsAnalysisLoading(false);
@@ -212,6 +232,11 @@ export function useBookDetailPageViewModel(novelId: number): BookDetailPageViewM
     novelId,
     onStatusUpdated: updateAnalysisStatus,
   });
+  const reparseController = useBookDetailReparseController({
+    fileType: novel?.fileType ?? 'epub',
+    novelId,
+    onReparsed: loadData,
+  });
   const deleteFlow = useBookDetailDeleteFlow({
     novelId,
     novelTitle: novel?.title ?? '',
@@ -225,6 +250,7 @@ export function useBookDetailPageViewModel(novelId: number): BookDetailPageViewM
     analysisStatus,
     analysisStatusError,
     characterChartData,
+    contentSummary,
     coverUrl,
     deleteFlow,
     error,
@@ -238,5 +264,6 @@ export function useBookDetailPageViewModel(novelId: number): BookDetailPageViewM
     novel,
     overview,
     pageHrefs,
+    reparseController,
   };
 }

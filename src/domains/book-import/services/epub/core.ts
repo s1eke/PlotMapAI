@@ -120,7 +120,11 @@ export async function parseEpubCore(
     signal,
   } = options;
 
-  emitProgress(onProgress, { progress: 5, stage: 'hashing' });
+  emitProgress(onProgress, {
+    progress: 5,
+    stage: 'hashing',
+    detail: file.name,
+  });
   const fileBuffer = await file.arrayBuffer();
   const fileHashPromise = computeHash(fileBuffer);
 
@@ -152,8 +156,11 @@ export async function parseEpubCore(
   for (let index = 0; index < orderedItems.length; index += 1) {
     throwIfAborted(signal);
     emitProgress(onProgress, {
+      current: index + 1,
+      detail: orderedItems[index]?.href,
       progress: 50 + Math.round((index / totalItems) * 32),
       stage: 'chapters',
+      total: totalItems,
     });
 
     const item = orderedItems[index];
@@ -196,12 +203,23 @@ export async function parseEpubCore(
     }
 
     if (chapter) {
+      emitProgress(onProgress, {
+        current: index + 1,
+        detail: chapter.title,
+        progress: 50 + Math.round(((index + 1) / totalItems) * 32),
+        stage: 'chapters',
+        total: totalItems,
+      });
       chapters.push(chapter);
     }
   }
 
   throwIfAborted(signal);
-  emitProgress(onProgress, { progress: 86, stage: 'images' });
+  emitProgress(onProgress, {
+    progress: 86,
+    stage: 'images',
+    detail: `${images.length} extracted`,
+  });
   const coverBlob = await extractCoverBlob(opfPackage).catch(() => null);
 
   const normalizedDescription = description && description.includes('<')
@@ -209,10 +227,18 @@ export async function parseEpubCore(
     : description;
 
   throwIfAborted(signal);
-  emitProgress(onProgress, { progress: 96, stage: 'finalizing' });
+  emitProgress(onProgress, {
+    progress: 96,
+    stage: 'finalizing',
+    detail: `${chapters.length} chapters`,
+  });
   const fileHash = await fileHashPromise;
 
-  emitProgress(onProgress, { progress: 100, stage: 'finalizing' });
+  emitProgress(onProgress, {
+    progress: 100,
+    stage: 'finalizing',
+    detail: title,
+  });
   return {
     title,
     author,

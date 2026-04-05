@@ -15,8 +15,11 @@ import type {
 } from './types';
 
 export interface TextProcessingProgress {
+  current?: number;
+  detail?: string;
   progress: number;
   stage: string;
+  total?: number;
 }
 
 export interface ParseTxtPayload {

@@ -1,3 +1,4 @@
+import type { BookImportProgress } from '@domains/book-import';
 import type { LucideIcon } from 'lucide-react';
 import type {
   AnalysisJobStatus,
@@ -23,6 +24,7 @@ export interface BookDetailPageViewModel {
   analysisStatus: AnalysisStatusResponse | null;
   analysisStatusError: AppError | null;
   characterChartData: AnalysisOverview['characterStats'];
+  contentSummary: BookDetailContentSummary;
   coverUrl: string | null;
   deleteFlow: BookDetailDeleteFlow;
   error: AppError | null;
@@ -36,10 +38,18 @@ export interface BookDetailPageViewModel {
   novel: NovelView | null;
   overview: AnalysisOverview | null;
   pageHrefs: BookDetailPageHrefs;
+  reparseController: BookDetailReparseController;
 }
 
 export type BookDetailAnalysisAction = 'start' | 'pause' | 'resume' | 'restart';
 export type BookDetailActionTone = 'neutral' | 'brand' | 'brand-soft' | 'warning' | 'danger';
+
+export interface BookDetailContentSummary {
+  contentFormat: 'plain' | 'rich';
+  contentVersion: number | null;
+  importFormatVersion: number | null;
+  lastParsedAt: string | null;
+}
 
 export interface BookDetailAnalysisActionButtonModel {
   disabled: boolean;
@@ -56,6 +66,16 @@ export interface BookDetailAnalysisController {
   actionMessage: string | null;
   primaryAction: BookDetailAnalysisActionButtonModel | null;
   restartAction: BookDetailAnalysisActionButtonModel | null;
+}
+
+export interface BookDetailReparseController {
+  accept: string;
+  actionError: AppError | null;
+  actionMessage: string | null;
+  currentFileName: string | null;
+  isReparsing: boolean;
+  onFilesSelected: (files: FileList | null) => void | Promise<void>;
+  progress: BookImportProgress | null;
 }
 
 export interface BookDetailDeleteFlow {
