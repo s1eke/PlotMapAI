@@ -45,6 +45,7 @@ describe('rich content shared contracts', () => {
     const richBlocks = [
       {
         type: 'heading',
+        anchorId: 'chapter-heading',
         level: 2,
         align: 'center',
         children: [textInline],
@@ -93,6 +94,7 @@ describe('rich content shared contracts', () => {
       },
       {
         type: 'hr',
+        anchorId: 'divider',
       },
       {
         type: 'poem',
@@ -103,6 +105,7 @@ describe('rich content shared contracts', () => {
       },
       {
         type: 'table',
+        anchorId: 'table-1',
         rows: [
           [
             {
@@ -159,6 +162,7 @@ describe('rich content shared contracts', () => {
     const paginationBlocks = [
       {
         type: 'heading',
+        anchorId: 'heading-anchor',
         sourceBlockType: 'heading',
         level: 3,
         children: [
@@ -170,6 +174,7 @@ describe('rich content shared contracts', () => {
       },
       {
         type: 'paragraph',
+        anchorId: 'list-anchor',
         sourceBlockType: 'list',
         container: 'list-item',
         listContext,
@@ -194,6 +199,7 @@ describe('rich content shared contracts', () => {
       },
       {
         type: 'image',
+        anchorId: 'image-anchor',
         sourceBlockType: 'image',
         key: 'map',
         container: 'body',
@@ -206,13 +212,19 @@ describe('rich content shared contracts', () => {
       },
       {
         type: 'hr',
+        anchorId: 'rule-anchor',
         sourceBlockType: 'hr',
       },
       {
-        type: 'unsupported',
+        type: 'table',
+        anchorId: 'table-anchor',
         sourceBlockType: 'table',
-        fallbackText: 'table fallback',
-        originalTag: 'table',
+        rows: [[{
+          children: [{
+            type: 'text',
+            text: 'table fallback',
+          }],
+        }]],
       },
     ] satisfies PaginationBlock[];
 

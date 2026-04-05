@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react';
+import type { RichInline } from '@shared/contracts';
 import type {
   ReaderImagePageItem,
   ReaderTextPageItem,
@@ -19,6 +20,7 @@ import {
   formatRichScrollListMarker,
   resolveRichScrollBlockInsets,
 } from '../../utils/richScroll';
+import RichInlineRenderer from './RichInlineRenderer';
 
 interface ReaderFlowBlockProps {
   chapterTitle?: string;
@@ -35,6 +37,7 @@ interface ReaderFlowBlockProps {
 
 interface RenderImageItem {
   align?: 'left' | 'center' | 'right';
+  anchorId?: string;
   blockIndex: number;
   captionFont?: string;
   captionFontSizePx?: number;
@@ -52,6 +55,7 @@ interface RenderImageItem {
 
 interface RenderTextItem {
   align?: 'left' | 'center' | 'right';
+  anchorId?: string;
   blockIndex: number;
   blockquoteDepth?: number;
   container?: ReaderTextPageItem['container'];
@@ -69,8 +73,28 @@ interface RenderTextItem {
   marginBefore: number;
   originalTag?: string;
   renderRole?: ReaderTextPageItem['renderRole'];
+  richLineFragments?: ReaderTextPageItem['richLineFragments'];
   showListMarker?: boolean;
+  tableRowHeights?: number[];
+  tableRows?: ReaderTextPageItem['tableRows'];
   text: string;
+}
+
+const TABLE_CELL_HORIZONTAL_PADDING_PX = 12;
+const TABLE_CELL_VERTICAL_PADDING_PX = 10;
+
+function serializeInlineKey(children: RichInline[]): string {
+  return children.map((child) => {
+    if (child.type === 'text') {
+      return child.text;
+    }
+
+    if (child.type === 'lineBreak') {
+      return '\n';
+    }
+
+    return `${child.href}:${serializeInlineKey(child.children)}`;
+  }).join('');
 }
 
 function serializeTextLines(lines: StaticTextLine[]): string {
@@ -81,6 +105,38 @@ function serializeTextLines(lines: StaticTextLine[]): string {
   return lines
     .map((line) => (line.text.length > 0 ? line.text : '\u00a0'))
     .join('\n');
+}
+
+function renderRichLineFragments(
+  richLineFragments: NonNullable<ReaderTextPageItem['richLineFragments']>,
+  keyPrefix: string,
+  firstLineIndent?: number,
+) {
+  const lineCounts = new Map<string, number>();
+
+  return richLineFragments.map((line, index) => {
+    const lineSignature = serializeInlineKey(line);
+    const lineOccurrence = lineCounts.get(lineSignature) ?? 0;
+    lineCounts.set(lineSignature, lineOccurrence + 1);
+    const lineKey = `${keyPrefix}:line:${lineSignature}:${lineOccurrence}`;
+
+    return (
+      <span
+        key={lineKey}
+        className="block overflow-hidden whitespace-pre"
+        style={typeof firstLineIndent === 'number' && index === 0
+          ? { paddingLeft: `${firstLineIndent}em` }
+          : undefined}
+      >
+        {line.length > 0 ? (
+          <RichInlineRenderer
+            inlines={line}
+            keyPrefix={lineKey}
+          />
+        ) : '\u00a0'}
+      </span>
+    );
+  });
 }
 
 function ReaderLayoutImage({
@@ -177,6 +233,7 @@ export default function ReaderFlowBlock({
     if (item.block.kind === 'image') {
       imageItem = {
         align: item.block.align,
+        anchorId: item.block.anchorId,
         blockIndex: item.block.blockIndex,
         captionFont: item.captionFont,
         captionFontSizePx: item.captionFontSizePx,
@@ -194,6 +251,7 @@ export default function ReaderFlowBlock({
     } else {
       textItem = {
         align: item.block.align,
+        anchorId: item.block.anchorId,
         blockIndex: item.block.blockIndex,
         blockquoteDepth: item.block.blockquoteDepth,
         container: item.block.container,
@@ -211,7 +269,10 @@ export default function ReaderFlowBlock({
         marginBefore: item.marginBefore,
         originalTag: item.block.originalTag,
         renderRole: item.block.renderRole,
+        richLineFragments: undefined,
         showListMarker: item.block.showListMarker,
+        tableRowHeights: item.tableRowHeights,
+        tableRows: item.block.tableRows,
         text: item.block.text ?? '',
       };
     }
@@ -224,6 +285,7 @@ export default function ReaderFlowBlock({
       const pageImageItem = item as ReaderImagePageItem;
       imageItem = {
         align: pageImageItem.align,
+        anchorId: pageImageItem.anchorId,
         blockIndex: pageImageItem.blockIndex,
         captionFont: pageImageItem.captionFont,
         captionFontSizePx: pageImageItem.captionFontSizePx,
@@ -242,6 +304,7 @@ export default function ReaderFlowBlock({
       const pageTextItem = item as ReaderTextPageItem;
       textItem = {
         align: pageTextItem.align,
+        anchorId: pageTextItem.anchorId,
         blockIndex: pageTextItem.blockIndex,
         blockquoteDepth: pageTextItem.blockquoteDepth,
         container: pageTextItem.container,
@@ -259,7 +322,10 @@ export default function ReaderFlowBlock({
         marginBefore: pageTextItem.marginBefore,
         originalTag: pageTextItem.originalTag,
         renderRole: pageTextItem.renderRole,
+        richLineFragments: pageTextItem.richLineFragments,
         showListMarker: pageTextItem.showListMarker,
+        tableRowHeights: pageTextItem.tableRowHeights,
+        tableRows: pageTextItem.tableRows,
         text: pageTextItem.text,
       };
     }
@@ -271,6 +337,7 @@ export default function ReaderFlowBlock({
 
     return (
       <div
+        id={imageItem.anchorId}
         className={cn('flex items-center overflow-visible', resolveImageJustifyClass(imageItem.align))}
         style={{
           ...positionStyle,
@@ -386,6 +453,9 @@ export default function ReaderFlowBlock({
     ? Math.max(0, insets.listInset - insets.markerWidth - insets.markerGap) + insets.poemInset
     : insets.poemInset;
   const serializedText = serializeTextLines(textItem.lines);
+  const hasRichLineFragments = Boolean(
+    textItem.richLineFragments?.some((line) => line.length > 0),
+  );
   let renderedText = serializedText;
   if (textItem.kind === 'heading') {
     renderedText = textItem.blockIndex === 0
@@ -396,6 +466,7 @@ export default function ReaderFlowBlock({
   if (textItem.renderRole === 'hr') {
     return (
       <div
+        id={textItem.anchorId}
         style={{
           ...positionStyle,
           height: textItem.height,
@@ -413,6 +484,92 @@ export default function ReaderFlowBlock({
     );
   }
 
+  if (textItem.renderRole === 'table' && textItem.tableRows) {
+    const rowCounts = new Map<string, number>();
+    let content = (
+      <div
+        data-testid="reader-flow-table"
+        className="h-full overflow-x-auto rounded-xl border border-border-color/40 bg-surface/60 px-1 py-1 shadow-sm"
+      >
+        <table
+          className="min-w-full table-fixed border-collapse"
+          style={{
+            ...textStyle,
+          }}
+        >
+          <tbody>
+            {textItem.tableRows.map((row, rowIndex) => {
+              const rowSignature = row.map((cell) => serializeInlineKey(cell.children)).join('|');
+              const rowOccurrence = rowCounts.get(rowSignature) ?? 0;
+              rowCounts.set(rowSignature, rowOccurrence + 1);
+              const rowKey = `${textItem.blockIndex}:row:${rowSignature}:${rowOccurrence}`;
+              const cellCounts = new Map<string, number>();
+
+              return (
+                <tr
+                  key={rowKey}
+                  style={textItem.tableRowHeights?.[rowIndex]
+                    ? { height: `${textItem.tableRowHeights[rowIndex]}px` }
+                    : undefined}
+                >
+                  {row.map((cell) => {
+                    const cellSignature = serializeInlineKey(cell.children);
+                    const cellOccurrence = cellCounts.get(cellSignature) ?? 0;
+                    cellCounts.set(cellSignature, cellOccurrence + 1);
+                    const cellKey = `${rowKey}:cell:${cellSignature}:${cellOccurrence}`;
+
+                    return (
+                      <td
+                        key={cellKey}
+                        className="border border-border-color/30 align-top text-left"
+                        style={{
+                          padding: `${TABLE_CELL_VERTICAL_PADDING_PX}px ${TABLE_CELL_HORIZONTAL_PADDING_PX}px`,
+                        }}
+                      >
+                        <RichInlineRenderer
+                          inlines={cell.children}
+                          keyPrefix={cellKey}
+                        />
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    );
+
+    if ((textItem.blockquoteDepth ?? 0) > 0) {
+      content = (
+        <div
+          className="h-full border-l border-border-color/40"
+          style={{
+            paddingLeft: `${Math.max(0, insets.quoteInset - 1)}px`,
+          }}
+        >
+          {content}
+        </div>
+      );
+    }
+
+    return (
+      <div
+        id={textItem.anchorId}
+        style={{
+          ...positionStyle,
+          height: textItem.height,
+          paddingBottom: textItem.marginAfter,
+          paddingRight: insets.end,
+          paddingTop: textItem.marginBefore,
+        }}
+      >
+        {content}
+      </div>
+    );
+  }
+
   let content = textItem.kind === 'heading'
     ? (() => {
       const TagName = getHeadingTagName(textItem.headingLevel);
@@ -424,10 +581,15 @@ export default function ReaderFlowBlock({
             ...textStyle,
             overflow: 'hidden',
             overflowWrap: 'anywhere',
-            whiteSpace: 'pre-wrap',
+            whiteSpace: hasRichLineFragments ? undefined : 'pre-wrap',
           }}
         >
-          {renderedText}
+          {hasRichLineFragments && textItem.blockIndex !== 0
+            ? renderRichLineFragments(
+              textItem.richLineFragments ?? [],
+              `${textItem.blockIndex}:heading`,
+            )
+            : renderedText}
         </TagName>
       );
     })()
@@ -442,13 +604,23 @@ export default function ReaderFlowBlock({
         style={{
           ...textStyle,
           overflow: 'hidden',
-          textIndent: typeof textItem.indent === 'number' && textItem.lineStartIndex === 0
+          textIndent: !hasRichLineFragments
+            && typeof textItem.indent === 'number'
+            && textItem.lineStartIndex === 0
             ? `${textItem.indent}em`
             : undefined,
-          whiteSpace: 'pre',
+          whiteSpace: hasRichLineFragments ? undefined : 'pre',
         }}
       >
-        {renderedText}
+        {hasRichLineFragments
+          ? renderRichLineFragments(
+            textItem.richLineFragments ?? [],
+            `${textItem.blockIndex}:text`,
+            typeof textItem.indent === 'number' && textItem.lineStartIndex === 0
+              ? textItem.indent
+              : undefined,
+          )
+          : renderedText}
       </div>
     );
 
@@ -504,6 +676,7 @@ export default function ReaderFlowBlock({
 
   return (
     <div
+      id={textItem.anchorId}
       style={{
         ...positionStyle,
         height: textItem.height,

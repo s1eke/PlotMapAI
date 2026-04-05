@@ -22,6 +22,8 @@ const RICH_HEADING_TOP_MARGIN_PX = 10;
 const RICH_HORIZONTAL_RULE_HEIGHT_PX = 1;
 const RICH_HORIZONTAL_RULE_MARGIN_AFTER_PX = 20;
 const RICH_HORIZONTAL_RULE_MARGIN_BEFORE_PX = 12;
+const RICH_TABLE_MARGIN_AFTER_PX = 16;
+const RICH_TABLE_MARGIN_BEFORE_PX = 12;
 
 export interface RichScrollBlockInsets {
   end: number;
@@ -123,6 +125,7 @@ export function buildRichScrollReaderBlocks(
         || entry.block.type === 'image'
         ? entry.block.align
         : undefined,
+      anchorId: 'anchorId' in entry.block ? entry.block.anchorId : undefined,
       blockIndex: entry.blockIndex,
       blockquoteDepth: entry.blockquoteDepth,
       chapterIndex: chapter.index,
@@ -170,6 +173,19 @@ export function buildRichScrollReaderBlocks(
         marginBefore: RICH_HORIZONTAL_RULE_MARGIN_BEFORE_PX,
         renderRole: 'hr',
         text: '',
+      };
+    }
+
+    if (entry.block.type === 'table') {
+      return {
+        ...sharedFields,
+        key: `${chapter.index}:rich-table:${entry.blockIndex}`,
+        kind: 'text',
+        marginAfter: RICH_TABLE_MARGIN_AFTER_PX + paragraphSpacing,
+        marginBefore: RICH_TABLE_MARGIN_BEFORE_PX,
+        renderRole: 'table',
+        tableRows: entry.block.rows,
+        text: getPaginationBlockPlainText(entry.block),
       };
     }
 

@@ -67,19 +67,12 @@ export default function BookDetailScreen({
 
         <div className="flex flex-col gap-8 md:flex-row">
           <BookDetailActionPanel
-            currentReparseFileName={viewModel.reparseController.currentFileName}
             characterGraphHref={viewModel.pageHrefs.characterGraph}
             coverUrl={viewModel.coverUrl}
             hasCover={viewModel.novel.hasCover}
             novelTitle={viewModel.novel.title}
             onDeleteRequested={deleteFlow.openDeleteModal}
-            onReparseFilesSelected={viewModel.reparseController.onFilesSelected}
             primaryAction={analysisController.primaryAction}
-            reparseAccept={viewModel.reparseController.accept}
-            reparseError={viewModel.reparseController.actionError}
-            reparseMessage={viewModel.reparseController.actionMessage}
-            reparseProgress={viewModel.reparseController.progress}
-            reparsing={viewModel.reparseController.isReparsing}
             readerHref={viewModel.pageHrefs.reader}
             restartAction={analysisController.restartAction}
           />

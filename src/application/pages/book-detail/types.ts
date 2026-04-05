@@ -1,4 +1,3 @@
-import type { BookImportProgress } from '@domains/book-import';
 import type { LucideIcon } from 'lucide-react';
 import type {
   AnalysisJobStatus,
@@ -38,7 +37,6 @@ export interface BookDetailPageViewModel {
   novel: NovelView | null;
   overview: AnalysisOverview | null;
   pageHrefs: BookDetailPageHrefs;
-  reparseController: BookDetailReparseController;
 }
 
 export type BookDetailAnalysisAction = 'start' | 'pause' | 'resume' | 'restart';
@@ -66,16 +64,6 @@ export interface BookDetailAnalysisController {
   actionMessage: string | null;
   primaryAction: BookDetailAnalysisActionButtonModel | null;
   restartAction: BookDetailAnalysisActionButtonModel | null;
-}
-
-export interface BookDetailReparseController {
-  accept: string;
-  actionError: AppError | null;
-  actionMessage: string | null;
-  currentFileName: string | null;
-  isReparsing: boolean;
-  onFilesSelected: (files: FileList | null) => void | Promise<void>;
-  progress: BookImportProgress | null;
 }
 
 export interface BookDetailDeleteFlow {

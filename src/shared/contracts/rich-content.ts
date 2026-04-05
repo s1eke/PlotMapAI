@@ -2,6 +2,10 @@ export type Mark = 'bold' | 'italic' | 'underline' | 'strike' | 'sup' | 'sub';
 
 export type RichTextAlign = 'left' | 'center' | 'right';
 
+interface RichAnchorTarget {
+  anchorId?: string;
+}
+
 export interface RichTextInline {
   type: 'text';
   text: string;
@@ -23,14 +27,14 @@ export type RichInline =
   | RichLineBreakInline
   | RichLinkInline;
 
-export interface RichHeadingBlock {
+export interface RichHeadingBlock extends RichAnchorTarget {
   type: 'heading';
   level: 1 | 2 | 3 | 4 | 5 | 6;
   children: RichInline[];
   align?: RichTextAlign;
 }
 
-export interface RichParagraphBlock {
+export interface RichParagraphBlock extends RichAnchorTarget {
   type: 'paragraph';
   children: RichInline[];
   align?: RichTextAlign;
@@ -48,7 +52,7 @@ export interface RichListBlock {
   items: RichBlock[][];
 }
 
-export interface RichImageBlock {
+export interface RichImageBlock extends RichAnchorTarget {
   type: 'image';
   key: string;
   alt?: string;
@@ -58,11 +62,11 @@ export interface RichImageBlock {
   align?: RichTextAlign;
 }
 
-export interface RichHorizontalRuleBlock {
+export interface RichHorizontalRuleBlock extends RichAnchorTarget {
   type: 'hr';
 }
 
-export interface RichPoemBlock {
+export interface RichPoemBlock extends RichAnchorTarget {
   type: 'poem';
   lines: RichInline[][];
 }
@@ -71,7 +75,7 @@ export interface RichTableCell {
   children: RichInline[];
 }
 
-export interface RichTableBlock {
+export interface RichTableBlock extends RichAnchorTarget {
   type: 'table';
   rows: RichTableCell[][];
 }

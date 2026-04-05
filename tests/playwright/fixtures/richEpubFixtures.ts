@@ -98,7 +98,13 @@ export const RICH_EPUB_FIXTURES = {
       {
         id: 'chapter-1',
         title: 'Meridian Ledger',
-        bodyHtml: ['<h1>Meridian Ledger</h1>', createParagraphSeries('The observatory ledger kept revising itself', 24)].join('\n'),
+        bodyHtml: [
+          '<h1>Meridian Ledger</h1>',
+          '<p id="signal-note">The observatory ledger kept <strong>revising</strong> itself whenever the eastern shutters sighed.</p>',
+          '<p>Each margin hid an <em>echo</em>, and the brass notation would <u>tilt north</u> before the next bell.</p>',
+          '<p>The night clerk learned to <a href="#signal-note">return to the signal note</a> whenever the page split in two.</p>',
+          createParagraphSeries('The observatory ledger kept revising itself', 21),
+        ].join('\n'),
       },
     ],
   },
@@ -142,10 +148,10 @@ export const RICH_EPUB_FIXTURES = {
       },
     ],
   },
-  tableFallback: {
-    id: 'table-fallback',
-    fileName: 'table-fallback.epub',
-    title: 'Fallback Survey Table',
+  simpleTable: {
+    id: 'simple-table',
+    fileName: 'simple-table.epub',
+    title: 'Survey Table Ledger',
     chapters: [
       {
         id: 'chapter-1',
@@ -209,17 +215,25 @@ export const RICH_EPUB_FIXTURES = {
       },
     ],
   },
-  poemSeed: {
-    id: 'poem-seed',
-    fileName: 'poem-seed.epub',
-    title: 'Poem Seed Archive',
+  linkedStructures: {
+    id: 'linked-structures',
+    fileName: 'linked-structures.epub',
+    title: 'Linked Survey Register',
     chapters: [
       {
         id: 'chapter-1',
-        title: 'Poem Seed',
+        title: 'Linked Survey',
         bodyHtml: [
-          '<h1>Poem Seed</h1>',
-          '<p>Seed content before poem projection.</p>',
+          '<h1>Linked Survey</h1>',
+          '<p id="intro">The harbor watch began at the tide gate, where every lantern carried a second set of instructions.</p>',
+          '<p><a href="#intro">Return to the gate note</a> before the route ledger resumed.</p>',
+          '<hr id="divider" />',
+          '<table>',
+          '<tr><th>Route</th><th>Status</th></tr>',
+          '<tr><td>North Lock</td><td>Open</td></tr>',
+          '<tr><td>Canal Gate</td><td>Delayed</td></tr>',
+          '</table>',
+          '<p>The survey clerks copied each change twice so the bridge runners could compare them at dawn.</p>',
         ].join('\n'),
       },
     ],

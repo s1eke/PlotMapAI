@@ -41,7 +41,6 @@ const UNSUPPORTED_BLOCK_TAG_NAMES = new Set([
   'dl',
   'fieldset',
   'form',
-  'hr',
   'iframe',
   'math',
   'object',
@@ -49,9 +48,17 @@ const UNSUPPORTED_BLOCK_TAG_NAMES = new Set([
   'pre',
   'ruby',
   'svg',
-  'table',
   'video',
 ]);
+
+const TABLE_SECTION_TAG_NAMES = new Set(['tbody', 'tfoot', 'thead']);
+const ELEMENT_NODE = 1;
+const TEXT_NODE = 3;
+
+function getElementChildren(parent: Element): Element[] {
+  return Array.from(parent.childNodes)
+    .filter((child): child is Element => child.nodeType === ELEMENT_NODE);
+}
 
 function normalizeInlineWhitespace(value: string): string {
   return value.replace(/\s+/gu, ' ');
@@ -134,6 +141,25 @@ function readParagraphIndent(element: Element): number | undefined {
 
   const parsedValue = readDimension(rawValue);
   return parsedValue !== undefined && parsedValue > 0 ? parsedValue : undefined;
+}
+
+function readAnchorId(element: Element): string | undefined {
+  const rawAnchorId = element.getAttribute('id')?.trim();
+  return rawAnchorId || undefined;
+}
+
+function extractInternalHrefTarget(value: string | null): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const trimmedValue = value.trim();
+  if (!trimmedValue.startsWith('#')) {
+    return undefined;
+  }
+
+  const targetId = trimmedValue.slice(1).trim();
+  return targetId.length > 0 ? targetId : undefined;
 }
 
 function pushUniqueMark(marks: Mark[], mark: Mark): void {
@@ -220,6 +246,46 @@ function createUnsupportedBlock(element: Element): RichBlock[] {
   }];
 }
 
+function attachAnchorIdToBlock<T extends RichBlock>(
+  block: T,
+  anchorId: string | undefined,
+): T {
+  if (!anchorId) {
+    return block;
+  }
+
+  if (
+    block.type === 'heading'
+    || block.type === 'paragraph'
+    || block.type === 'image'
+    || block.type === 'hr'
+    || block.type === 'poem'
+    || block.type === 'table'
+  ) {
+    return {
+      ...block,
+      anchorId,
+    };
+  }
+
+  return block;
+}
+
+function attachAnchorIdToFirstBlock(
+  blocks: RichBlock[],
+  anchorId: string | undefined,
+): RichBlock[] {
+  if (!anchorId || blocks.length === 0) {
+    return blocks;
+  }
+
+  const [firstBlock, ...remainingBlocks] = blocks;
+  return [
+    attachAnchorIdToBlock(firstBlock, anchorId),
+    ...remainingBlocks,
+  ];
+}
+
 function flattenInlineText(inlines: RichInline[]): string {
   let value = '';
   for (const inline of inlines) {
@@ -248,11 +314,11 @@ function collectInlineChildren(parent: ParentNode, marks: Mark[]): RichInline[] 
 }
 
 function convertNodeToInlines(node: ChildNode, marks: Mark[]): RichInline[] {
-  if (node.nodeType === Node.TEXT_NODE) {
+  if (node.nodeType === TEXT_NODE) {
     return createTextInline(node.textContent ?? '', marks);
   }
 
-  if (node.nodeType !== Node.ELEMENT_NODE) {
+  if (node.nodeType !== ELEMENT_NODE) {
     return [];
   }
 
@@ -265,6 +331,24 @@ function convertNodeToInlines(node: ChildNode, marks: Mark[]): RichInline[] {
     return [];
   }
 
+  if (element.localName === 'a') {
+    const children = collectInlineChildren(element, deriveMarks(element, marks));
+    if (children.length === 0) {
+      return [];
+    }
+
+    const targetId = extractInternalHrefTarget(element.getAttribute('href'));
+    if (!targetId) {
+      return children;
+    }
+
+    return [{
+      type: 'link',
+      href: `#${targetId}`,
+      children,
+    }];
+  }
+
   const nextMarks = deriveMarks(element, marks);
   return collectInlineChildren(element, nextMarks);
 }
@@ -274,17 +358,18 @@ function appendParagraphBlock(
   inlines: RichInline[],
   align?: RichTextAlign,
   indent?: number,
+  anchorId?: string,
 ): void {
   if (inlines.length === 0) {
     return;
   }
 
-  blocks.push({
+  blocks.push(attachAnchorIdToBlock({
     type: 'paragraph',
     children: inlines,
     ...(align ? { align } : {}),
     ...(indent !== undefined ? { indent } : {}),
-  });
+  }, anchorId));
 }
 
 function convertFlowChildrenToBlocks(
@@ -303,12 +388,12 @@ function convertFlowChildrenToBlocks(
   };
 
   for (const child of Array.from(parent.childNodes)) {
-    if (child.nodeType === Node.TEXT_NODE) {
+    if (child.nodeType === TEXT_NODE) {
       inlineBuffer.push(...createTextInline(child.textContent ?? '', []));
       continue;
     }
 
-    if (child.nodeType !== Node.ELEMENT_NODE) {
+    if (child.nodeType !== ELEMENT_NODE) {
       continue;
     }
 
@@ -339,6 +424,7 @@ function convertHeadingElementToBlocks(element: Element): RichBlock[] {
 
   return [{
     type: 'heading',
+    ...(readAnchorId(element) ? { anchorId: readAnchorId(element) } : {}),
     level: level as 1 | 2 | 3 | 4 | 5 | 6,
     children,
     ...(readTextAlign(element) ? { align: readTextAlign(element) } : {}),
@@ -353,6 +439,7 @@ function convertImageElementToBlocks(element: Element): RichBlock[] {
 
   return [{
     type: 'image',
+    ...(readAnchorId(element) ? { anchorId: readAnchorId(element) } : {}),
     key,
     ...(element.getAttribute('alt') ? { alt: element.getAttribute('alt') ?? undefined } : {}),
     ...(readDimensionFromElement(element, 'width') ? { width: readDimensionFromElement(element, 'width') } : {}),
@@ -372,12 +459,12 @@ function convertFigureElementToBlocks(element: Element): RichBlock[] {
   };
 
   for (const child of Array.from(element.childNodes)) {
-    if (child.nodeType === Node.TEXT_NODE) {
+    if (child.nodeType === TEXT_NODE) {
       inlineBuffer.push(...createTextInline(child.textContent ?? '', []));
       continue;
     }
 
-    if (child.nodeType !== Node.ELEMENT_NODE) {
+    if (child.nodeType !== ELEMENT_NODE) {
       continue;
     }
 
@@ -405,11 +492,11 @@ function convertFigureElementToBlocks(element: Element): RichBlock[] {
     }
   }
 
-  return blocks;
+  return attachAnchorIdToFirstBlock(blocks, readAnchorId(element));
 }
 
 function convertListElementToBlocks(element: Element): RichBlock[] {
-  const items = Array.from(element.children)
+  const items = getElementChildren(element)
     .filter((child) => child.localName === 'li')
     .map((child) => {
       const blocks = convertFlowChildrenToBlocks(child);
@@ -441,15 +528,231 @@ function convertBlockquoteElementToBlocks(element: Element): RichBlock[] {
 }
 
 function convertParagraphElementToBlocks(element: Element): RichBlock[] {
-  return convertFlowChildrenToBlocks(element, {
+  return attachAnchorIdToFirstBlock(convertFlowChildrenToBlocks(element, {
     align: readTextAlign(element),
     indent: readParagraphIndent(element),
+  }), readAnchorId(element));
+}
+
+function joinTextualBlocksIntoInlines(blocks: RichBlock[]): RichInline[] | null {
+  const inlines: RichInline[] = [];
+
+  blocks.forEach((block, blockIndex) => {
+    if (block.type !== 'heading' && block.type !== 'paragraph') {
+      return;
+    }
+
+    if (blockIndex > 0) {
+      inlines.push({ type: 'lineBreak' }, { type: 'lineBreak' });
+    }
+    inlines.push(...block.children);
+  });
+
+  return blocks.every((block) => block.type === 'heading' || block.type === 'paragraph')
+    ? inlines
+    : null;
+}
+
+function convertTableRowElementToCells(
+  rowElement: Element,
+): Array<{ children: RichInline[] }> | null {
+  const cells: Array<{ children: RichInline[] }> = [];
+
+  for (const child of getElementChildren(rowElement)) {
+    if (child.localName !== 'td' && child.localName !== 'th') {
+      continue;
+    }
+
+    const rowspan = child.getAttribute('rowspan');
+    const colspan = child.getAttribute('colspan');
+    if ((rowspan && rowspan !== '1') || (colspan && colspan !== '1')) {
+      return null;
+    }
+
+    const cellBlocks = convertFlowChildrenToBlocks(child);
+    const cellChildren = joinTextualBlocksIntoInlines(cellBlocks);
+    if (!cellChildren) {
+      return null;
+    }
+
+    cells.push({ children: cellChildren });
+  }
+
+  return cells.length > 0 ? cells : null;
+}
+
+function collectTableRows(
+  element: Element,
+): Array<Array<{ children: RichInline[] }>> | null {
+  const rows: Array<Array<{ children: RichInline[] }>> = [];
+
+  const appendRowsFromContainer = (container: Element): boolean => {
+    for (const rowCandidate of getElementChildren(container)) {
+      if (rowCandidate.localName !== 'tr') {
+        continue;
+      }
+
+      const cells = convertTableRowElementToCells(rowCandidate);
+      if (!cells) {
+        return false;
+      }
+
+      rows.push(cells);
+    }
+
+    return true;
+  };
+
+  for (const child of getElementChildren(element)) {
+    if (child.localName === 'tr') {
+      const cells = convertTableRowElementToCells(child);
+      if (!cells) {
+        return null;
+      }
+
+      rows.push(cells);
+      continue;
+    }
+
+    if (TABLE_SECTION_TAG_NAMES.has(child.localName)) {
+      if (!appendRowsFromContainer(child)) {
+        return null;
+      }
+    }
+  }
+
+  return rows.length > 0 ? rows : null;
+}
+
+function convertTableElementToBlocks(element: Element): RichBlock[] {
+  const rows = collectTableRows(element);
+  if (!rows) {
+    return createUnsupportedBlock(element);
+  }
+
+  return [{
+    type: 'table',
+    ...(readAnchorId(element) ? { anchorId: readAnchorId(element) } : {}),
+    rows,
+  }];
+}
+
+function collectAnchorIdsFromBlocks(blocks: RichBlock[]): Set<string> {
+  const anchorIds = new Set<string>();
+
+  const visitBlocks = (blockList: RichBlock[]): void => {
+    blockList.forEach((block) => {
+      if ('anchorId' in block && typeof block.anchorId === 'string' && block.anchorId.length > 0) {
+        anchorIds.add(block.anchorId);
+      }
+
+      if (block.type === 'blockquote') {
+        visitBlocks(block.children);
+        return;
+      }
+
+      if (block.type === 'list') {
+        block.items.forEach((item) => visitBlocks(item));
+      }
+    });
+  };
+
+  visitBlocks(blocks);
+  return anchorIds;
+}
+
+function filterResolvableInternalLinksInInlines(
+  inlines: RichInline[],
+  anchorIds: ReadonlySet<string>,
+): RichInline[] {
+  const filtered: RichInline[] = [];
+
+  inlines.forEach((inline) => {
+    if (inline.type !== 'link') {
+      filtered.push(inline);
+      return;
+    }
+
+    const children = filterResolvableInternalLinksInInlines(inline.children, anchorIds);
+    if (children.length === 0) {
+      return;
+    }
+
+    const targetId = extractInternalHrefTarget(inline.href);
+    if (!targetId || !anchorIds.has(targetId)) {
+      filtered.push(...children);
+      return;
+    }
+
+    filtered.push({
+      ...inline,
+      href: `#${targetId}`,
+      children,
+    });
+  });
+
+  return filtered;
+}
+
+function filterResolvableInternalLinksInBlocks(
+  blocks: RichBlock[],
+  anchorIds: ReadonlySet<string>,
+): RichBlock[] {
+  return blocks.map((block) => {
+    if (block.type === 'heading' || block.type === 'paragraph') {
+      return {
+        ...block,
+        children: filterResolvableInternalLinksInInlines(block.children, anchorIds),
+      };
+    }
+
+    if (block.type === 'image') {
+      return {
+        ...block,
+        caption: block.caption
+          ? filterResolvableInternalLinksInInlines(block.caption, anchorIds)
+          : undefined,
+      };
+    }
+
+    if (block.type === 'poem') {
+      return {
+        ...block,
+        lines: block.lines.map((line) => filterResolvableInternalLinksInInlines(line, anchorIds)),
+      };
+    }
+
+    if (block.type === 'table') {
+      return {
+        ...block,
+        rows: block.rows.map((row) => row.map((cell) => ({
+          ...cell,
+          children: filterResolvableInternalLinksInInlines(cell.children, anchorIds),
+        }))),
+      };
+    }
+
+    if (block.type === 'blockquote') {
+      return {
+        ...block,
+        children: filterResolvableInternalLinksInBlocks(block.children, anchorIds),
+      };
+    }
+
+    if (block.type === 'list') {
+      return {
+        ...block,
+        items: block.items.map((item) => filterResolvableInternalLinksInBlocks(item, anchorIds)),
+      };
+    }
+
+    return block;
   });
 }
 
 function convertElementToBlocks(element: Element): RichBlock[] {
   if (BLOCK_CONTAINER_TAG_NAMES.has(element.localName)) {
-    return convertFlowChildrenToBlocks(element);
+    return attachAnchorIdToFirstBlock(convertFlowChildrenToBlocks(element), readAnchorId(element));
   }
 
   if (element.localName === 'p') {
@@ -472,6 +775,17 @@ function convertElementToBlocks(element: Element): RichBlock[] {
     return convertImageElementToBlocks(element);
   }
 
+  if (element.localName === 'hr') {
+    return [{
+      type: 'hr',
+      ...(readAnchorId(element) ? { anchorId: readAnchorId(element) } : {}),
+    }];
+  }
+
+  if (element.localName === 'table') {
+    return convertTableElementToBlocks(element);
+  }
+
   if (/^h[1-6]$/u.test(element.localName)) {
     return convertHeadingElementToBlocks(element);
   }
@@ -492,7 +806,9 @@ function convertElementToBlocks(element: Element): RichBlock[] {
 }
 
 export function epubDomToRichBlocks(root: ParentNode): RichBlock[] {
-  return convertFlowChildrenToBlocks(root);
+  const blocks = convertFlowChildrenToBlocks(root);
+  const anchorIds = collectAnchorIdsFromBlocks(blocks);
+  return filterResolvableInternalLinksInBlocks(blocks, anchorIds);
 }
 
 export function getRichBlockText(block: RichBlock): string {

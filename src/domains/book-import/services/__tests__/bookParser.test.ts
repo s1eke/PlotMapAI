@@ -72,6 +72,31 @@ describe('parseBook', () => {
     expect(mockParseEpub).toHaveBeenCalledWith(file, { purificationRules: undefined });
   });
 
+  it('passes signal, progress, and purification options to the EPUB parser', async () => {
+    const file = new File(['epub'], 'book.epub', { type: 'application/epub+zip' });
+    const controller = new AbortController();
+    const onProgress = vi.fn();
+    const purificationRules = [{
+      pattern: 'foo',
+      replacement: 'bar',
+      is_regex: false,
+      target_scope: 'text' as const,
+      execution_stage: 'pre-ast' as const,
+    }];
+
+    await parseBook(file, [], {
+      signal: controller.signal,
+      onProgress,
+      purificationRules,
+    });
+
+    expect(mockParseEpub).toHaveBeenCalledWith(file, {
+      signal: controller.signal,
+      onProgress,
+      purificationRules,
+    });
+  });
+
   it('throws for unsupported file types', async () => {
     const file = new File(['data'], 'book.pdf', { type: 'application/pdf' });
     await expect(parseBook(file, [])).rejects.toThrow('Unsupported file type');

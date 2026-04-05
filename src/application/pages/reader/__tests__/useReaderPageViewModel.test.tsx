@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { analyzeChapter } from '@application/use-cases/analysis';
+import { loadReaderSession } from '@application/use-cases/library';
 import { analysisService } from '@domains/analysis';
 import { useReaderInput } from '@domains/reader-interaction';
 import { useReaderAnalysisBridge } from '@domains/reader-shell';
@@ -32,6 +33,10 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('@application/use-cases/analysis', () => ({
   analyzeChapter: vi.fn(),
+}));
+
+vi.mock('@application/use-cases/library', () => ({
+  loadReaderSession: vi.fn(),
 }));
 
 vi.mock('@domains/analysis', async () => {
@@ -206,6 +211,22 @@ describe('useReaderPageViewModel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(analyzeChapter).mockResolvedValue({ analysis: null });
+    vi.mocked(loadReaderSession).mockResolvedValue({
+      novel: {
+        id: 1,
+        title: 'Reader Novel',
+        author: 'Author',
+        description: '',
+        tags: [],
+        fileType: 'epub',
+        hasCover: false,
+        createdAt: new Date().toISOString(),
+        totalWords: 100,
+        chapterCount: 1,
+        originalFilename: 'reader.epub',
+        originalEncoding: 'utf-8',
+      },
+    });
   });
 
   it('builds the reader page view model from domain hooks and wires the analysis controller', async () => {
@@ -213,6 +234,8 @@ describe('useReaderPageViewModel', () => {
 
     expect(result.current.backHref).toBe('/novel/1');
     expect(result.current.pageBgClassName).toBe('bg-page');
+    expect(result.current.reparseRecovery.accept).toBe('.epub');
+    expect(result.current.reparseRecovery.visible).toBe(false);
     expect(result.current.viewportProps.emptyHref).toBe('/novel/1');
     expect(result.current.viewportProps.summaryContentProps).toBeDefined();
     expect(useReaderInput).toHaveBeenCalledTimes(1);

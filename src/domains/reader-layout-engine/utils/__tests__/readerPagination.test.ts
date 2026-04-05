@@ -178,6 +178,114 @@ describe('readerPagination', () => {
     });
   });
 
+  it('preserves rich inline fragments for paged text items', () => {
+    const measuredLayout = createMeasuredLayout([{
+      block: {
+        blockIndex: 1,
+        chapterIndex: 0,
+        key: '0:rich-text:1',
+        kind: 'text',
+        marginAfter: 0,
+        marginBefore: 0,
+        paragraphIndex: 1,
+        renderRole: 'rich-text',
+        richChildren: [
+          {
+            marks: ['bold'],
+            text: 'Al',
+            type: 'text',
+          },
+          {
+            text: 'pha ',
+            type: 'text',
+          },
+          {
+            children: [
+              {
+                text: 'Beta',
+                type: 'text',
+              },
+            ],
+            href: '#anchor',
+            type: 'link',
+          },
+        ],
+        text: 'Alpha Beta',
+      },
+      contentHeight: 32,
+      font: '400 16px sans-serif',
+      fontSizePx: 16,
+      fontWeight: 400,
+      height: 32,
+      lineHeightPx: 16,
+      lines: [
+        {
+          end: {
+            graphemeIndex: 5,
+            segmentIndex: 0,
+          },
+          lineIndex: 0,
+          start: {
+            graphemeIndex: 0,
+            segmentIndex: 0,
+          },
+          text: 'Alpha',
+          width: 80,
+        },
+        {
+          end: {
+            graphemeIndex: 10,
+            segmentIndex: 0,
+          },
+          lineIndex: 1,
+          start: {
+            graphemeIndex: 6,
+            segmentIndex: 0,
+          },
+          text: 'Beta',
+          width: 64,
+        },
+      ],
+      marginAfter: 0,
+      marginBefore: 0,
+      top: 0,
+    }]);
+
+    const paginatedLayout = composePaginatedChapterLayout(measuredLayout, 64, 1, 32);
+    const pageItem = paginatedLayout.pageSlices[0]?.columns[0]?.items[0];
+
+    expect(pageItem).toMatchObject({
+      kind: 'text',
+      renderRole: 'rich-text',
+    });
+    expect('richLineFragments' in (pageItem ?? {})).toBe(true);
+    expect(pageItem?.kind === 'text' ? pageItem.richLineFragments : undefined).toEqual([
+      [
+        {
+          marks: ['bold'],
+          text: 'Al',
+          type: 'text',
+        },
+        {
+          text: 'pha',
+          type: 'text',
+        },
+      ],
+      [
+        {
+          children: [
+            {
+              text: 'Beta',
+              type: 'text',
+            },
+          ],
+          href: '#anchor',
+          type: 'link',
+        },
+      ],
+    ]);
+  });
+
   it('drops terminal paragraph spacing when that keeps the next paragraph on the same page', () => {
     const measuredLayout = createMeasuredLayout([
       createTextMetric({ blockIndex: 1, lineCount: 1, marginAfter: 16, top: 0 }),

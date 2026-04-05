@@ -30,6 +30,9 @@ import { getRichInlinePlainText } from '@shared/text-processing';
 
 const MAX_PRETEXT_CACHE_SIZE = 256;
 const PRETEXT_CACHE = new Map<string, PreparedTextWithSegments | null>();
+const TABLE_BORDER_WIDTH_PX = 1;
+const TABLE_CELL_HORIZONTAL_PADDING_PX = 12;
+const TABLE_CELL_VERTICAL_PADDING_PX = 10;
 
 interface PreparedTextBlock {
   font: string;
@@ -223,6 +226,61 @@ function measureCaptionLines(params: {
   };
 }
 
+function measureTableRows(params: {
+  lineHeightPx: number;
+  maxWidth: number;
+  tableRows: NonNullable<VirtualBlockMetrics['block']['tableRows']>;
+  textLayoutEngine: ReaderTextLayoutEngine;
+  typography: ReaderTypographyMetrics;
+}): {
+    contentHeight: number;
+    rowHeights: number[];
+  } {
+  if (params.tableRows.length === 0) {
+    return {
+      contentHeight: 0,
+      rowHeights: [],
+    };
+  }
+
+  const columnCount = Math.max(
+    ...params.tableRows.map((row) => row.length),
+    1,
+  );
+  const totalHorizontalPadding =
+    columnCount * TABLE_CELL_HORIZONTAL_PADDING_PX * 2
+    + (columnCount + 1) * TABLE_BORDER_WIDTH_PX;
+  const cellMaxWidth = Math.max(
+    48,
+    (params.maxWidth - totalHorizontalPadding) / columnCount,
+  );
+  const rowHeights = params.tableRows.map((row) => {
+    const maxCellHeight = Math.max(...row.map((cell) => {
+      const cellText = getRichInlinePlainText(cell.children);
+      const measuredLines = cellText.length > 0
+        ? params.textLayoutEngine.layoutLines({
+          font: params.typography.bodyFont,
+          fontSizePx: params.typography.bodyFontSize,
+          lineHeightPx: params.lineHeightPx,
+          maxWidth: cellMaxWidth,
+          text: cellText,
+        })
+        : [];
+
+      return Math.max(measuredLines.length, 1) * params.lineHeightPx
+        + TABLE_CELL_VERTICAL_PADDING_PX * 2;
+    }), params.lineHeightPx + TABLE_CELL_VERTICAL_PADDING_PX * 2);
+
+    return maxCellHeight;
+  });
+  const borderHeight = (params.tableRows.length + 1) * TABLE_BORDER_WIDTH_PX;
+
+  return {
+    contentHeight: rowHeights.reduce((total, height) => total + height, 0) + borderHeight,
+    rowHeights,
+  };
+}
+
 function measureReaderBlocks(params: {
   blocks: ReturnType<typeof buildReaderBlocks>;
   chapterIndex: number;
@@ -254,7 +312,30 @@ function measureReaderBlocks(params: {
         ? getRichScrollHorizontalTextWidth(block, params.width)
         : params.width;
 
-      if (block.renderRole === 'hr') {
+      if (block.renderRole === 'table' && block.tableRows) {
+        const tableMetrics = measureTableRows({
+          lineHeightPx,
+          maxWidth,
+          tableRows: block.tableRows,
+          textLayoutEngine: params.textLayoutEngine,
+          typography: params.typography,
+        });
+
+        blockMetrics = {
+          block,
+          contentHeight: tableMetrics.contentHeight,
+          font,
+          fontSizePx,
+          fontWeight: 400,
+          height: block.marginBefore + tableMetrics.contentHeight + block.marginAfter,
+          lineHeightPx,
+          lines: [],
+          marginAfter: block.marginAfter,
+          marginBefore: block.marginBefore,
+          tableRowHeights: tableMetrics.rowHeights,
+          top: offsetTop,
+        };
+      } else if (block.renderRole === 'hr') {
         blockMetrics = {
           block,
           contentHeight: getRichScrollRuleHeight(),

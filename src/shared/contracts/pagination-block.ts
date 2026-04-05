@@ -22,6 +22,7 @@ interface BasePaginationBlock {
 }
 
 export interface PaginationHeadingBlock extends BasePaginationBlock {
+  anchorId?: string;
   type: 'heading';
   level: 1 | 2 | 3 | 4 | 5 | 6;
   children: RichInline[];
@@ -29,6 +30,7 @@ export interface PaginationHeadingBlock extends BasePaginationBlock {
 }
 
 export interface PaginationParagraphBlock extends BasePaginationBlock {
+  anchorId?: string;
   type: 'paragraph';
   children: RichInline[];
   align?: RichTextAlign;
@@ -38,6 +40,7 @@ export interface PaginationParagraphBlock extends BasePaginationBlock {
 }
 
 export interface PaginationImageBlock extends BasePaginationBlock {
+  anchorId?: string;
   type: 'image';
   key: string;
   alt?: string;
@@ -49,7 +52,18 @@ export interface PaginationImageBlock extends BasePaginationBlock {
 }
 
 export interface PaginationHorizontalRuleBlock extends BasePaginationBlock {
+  anchorId?: string;
   type: 'hr';
+}
+
+export interface PaginationTableCell {
+  children: RichInline[];
+}
+
+export interface PaginationTableBlock extends BasePaginationBlock {
+  anchorId?: string;
+  type: 'table';
+  rows: PaginationTableCell[][];
 }
 
 export interface PaginationUnsupportedBlock extends BasePaginationBlock {
@@ -63,4 +77,5 @@ export type PaginationBlock =
   | PaginationParagraphBlock
   | PaginationImageBlock
   | PaginationHorizontalRuleBlock
+  | PaginationTableBlock
   | PaginationUnsupportedBlock;

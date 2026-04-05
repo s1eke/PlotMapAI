@@ -1,3 +1,5 @@
+import { DOMParser as XmldomDOMParser } from '@xmldom/xmldom';
+
 const BLOCKED_TAG_NAMES = new Set([
   'head',
   'header',
@@ -23,7 +25,12 @@ const ALLOWED_STYLE_PROPERTIES = new Set([
 
 const GLOBAL_ALLOWED_ATTRIBUTES = new Set([
   'align',
+  'id',
   'style',
+]);
+
+const ANCHOR_ALLOWED_ATTRIBUTES = new Set([
+  'href',
 ]);
 
 const IMAGE_ALLOWED_ATTRIBUTES = new Set([
@@ -33,12 +40,18 @@ const IMAGE_ALLOWED_ATTRIBUTES = new Set([
   'width',
 ]);
 
+const ELEMENT_NODE = 1;
+
+function getLocalName(element: Element): string {
+  return (element.localName || element.tagName || '').toLowerCase();
+}
+
 function containsNavMarker(value: string | null): boolean {
   return value?.toLowerCase().includes('nav') ?? false;
 }
 
 function shouldRemoveElement(element: Element): boolean {
-  if (BLOCKED_TAG_NAMES.has(element.localName)) {
+  if (BLOCKED_TAG_NAMES.has(getLocalName(element))) {
     return true;
   }
 
@@ -70,6 +83,8 @@ function sanitizeStyleAttribute(styleValue: string): string {
 }
 
 function isAllowedAttribute(element: Element, name: string): boolean {
+  const localName = getLocalName(element);
+
   if (name.startsWith('on')) {
     return false;
   }
@@ -78,7 +93,11 @@ function isAllowedAttribute(element: Element, name: string): boolean {
     return true;
   }
 
-  if (element.localName === 'img' && IMAGE_ALLOWED_ATTRIBUTES.has(name)) {
+  if (localName === 'img' && IMAGE_ALLOWED_ATTRIBUTES.has(name)) {
+    return true;
+  }
+
+  if (localName === 'a' && ANCHOR_ALLOWED_ATTRIBUTES.has(name)) {
     return true;
   }
 
@@ -106,15 +125,42 @@ function sanitizeAttributes(element: Element): void {
 
     if (attribute.value.trim().length === 0) {
       element.removeAttribute(attribute.name);
+      continue;
+    }
+
+    if (getLocalName(element) === 'a' && name === 'href' && !attribute.value.trim().startsWith('#')) {
+      element.removeAttribute(attribute.name);
     }
   }
 }
 
+function collectDescendantElements(root: Element): Element[] {
+  const elements: Element[] = [];
+  const queue = Array.from(root.childNodes);
+
+  while (queue.length > 0) {
+    const next = queue.shift();
+    if (!next || next.nodeType !== ELEMENT_NODE) {
+      continue;
+    }
+
+    const element = next as Element;
+    elements.push(element);
+    queue.push(...Array.from(element.childNodes));
+  }
+
+  return elements;
+}
+
+function removeElement(element: Element): void {
+  element.parentNode?.removeChild(element);
+}
+
 function sanitizeTree(root: Element): void {
-  const elements = Array.from(root.querySelectorAll('*'));
+  const elements = collectDescendantElements(root);
   for (const element of elements) {
     if (shouldRemoveElement(element)) {
-      element.remove();
+      removeElement(element);
       continue;
     }
 
@@ -126,8 +172,16 @@ function parseMarkup(parser: DOMParser, html: string, mimeType: DOMParserSupport
   return parser.parseFromString(html, mimeType);
 }
 
+function createDomParser(): DOMParser {
+  if (typeof globalThis.DOMParser !== 'undefined') {
+    return new globalThis.DOMParser();
+  }
+
+  return new XmldomDOMParser() as unknown as DOMParser;
+}
+
 function resolveSanitizedRoot(document: Document): Element {
-  const body = document.querySelector('body');
+  const body = document.getElementsByTagName('body')[0];
   if (body) {
     return body;
   }
@@ -136,7 +190,7 @@ function resolveSanitizedRoot(document: Document): Element {
 }
 
 export function sanitizeEpubHtml(html: string): Element {
-  const parser = new DOMParser();
+  const parser = createDomParser();
   let document = parseMarkup(parser, html, 'application/xhtml+xml');
   if (document.getElementsByTagName('parsererror').length > 0) {
     document = parseMarkup(parser, html, 'text/html');

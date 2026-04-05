@@ -4,7 +4,6 @@ import {
   importFixtureToDetailPage,
   openReaderFromDetailPage,
   seedChapterAnalysis,
-  seedPoemChapterContent,
   setPageTurnMode,
 } from './helpers/readerVisualHarness';
 
@@ -40,11 +39,10 @@ test.describe('reader visual regression', () => {
     await expect(page.getByTestId('reader-flow-image-caption')).toHaveScreenshot('04-image-caption.png');
   });
 
-  test('renders table fallback blocks for unsupported rich content', async ({ page }) => {
-    await importFixtureToDetailPage(page, 'tableFallback');
+  test('renders imported simple tables with stable spacing', async ({ page }) => {
+    await importFixtureToDetailPage(page, 'simpleTable');
     await openReaderFromDetailPage(page);
-
-    await expect(page.getByTestId('reader-flow-table-fallback')).toHaveScreenshot('05-table-fallback.png');
+    await expect(page.getByTestId('reader-rich-table')).toHaveScreenshot('05-simple-table.png');
   });
 
   test('renders sanitized dirty-style chapters consistently', async ({ page }) => {
@@ -83,15 +81,11 @@ test.describe('reader visual regression', () => {
     await expect(page.getByTestId('reader-viewport')).toHaveScreenshot('08-summary-shell-analysis.png');
   });
 
-  test('renders seeded poem chapters through the reader flow', async ({ page }) => {
-    const { novelId } = await importFixtureToDetailPage(page, 'poemSeed');
-    await seedPoemChapterContent(page, {
-      novelId,
-      chapterIndex: 0,
-    });
+  test('renders imported hr, internal links, and simple tables through the reader flow', async ({ page }) => {
+    await importFixtureToDetailPage(page, 'linkedStructures');
     await openReaderFromDetailPage(page);
 
-    await expect(page.getByTestId('reader-viewport')).toHaveScreenshot('09-poem-viewport.png');
+    await expect(page.getByTestId('reader-viewport')).toHaveScreenshot('09-structured-rich-viewport.png');
   });
 
   test('renders multi-image chapters with stable gallery spacing', async ({ page }) => {

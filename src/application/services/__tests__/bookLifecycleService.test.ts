@@ -543,7 +543,7 @@ describe('bookLifecycleService', () => {
       ),
     ).rejects.toMatchObject({
       code: 'UNSUPPORTED_FILE_TYPE',
-      userMessageKey: 'bookDetail.reparseFileTypeMismatch',
+      userMessageKey: 'reader.reparse.fileTypeMismatch',
     });
     expect(bookImportService.parseBookImport).not.toHaveBeenCalled();
   });

@@ -251,9 +251,10 @@ export function useReaderVisibleRenderResults({
       ?? visibleTargets[0]
       ?? null;
     const activeRichBlocks = activeTarget?.chapter.richBlocks ?? [];
-    const pagedDowngradeCount = visibleTargets.filter((target) => (
-      target.variantFamily === 'original-paged' && target.contentFormat === 'rich'
-    )).length;
+    const pagedDowngradeCount =
+      activeTarget?.variantFamily === 'original-paged' && activeTarget.contentFormat === 'rich'
+        ? countUnsupportedBlocks(activeRichBlocks)
+        : 0;
 
     return {
       activeVariant,

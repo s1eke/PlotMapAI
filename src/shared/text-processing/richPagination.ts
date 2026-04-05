@@ -32,6 +32,7 @@ interface SequenceProjectionParams {
 }
 
 function createTextParagraphBlock(params: {
+  anchorId?: string;
   children: RichInline[];
   container?: PaginationContainer;
   indent?: number;
@@ -39,6 +40,7 @@ function createTextParagraphBlock(params: {
   sourceBlockType: RichBlock['type'];
 }): PaginationBlock {
   return {
+    ...(params.anchorId ? { anchorId: params.anchorId } : {}),
     type: 'paragraph',
     align: undefined,
     children: params.children,
@@ -61,45 +63,6 @@ function inlineChildrenToPlainText(children: RichInline[]): string {
 
     return inlineChildrenToPlainText(child.children);
   }).join('');
-}
-
-function blockToFallbackText(block: RichBlock): string {
-  if (block.type === 'heading' || block.type === 'paragraph') {
-    return inlineChildrenToPlainText(block.children);
-  }
-
-  if (block.type === 'blockquote') {
-    return block.children.map((child) => blockToFallbackText(child)).filter(Boolean).join('\n');
-  }
-
-  if (block.type === 'list') {
-    return block.items
-      .map((item) => item.map((child) => blockToFallbackText(child)).filter(Boolean).join('\n'))
-      .filter(Boolean)
-      .join('\n');
-  }
-
-  if (block.type === 'image') {
-    return inlineChildrenToPlainText(block.caption ?? [])
-      || block.alt
-      || 'Illustration';
-  }
-
-  if (block.type === 'poem') {
-    return block.lines.map((line) => inlineChildrenToPlainText(line)).join('\n');
-  }
-
-  if (block.type === 'table') {
-    return block.rows
-      .map((row) => row.map((cell) => inlineChildrenToPlainText(cell.children)).join(' | '))
-      .join('\n');
-  }
-
-  if (block.type === 'unsupported') {
-    return block.fallbackText;
-  }
-
-  return '';
 }
 
 function appendSequenceEntry(params: {
@@ -183,6 +146,7 @@ function projectRichBlocksIntoSequence(params: SequenceProjectionParams): void {
       block.lines.forEach((line) => {
         appendSequenceEntry({
           block: createTextParagraphBlock({
+            anchorId: block.anchorId,
             children: line,
             container: 'poem-line',
             sourceBlockType: 'poem',
@@ -199,9 +163,9 @@ function projectRichBlocksIntoSequence(params: SequenceProjectionParams): void {
     if (block.type === 'table') {
       appendSequenceEntry({
         block: {
-          type: 'unsupported',
-          fallbackText: blockToFallbackText(block),
-          originalTag: 'table',
+          anchorId: block.anchorId,
+          type: 'table',
+          rows: block.rows,
           sourceBlockType: 'table',
         },
         context,
@@ -215,6 +179,7 @@ function projectRichBlocksIntoSequence(params: SequenceProjectionParams): void {
     if (block.type === 'heading') {
       appendSequenceEntry({
         block: {
+          anchorId: block.anchorId,
           type: 'heading',
           align: block.align,
           children: block.children,
@@ -232,6 +197,7 @@ function projectRichBlocksIntoSequence(params: SequenceProjectionParams): void {
     if (block.type === 'paragraph') {
       appendSequenceEntry({
         block: {
+          anchorId: block.anchorId,
           type: 'paragraph',
           align: block.align,
           children: block.children,
@@ -251,6 +217,7 @@ function projectRichBlocksIntoSequence(params: SequenceProjectionParams): void {
     if (block.type === 'image') {
       appendSequenceEntry({
         block: {
+          anchorId: block.anchorId,
           type: 'image',
           align: block.align,
           alt: block.alt,
@@ -272,6 +239,7 @@ function projectRichBlocksIntoSequence(params: SequenceProjectionParams): void {
     if (block.type === 'hr') {
       appendSequenceEntry({
         block: {
+          anchorId: block.anchorId,
           type: 'hr',
           sourceBlockType: context.sourceBlockTypeOverride ?? 'hr',
         },
@@ -338,6 +306,12 @@ export function getPaginationBlockPlainText(block: PaginationBlock): string {
 
   if (block.type === 'image') {
     return inlineChildrenToPlainText(block.caption ?? []) || block.alt || '';
+  }
+
+  if (block.type === 'table') {
+    return block.rows
+      .map((row) => row.map((cell) => inlineChildrenToPlainText(cell.children)).join(' | '))
+      .join('\n');
   }
 
   if (block.type === 'unsupported') {

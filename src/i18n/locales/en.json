@@ -118,12 +118,7 @@
     "contentFormatRich": "Rich",
     "contentVersion": "Content Version",
     "importFormatVersion": "Import Format Version",
-    "lastParsedAt": "Last Parsed",
-    "reparseAction": "Reparse Source File",
-    "reparseHint": "Select the original source file again to overwrite the current parsed content, images, and analysis artifacts.",
-    "reparseSucceeded": "The book has been reparsed and overwritten.",
-    "reparseFailed": "Failed to reparse the source file.",
-    "reparseFileTypeMismatch": "Please select the same file type as the current book."
+    "lastParsedAt": "Last Parsed"
   },
   "characterGraph": {
     "title": "Character Graph",
@@ -258,9 +253,73 @@
       "title": "Image Viewer",
       "loadingMore": "Loading more images"
     },
+    "reparse": {
+      "required": "This book is missing enhanced layout data. Reparse the original source file to continue.",
+      "description": "Select the original source file. PlotMapAI will overwrite the parsed content, images, analysis artifacts, and reading progress for this book.",
+      "action": "Reparse Source File",
+      "succeeded": "The book has been reparsed. Reopening the reader now.",
+      "failed": "Failed to reparse the source file.",
+      "fileTypeMismatch": "Please select the same file type as the current book."
+    },
     "loadError": "Failed to load reader content.",
     "exit": "Exit Reader",
     "goBack": "Go Back"
+  },
+  "debug": {
+    "panelTitle": "Debug Panel",
+    "titleWithCount": "Debug ({{count}})",
+    "clearLogs": "Clear logs",
+    "filters": {
+      "all": "All",
+      "errors": "Errors",
+      "logs": "Logs"
+    },
+    "features": {
+      "readerTelemetry": {
+        "label": "Reader Telemetry",
+        "description": "Verbose reader layout snapshots and preheat source logs"
+      },
+      "readerLegacyPlainScroll": {
+        "label": "Legacy Plain Scroll",
+        "description": "Temporarily force scroll mode back to the plain-text block renderer"
+      }
+    },
+    "actions": {
+      "goBack": "Go Back",
+      "installPrompt": "Install Prompt",
+      "iosHint": "iOS Hint",
+      "updateToast": "Update Toast",
+      "resetPwa": "Reset PWA"
+    },
+    "diagnostics": {
+      "title": "Diagnostics",
+      "empty": "No diagnostics yet",
+      "labels": {
+        "bookImport": "Import Diagnostics",
+        "readerLayout": "Reader Diagnostics",
+        "storage": "Storage Diagnostics"
+      },
+      "preview": {
+        "storageUsage": "Usage {{usage}} / {{quota}}",
+        "storageCounts": "Render cache {{renderCacheCount}} · rich {{richCount}} · images {{imageCount}}",
+        "storageNovelCache": "Current novel cache {{count}}",
+        "readerFormat": "Format {{format}}",
+        "readerLayout": "Layout {{layout}}",
+        "readerPendingPreheat": "Pending preheat {{count}}",
+        "importOperation": "Operation {{operation}}",
+        "importFile": "File {{file}}",
+        "importStage": "Stage {{stage}}"
+      }
+    },
+    "logsEmpty": "No logs yet",
+    "errorDetails": {
+      "retryable": "retryable={{value}}",
+      "source": "source: {{value}}",
+      "userVisible": "userVisible: {{value}}",
+      "debugVisible": "debugVisible: {{value}}",
+      "messageKey": "messageKey: {{value}}",
+      "cause": "cause: {{value}}"
+    }
   },
   "settings": {
     "title": "Settings",
@@ -465,6 +524,7 @@
     "JOB_NOT_FOUND": "No analysis job found for this novel.",
     "JOB_CREATE_FAILED": "Failed to create analysis job.",
     "CHAPTER_NOT_FOUND": "Chapter not found.",
+    "CHAPTER_STRUCTURED_CONTENT_MISSING": "This book is missing enhanced layout data. Reparse the original source file to continue.",
     "CHAPTER_MISSING": "Chapter not found, unable to continue analysis.",
     "INTERNAL_ERROR": "Internal error: {{message}}",
     "CHUNK_COMPLETED": "Chunk analysis completed.",

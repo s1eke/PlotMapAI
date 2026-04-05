@@ -1,8 +1,11 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 import JSZip from 'jszip';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockEpubDomToRichBlocks } = vi.hoisted(() => ({
+import { AppErrorCode } from '@shared/errors';
+
+const { mockEpubDomToRichBlocks, mockRunParseEpubTask } = vi.hoisted(() => ({
   mockEpubDomToRichBlocks: vi.fn(),
+  mockRunParseEpubTask: vi.fn(),
 }));
 
 const mockDigest = vi.fn().mockResolvedValue(new ArrayBuffer(32));
@@ -20,6 +23,10 @@ vi.mock('../epub/epubDomToRichBlocks', async (importOriginal) => {
   };
 });
 
+vi.mock('../../workers/epubClient', () => ({
+  runParseEpubTask: mockRunParseEpubTask,
+}));
+
 import { parseEpubCore } from '../epub/core';
 import { parseEpub } from '../epub/parser';
 
@@ -31,13 +38,82 @@ async function makeEpubFile(zip: JSZip, name: string): Promise<File> {
 describe('parseEpub', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockRunParseEpubTask.mockResolvedValue({
+      title: 'Worker Parsed',
+      author: 'Author',
+      description: '',
+      coverBlob: null,
+      chapters: [],
+      rawText: '',
+      encoding: 'utf-8',
+      totalWords: 0,
+      fileHash: 'hash',
+      tags: [],
+      images: [],
+    });
+  });
+
+  it('delegates EPUB parsing to the worker client with progress, abort, and purification options', async () => {
+    const file = new File(['epub'], 'book.epub', { type: 'application/epub+zip' });
+    const controller = new AbortController();
+    const onProgress = vi.fn();
+    const purificationRules = [{
+      pattern: 'foo',
+      replacement: 'bar',
+      is_regex: false,
+      target_scope: 'text' as const,
+      execution_stage: 'pre-ast' as const,
+    }];
+
+    const result = await parseEpub(file, {
+      signal: controller.signal,
+      onProgress,
+      purificationRules,
+    });
+
+    expect(result).toMatchObject({ title: 'Worker Parsed' });
+    expect(mockRunParseEpubTask).toHaveBeenCalledWith({
+      file,
+      purificationRules,
+    }, {
+      signal: controller.signal,
+      onProgress,
+    });
+  });
+
+  it('propagates AbortError from the worker client', async () => {
+    const file = new File(['epub'], 'book.epub', { type: 'application/epub+zip' });
+    mockRunParseEpubTask.mockRejectedValueOnce(new DOMException('The operation was aborted.', 'AbortError'));
+
+    await expect(parseEpub(file)).rejects.toMatchObject({ name: 'AbortError' });
+  });
+
+  it('propagates WORKER_UNAVAILABLE from the worker client', async () => {
+    const file = new File(['epub'], 'book.epub', { type: 'application/epub+zip' });
+    mockRunParseEpubTask.mockRejectedValueOnce({
+      code: AppErrorCode.WORKER_UNAVAILABLE,
+      kind: 'unsupported',
+      source: 'book-import',
+      userMessageKey: 'errors.WORKER_UNAVAILABLE',
+    });
+
+    await expect(parseEpub(file)).rejects.toMatchObject({
+      code: AppErrorCode.WORKER_UNAVAILABLE,
+      userMessageKey: 'errors.WORKER_UNAVAILABLE',
+    });
+  });
+});
+
+describe('parseEpubCore', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
   });
 
   it('throws when container.xml is missing', async () => {
     const zip = new JSZip();
     zip.file('dummy.txt', 'not an epub');
     const file = await makeEpubFile(zip, 'bad.epub');
-    await expect(parseEpub(file)).rejects.toThrow('container.xml');
+    await expect(parseEpubCore(file)).rejects.toThrow('container.xml');
   });
 
   it('returns a ParsedBook structure for valid epub', async () => {
@@ -64,7 +140,7 @@ describe('parseEpub', () => {
 <html xmlns="http://www.w3.org/1999/xhtml"><body><p>Some text content.</p></body></html>`);
 
     const file = await makeEpubFile(zip, 'test.epub');
-    const result = await parseEpub(file);
+    const result = await parseEpubCore(file);
 
     expect(result).toHaveProperty('title');
     expect(result).toHaveProperty('author');
@@ -107,7 +183,7 @@ describe('parseEpub', () => {
 <html xmlns="http://www.w3.org/1999/xhtml"><body><p>text</p></body></html>`);
 
     const file = await makeEpubFile(zip, 'MyNovel.epub');
-    const result = await parseEpub(file);
+    const result = await parseEpubCore(file);
     expect(result.title).toBe('MyNovel');
   });
 
@@ -127,7 +203,7 @@ describe('parseEpub', () => {
 </package>`);
 
     const file = await makeEpubFile(zip, 'empty.epub');
-    const result = await parseEpub(file);
+    const result = await parseEpubCore(file);
     expect(result.chapters).toEqual([]);
   });
 
@@ -173,7 +249,7 @@ describe('parseEpub', () => {
     );
 
     const file = await makeEpubFile(zip, 'test.epub');
-    const result = await parseEpub(file);
+    const result = await parseEpubCore(file);
 
     expect(result.chapters).toEqual([
       {
@@ -375,6 +451,71 @@ describe('parseEpub', () => {
         },
       ],
     });
+  });
+
+  it('uses the bundled parser fallback when DOMParser is unavailable in the worker environment', async () => {
+    const zip = new JSZip();
+    zip.file('META-INF/container.xml', `<?xml version="1.0"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <rootfiles>
+    <rootfile full-path="content.opf" media-type="application/oebps-package+xml"/>
+  </rootfiles>
+</container>`);
+    zip.file('content.opf', `<?xml version="1.0"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="uid">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:title id="uid">Fallback Parser</dc:title>
+  </metadata>
+  <manifest>
+    <item id="ch1" href="ch1.xhtml" media-type="application/xhtml+xml"/>
+  </manifest>
+  <spine>
+    <itemref idref="ch1"/>
+  </spine>
+</package>`);
+    zip.file('ch1.xhtml', `<?xml version="1.0"?>
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <body>
+    <p id="intro">Worker rich content.</p>
+    <hr />
+  </body>
+</html>`);
+
+    const file = await makeEpubFile(zip, 'fallback-parser.epub');
+    const originalDomParser = globalThis.DOMParser;
+    Object.defineProperty(globalThis, 'DOMParser', {
+      configurable: true,
+      value: undefined,
+    });
+
+    let result;
+    try {
+      result = await parseEpubCore(file);
+    } finally {
+      Object.defineProperty(globalThis, 'DOMParser', {
+        configurable: true,
+        value: originalDomParser,
+      });
+    }
+
+    expect(result.chapters).toEqual([{
+      title: 'ch1.xhtml',
+      content: 'Worker rich content.\n\n---',
+      contentFormat: 'rich',
+      richBlocks: [
+        {
+          type: 'paragraph',
+          anchorId: 'intro',
+          children: [{
+            type: 'text',
+            text: 'Worker rich content.',
+          }],
+        },
+        {
+          type: 'hr',
+        },
+      ],
+    }]);
   });
 
   it('falls back to plain chapter projection when rich parsing throws for a chapter', async () => {

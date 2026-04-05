@@ -5,7 +5,7 @@ import { sanitizeEpubHtml } from '../epub/epubHtmlSanitizer';
 import { normalizeRichBlocks } from '../epub/richTextNormalizer';
 
 describe('epubDomToRichBlocks', () => {
-  it('maps supported P0 structures into rich blocks and degrades unsupported blocks', () => {
+  it('maps supported rich structures into typed blocks including simple tables', () => {
     const root = sanitizeEpubHtml(`
       <html>
         <body>
@@ -33,7 +33,7 @@ describe('epubDomToRichBlocks', () => {
       'blockquote',
       'list',
       'image',
-      'unsupported',
+      'table',
     ]);
     expect(blocks[0]).toMatchObject({
       type: 'heading',
@@ -73,9 +73,46 @@ describe('epubDomToRichBlocks', () => {
       caption: [{ type: 'text', text: 'World map' }],
     });
     expect(blocks[5]).toMatchObject({
-      type: 'unsupported',
-      originalTag: 'table',
-      fallbackText: 'Cell',
+      type: 'table',
+      rows: [[{
+        children: [{ type: 'text', text: 'Cell' }],
+      }]],
     });
+  });
+
+  it('keeps supported chapter-internal links and drops unresolved internal targets', () => {
+    const root = sanitizeEpubHtml(`
+      <html>
+        <body>
+          <p id="intro">Intro</p>
+          <p><a href="#intro">Jump back</a> and <a href="#missing">skip missing</a>.</p>
+          <hr id="divider" />
+        </body>
+      </html>
+    `);
+
+    const blocks = normalizeRichBlocks(epubDomToRichBlocks(root));
+
+    expect(blocks).toMatchObject([
+      {
+        type: 'paragraph',
+        anchorId: 'intro',
+      },
+      {
+        type: 'paragraph',
+        children: [
+          {
+            type: 'link',
+            href: '#intro',
+            children: [{ type: 'text', text: 'Jump back' }],
+          },
+          { type: 'text', text: ' and skip missing.' },
+        ],
+      },
+      {
+        type: 'hr',
+        anchorId: 'divider',
+      },
+    ]);
   });
 });

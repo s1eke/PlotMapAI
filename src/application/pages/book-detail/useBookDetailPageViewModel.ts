@@ -20,7 +20,6 @@ import type {
 } from './types';
 import { useBookDetailAnalysisController } from './useBookDetailAnalysisController';
 import { useBookDetailDeleteFlow } from './useBookDetailDeleteFlow';
-import { useBookDetailReparseController } from './useBookDetailReparseController';
 
 function isValidNovelId(novelId: number): boolean {
   return Number.isFinite(novelId) && novelId > 0;
@@ -232,11 +231,6 @@ export function useBookDetailPageViewModel(novelId: number): BookDetailPageViewM
     novelId,
     onStatusUpdated: updateAnalysisStatus,
   });
-  const reparseController = useBookDetailReparseController({
-    fileType: novel?.fileType ?? 'epub',
-    novelId,
-    onReparsed: loadData,
-  });
   const deleteFlow = useBookDetailDeleteFlow({
     novelId,
     novelTitle: novel?.title ?? '',
@@ -264,6 +258,5 @@ export function useBookDetailPageViewModel(novelId: number): BookDetailPageViewM
     novel,
     overview,
     pageHrefs,
-    reparseController,
   };
 }

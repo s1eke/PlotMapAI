@@ -64,7 +64,7 @@ function blockToPlainText(block: RichBlock): string {
   }
 
   if (block.type === 'hr') {
-    return '';
+    return '---';
   }
 
   if (block.type === 'poem') {

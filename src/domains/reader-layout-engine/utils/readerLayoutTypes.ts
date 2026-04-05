@@ -4,6 +4,7 @@ import type {
   PaginationListContext,
   RichBlock,
   RichInline,
+  RichTableCell,
   RichTextAlign,
 } from '@shared/contracts';
 
@@ -24,6 +25,7 @@ export interface ReaderLocator {
 
 export interface ReaderBlock {
   align?: RichTextAlign;
+  anchorId?: string;
   chapterIndex: number;
   blockquoteDepth?: number;
   blockIndex: number;
@@ -39,10 +41,11 @@ export interface ReaderBlock {
   marginAfter: number;
   originalTag?: string;
   paragraphIndex: number;
-  renderRole?: 'hr' | 'plain' | 'rich-text' | 'unsupported';
+  renderRole?: 'hr' | 'plain' | 'rich-text' | 'table' | 'unsupported';
   richChildren?: RichInline[];
   showListMarker?: boolean;
   sourceBlockType?: RichBlock['type'];
+  tableRows?: RichTableCell[][];
   indent?: number;
 }
 
@@ -107,6 +110,7 @@ export interface VirtualBlockMetrics {
   marginAfter: number;
   marginBefore: number;
   top: number;
+  tableRowHeights?: number[];
 }
 
 export interface MeasuredChapterLayout {
@@ -120,6 +124,7 @@ export interface MeasuredChapterLayout {
 
 export interface ReaderTextPageItem {
   align?: RichTextAlign;
+  anchorId?: string;
   blockquoteDepth?: number;
   blockIndex: number;
   chapterIndex: number;
@@ -139,14 +144,18 @@ export interface ReaderTextPageItem {
   marginAfter: number;
   marginBefore: number;
   originalTag?: string;
-  renderRole?: 'hr' | 'plain' | 'rich-text' | 'unsupported';
+  renderRole?: 'hr' | 'plain' | 'rich-text' | 'table' | 'unsupported';
+  richLineFragments?: RichInline[][];
   showListMarker?: boolean;
   sourceBlockType?: RichBlock['type'];
+  tableRowHeights?: number[];
+  tableRows?: RichTableCell[][];
   text: string;
 }
 
 export interface ReaderImagePageItem {
   align?: RichTextAlign;
+  anchorId?: string;
   blockIndex: number;
   captionFont?: string;
   captionFontSizePx?: number;

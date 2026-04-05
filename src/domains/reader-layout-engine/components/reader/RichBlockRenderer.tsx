@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react';
+import type { RichInline } from '@shared/contracts';
 import type {
   StaticScrollBlockNode,
 } from '../../utils/readerLayout';
@@ -27,6 +28,23 @@ interface RichBlockRendererProps {
     element: HTMLButtonElement | null,
   ) => void;
   positionStyle?: CSSProperties;
+}
+
+const TABLE_CELL_HORIZONTAL_PADDING_PX = 12;
+const TABLE_CELL_VERTICAL_PADDING_PX = 10;
+
+function serializeInlineKey(children: RichInline[]): string {
+  return children.map((child) => {
+    if (child.type === 'text') {
+      return child.text;
+    }
+
+    if (child.type === 'lineBreak') {
+      return '\n';
+    }
+
+    return `${child.href}:${serializeInlineKey(child.children)}`;
+  }).join('');
 }
 
 function RichImage({
@@ -146,6 +164,67 @@ function renderRichContent(metric: StaticScrollBlockNode, chapterTitle?: string)
           className="w-full border-t border-border-color/40"
           style={{ height: metric.contentHeight }}
         />
+      </div>
+    );
+  }
+
+  if (block.renderRole === 'table' && block.tableRows) {
+    const rowCounts = new Map<string, number>();
+
+    return (
+      <div
+        data-testid="reader-rich-table"
+        className="h-full overflow-x-auto rounded-xl border border-border-color/40 bg-surface/60 px-1 py-1 shadow-sm"
+      >
+        <table
+          className="min-w-full table-fixed border-collapse"
+          style={{
+            font: metric.font,
+            fontSize: `${metric.fontSizePx}px`,
+            lineHeight: `${metric.lineHeightPx}px`,
+          }}
+        >
+          <tbody>
+            {block.tableRows.map((row, rowIndex) => {
+              const rowSignature = row.map((cell) => serializeInlineKey(cell.children)).join('|');
+              const rowOccurrence = rowCounts.get(rowSignature) ?? 0;
+              rowCounts.set(rowSignature, rowOccurrence + 1);
+              const rowKey = `${block.key}:row:${rowSignature}:${rowOccurrence}`;
+              const cellCounts = new Map<string, number>();
+
+              return (
+                <tr
+                  key={rowKey}
+                  style={metric.tableRowHeights?.[rowIndex]
+                    ? { height: `${metric.tableRowHeights[rowIndex]}px` }
+                    : undefined}
+                >
+                  {row.map((cell) => {
+                    const cellSignature = serializeInlineKey(cell.children);
+                    const cellOccurrence = cellCounts.get(cellSignature) ?? 0;
+                    cellCounts.set(cellSignature, cellOccurrence + 1);
+                    const cellKey = `${rowKey}:cell:${cellSignature}:${cellOccurrence}`;
+
+                    return (
+                      <td
+                        key={cellKey}
+                        className="border border-border-color/30 align-top text-left"
+                        style={{
+                          padding: `${TABLE_CELL_VERTICAL_PADDING_PX}px ${TABLE_CELL_HORIZONTAL_PADDING_PX}px`,
+                        }}
+                      >
+                        <RichInlineRenderer
+                          inlines={cell.children}
+                          keyPrefix={cellKey}
+                        />
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
     );
   }
@@ -316,6 +395,7 @@ export default function RichBlockRenderer({
 
   return (
     <div
+      id={block.anchorId}
       style={{
         ...positionStyle,
         height: metric.height,

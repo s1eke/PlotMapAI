@@ -92,10 +92,10 @@ export const applicationReaderContentController: ReaderContentController = {
 
     if (!chapterRichContent) {
       throw createAppError({
-        code: AppErrorCode.CHAPTER_MISSING,
+        code: AppErrorCode.CHAPTER_STRUCTURED_CONTENT_MISSING,
         kind: 'storage',
         source: 'reader',
-        userMessageKey: 'reader.loadError',
+        userMessageKey: 'reader.reparse.required',
         debugMessage: 'Structured chapter content is missing for the requested chapter.',
         details: {
           chapterIndex,

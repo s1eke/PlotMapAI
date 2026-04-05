@@ -4,6 +4,7 @@ import type {
   PaginationListContext,
   RichBlock,
   RichInline,
+  RichTableCell,
   RichTextAlign,
 } from '@shared/contracts';
 
@@ -64,6 +65,7 @@ export interface StaticTextLineRecord {
 
 export interface StaticReaderBlockRecord {
   align?: RichTextAlign;
+  anchorId?: string;
   blockquoteDepth?: number;
   chapterIndex: number;
   blockIndex: number;
@@ -75,10 +77,11 @@ export interface StaticReaderBlockRecord {
   kind: 'heading' | 'text' | 'image' | 'blank';
   listContext?: PaginationListContext;
   originalTag?: string;
-  renderRole?: 'hr' | 'plain' | 'rich-text' | 'unsupported';
+  renderRole?: 'hr' | 'plain' | 'rich-text' | 'table' | 'unsupported';
   richChildren?: RichInline[];
   showListMarker?: boolean;
   sourceBlockType?: RichBlock['type'];
+  tableRows?: RichTableCell[][];
   text?: string;
   imageKey?: string;
   marginBefore: number;
@@ -99,6 +102,7 @@ export interface StaticScrollBlockRecord {
   lines: StaticTextLineRecord[];
   marginAfter: number;
   marginBefore: number;
+  tableRowHeights?: number[];
   top: number;
 }
 
@@ -112,6 +116,7 @@ export interface StaticScrollChapterTreeRecord {
 
 export interface StaticTextPageItemRecord {
   align?: RichTextAlign;
+  anchorId?: string;
   blockquoteDepth?: number;
   chapterIndex: number;
   blockIndex: number;
@@ -131,14 +136,17 @@ export interface StaticTextPageItemRecord {
   marginAfter: number;
   marginBefore: number;
   originalTag?: string;
-  renderRole?: 'hr' | 'plain' | 'rich-text' | 'unsupported';
+  renderRole?: 'hr' | 'plain' | 'rich-text' | 'table' | 'unsupported';
   showListMarker?: boolean;
   sourceBlockType?: RichBlock['type'];
+  tableRowHeights?: number[];
+  tableRows?: RichTableCell[][];
   text?: string;
 }
 
 export interface StaticImagePageItemRecord {
   align?: RichTextAlign;
+  anchorId?: string;
   captionFont?: string;
   captionFontSizePx?: number;
   captionHeight?: number;

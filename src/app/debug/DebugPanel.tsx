@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { ArrowLeft, Bug, ChevronDown, Download, RefreshCw, RotateCcw, Smartphone, Trash2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import {
   clearDebugSnapshots,
   clearLogs,
@@ -49,11 +50,6 @@ const CATEGORY_COLORS: Record<string, string> = {
   'character-graph': 'text-cyan-300',
 };
 
-const SNAPSHOT_LABELS: Record<string, string> = {
-  'book-import': 'Import Diagnostics',
-  'reader-layout': 'Reader Diagnostics',
-  storage: 'Storage Diagnostics',
-};
 const SNAPSHOT_ORDER = ['reader-layout', 'book-import', 'storage'];
 
 interface ReaderLayoutDiagnosticSnapshot {
@@ -103,22 +99,56 @@ function formatBytes(value: number | null): string {
   return `${(value / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }
 
-function buildSnapshotPreview(snapshot: DebugSnapshotEntry): string[] {
+function getSnapshotLabel(
+  key: string,
+  t: ReturnType<typeof useTranslation>['t'],
+): string {
+  switch (key) {
+    case 'book-import':
+      return t('debug.diagnostics.labels.bookImport');
+    case 'reader-layout':
+      return t('debug.diagnostics.labels.readerLayout');
+    case 'storage':
+      return t('debug.diagnostics.labels.storage');
+    default:
+      return key;
+  }
+}
+
+function buildSnapshotPreview(
+  snapshot: DebugSnapshotEntry,
+  t: ReturnType<typeof useTranslation>['t'],
+): string[] {
   if (snapshot.key === 'storage') {
     const value = snapshot.value as Partial<StorageDiagnosticSnapshot>;
     return [
-      `usage ${formatBytes(value.usage ?? null)} / ${formatBytes(value.quota ?? null)}`,
-      `render cache ${value.readerRenderCacheCount ?? 0} · rich ${value.chapterRichContentsCount ?? 0} · images ${value.chapterImagesCount ?? 0}`,
-      `current novel cache ${value.currentNovelRenderCacheCount ?? 0}`,
+      t('debug.diagnostics.preview.storageUsage', {
+        quota: formatBytes(value.quota ?? null),
+        usage: formatBytes(value.usage ?? null),
+      }),
+      t('debug.diagnostics.preview.storageCounts', {
+        imageCount: value.chapterImagesCount ?? 0,
+        renderCacheCount: value.readerRenderCacheCount ?? 0,
+        richCount: value.chapterRichContentsCount ?? 0,
+      }),
+      t('debug.diagnostics.preview.storageNovelCache', {
+        count: value.currentNovelRenderCacheCount ?? 0,
+      }),
     ];
   }
 
   if (snapshot.key === 'reader-layout') {
     const value = snapshot.value as Record<string, unknown>;
     return [
-      `format ${String(value.contentFormat ?? value.activeContentFormat ?? '-')}`,
-      `layout ${String(value.layoutFeatureSet ?? value.activeLayoutFeatureSet ?? '-')}`,
-      `pending preheat ${String(value.pendingPreheatCount ?? 0)}`,
+      t('debug.diagnostics.preview.readerFormat', {
+        format: String(value.contentFormat ?? value.activeContentFormat ?? '-'),
+      }),
+      t('debug.diagnostics.preview.readerLayout', {
+        layout: String(value.layoutFeatureSet ?? value.activeLayoutFeatureSet ?? '-'),
+      }),
+      t('debug.diagnostics.preview.readerPendingPreheat', {
+        count: Number(value.pendingPreheatCount ?? 0),
+      }),
     ];
   }
 
@@ -126,9 +156,15 @@ function buildSnapshotPreview(snapshot: DebugSnapshotEntry): string[] {
     const value = snapshot.value as Record<string, unknown>;
     const progress = typeof value.progress === 'object' && value.progress ? value.progress as Record<string, unknown> : null;
     return [
-      `operation ${String(value.operation ?? '-')}`,
-      `file ${String(value.currentFileName ?? '-')}`,
-      `stage ${String(progress?.stage ?? '-')}`,
+      t('debug.diagnostics.preview.importOperation', {
+        operation: String(value.operation ?? '-'),
+      }),
+      t('debug.diagnostics.preview.importFile', {
+        file: String(value.currentFileName ?? '-'),
+      }),
+      t('debug.diagnostics.preview.importStage', {
+        stage: String(progress?.stage ?? '-'),
+      }),
     ];
   }
 
@@ -149,6 +185,7 @@ async function getStorageEstimate(): Promise<{ quota?: number; usage?: number } 
 }
 
 export default function DebugPanel() {
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [logs, setLogs] = useState<DebugEntry[]>(() => getRecentLogs());
   const [snapshots, setSnapshots] = useState<DebugSnapshotEntry[]>(() => getDebugSnapshots());
@@ -283,7 +320,7 @@ export default function DebugPanel() {
           'fixed bottom-4 right-4 z-[70] w-10 h-10 rounded-full flex items-center justify-center shadow-lg border border-border-color transition-colors',
           'bg-bg-secondary/90 dark:bg-brand-800/90 backdrop-blur-sm hover:bg-bg-secondary dark:hover:bg-brand-800',
         )}
-        title="Debug Panel"
+        title={t('debug.panelTitle')}
       >
         <Bug className="w-4 h-4 text-text-primary" />
         {logs.length > 0 && (
@@ -300,10 +337,12 @@ export default function DebugPanel() {
       <div className="flex items-center justify-between px-3 py-2 border-b border-border-color/50">
         <div className="flex items-center gap-2">
           <Bug className="w-4 h-4 text-accent" />
-          <span className="text-xs font-semibold text-text-primary">Debug ({logs.length})</span>
+          <span className="text-xs font-semibold text-text-primary">
+            {t('debug.titleWithCount', { count: logs.length })}
+          </span>
         </div>
         <div className="flex items-center gap-1">
-          <button onClick={handleClear} className="p-1 rounded hover:bg-white/10 text-text-secondary transition-colors" title="Clear logs">
+          <button onClick={handleClear} className="p-1 rounded hover:bg-white/10 text-text-secondary transition-colors" title={t('debug.clearLogs')}>
             <Trash2 className="w-3.5 h-3.5" />
           </button>
           <button onClick={() => setIsOpen(false)} className="p-1 rounded hover:bg-white/10 text-text-secondary transition-colors">
@@ -320,7 +359,7 @@ export default function DebugPanel() {
             filter === 'all' ? 'bg-accent text-white' : 'bg-white/5 text-text-secondary hover:bg-white/10',
           )}
         >
-          All
+          {t('debug.filters.all')}
         </button>
         <button
           type="button"
@@ -330,7 +369,7 @@ export default function DebugPanel() {
             filter === 'errors' ? 'bg-red-500 text-white' : 'bg-white/5 text-text-secondary hover:bg-white/10',
           )}
         >
-          Errors
+          {t('debug.filters.errors')}
         </button>
         <button
           type="button"
@@ -340,14 +379,14 @@ export default function DebugPanel() {
             filter === 'logs' ? 'bg-brand-700 text-white' : 'bg-white/5 text-text-secondary hover:bg-white/10',
           )}
         >
-          Logs
+          {t('debug.filters.logs')}
         </button>
       </div>
       <div className="grid grid-cols-2 gap-2 border-b border-border-color/50 p-2">
         <div className="col-span-2 flex items-center justify-between rounded-lg border border-border-color/50 px-3 py-2">
           <div className="min-w-0">
-            <div className="text-xs font-medium text-text-primary">Reader Telemetry</div>
-            <div className="text-[10px] text-text-secondary">Verbose reader layout snapshots and preheat source logs</div>
+            <div className="text-xs font-medium text-text-primary">{t('debug.features.readerTelemetry.label')}</div>
+            <div className="text-[10px] text-text-secondary">{t('debug.features.readerTelemetry.description')}</div>
           </div>
           <Toggle
             checked={featureFlags.readerTelemetry}
@@ -359,8 +398,8 @@ export default function DebugPanel() {
         </div>
         <div className="col-span-2 flex items-center justify-between rounded-lg border border-border-color/50 px-3 py-2">
           <div className="min-w-0">
-            <div className="text-xs font-medium text-text-primary">Legacy Plain Scroll</div>
-            <div className="text-[10px] text-text-secondary">Temporarily force scroll mode back to the plain-text block renderer</div>
+            <div className="text-xs font-medium text-text-primary">{t('debug.features.readerLegacyPlainScroll.label')}</div>
+            <div className="text-[10px] text-text-secondary">{t('debug.features.readerLegacyPlainScroll.description')}</div>
           </div>
           <Toggle
             checked={featureFlags.readerLegacyPlainScroll}
@@ -375,41 +414,41 @@ export default function DebugPanel() {
           className="flex items-center justify-center gap-2 rounded-lg border border-border-color/50 px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-white/10"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
-          Go Back
+          {t('debug.actions.goBack')}
         </button>
         <button
           onClick={triggerDebugInstallPrompt}
           className="flex items-center justify-center gap-2 rounded-lg border border-border-color/50 px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-white/10"
         >
           <Download className="h-3.5 w-3.5" />
-          Install Prompt
+          {t('debug.actions.installPrompt')}
         </button>
         <button
           onClick={triggerDebugIosInstallHint}
           className="flex items-center justify-center gap-2 rounded-lg border border-border-color/50 px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-white/10"
         >
           <Smartphone className="h-3.5 w-3.5" />
-          iOS Hint
+          {t('debug.actions.iosHint')}
         </button>
         <button
           onClick={triggerDebugUpdateToast}
           className="flex items-center justify-center gap-2 rounded-lg border border-border-color/50 px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-white/10"
         >
           <RefreshCw className="h-3.5 w-3.5" />
-          Update Toast
+          {t('debug.actions.updateToast')}
         </button>
         <button
           onClick={triggerDebugResetPwaPrompts}
           className="flex items-center justify-center gap-2 rounded-lg border border-border-color/50 px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-white/10"
         >
           <RotateCcw className="h-3.5 w-3.5" />
-          Reset PWA
+          {t('debug.actions.resetPwa')}
         </button>
       </div>
       <div className="border-b border-border-color/50 p-2">
         <div className="mb-2 flex items-center justify-between">
           <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-text-secondary/80">
-            Diagnostics
+            {t('debug.diagnostics.title')}
           </span>
           <span className="text-[10px] text-text-secondary/60">
             {orderedSnapshots.length}
@@ -418,7 +457,7 @@ export default function DebugPanel() {
         <div className="space-y-2">
           {orderedSnapshots.length === 0 && (
             <div className="rounded-lg border border-white/5 bg-black/10 px-3 py-2 text-[11px] text-text-secondary">
-              No diagnostics yet
+              {t('debug.diagnostics.empty')}
             </div>
           )}
           {orderedSnapshots.map((snapshot) => (
@@ -428,14 +467,14 @@ export default function DebugPanel() {
             >
               <div className="flex items-center justify-between gap-3">
                 <span className="text-[11px] font-semibold text-text-primary">
-                  {SNAPSHOT_LABELS[snapshot.key] ?? snapshot.key}
+                  {getSnapshotLabel(snapshot.key, t)}
                 </span>
                 <span className="shrink-0 text-[10px] text-text-secondary/60">
                   {formatDiagnosticTime(snapshot.time)}
                 </span>
               </div>
               <div className="mt-2 space-y-1">
-                {buildSnapshotPreview(snapshot).map((line) => (
+                {buildSnapshotPreview(snapshot, t).map((line) => (
                   <div key={line} className="text-[10px] text-text-secondary/90">
                     {line}
                   </div>
@@ -450,7 +489,7 @@ export default function DebugPanel() {
       </div>
       <div ref={listRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-2 space-y-0.5 text-[11px] font-mono leading-relaxed custom-scrollbar">
         {visibleLogs.length === 0 && (
-          <div className="text-text-secondary text-center py-8">No logs yet</div>
+          <div className="text-text-secondary text-center py-8">{t('debug.logsEmpty')}</div>
         )}
         {visibleLogs.map((entry) => (
           <div
@@ -477,21 +516,21 @@ export default function DebugPanel() {
                 <summary className="cursor-pointer select-none font-semibold text-text-primary/85">
                   {entry.error.code} · {entry.error.kind}
                   {' · '}
-                  retryable={String(entry.error.retryable)}
+                  {t('debug.errorDetails.retryable', { value: String(entry.error.retryable) })}
                 </summary>
                 <div className="mt-2 space-y-1 break-all">
-                  <div>source: {entry.error.source}</div>
-                  <div>userVisible: {String(entry.error.userVisible)}</div>
-                  <div>debugVisible: {String(entry.error.debugVisible)}</div>
+                  <div>{t('debug.errorDetails.source', { value: entry.error.source })}</div>
+                  <div>{t('debug.errorDetails.userVisible', { value: String(entry.error.userVisible) })}</div>
+                  <div>{t('debug.errorDetails.debugVisible', { value: String(entry.error.debugVisible) })}</div>
                   {entry.error.userMessageKey && (
-                    <div>messageKey: {entry.error.userMessageKey}</div>
+                    <div>{t('debug.errorDetails.messageKey', { value: entry.error.userMessageKey })}</div>
                   )}
                   {entry.error.details && (
                     <pre className="whitespace-pre-wrap text-[10px] text-text-secondary/90">
                       {JSON.stringify(entry.error.details, null, 2)}
                     </pre>
                   )}
-                  {entry.error.cause?.message && <div>cause: {entry.error.cause.message}</div>}
+                  {entry.error.cause?.message && <div>{t('debug.errorDetails.cause', { value: entry.error.cause.message })}</div>}
                   {entry.error.stack && (
                     <pre className="max-h-48 overflow-auto whitespace-pre-wrap text-[10px] text-text-secondary/90">
                       {entry.error.stack}

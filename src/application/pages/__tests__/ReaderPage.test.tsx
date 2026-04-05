@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
 import { analyzeChapter } from '@application/use-cases/analysis';
+import { loadReaderSession } from '@application/use-cases/library';
 
 import ReaderPage from '../reader';
 
@@ -30,6 +31,10 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('@application/use-cases/analysis', () => ({
   analyzeChapter: vi.fn(),
+}));
+
+vi.mock('@application/use-cases/library', () => ({
+  loadReaderSession: vi.fn(),
 }));
 
 vi.mock('@domains/analysis', async () => {
@@ -243,6 +248,22 @@ describe('application ReaderPage', () => {
         summary: 'summary',
         tags: ['tag'],
         updatedAt: null,
+      },
+    });
+    vi.mocked(loadReaderSession).mockResolvedValue({
+      novel: {
+        id: 1,
+        title: 'Reader Novel',
+        author: 'Author',
+        description: '',
+        tags: [],
+        fileType: 'epub',
+        hasCover: false,
+        createdAt: new Date().toISOString(),
+        totalWords: 100,
+        chapterCount: 1,
+        originalFilename: 'reader.epub',
+        originalEncoding: 'utf-8',
       },
     });
   });

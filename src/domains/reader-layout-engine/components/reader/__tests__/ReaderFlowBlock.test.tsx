@@ -76,6 +76,80 @@ describe('ReaderFlowBlock', () => {
     expect(fragment).not.toHaveStyle({ textAlign: 'justify' });
   });
 
+  it('renders rich inline styling for paged text fragments', () => {
+    render(
+      <ReaderFlowBlock
+        imageRenderMode="paged"
+        novelId={1}
+        item={{
+          blockIndex: 3,
+          chapterIndex: 0,
+          contentHeight: 64,
+          font: '400 18px sans-serif',
+          fontSizePx: 18,
+          height: 64,
+          indent: 2,
+          key: '0:text:3:0',
+          kind: 'text',
+          lineHeightPx: 32,
+          lineStartIndex: 0,
+          lines: [
+            {
+              end: { graphemeIndex: 5, segmentIndex: 0 },
+              lineIndex: 0,
+              start: { graphemeIndex: 0, segmentIndex: 0 },
+              text: 'Bold ',
+              width: 200,
+            },
+            {
+              end: { graphemeIndex: 9, segmentIndex: 0 },
+              lineIndex: 1,
+              start: { graphemeIndex: 5, segmentIndex: 0 },
+              text: 'Link',
+              width: 180,
+            },
+          ],
+          marginAfter: 0,
+          marginBefore: 0,
+          renderRole: 'rich-text',
+          richLineFragments: [
+            [
+              {
+                marks: ['bold'],
+                text: 'Bold',
+                type: 'text',
+              },
+              {
+                text: ' ',
+                type: 'text',
+              },
+            ],
+            [
+              {
+                children: [
+                  {
+                    marks: ['italic'],
+                    text: 'Link',
+                    type: 'text',
+                  },
+                ],
+                href: '#target',
+                type: 'link',
+              },
+            ],
+          ],
+          text: 'Bold Link',
+        }}
+      />,
+    );
+
+    const fragment = screen.getByTestId('reader-flow-text-fragment');
+    expect(fragment.querySelector('strong')).not.toBeNull();
+    expect(screen.getByRole('link', { name: 'Link' })).toHaveAttribute('href', '#target');
+    expect(fragment.querySelector('em')).not.toBeNull();
+    expect(fragment.firstElementChild).toHaveStyle({ paddingLeft: '2em' });
+  });
+
   it('renders heading fragments as a single h2 node', () => {
     render(
       <ReaderFlowBlock

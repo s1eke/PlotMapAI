@@ -3,6 +3,53 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import DebugPanel from '../DebugPanel';
 
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string, options?: Record<string, string | number>) => {
+      const translations: Record<string, string> = {
+        'debug.panelTitle': 'Debug Panel',
+        'debug.titleWithCount': 'Debug ({{count}})',
+        'debug.clearLogs': 'Clear logs',
+        'debug.filters.all': 'All',
+        'debug.filters.errors': 'Errors',
+        'debug.filters.logs': 'Logs',
+        'debug.features.readerTelemetry.label': 'Reader Telemetry',
+        'debug.features.readerTelemetry.description': 'Verbose reader layout snapshots and preheat source logs',
+        'debug.features.readerLegacyPlainScroll.label': 'Legacy Plain Scroll',
+        'debug.features.readerLegacyPlainScroll.description': 'Temporarily force scroll mode back to the plain-text block renderer',
+        'debug.actions.goBack': 'Go Back',
+        'debug.actions.installPrompt': 'Install Prompt',
+        'debug.actions.iosHint': 'iOS Hint',
+        'debug.actions.updateToast': 'Update Toast',
+        'debug.actions.resetPwa': 'Reset PWA',
+        'debug.diagnostics.title': 'Diagnostics',
+        'debug.diagnostics.empty': 'No diagnostics yet',
+        'debug.diagnostics.labels.bookImport': 'Import Diagnostics',
+        'debug.diagnostics.labels.readerLayout': 'Reader Diagnostics',
+        'debug.diagnostics.labels.storage': 'Storage Diagnostics',
+        'debug.diagnostics.preview.storageUsage': 'Usage {{usage}} / {{quota}}',
+        'debug.diagnostics.preview.storageCounts': 'Render cache {{renderCacheCount}} · rich {{richCount}} · images {{imageCount}}',
+        'debug.diagnostics.preview.storageNovelCache': 'Current novel cache {{count}}',
+        'debug.diagnostics.preview.readerFormat': 'Format {{format}}',
+        'debug.diagnostics.preview.readerLayout': 'Layout {{layout}}',
+        'debug.diagnostics.preview.readerPendingPreheat': 'Pending preheat {{count}}',
+        'debug.diagnostics.preview.importOperation': 'Operation {{operation}}',
+        'debug.diagnostics.preview.importFile': 'File {{file}}',
+        'debug.diagnostics.preview.importStage': 'Stage {{stage}}',
+        'debug.logsEmpty': 'No logs yet',
+        'debug.errorDetails.retryable': 'retryable={{value}}',
+        'debug.errorDetails.source': 'source: {{value}}',
+        'debug.errorDetails.userVisible': 'userVisible: {{value}}',
+        'debug.errorDetails.debugVisible': 'debugVisible: {{value}}',
+        'debug.errorDetails.messageKey': 'messageKey: {{value}}',
+        'debug.errorDetails.cause': 'cause: {{value}}',
+      };
+      const template = translations[key] ?? key;
+      return template.replace(/\{\{(\w+)\}\}/gu, (_, name: string) => String(options?.[name] ?? `{{${name}}}`));
+    },
+  }),
+}));
+
 const debugTest = vi.hoisted(() => {
   let logs: Array<{ time: number; category: string; message: string }> = [];
   let snapshots: Array<{ key: string; time: number; value: unknown }> = [];

@@ -229,7 +229,7 @@ describe('applicationReaderContentController', () => {
     await db.chapterRichContents.where('[novelId+chapterIndex]').equals([1, 0]).delete();
 
     await expect(applicationReaderContentController.getChapterContent(1, 0)).rejects.toMatchObject({
-      code: AppErrorCode.CHAPTER_MISSING,
+      code: AppErrorCode.CHAPTER_STRUCTURED_CONTENT_MISSING,
       details: {
         chapterIndex: 0,
         novelId: 1,

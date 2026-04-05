@@ -97,7 +97,7 @@ export const bookLifecycleService = {
         code: AppErrorCode.UNSUPPORTED_FILE_TYPE,
         kind: 'validation',
         source: 'book-import',
-        userMessageKey: 'bookDetail.reparseFileTypeMismatch',
+        userMessageKey: 'reader.reparse.fileTypeMismatch',
         debugMessage: 'Selected reparse file type does not match the imported novel type.',
         details: {
           expectedFileType: existingNovel.fileType,

@@ -2,5 +2,5 @@
   "shellInitialJsGzip": 261120,
   "largestSharedChunkGzip": 112640,
   "largestLazyRouteChunkGzip": 40960,
-  "largestWorkerChunkGzip": 46080
+  "largestWorkerChunkGzip": 76800
 }
