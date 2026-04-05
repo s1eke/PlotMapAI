@@ -4,8 +4,20 @@ import type {
   PaginationContainer,
   RichBlock,
 } from '@shared/contracts';
-
+import type {
+  ReaderContentMeasuredToken,
+  ReaderContentVisualToken,
+} from '@shared/reader-content';
 import { READER_THEMES } from './readerThemes';
+
+export {
+  READER_CONTENT_MEASURED_TOKENS,
+  READER_CONTENT_VISUAL_TOKENS,
+} from '@shared/reader-content';
+export type {
+  ReaderContentMeasuredToken,
+  ReaderContentVisualToken,
+} from '@shared/reader-content';
 
 export type ReaderContentMode = 'scroll' | 'paged';
 
@@ -59,52 +71,6 @@ export const READER_CONTENT_THEME_CLASSES = {
   green: 'pm-reader--theme-green',
   night: 'pm-reader--theme-night',
 } as const satisfies Record<keyof typeof READER_THEMES, string>;
-
-export const READER_CONTENT_MEASURED_TOKENS = [
-  '--pm-reader-font-size',
-  '--pm-reader-line-height',
-  '--pm-reader-paragraph-gap',
-  '--pm-reader-heading-font-size',
-  '--pm-reader-heading-line-height',
-  '--pm-reader-heading-margin-top',
-  '--pm-reader-heading-margin-bottom',
-  '--pm-reader-list-marker-width',
-  '--pm-reader-list-marker-gap',
-  '--pm-reader-list-nested-indent',
-  '--pm-reader-blockquote-border-width',
-  '--pm-reader-blockquote-gap',
-  '--pm-reader-blockquote-padding',
-  '--pm-reader-poem-indent',
-  '--pm-reader-poem-line-gap',
-  '--pm-reader-image-block-margin-before',
-  '--pm-reader-image-block-margin-after',
-  '--pm-reader-image-caption-gap',
-  '--pm-reader-hr-height',
-  '--pm-reader-hr-margin-before',
-  '--pm-reader-hr-margin-after',
-  '--pm-reader-table-margin-before',
-  '--pm-reader-table-margin-after',
-  '--pm-reader-table-cell-padding-x',
-  '--pm-reader-table-cell-padding-y',
-] as const;
-
-export type ReaderContentMeasuredToken = (typeof READER_CONTENT_MEASURED_TOKENS)[number];
-
-export const READER_CONTENT_VISUAL_TOKENS = [
-  '--pm-reader-bg',
-  '--pm-reader-surface',
-  '--pm-reader-text',
-  '--pm-reader-text-muted',
-  '--pm-reader-border',
-  '--pm-reader-accent',
-  '--pm-reader-link',
-  '--pm-reader-selection-bg',
-  '--pm-reader-image-radius',
-  '--pm-reader-shadow-soft',
-  '--pm-reader-focus-ring',
-] as const;
-
-export type ReaderContentVisualToken = (typeof READER_CONTENT_VISUAL_TOKENS)[number];
 
 export interface ReaderContentSourceStructureSpec {
   emittedContexts: readonly ReaderContentContextVariant[];

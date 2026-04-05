@@ -39,6 +39,7 @@ import {
   shouldUseRichScrollBlocks,
 } from './richScroll';
 import { createRichLineFragments } from './richLineFragments';
+import { READER_CONTENT_TOKEN_DEFAULTS } from '@shared/reader-content';
 import { getRichInlinePlainText } from '@shared/text-processing';
 
 interface EstimatedReaderBlockMetric {
@@ -54,10 +55,6 @@ interface EstimatedReaderBlockMetric {
   marginAfter: number;
   marginBefore: number;
 }
-
-const TABLE_BORDER_WIDTH_PX = 1;
-const TABLE_CELL_HORIZONTAL_PADDING_PX = 12;
-const TABLE_CELL_VERTICAL_PADDING_PX = 10;
 
 export function getPagedContentHeight(pagedViewportHeight: number): number {
   return Math.max(0, pagedViewportHeight - PAGED_VIEWPORT_TOP_PADDING_PX);
@@ -216,21 +213,25 @@ function estimateTableContentHeight(
 
   const columnCount = Math.max(...tableRows.map((row) => row.length), 1);
   const totalHorizontalPadding =
-    columnCount * TABLE_CELL_HORIZONTAL_PADDING_PX * 2
-    + (columnCount + 1) * TABLE_BORDER_WIDTH_PX;
-  const cellMaxWidth = Math.max(48, (maxWidth - totalHorizontalPadding) / columnCount);
+    columnCount * READER_CONTENT_TOKEN_DEFAULTS.tableCellPaddingXPx * 2
+    + (columnCount + 1) * READER_CONTENT_TOKEN_DEFAULTS.tableBorderWidthPx;
+  const cellMaxWidth = Math.max(
+    READER_CONTENT_TOKEN_DEFAULTS.tableMinCellWidthPx,
+    (maxWidth - totalHorizontalPadding) / columnCount,
+  );
   const rowHeights = tableRows.map((row) => {
     const maxCellHeight = Math.max(...row.map((cell) => {
       const lineCount = Math.max(
         estimateTextLineCount(getRichInlinePlainText(cell.children), cellMaxWidth, fontSizePx),
         1,
       );
-      return lineCount * lineHeightPx + TABLE_CELL_VERTICAL_PADDING_PX * 2;
-    }), lineHeightPx + TABLE_CELL_VERTICAL_PADDING_PX * 2);
+      return lineCount * lineHeightPx + READER_CONTENT_TOKEN_DEFAULTS.tableCellPaddingYPx * 2;
+    }), lineHeightPx + READER_CONTENT_TOKEN_DEFAULTS.tableCellPaddingYPx * 2);
 
     return maxCellHeight;
   });
-  const borderHeight = (tableRows.length + 1) * TABLE_BORDER_WIDTH_PX;
+  const borderHeight =
+    (tableRows.length + 1) * READER_CONTENT_TOKEN_DEFAULTS.tableBorderWidthPx;
 
   return {
     contentHeight: rowHeights.reduce((total, height) => total + height, 0) + borderHeight,

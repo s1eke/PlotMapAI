@@ -9,6 +9,7 @@ import type {
 
 import { useTranslation } from 'react-i18next';
 
+import { READER_CONTENT_TOKEN_DEFAULTS } from '@shared/reader-content';
 import { cn } from '@shared/utils/cn';
 
 import { useReaderImageResource } from '../../hooks/useReaderImageResource';
@@ -79,9 +80,6 @@ interface RenderTextItem {
   tableRows?: ReaderTextPageItem['tableRows'];
   text: string;
 }
-
-const TABLE_CELL_HORIZONTAL_PADDING_PX = 12;
-const TABLE_CELL_VERTICAL_PADDING_PX = 10;
 
 function serializeInlineKey(children: RichInline[]): string {
   return children.map((child) => {
@@ -402,7 +400,6 @@ export default function ReaderFlowBlock({
               data-testid="reader-flow-image-caption"
               className={cn(
                 'w-full text-sm text-text-secondary',
-                imageItem.captionSpacing ? 'mt-2' : undefined,
                 resolveTextAlignClass(imageItem.align),
               )}
               style={{
@@ -415,6 +412,9 @@ export default function ReaderFlowBlock({
                   : undefined,
                 minHeight: imageItem.captionLines && imageItem.captionLineHeightPx
                   ? `${imageItem.captionLines.length * imageItem.captionLineHeightPx}px`
+                  : undefined,
+                marginTop: imageItem.captionSpacing
+                  ? `${READER_CONTENT_TOKEN_DEFAULTS.imageCaptionGapPx}px`
                   : undefined,
                 whiteSpace: 'pre',
               }}
@@ -523,7 +523,7 @@ export default function ReaderFlowBlock({
                         key={cellKey}
                         className="border border-border-color/30 align-top text-left"
                         style={{
-                          padding: `${TABLE_CELL_VERTICAL_PADDING_PX}px ${TABLE_CELL_HORIZONTAL_PADDING_PX}px`,
+                          padding: `${READER_CONTENT_TOKEN_DEFAULTS.tableCellPaddingYPx}px ${READER_CONTENT_TOKEN_DEFAULTS.tableCellPaddingXPx}px`,
                         }}
                       >
                         <RichInlineRenderer

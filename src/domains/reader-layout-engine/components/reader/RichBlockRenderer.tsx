@@ -10,6 +10,7 @@ import type {
 
 import { useTranslation } from 'react-i18next';
 
+import { READER_CONTENT_TOKEN_DEFAULTS } from '@shared/reader-content';
 import { cn } from '@shared/utils/cn';
 import { useReaderImageResource } from '../../hooks/useReaderImageResource';
 import {
@@ -29,9 +30,6 @@ interface RichBlockRendererProps {
   ) => void;
   positionStyle?: CSSProperties;
 }
-
-const TABLE_CELL_HORIZONTAL_PADDING_PX = 12;
-const TABLE_CELL_VERTICAL_PADDING_PX = 10;
 
 function serializeInlineKey(children: RichInline[]): string {
   return children.map((child) => {
@@ -210,7 +208,7 @@ function renderRichContent(metric: StaticScrollBlockNode, chapterTitle?: string)
                         key={cellKey}
                         className="border border-border-color/30 align-top text-left"
                         style={{
-                          padding: `${TABLE_CELL_VERTICAL_PADDING_PX}px ${TABLE_CELL_HORIZONTAL_PADDING_PX}px`,
+                          padding: `${READER_CONTENT_TOKEN_DEFAULTS.tableCellPaddingYPx}px ${READER_CONTENT_TOKEN_DEFAULTS.tableCellPaddingXPx}px`,
                         }}
                       >
                         <RichInlineRenderer
@@ -307,13 +305,14 @@ export default function RichBlockRenderer({
               <figcaption
                 data-testid="reader-flow-image-caption"
                 className={cn(
-                  'mt-2 w-full text-sm text-text-secondary',
+                  'w-full text-sm text-text-secondary',
                   resolveTextAlignClass(block.align),
                 )}
                 style={{
                   font: metric.captionFont,
                   fontSize: `${metric.captionFontSizePx}px`,
                   lineHeight: `${metric.captionLineHeightPx}px`,
+                  marginTop: `${READER_CONTENT_TOKEN_DEFAULTS.imageCaptionGapPx}px`,
                   minHeight: metric.captionHeight,
                 }}
               >

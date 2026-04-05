@@ -26,13 +26,15 @@ import {
   getRichScrollRuleHeight,
   shouldUseRichScrollBlocks,
 } from './richScroll';
+import {
+  createReaderContentMeasuredTokenValues,
+  READER_CONTENT_MEASURED_TOKEN_NAMES,
+  READER_CONTENT_TOKEN_DEFAULTS,
+} from '@shared/reader-content';
 import { getRichInlinePlainText } from '@shared/text-processing';
 
 const MAX_PRETEXT_CACHE_SIZE = 256;
 const PRETEXT_CACHE = new Map<string, PreparedTextWithSegments | null>();
-const TABLE_BORDER_WIDTH_PX = 1;
-const TABLE_CELL_HORIZONTAL_PADDING_PX = 12;
-const TABLE_CELL_VERTICAL_PADDING_PX = 10;
 
 interface PreparedTextBlock {
   font: string;
@@ -174,19 +176,28 @@ export function createReaderTypographyMetrics(
   viewportWidth: number,
 ): ReaderTypographyMetrics {
   const fontFamily = resolveReaderFontFamily();
-  const headingFontSize = Math.max(
-    fontSize * 1.35,
-    viewportWidth >= 640 ? 28 : 24,
-  );
+  const measuredTokens = createReaderContentMeasuredTokenValues({
+    fontSize,
+    lineSpacing,
+    paragraphSpacing,
+    viewportWidth,
+  });
+  const bodyFontSize = measuredTokens[READER_CONTENT_MEASURED_TOKEN_NAMES.fontSize];
+  const bodyLineHeightPx = measuredTokens[READER_CONTENT_MEASURED_TOKEN_NAMES.lineHeight];
+  const headingFontSize = measuredTokens[READER_CONTENT_MEASURED_TOKEN_NAMES.headingFontSize];
+  const headingLineHeightPx = measuredTokens[
+    READER_CONTENT_MEASURED_TOKEN_NAMES.headingLineHeight
+  ];
+  const paragraphGap = measuredTokens[READER_CONTENT_MEASURED_TOKEN_NAMES.paragraphGap];
 
   return {
-    bodyFont: `400 ${fontSize}px ${fontFamily}`,
-    bodyFontSize: fontSize,
-    bodyLineHeightPx: Math.max(1, fontSize * lineSpacing),
+    bodyFont: `400 ${bodyFontSize}px ${fontFamily}`,
+    bodyFontSize,
+    bodyLineHeightPx,
     headingFont: `700 ${headingFontSize}px ${fontFamily}`,
     headingFontSize,
-    headingLineHeightPx: Math.max(1, headingFontSize * 1.4),
-    paragraphSpacing,
+    headingLineHeightPx,
+    paragraphSpacing: paragraphGap,
   };
 }
 
@@ -222,7 +233,9 @@ function measureCaptionLines(params: {
     captionHeight,
     captionLineHeightPx: params.lineHeightPx,
     captionLines,
-    captionSpacing: captionLines.length > 0 ? 8 : 0,
+    captionSpacing: captionLines.length > 0
+      ? READER_CONTENT_TOKEN_DEFAULTS.imageCaptionGapPx
+      : 0,
   };
 }
 
@@ -248,10 +261,10 @@ function measureTableRows(params: {
     1,
   );
   const totalHorizontalPadding =
-    columnCount * TABLE_CELL_HORIZONTAL_PADDING_PX * 2
-    + (columnCount + 1) * TABLE_BORDER_WIDTH_PX;
+    columnCount * READER_CONTENT_TOKEN_DEFAULTS.tableCellPaddingXPx * 2
+    + (columnCount + 1) * READER_CONTENT_TOKEN_DEFAULTS.tableBorderWidthPx;
   const cellMaxWidth = Math.max(
-    48,
+    READER_CONTENT_TOKEN_DEFAULTS.tableMinCellWidthPx,
     (params.maxWidth - totalHorizontalPadding) / columnCount,
   );
   const rowHeights = params.tableRows.map((row) => {
@@ -268,12 +281,13 @@ function measureTableRows(params: {
         : [];
 
       return Math.max(measuredLines.length, 1) * params.lineHeightPx
-        + TABLE_CELL_VERTICAL_PADDING_PX * 2;
-    }), params.lineHeightPx + TABLE_CELL_VERTICAL_PADDING_PX * 2);
+        + READER_CONTENT_TOKEN_DEFAULTS.tableCellPaddingYPx * 2;
+    }), params.lineHeightPx + READER_CONTENT_TOKEN_DEFAULTS.tableCellPaddingYPx * 2);
 
     return maxCellHeight;
   });
-  const borderHeight = (params.tableRows.length + 1) * TABLE_BORDER_WIDTH_PX;
+  const borderHeight =
+    (params.tableRows.length + 1) * READER_CONTENT_TOKEN_DEFAULTS.tableBorderWidthPx;
 
   return {
     contentHeight: rowHeights.reduce((total, height) => total + height, 0) + borderHeight,

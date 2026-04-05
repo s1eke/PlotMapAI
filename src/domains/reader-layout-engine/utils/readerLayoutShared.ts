@@ -8,6 +8,7 @@ import type {
 } from './readerLayoutTypes';
 
 import { buildChapterBlockSequence } from '@shared/text-processing/chapterBlocks';
+import { READER_CONTENT_TOKEN_DEFAULTS } from '@shared/reader-content';
 
 import {
   buildRichScrollReaderBlocks,
@@ -15,9 +16,6 @@ import {
 } from './richScroll';
 
 const DEFAULT_IMAGE_ASPECT_RATIO = 4 / 3;
-const IMAGE_BLOCK_MARGIN_PX = 16;
-const HEADING_TOP_MARGIN_PX = 8;
-const HEADING_BOTTOM_MARGIN_PX = 32;
 const TEXT_FALLBACK_WIDTH_RATIO = 0.55;
 const MIN_TWO_COLUMN_WIDTH_PX = 360;
 const PORTRAIT_PAGED_RATIO_THRESHOLD = 1.1;
@@ -113,8 +111,8 @@ export function buildReaderBlocks(
     key: `${chapter.index}:heading:0`,
     kind: 'heading',
     text: chapter.title,
-    marginBefore: HEADING_TOP_MARGIN_PX,
-    marginAfter: HEADING_BOTTOM_MARGIN_PX,
+    marginBefore: READER_CONTENT_TOKEN_DEFAULTS.chapterTitleMarginTopPx,
+    marginAfter: READER_CONTENT_TOKEN_DEFAULTS.chapterTitleMarginBottomPx,
     paragraphIndex: -1,
     renderRole: 'plain',
   }];
@@ -143,9 +141,9 @@ export function buildReaderBlocks(
         imageKey: block.imageKey,
         key: `${chapter.index}:image:${block.blockIndex}`,
         kind: 'image',
-        marginBefore: IMAGE_BLOCK_MARGIN_PX,
+        marginBefore: READER_CONTENT_TOKEN_DEFAULTS.imageBlockMarginPx,
         marginAfter:
-          IMAGE_BLOCK_MARGIN_PX +
+          READER_CONTENT_TOKEN_DEFAULTS.imageBlockMarginPx +
           (block.hasParagraphSpacingAfter ? paragraphSpacing : 0),
         paragraphIndex: block.paragraphIndex,
         renderRole: 'plain',

@@ -7,23 +7,7 @@ import {
   buildRichPaginationBlockSequence,
   getPaginationBlockPlainText,
 } from '@shared/text-processing';
-
-const BLOCKQUOTE_BORDER_WIDTH_PX = 2;
-const BLOCKQUOTE_GAP_PX = 10;
-const BLOCKQUOTE_PADDING_PX = 14;
-const IMAGE_BLOCK_MARGIN_PX = 16;
-const LIST_MARKER_GAP_PX = 8;
-const LIST_MARKER_WIDTH_PX = 24;
-const LIST_NESTED_INDENT_PX = 20;
-const POEM_LINE_GAP_PX = 6;
-const POEM_LINE_INDENT_PX = 20;
-const RICH_HEADING_BOTTOM_MARGIN_PX = 20;
-const RICH_HEADING_TOP_MARGIN_PX = 10;
-const RICH_HORIZONTAL_RULE_HEIGHT_PX = 1;
-const RICH_HORIZONTAL_RULE_MARGIN_AFTER_PX = 20;
-const RICH_HORIZONTAL_RULE_MARGIN_BEFORE_PX = 12;
-const RICH_TABLE_MARGIN_AFTER_PX = 16;
-const RICH_TABLE_MARGIN_BEFORE_PX = 12;
+import { READER_CONTENT_TOKEN_DEFAULTS } from '@shared/reader-content';
 
 export interface RichScrollBlockInsets {
   end: number;
@@ -42,8 +26,8 @@ function toChapterTitleBlock(chapter: ChapterContent): ReaderBlock {
     headingLevel: 1,
     key: `${chapter.index}:heading:0`,
     kind: 'heading',
-    marginAfter: 32,
-    marginBefore: 8,
+    marginAfter: READER_CONTENT_TOKEN_DEFAULTS.chapterTitleMarginBottomPx,
+    marginBefore: READER_CONTENT_TOKEN_DEFAULTS.chapterTitleMarginTopPx,
     paragraphIndex: -1,
     text: chapter.title,
   };
@@ -71,19 +55,26 @@ export function resolveRichScrollBlockInsets(
   block: Pick<ReaderBlock, 'blockquoteDepth' | 'container' | 'listContext'>,
 ): RichScrollBlockInsets {
   const quoteInset = Math.max(block.blockquoteDepth ?? 0, 0)
-    * (BLOCKQUOTE_BORDER_WIDTH_PX + BLOCKQUOTE_GAP_PX + BLOCKQUOTE_PADDING_PX);
+    * (
+      READER_CONTENT_TOKEN_DEFAULTS.blockquoteBorderWidthPx
+      + READER_CONTENT_TOKEN_DEFAULTS.blockquoteGapPx
+      + READER_CONTENT_TOKEN_DEFAULTS.blockquotePaddingPx
+    );
   const listInset = block.listContext
-    ? LIST_MARKER_WIDTH_PX
-      + LIST_MARKER_GAP_PX
-      + Math.max(0, block.listContext.depth - 1) * LIST_NESTED_INDENT_PX
+    ? READER_CONTENT_TOKEN_DEFAULTS.listMarkerWidthPx
+      + READER_CONTENT_TOKEN_DEFAULTS.listMarkerGapPx
+      + Math.max(0, block.listContext.depth - 1)
+        * READER_CONTENT_TOKEN_DEFAULTS.listNestedIndentPx
     : 0;
-  const poemInset = block.container === 'poem-line' ? POEM_LINE_INDENT_PX : 0;
+  const poemInset = block.container === 'poem-line'
+    ? READER_CONTENT_TOKEN_DEFAULTS.poemIndentPx
+    : 0;
 
   return {
-    end: quoteInset > 0 ? BLOCKQUOTE_PADDING_PX : 0,
+    end: quoteInset > 0 ? READER_CONTENT_TOKEN_DEFAULTS.blockquotePaddingPx : 0,
     listInset,
-    markerGap: block.listContext ? LIST_MARKER_GAP_PX : 0,
-    markerWidth: block.listContext ? LIST_MARKER_WIDTH_PX : 0,
+    markerGap: block.listContext ? READER_CONTENT_TOKEN_DEFAULTS.listMarkerGapPx : 0,
+    markerWidth: block.listContext ? READER_CONTENT_TOKEN_DEFAULTS.listMarkerWidthPx : 0,
     poemInset,
     quoteInset,
     start: quoteInset + listInset + poemInset,
@@ -145,8 +136,8 @@ export function buildRichScrollReaderBlocks(
         headingLevel: entry.block.level,
         key: `${chapter.index}:rich-heading:${entry.blockIndex}`,
         kind: 'heading',
-        marginAfter: RICH_HEADING_BOTTOM_MARGIN_PX,
-        marginBefore: RICH_HEADING_TOP_MARGIN_PX,
+        marginAfter: READER_CONTENT_TOKEN_DEFAULTS.headingMarginBottomPx,
+        marginBefore: READER_CONTENT_TOKEN_DEFAULTS.headingMarginTopPx,
         richChildren: entry.block.children,
         text: getPaginationBlockPlainText(entry.block),
       };
@@ -159,8 +150,8 @@ export function buildRichScrollReaderBlocks(
         imageKey: entry.block.key,
         key: `${chapter.index}:rich-image:${entry.blockIndex}`,
         kind: 'image',
-        marginAfter: IMAGE_BLOCK_MARGIN_PX + paragraphSpacing,
-        marginBefore: IMAGE_BLOCK_MARGIN_PX,
+        marginAfter: READER_CONTENT_TOKEN_DEFAULTS.imageBlockMarginPx + paragraphSpacing,
+        marginBefore: READER_CONTENT_TOKEN_DEFAULTS.imageBlockMarginPx,
       };
     }
 
@@ -169,8 +160,8 @@ export function buildRichScrollReaderBlocks(
         ...sharedFields,
         key: `${chapter.index}:rich-hr:${entry.blockIndex}`,
         kind: 'text',
-        marginAfter: RICH_HORIZONTAL_RULE_MARGIN_AFTER_PX,
-        marginBefore: RICH_HORIZONTAL_RULE_MARGIN_BEFORE_PX,
+        marginAfter: READER_CONTENT_TOKEN_DEFAULTS.hrMarginAfterPx,
+        marginBefore: READER_CONTENT_TOKEN_DEFAULTS.hrMarginBeforePx,
         renderRole: 'hr',
         text: '',
       };
@@ -181,8 +172,8 @@ export function buildRichScrollReaderBlocks(
         ...sharedFields,
         key: `${chapter.index}:rich-table:${entry.blockIndex}`,
         kind: 'text',
-        marginAfter: RICH_TABLE_MARGIN_AFTER_PX + paragraphSpacing,
-        marginBefore: RICH_TABLE_MARGIN_BEFORE_PX,
+        marginAfter: READER_CONTENT_TOKEN_DEFAULTS.tableMarginAfterPx + paragraphSpacing,
+        marginBefore: READER_CONTENT_TOKEN_DEFAULTS.tableMarginBeforePx,
         renderRole: 'table',
         tableRows: entry.block.rows,
         text: getPaginationBlockPlainText(entry.block),
@@ -204,7 +195,9 @@ export function buildRichScrollReaderBlocks(
       indent: entry.block.type === 'paragraph' ? entry.block.indent : undefined,
       key: `${chapter.index}:rich-text:${entry.blockIndex}`,
       kind: 'text',
-      marginAfter: isPoemLine && nextIsPoemLine ? POEM_LINE_GAP_PX : paragraphSpacing,
+      marginAfter: isPoemLine && nextIsPoemLine
+        ? READER_CONTENT_TOKEN_DEFAULTS.poemLineGapPx
+        : paragraphSpacing,
       marginBefore: 0,
       originalTag: entry.block.type === 'unsupported' ? entry.block.originalTag : undefined,
       renderRole: entry.block.type === 'unsupported' ? 'unsupported' : 'rich-text',
@@ -225,5 +218,5 @@ export function getRichScrollHorizontalTextWidth(
 }
 
 export function getRichScrollRuleHeight(): number {
-  return RICH_HORIZONTAL_RULE_HEIGHT_PX;
+  return READER_CONTENT_TOKEN_DEFAULTS.hrHeightPx;
 }
