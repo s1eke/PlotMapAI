@@ -656,7 +656,7 @@ function estimateReaderBlockMetric(
     const displayHeight = resolvedImageSize.height;
     const captionHeight = estimateTextLineCount(
       getRichInlinePlainText(block.imageCaption ?? []),
-      availableWidth,
+      displayWidth,
       typography.bodyFontSize,
     ) * typography.bodyLineHeightPx;
     const captionSpacing = captionHeight > 0 ? 8 : 0;

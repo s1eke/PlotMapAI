@@ -11,6 +11,102 @@ import {
 type ReaderPageTurnModeLabel = 'Cover' | 'No Animation' | 'Slide' | 'Vertical';
 
 type ReaderPageTurnModeId = 'cover' | 'none' | 'slide' | 'scroll';
+type ReaderThemeId = 'auto' | 'paper' | 'parchment' | 'green' | 'night';
+
+interface SeedRichInlineText {
+  marks?: Array<'bold' | 'italic' | 'underline' | 'strike' | 'sup' | 'sub'>;
+  text: string;
+  type: 'text';
+}
+
+interface SeedRichInlineLineBreak {
+  type: 'lineBreak';
+}
+
+interface SeedRichInlineLink {
+  children: SeedRichInline[];
+  href: string;
+  type: 'link';
+}
+
+type SeedRichInline =
+  | SeedRichInlineLineBreak
+  | SeedRichInlineLink
+  | SeedRichInlineText;
+
+interface SeedRichHeadingBlock {
+  align?: 'left' | 'center' | 'right';
+  anchorId?: string;
+  children: SeedRichInline[];
+  level: 1 | 2 | 3 | 4 | 5 | 6;
+  type: 'heading';
+}
+
+interface SeedRichParagraphBlock {
+  align?: 'left' | 'center' | 'right';
+  anchorId?: string;
+  children: SeedRichInline[];
+  indent?: number;
+  type: 'paragraph';
+}
+
+interface SeedRichBlockquoteBlock {
+  children: SeedRichBlock[];
+  type: 'blockquote';
+}
+
+interface SeedRichListBlock {
+  items: SeedRichBlock[][];
+  ordered: boolean;
+  type: 'list';
+}
+
+interface SeedRichImageBlock {
+  align?: 'left' | 'center' | 'right';
+  alt?: string;
+  anchorId?: string;
+  caption?: SeedRichInline[];
+  key: string;
+  type: 'image';
+}
+
+interface SeedRichHorizontalRuleBlock {
+  anchorId?: string;
+  type: 'hr';
+}
+
+interface SeedRichPoemBlock {
+  anchorId?: string;
+  lines: SeedRichInline[][];
+  type: 'poem';
+}
+
+interface SeedRichTableCell {
+  children: SeedRichInline[];
+}
+
+interface SeedRichTableBlock {
+  anchorId?: string;
+  rows: SeedRichTableCell[][];
+  type: 'table';
+}
+
+interface SeedRichUnsupportedBlock {
+  fallbackText: string;
+  originalTag?: string;
+  type: 'unsupported';
+}
+
+type SeedRichBlock =
+  | SeedRichBlockquoteBlock
+  | SeedRichHeadingBlock
+  | SeedRichHorizontalRuleBlock
+  | SeedRichImageBlock
+  | SeedRichListBlock
+  | SeedRichParagraphBlock
+  | SeedRichPoemBlock
+  | SeedRichTableBlock
+  | SeedRichUnsupportedBlock;
 
 interface ReaderPreferenceSnapshot {
   version: 1;
@@ -19,7 +115,24 @@ interface ReaderPreferenceSnapshot {
   lineSpacing: number;
   pageTurnMode: ReaderPageTurnModeId;
   paragraphSpacing: number;
-  readerTheme: 'auto';
+  readerTheme: ReaderThemeId;
+}
+
+interface ReaderPreferenceOverrides {
+  fontSize?: number;
+  lineSpacing?: number;
+  pageTurnMode?: ReaderPageTurnModeId;
+  paragraphSpacing?: number;
+  readerTheme?: ReaderThemeId;
+}
+
+interface SeedChapterRichContentParams {
+  chapterIndex: number;
+  contentVersion?: number;
+  importFormatVersion?: number;
+  novelId: number;
+  plainText: string;
+  richBlocks: SeedRichBlock[];
 }
 
 function readNovelIdFromUrl(url: string): number {
@@ -47,16 +160,16 @@ function toPageTurnModeId(modeLabel: ReaderPageTurnModeLabel): ReaderPageTurnMod
 }
 
 function createReaderPreferenceSnapshot(
-  pageTurnMode: ReaderPageTurnModeId,
+  overrides: ReaderPreferenceOverrides = {},
 ): ReaderPreferenceSnapshot {
   return {
     version: 1,
     appTheme: 'light',
-    fontSize: 18,
-    lineSpacing: 1.8,
-    pageTurnMode,
-    paragraphSpacing: 16,
-    readerTheme: 'auto',
+    fontSize: overrides.fontSize ?? 18,
+    lineSpacing: overrides.lineSpacing ?? 1.8,
+    pageTurnMode: overrides.pageTurnMode ?? 'scroll',
+    paragraphSpacing: overrides.paragraphSpacing ?? 16,
+    readerTheme: overrides.readerTheme ?? 'auto',
   };
 }
 
@@ -105,13 +218,15 @@ export async function openReaderFromDetailPage(page: Page): Promise<void> {
   });
 }
 
-export async function setPageTurnMode(
+export async function setReaderPreferences(
   page: Page,
-  modeLabel: ReaderPageTurnModeLabel,
+  overrides: ReaderPreferenceOverrides,
+  options?: {
+    reload?: boolean;
+    waitForReader?: boolean;
+  },
 ): Promise<void> {
-  const pageTurnMode = toPageTurnModeId(modeLabel);
-  const snapshot = createReaderPreferenceSnapshot(pageTurnMode);
-
+  const snapshot = createReaderPreferenceSnapshot(overrides);
   await page.evaluate(async (nextSnapshot) => {
     window.localStorage.setItem('reader-preferences', JSON.stringify(nextSnapshot));
     const db = await new Promise<IDBDatabase>((resolve, reject) => {
@@ -134,15 +249,90 @@ export async function setPageTurnMode(
 
     db.close();
   }, snapshot);
+
+  if (!options?.reload) {
+    return;
+  }
+
   await page.reload();
+  await disableAnimations(page);
 
-  const target = pageTurnMode === 'scroll'
-    ? page.getByTestId('reader-viewport')
-    : page.getByTestId('paged-reader-interactive');
+  if (options.waitForReader) {
+    const target = snapshot.pageTurnMode === 'scroll'
+      ? page.getByTestId('reader-viewport')
+      : page.getByTestId('paged-reader-interactive');
 
-  await expect(target).toBeVisible({
-    timeout: 30_000,
+    await expect(target).toBeVisible({
+      timeout: 30_000,
+    });
+  }
+}
+
+export async function setPageTurnMode(
+  page: Page,
+  modeLabel: ReaderPageTurnModeLabel,
+): Promise<void> {
+  await setReaderPreferences(page, {
+    pageTurnMode: toPageTurnModeId(modeLabel),
+  }, {
+    reload: true,
+    waitForReader: true,
   });
+}
+
+export async function seedChapterRichContent(
+  page: Page,
+  params: SeedChapterRichContentParams,
+): Promise<void> {
+  await page.evaluate(async (nextContent) => {
+    function requestToPromise<T>(request: IDBRequest<T>): Promise<T> {
+      return new Promise<T>((resolve, reject) => {
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+    }
+
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('PlotMapAI');
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve(request.result);
+    });
+
+    await new Promise<void>((resolve, reject) => {
+      const transaction = db.transaction(['chapterRichContents'], 'readwrite');
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+
+      async function writeRichContent(): Promise<void> {
+        const store = transaction.objectStore('chapterRichContents');
+        const existingKey = await requestToPromise(
+          store.index('[novelId+chapterIndex]').getKey([
+            nextContent.novelId,
+            nextContent.chapterIndex,
+          ]),
+        );
+
+        if (typeof existingKey === 'number') {
+          store.delete(existingKey);
+        }
+
+        store.put({
+          novelId: nextContent.novelId,
+          chapterIndex: nextContent.chapterIndex,
+          contentRich: nextContent.richBlocks,
+          contentPlain: nextContent.plainText,
+          contentFormat: 'rich',
+          contentVersion: nextContent.contentVersion ?? 4,
+          importFormatVersion: nextContent.importFormatVersion ?? 1,
+          updatedAt: new Date().toISOString(),
+        });
+      }
+
+      writeRichContent().catch(reject);
+    });
+
+    db.close();
+  }, params);
 }
 
 export async function seedChapterAnalysis(page: Page, params: {

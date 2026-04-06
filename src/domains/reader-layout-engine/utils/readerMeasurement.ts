@@ -42,6 +42,8 @@ interface PreparedTextBlock {
   text: string;
 }
 
+let browserTextMeasureRoot: HTMLDivElement | null = null;
+
 export interface ReaderTextLayoutEngine {
   layoutLines: (params: {
     font: string;
@@ -163,6 +165,75 @@ function measurePreparedTextBlock(params: {
   return fallbackLayoutLines(params.text, params.maxWidth, params.fontSizePx);
 }
 
+function getBrowserTextMeasureRoot(): HTMLDivElement | null {
+  if (typeof window === 'undefined' || typeof document === 'undefined' || !document.body) {
+    return null;
+  }
+
+  if (browserTextMeasureRoot && document.body.contains(browserTextMeasureRoot)) {
+    return browserTextMeasureRoot;
+  }
+
+  const root = document.createElement('div');
+  root.setAttribute('aria-hidden', 'true');
+  root.style.position = 'absolute';
+  root.style.inset = '0 auto auto -99999px';
+  root.style.visibility = 'hidden';
+  root.style.pointerEvents = 'none';
+  root.style.zIndex = '-1';
+  root.style.contain = 'layout style';
+  document.body.appendChild(root);
+  browserTextMeasureRoot = root;
+  return root;
+}
+
+function writeMeasuredTextContent(target: HTMLElement, text: string): void {
+  target.replaceChildren();
+
+  const lines = text.split('\n');
+  lines.forEach((line, index) => {
+    target.append(document.createTextNode(line));
+    if (index < lines.length - 1) {
+      target.append(document.createElement('br'));
+    }
+  });
+}
+
+function measureTextHeightWithBrowserLayout(params: {
+  font: string;
+  fontSizePx: number;
+  lineHeightPx: number;
+  maxWidth: number;
+  text: string;
+  whiteSpace?: 'normal' | 'pre-wrap';
+}): number | null {
+  const root = getBrowserTextMeasureRoot();
+  if (!root || params.maxWidth <= 0 || params.text.length === 0) {
+    return null;
+  }
+
+  const probe = document.createElement('div');
+  probe.style.boxSizing = 'border-box';
+  probe.style.display = 'block';
+  probe.style.font = params.font;
+  probe.style.fontSize = `${params.fontSizePx}px`;
+  probe.style.lineHeight = `${params.lineHeightPx}px`;
+  probe.style.maxWidth = `${params.maxWidth}px`;
+  probe.style.width = `${params.maxWidth}px`;
+  probe.style.margin = '0';
+  probe.style.padding = '0';
+  probe.style.whiteSpace = params.whiteSpace ?? 'normal';
+  probe.style.overflowWrap = 'break-word';
+  probe.style.wordBreak = 'normal';
+
+  writeMeasuredTextContent(probe, params.text);
+  root.appendChild(probe);
+  const height = Math.ceil(probe.getBoundingClientRect().height);
+  probe.remove();
+
+  return height > 0 ? height : null;
+}
+
 export const browserReaderTextLayoutEngine: ReaderTextLayoutEngine = {
   layoutLines(params) {
     return measurePreparedTextBlock(params);
@@ -225,7 +296,15 @@ function measureCaptionLines(params: {
       text: params.captionText,
     })
     : [];
-  const captionHeight = captionLines.length * params.lineHeightPx;
+  const measuredCaptionHeight = captionLines.length * params.lineHeightPx;
+  const browserCaptionHeight = measureTextHeightWithBrowserLayout({
+    font: params.typography.bodyFont,
+    fontSizePx: params.typography.bodyFontSize,
+    lineHeightPx: params.lineHeightPx,
+    maxWidth: params.maxWidth,
+    text: params.captionText,
+  });
+  const captionHeight = Math.max(measuredCaptionHeight, browserCaptionHeight ?? 0);
 
   return {
     captionFont: params.typography.bodyFont,
@@ -402,7 +481,7 @@ function measureReaderBlocks(params: {
       const captionMetrics = measureCaptionLines({
         captionText: getRichInlinePlainText(block.imageCaption ?? []),
         lineHeightPx: params.typography.bodyLineHeightPx,
-        maxWidth: availableWidth,
+        maxWidth: displayWidth,
         textLayoutEngine: params.textLayoutEngine,
         typography: params.typography,
       });
@@ -547,4 +626,6 @@ export function getReaderLayoutPretextCacheSizeForTests(): number {
 
 export function resetReaderLayoutPretextCacheForTests(): void {
   PRETEXT_CACHE.clear();
+  browserTextMeasureRoot?.remove();
+  browserTextMeasureRoot = null;
 }

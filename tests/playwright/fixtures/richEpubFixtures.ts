@@ -45,6 +45,24 @@ function buildSceneSvg(title: string, primary: string, secondary: string): strin
   ].join('');
 }
 
+function buildWideSceneSvg(title: string, primary: string, secondary: string): string {
+  return [
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 360">',
+    '<defs>',
+    '<linearGradient id="bg" x1="0%" x2="100%" y1="0%" y2="100%">',
+    `<stop offset="0%" stop-color="${primary}" />`,
+    `<stop offset="100%" stop-color="${secondary}" />`,
+    '</linearGradient>',
+    '</defs>',
+    '<rect width="1600" height="360" fill="url(#bg)" rx="32" />',
+    '<path d="M96 274 C260 150 430 204 612 124 C768 58 994 90 1200 148 C1340 188 1470 178 1540 104" fill="none" stroke="rgba(255,255,255,0.46)" stroke-width="18" stroke-linecap="round" />',
+    '<circle cx="280" cy="102" r="72" fill="rgba(255,255,255,0.12)" />',
+    '<circle cx="1270" cy="198" r="94" fill="rgba(255,255,255,0.15)" />',
+    `<text x="96" y="312" fill="white" font-family="Georgia, serif" font-size="72" font-weight="700">${title}</text>`,
+    '</svg>',
+  ].join('');
+}
+
 function createParagraphSeries(prefix: string, count: number): string {
   return Array.from({ length: count }, (_, index) => (
     `<p>${prefix} ${index + 1}. The lantern-lit avenue folded into another rumor, and every footstep stretched the silence a little further.</p>`
@@ -66,6 +84,11 @@ const SHARED_IMAGES: RichEpubFixtureImage[] = [
     content: buildSceneSvg('Archive Bloom', '#7a4d3a', '#d8b26e'),
     mediaType: 'image/svg+xml',
     path: 'images/archive-bloom.svg',
+  },
+  {
+    content: buildWideSceneSvg('Signal Banner', '#51407a', '#db8c58'),
+    mediaType: 'image/svg+xml',
+    path: 'images/signal-banner.svg',
   },
 ];
 
@@ -104,6 +127,46 @@ export const RICH_EPUB_FIXTURES = {
           '<p>Each margin hid an <em>echo</em>, and the brass notation would <u>tilt north</u> before the next bell.</p>',
           '<p>The night clerk learned to <a href="#signal-note">return to the signal note</a> whenever the page split in two.</p>',
           createParagraphSeries('The observatory ledger kept revising itself', 21),
+        ].join('\n'),
+      },
+    ],
+  },
+  semanticShowcase: {
+    id: 'semantic-showcase',
+    fileName: 'semantic-showcase.epub',
+    title: 'Semantic Showcase Atlas',
+    images: SHARED_IMAGES,
+    chapters: [
+      {
+        id: 'chapter-1',
+        title: 'Signal Grammar',
+        bodyHtml: [
+          '<h1>Signal Grammar</h1>',
+          '<p style="text-indent: 2em;">The first relay note leaned inward, proving the paragraph contract still owns indentation after import.</p>',
+          '<blockquote><p>The bridge answered twice, once in brass and once in rain.</p></blockquote>',
+          '<ol>',
+          '<li><p>Count the shutters.</p></li>',
+          '<li><p>Mark the bell.</p></li>',
+          '</ol>',
+          '<ul>',
+          '<li><p>Carry dry ink.</p></li>',
+          '<li><p>Return before dawn.</p></li>',
+          '</ul>',
+          '<p>The relay clerks copied each warning twice so the tower watch could compare the rhythm without touching the original sheet.</p>',
+          '<p>Every margin mark arrived with a second instruction, and none of them agreed on which bell truly started the route.</p>',
+          '<p>The survey table below keeps the final pass separate from the rehearsal pass so the lower viewport has enough depth to validate scrolling.</p>',
+          '<figure>',
+          '<img src="images/signal-banner.svg" alt="Signal banner" />',
+          '<figcaption>Signal banner stretched low across the relay hall, keeping the gallery block compact but visible.</figcaption>',
+          '</figure>',
+          '<p id="gate-note">A brass thread tied the route ledger back to the gate note.</p>',
+          '<p><a href="#gate-note">Return to the gate note</a> before the clerk seals the margin.</p>',
+          '<hr id="relay-divider" />',
+          '<table>',
+          '<tr><th>Route</th><th>Status</th></tr>',
+          '<tr><td>North Lock</td><td>Open</td></tr>',
+          '</table>',
+          '<aside>Unsupported marginalia: ferry lanterns only after dusk.</aside>',
         ].join('\n'),
       },
     ],

@@ -57,7 +57,27 @@ function createRichScrollChapterLayout() {
   const chapter = {
     index: 0,
     title: 'Chapter 1',
-    plainText: 'Section\nHeroic opening\nRemember the river.\nThe world map',
+    plainText: [
+      'Section',
+      '',
+      'Heroic opening',
+      '',
+      'Remember the river.',
+      '',
+      'Pack lightly',
+      '',
+      'The wind remembers',
+      'the river path',
+      '',
+      'The world map',
+      '',
+      'Return to the river note',
+      '',
+      'Route | Status',
+      'North Lock | Open',
+      '',
+      'Margin note: ferries only after dusk.',
+    ].join('\n'),
     richBlocks: [
       {
         type: 'heading',
@@ -69,6 +89,7 @@ function createRichScrollChapterLayout() {
       },
       {
         type: 'paragraph',
+        anchorId: 'river-note',
         children: [
           {
             type: 'text',
@@ -122,6 +143,55 @@ function createRichScrollChapterLayout() {
       },
       {
         type: 'hr',
+      },
+      {
+        type: 'paragraph',
+        children: [{
+          type: 'link',
+          href: '#river-note',
+          children: [{
+            type: 'text',
+            text: 'Return to the river note',
+          }],
+        }],
+      },
+      {
+        type: 'table',
+        rows: [
+          [
+            {
+              children: [{
+                type: 'text',
+                text: 'Route',
+              }],
+            },
+            {
+              children: [{
+                type: 'text',
+                text: 'Status',
+              }],
+            },
+          ],
+          [
+            {
+              children: [{
+                type: 'text',
+                text: 'North Lock',
+              }],
+            },
+            {
+              children: [{
+                type: 'text',
+                text: 'Open',
+              }],
+            },
+          ],
+        ],
+      },
+      {
+        type: 'unsupported',
+        originalTag: 'aside',
+        fallbackText: 'Margin note: ferries only after dusk.',
       },
     ],
     contentFormat: 'rich' as const,
@@ -342,7 +412,24 @@ describe('ScrollReaderContent', () => {
     expect(screen.getByText('The wind remembers')).toBeInTheDocument();
     expect(screen.getByText('the river path')).toBeInTheDocument();
     expect(screen.getByText('The world map')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Return to the river note' })).toHaveClass(
+      READER_CONTENT_CLASS_NAMES.inlineLink,
+    );
+    expect(screen.getByTestId('reader-rich-table')).toBeInTheDocument();
+    expect(screen.getByText('Route').closest('td')).toHaveClass(
+      READER_CONTENT_CLASS_NAMES.tableCell,
+    );
+    expect(
+      screen.getByText('Margin note: ferries only after dusk.').closest(
+        `.${READER_CONTENT_CLASS_NAMES.blockUnsupported}`,
+      ),
+    ).toBeTruthy();
     expect(screen.getByTestId('reader-rich-hr')).toBeInTheDocument();
+    expect(document.querySelector(`.${READER_CONTENT_CLASS_NAMES.listMarker}`)).toBeTruthy();
+    expect(screen.getByText('The wind remembers').closest(`.${READER_CONTENT_CLASS_NAMES.poemLine}`)).toBeTruthy();
+    expect(screen.getByTestId('reader-flow-image-caption')).toHaveClass(
+      READER_CONTENT_CLASS_NAMES.imageCaption,
+    );
 
     const imageButton = screen.getByRole('button', { name: 'reader.imageViewer.title' });
     await user.click(imageButton);

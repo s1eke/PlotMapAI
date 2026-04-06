@@ -4,7 +4,9 @@ import {
   importFixtureToDetailPage,
   openReaderFromDetailPage,
   seedChapterAnalysis,
+  seedChapterRichContent,
   setPageTurnMode,
+  setReaderPreferences,
 } from './helpers/readerVisualHarness';
 
 test.describe('reader visual regression', () => {
@@ -36,7 +38,7 @@ test.describe('reader visual regression', () => {
     await importFixtureToDetailPage(page, 'imageCaption');
     await openReaderFromDetailPage(page);
 
-    await expect(page.getByTestId('reader-flow-image-caption')).toHaveScreenshot('04-image-caption.png');
+    await expect(page.getByTestId('reader-viewport')).toHaveScreenshot('04-image-caption.png');
   });
 
   test('renders imported simple tables with stable spacing', async ({ page }) => {
@@ -93,5 +95,120 @@ test.describe('reader visual regression', () => {
     await openReaderFromDetailPage(page);
 
     await expect(page.getByTestId('reader-viewport')).toHaveScreenshot('10-multi-image-viewport.png');
+  });
+
+  test('renders the paper-theme semantic showcase above the fold in scroll mode', async ({ page }) => {
+    await importFixtureToDetailPage(page, 'semanticShowcase');
+    await setReaderPreferences(page, {
+      fontSize: 16,
+      lineSpacing: 1.6,
+      paragraphSpacing: 12,
+      readerTheme: 'paper',
+    }, {
+      reload: true,
+    });
+    await openReaderFromDetailPage(page);
+
+    await expect(page.getByTestId('reader-viewport')).toHaveScreenshot('11-scroll-paper-semantic-top.png');
+  });
+
+  test('renders the lower semantic showcase blocks in paper theme with stable structure spacing', async ({ page }) => {
+    await importFixtureToDetailPage(page, 'semanticShowcase');
+    await setReaderPreferences(page, {
+      fontSize: 16,
+      lineSpacing: 1.6,
+      paragraphSpacing: 12,
+      readerTheme: 'paper',
+    }, {
+      reload: true,
+    });
+    await openReaderFromDetailPage(page);
+
+    await page.getByTestId('reader-viewport').evaluate((element) => {
+      const viewport = element;
+      const target = viewport.querySelector('[data-testid="reader-rich-table"]');
+      if (!(target instanceof HTMLElement)) {
+        return;
+      }
+
+      const viewportRect = viewport.getBoundingClientRect();
+      const targetRect = target.getBoundingClientRect();
+      viewport.scrollTop += targetRect.top - viewportRect.top - 120;
+    });
+
+    await expect(page.getByTestId('reader-viewport')).toHaveScreenshot('12-scroll-paper-semantic-lower.png');
+  });
+
+  test('renders poem blocks in paged night theme through the standard rich-content pipeline', async ({ page }) => {
+    const { novelId } = await importFixtureToDetailPage(page, 'analysisLinked');
+    await seedChapterRichContent(page, {
+      novelId,
+      chapterIndex: 0,
+      plainText: [
+        'Night Chorus',
+        '',
+        'The bridge note leaned inward before the rain took over.',
+        '',
+        'Lantern one hums low.',
+        'Lantern two answers from rain.',
+        'The river keeps the meter.',
+        '',
+        'The ledger closes softly after the chorus.',
+      ].join('\n'),
+      richBlocks: [
+        {
+          type: 'heading',
+          level: 2,
+          children: [{
+            type: 'text',
+            text: 'Night Chorus',
+          }],
+        },
+        {
+          type: 'paragraph',
+          indent: 2,
+          children: [{
+            type: 'text',
+            text: 'The bridge note leaned inward before the rain took over.',
+          }],
+        },
+        {
+          type: 'poem',
+          lines: [
+            [{
+              type: 'text',
+              text: 'Lantern one hums low.',
+            }],
+            [{
+              type: 'text',
+              text: 'Lantern two answers from rain.',
+            }],
+            [{
+              type: 'text',
+              text: 'The river keeps the meter.',
+            }],
+          ],
+        },
+        {
+          type: 'paragraph',
+          children: [{
+            type: 'text',
+            text: 'The ledger closes softly after the chorus.',
+          }],
+        },
+      ],
+    });
+    await setReaderPreferences(page, {
+      fontSize: 17,
+      lineSpacing: 1.7,
+      pageTurnMode: 'slide',
+      paragraphSpacing: 12,
+      readerTheme: 'night',
+    }, {
+      reload: true,
+    });
+    await openReaderFromDetailPage(page);
+
+    await expect(page.getByTestId('paged-reader-interactive')).toHaveScreenshot('13-paged-night-poem-viewport.png');
   });
 });

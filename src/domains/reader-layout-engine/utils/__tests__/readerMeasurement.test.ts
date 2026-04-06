@@ -179,6 +179,48 @@ describe('readerMeasurement', () => {
     });
   });
 
+  it('measures image captions against the rendered image width for narrow assets', () => {
+    const textLayoutEngine = createFakeReaderTextLayoutEngine();
+    const typography = createReaderTypographyMetrics(18, 1.8, 16, 600);
+    const measuredLayout = measureScrollReaderChapterLayout(
+      {
+        index: 0,
+        title: 'Chapter 1',
+        plainText: 'Signal banner stretched low across the relay hall.',
+        richBlocks: [
+          {
+            type: 'image',
+            key: 'banner',
+            caption: [{
+              type: 'text',
+              text: 'Signal banner stretched low across the relay hall.',
+            }],
+          },
+        ],
+        contentFormat: 'rich',
+        contentVersion: 1,
+        wordCount: 20,
+        totalChapters: 1,
+        hasPrev: false,
+        hasNext: false,
+      },
+      360,
+      typography,
+      new Map([
+        ['banner', { width: 180, height: 90, aspectRatio: 2 }],
+      ]),
+      createScrollImageLayoutConstraints(360, 360),
+      textLayoutEngine,
+    );
+
+    const imageMetric = measuredLayout.metrics.find((metric) => metric.block.kind === 'image');
+    expect(imageMetric).toMatchObject({
+      displayHeight: 90,
+      displayWidth: 180,
+    });
+    expect(imageMetric?.captionHeight).toBe(typography.bodyLineHeightPx * 3);
+  });
+
   it('falls back to sans-serif when document.body is unavailable', () => {
     const originalBody = document.body;
     Object.defineProperty(document, 'body', {
