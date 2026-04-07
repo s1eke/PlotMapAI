@@ -14,6 +14,7 @@ import type {
 } from '../utils/readerImageViewerTypes';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { animate, useMotionValue } from 'motion/react';
 
 import { peekReaderImageDimensions } from '../utils/readerImageResourceCache';
@@ -393,10 +394,12 @@ export function useReaderImageViewerGesture({
   const handleNavigate = useCallback(async (direction: 'next' | 'prev'): Promise<boolean> => {
     const candidateEntry = entries[activeIndex + (direction === 'next' ? 1 : -1)] ?? null;
     if (candidateEntry) {
-      onPrepareNavigationTransition(
-        direction === 'next' ? 1 : -1,
-        createReaderImageEntryId(candidateEntry),
-      );
+      flushSync(() => {
+        onPrepareNavigationTransition(
+          direction === 'next' ? 1 : -1,
+          createReaderImageEntryId(candidateEntry),
+        );
+      });
     }
 
     const didNavigate = await onRequestNavigate(direction);

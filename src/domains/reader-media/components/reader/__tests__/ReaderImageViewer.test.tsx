@@ -198,6 +198,49 @@ describe('ReaderImageViewer', () => {
     expect(onRequestClose).toHaveBeenCalledTimes(0);
   });
 
+  it('switches the current surface to non-anchor mode as soon as swipe navigation is armed', async () => {
+    let resolveNavigate: ((value: boolean) => void) | null = null;
+    const onRequestNavigate = vi.fn(() => new Promise<boolean>((resolve) => {
+      resolveNavigate = resolve;
+    }));
+    renderViewer({
+      canNavigatePrev: true,
+      onRequestNavigate,
+    });
+
+    const stage = document.body.querySelector('[data-reader-image-stage]') as HTMLDivElement | null;
+    const surface = document.body.querySelector('[data-reader-image-transition-mode]') as HTMLDivElement | null;
+    expect(stage).not.toBeNull();
+    expect(surface).not.toBeNull();
+    expect(surface).toHaveAttribute('data-reader-image-transition-mode', 'anchor');
+
+    await act(async () => {
+      fireEvent.pointerDown(stage!, {
+        clientX: 280,
+        clientY: 180,
+        pointerId: 15,
+        pointerType: 'touch',
+      });
+      fireEvent.pointerUp(stage!, {
+        clientX: 120,
+        clientY: 184,
+        pointerId: 15,
+        pointerType: 'touch',
+      });
+      await Promise.resolve();
+    });
+
+    expect(onRequestNavigate).toHaveBeenCalledWith('next');
+    expect(surface).toHaveAttribute('data-reader-image-transition-mode', 'none');
+
+    await act(async () => {
+      resolveNavigate?.(false);
+      await Promise.resolve();
+    });
+
+    expect(surface).toHaveAttribute('data-reader-image-transition-mode', 'anchor');
+  });
+
   it('closes after a touch drag dismisses the unzoomed image downward', async () => {
     vi.useFakeTimers();
     const onRequestClose = vi.fn();
@@ -301,5 +344,65 @@ describe('ReaderImageViewer', () => {
     const indexOverlay = document.body.querySelector('[data-reader-image-index]') as HTMLDivElement | null;
     expect(indexOverlay).not.toBeNull();
     expect(indexOverlay?.closest('[data-reader-image-transition-kind]')).toBeNull();
+  });
+
+  it('keeps swipe transition modes uniform when navigating away from the initially opened image', async () => {
+    function StatefulViewer() {
+      const [activeIndex, setActiveIndex] = useState(0);
+      const activeEntry = entries[activeIndex] ?? null;
+
+      return (
+        <ReaderImageViewer
+          activeEntry={activeEntry}
+          activeIndex={activeIndex}
+          canNavigateNext={activeIndex < entries.length - 1}
+          canNavigatePrev={activeIndex > 0}
+          entries={entries}
+          getOriginRect={() => new DOMRect(40, 80, 120, 90)}
+          isIndexResolved
+          isIndexLoading={false}
+          isOpen
+          novelId={1}
+          onRequestClose={() => {}}
+          onRequestNavigate={async (direction) => {
+            if (direction !== 'next') {
+              return false;
+            }
+
+            setActiveIndex(1);
+            return true;
+          }}
+        />
+      );
+    }
+
+    render(<StatefulViewer />);
+
+    const stage = document.body.querySelector('[data-reader-image-stage]') as HTMLDivElement | null;
+    expect(stage).not.toBeNull();
+    expect(document.body.querySelector('[data-reader-image-transition-mode="anchor"]')).not.toBeNull();
+
+    await act(async () => {
+      fireEvent.pointerDown(stage!, {
+        clientX: 280,
+        clientY: 180,
+        pointerId: 27,
+        pointerType: 'touch',
+      });
+      fireEvent.pointerUp(stage!, {
+        clientX: 120,
+        clientY: 184,
+        pointerId: 27,
+        pointerType: 'touch',
+      });
+      await Promise.resolve();
+    });
+
+    const transitionModes = Array.from(
+      document.body.querySelectorAll('[data-reader-image-transition-mode]'),
+    ).map((element) => element.getAttribute('data-reader-image-transition-mode'));
+
+    expect(transitionModes).toContain('none');
+    expect(transitionModes).not.toContain('anchor');
   });
 });

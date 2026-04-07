@@ -20,6 +20,7 @@ interface UseReaderImageViewerTransitionParams {
 interface UseReaderImageViewerTransitionResult {
   clearNavigationTransition: () => void;
   consumeDeferredStageClick: () => boolean;
+  isNavigationTransitionPending: boolean;
   prepareNavigationTransition: (direction: -1 | 1, targetEntryId: string) => void;
   resolvedSurfaceTransition: ReaderImageViewerSurfaceTransition;
   suppressDeferredStageClick: () => void;
@@ -99,6 +100,7 @@ export function useReaderImageViewerTransition({
   return {
     clearNavigationTransition,
     consumeDeferredStageClick,
+    isNavigationTransitionPending: surfaceTransition.kind === 'slide',
     prepareNavigationTransition,
     resolvedSurfaceTransition,
     suppressDeferredStageClick,

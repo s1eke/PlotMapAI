@@ -72,6 +72,7 @@ export default function ReaderImageViewer({
   const {
     clearNavigationTransition,
     consumeDeferredStageClick,
+    isNavigationTransitionPending,
     prepareNavigationTransition,
     resolvedSurfaceTransition,
     suppressDeferredStageClick,
@@ -194,7 +195,7 @@ export default function ReaderImageViewer({
                   consumeDeferredStageClick={consumeDeferredStageClick}
                   dismissProgress={dragDismissProgress}
                   entries={entries}
-                  entryTransitionMode={resolvedSurfaceTransition.kind === 'slide' ? 'none' : 'anchor'}
+                  entryTransitionMode={isNavigationTransitionPending ? 'none' : 'anchor'}
                   getOriginRect={getOriginRect}
                   novelId={novelId}
                   onClearNavigationTransition={clearNavigationTransition}
