@@ -99,6 +99,16 @@ export default function UploadModal({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const autoProcessedFilesRef = useRef<File[] | null>(null);
+  const latestProgressRef = useRef<BookImportProgress | null>(null);
+  const progressRafRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (progressRafRef.current !== null) {
+        cancelAnimationFrame(progressRafRef.current);
+      }
+    };
+  }, []);
 
   const currentStageLabel = batchState ? t(`bookshelf.workerStages.${batchState.progress.stage}`) : null;
   const currentProgressLabel = batchState && currentStageLabel
@@ -159,16 +169,35 @@ export default function UploadModal({
         await importBookAndRefreshLibrary(file, {
           signal: controller.signal,
           onProgress: (progress) => {
-            setBatchState((current) => {
-              if (!current || current.currentFileIndex !== index) {
-                return current;
-              }
+            latestProgressRef.current = progress;
+            if (progressRafRef.current === null) {
+              progressRafRef.current = requestAnimationFrame(() => {
+                progressRafRef.current = null;
+                const p = latestProgressRef.current;
+                if (!p) return;
 
-              return {
-                ...current,
-                progress,
-              };
-            });
+                setBatchState((current) => {
+                  if (!current || current.currentFileIndex !== index) {
+                    return current;
+                  }
+
+                  if (
+                    current.progress.progress === p.progress &&
+                    current.progress.stage === p.stage &&
+                    current.progress.detail === p.detail &&
+                    current.progress.current === p.current &&
+                    current.progress.total === p.total
+                  ) {
+                    return current;
+                  }
+
+                  return {
+                    ...current,
+                    progress: p,
+                  };
+                });
+              });
+            }
           },
         });
         importedCount += 1;
@@ -200,6 +229,10 @@ export default function UploadModal({
       }
     } finally {
       abortControllerRef.current = null;
+      if (progressRafRef.current !== null) {
+        cancelAnimationFrame(progressRafRef.current);
+        progressRafRef.current = null;
+      }
       setIsUploading(false);
       setBatchState(null);
       if (fileInputRef.current) {
