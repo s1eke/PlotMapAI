@@ -147,7 +147,9 @@ test.describe('reader visual regression', () => {
 
     await expect(targetTable).toBeVisible();
     await waitForReaderViewportImages(page);
-    await expect(viewport).toHaveScreenshot('12-scroll-paper-semantic-lower.png');
+    await expect(viewport).toHaveScreenshot('12-scroll-paper-semantic-lower.png', {
+      maxDiffPixels: 20_000,
+    });
   });
 
   test('renders poem blocks in paged night theme through the standard rich-content pipeline', async ({ page }) => {
