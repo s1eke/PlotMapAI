@@ -35,6 +35,7 @@ import { PAGED_VIEWPORT_TOP_PADDING_PX } from '../../utils/readerLayout';
 import ReaderFlowBlock from './ReaderFlowBlock';
 
 const DRAG_START_THRESHOLD_PX = 8;
+const PAGED_IMAGE_ACTIVATION_GUARD_MS = 280;
 
 interface PagedReaderContentProps {
   chapter: ChapterContent;
@@ -301,6 +302,9 @@ export default function PagedReaderContent({
   twoColumnGap = 48,
   twoColumnWidth,
 }: PagedReaderContentProps) {
+  const [isDragGestureActive, setIsDragGestureActive] = useState(false);
+  const [isDragSettling, setIsDragSettling] = useState(false);
+  const [isImageActivationGuardActive, setIsImageActivationGuardActive] = useState(false);
   const [viewportSize, setViewportSize] = useState<ViewportSize>(EMPTY_VIEWPORT_SIZE);
   const [viewportElement, setViewportElement] = useState<HTMLDivElement | null>(null);
   const [dragDirection, setDragDirection] = useState<PageTurnDirection | null>(null);
@@ -309,7 +313,10 @@ export default function PagedReaderContent({
   const [pendingCommittedPageOverride, setPendingCommittedPageOverride] =
     useState<PendingCommittedPageOverride | null>(null);
   const dragAnimationRef = useRef<AnimationPlaybackControls | null>(null);
+  const imageActivationGuardTimeoutRef = useRef<number | null>(null);
+  const imageActivationGuardUntilRef = useRef(0);
   const pagedViewportRefBridgeRef = useRef(pagedViewportRef);
+  const pageTurnTokenRef = useRef(pageTurnToken);
   const suppressNextClickRef = useRef(false);
   const dragOffset = useMotionValue(0);
 
@@ -497,6 +504,47 @@ export default function PagedReaderContent({
     ).previewX;
   });
 
+  const clearImageActivationGuardTimeout = useCallback(() => {
+    if (imageActivationGuardTimeoutRef.current !== null) {
+      window.clearTimeout(imageActivationGuardTimeoutRef.current);
+      imageActivationGuardTimeoutRef.current = null;
+    }
+  }, []);
+
+  const syncImageActivationGuardTimeout = useCallback(() => {
+    clearImageActivationGuardTimeout();
+    const remainingMs = imageActivationGuardUntilRef.current - Date.now();
+    if (remainingMs <= 0) {
+      imageActivationGuardUntilRef.current = 0;
+      setIsImageActivationGuardActive(false);
+      return;
+    }
+
+    setIsImageActivationGuardActive(true);
+    imageActivationGuardTimeoutRef.current = window.setTimeout(() => {
+      imageActivationGuardTimeoutRef.current = null;
+      const nextRemainingMs = imageActivationGuardUntilRef.current - Date.now();
+      if (nextRemainingMs > 0) {
+        syncImageActivationGuardTimeout();
+        return;
+      }
+
+      imageActivationGuardUntilRef.current = 0;
+      setIsImageActivationGuardActive(false);
+    }, remainingMs);
+  }, [clearImageActivationGuardTimeout]);
+
+  const scheduleImageActivationGuard = useCallback(
+    (durationMs: number = PAGED_IMAGE_ACTIVATION_GUARD_MS) => {
+      imageActivationGuardUntilRef.current = Math.max(
+        imageActivationGuardUntilRef.current,
+        Date.now() + durationMs,
+      );
+      syncImageActivationGuardTimeout();
+    },
+    [syncImageActivationGuardTimeout],
+  );
+
   const stopDragAnimation = useCallback(() => {
     dragAnimationRef.current?.stop();
     dragAnimationRef.current = null;
@@ -505,6 +553,8 @@ export default function PagedReaderContent({
   const resetDragState = useCallback(() => {
     stopDragAnimation();
     dragOffset.set(0);
+    setIsDragGestureActive(false);
+    setIsDragSettling(false);
     setDragDirection(null);
   }, [dragOffset, stopDragAnimation]);
 
@@ -514,11 +564,28 @@ export default function PagedReaderContent({
     };
   }, [stopDragAnimation]);
 
+  useEffect(() => {
+    return () => {
+      clearImageActivationGuardTimeout();
+    };
+  }, [clearImageActivationGuardTimeout]);
+
+  useEffect(() => {
+    if (pageTurnToken === pageTurnTokenRef.current) {
+      return;
+    }
+
+    pageTurnTokenRef.current = pageTurnToken;
+    scheduleImageActivationGuard();
+  }, [pageTurnToken, scheduleImageActivationGuard]);
+
   const handlePanStart = useCallback(() => {
     if (!isDragEnabled) {
       return;
     }
     stopDragAnimation();
+    setIsDragGestureActive(true);
+    setIsDragSettling(false);
   }, [isDragEnabled, stopDragAnimation]);
 
   const handlePan = useCallback((_event: PointerEvent, info: PanInfo) => {
@@ -548,6 +615,7 @@ export default function PagedReaderContent({
       return;
     }
 
+    setIsDragGestureActive(false);
     const nextOffset = clampDragOffset(
       info.offset.x,
       resolvedViewportWidth,
@@ -587,6 +655,7 @@ export default function PagedReaderContent({
       info.velocity.x,
     );
 
+    setIsDragSettling(true);
     dragAnimationRef.current = animate(dragOffset, targetOffset, {
       ...animation.transition,
       duration: settleDuration,
@@ -595,11 +664,13 @@ export default function PagedReaderContent({
         suppressNextClickRef.current = false;
         setCommittedDragTransition(null);
         dragOffset.set(0);
+        setIsDragSettling(false);
         setDragDirection(null);
       },
     });
 
     if (shouldCommit) {
+      scheduleImageActivationGuard();
       setPendingCommittedPageOverride(
         commitPreviewTarget.chapter.index !== currentPreviewTarget.chapter.index
           ? {
@@ -634,6 +705,7 @@ export default function PagedReaderContent({
     previousPreviewTarget,
     resetDragState,
     resolvedViewportWidth,
+    scheduleImageActivationGuard,
   ]);
 
   const handleClickCapture = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
@@ -685,6 +757,16 @@ export default function PagedReaderContent({
       resolvedViewportWidth,
     )
     : null;
+  const shouldDisableImageActivation = isDragGestureActive
+    || isDragSettling
+    || committedDragTransition !== null
+    || isImageActivationGuardActive;
+  const resolvedOnImageActivate = shouldDisableImageActivation
+    ? undefined
+    : onImageActivate;
+  const resolvedOnRegisterImageElement = shouldDisableImageActivation
+    ? undefined
+    : onRegisterImageElement;
 
   if (!currentPreviewTarget) {
     return null;
@@ -694,7 +776,10 @@ export default function PagedReaderContent({
     <div className="relative h-full w-full">
       <motion.div
         data-testid="paged-reader-interactive"
-        className="relative h-full overflow-hidden"
+        className={cn(
+          'relative h-full overflow-hidden',
+          shouldDisableImageActivation && '[&_[data-reader-image-activate]]:pointer-events-none',
+        )}
         style={isDragEnabled ? { touchAction: 'pan-y' } : undefined}
         onClickCapture={handleClickCapture}
         onPan={handlePan}
@@ -723,8 +808,8 @@ export default function PagedReaderContent({
                 rootStyle={rootStyle}
                 textClassName={textClassName}
                 headerBgClassName={headerBgClassName}
-                onImageActivate={onImageActivate}
-                onRegisterImageElement={onRegisterImageElement}
+                onImageActivate={resolvedOnImageActivate}
+                onRegisterImageElement={resolvedOnRegisterImageElement}
               />
             </motion.div>
 
@@ -748,8 +833,8 @@ export default function PagedReaderContent({
                 rootStyle={rootStyle}
                 textClassName={textClassName}
                 headerBgClassName={headerBgClassName}
-                onImageActivate={onImageActivate}
-                onRegisterImageElement={onRegisterImageElement}
+                onImageActivate={resolvedOnImageActivate}
+                onRegisterImageElement={resolvedOnRegisterImageElement}
               />
             </motion.div>
           </>
@@ -780,8 +865,8 @@ export default function PagedReaderContent({
                 rootStyle={rootStyle}
                 textClassName={textClassName}
                 headerBgClassName={headerBgClassName}
-                onImageActivate={onImageActivate}
-                onRegisterImageElement={onRegisterImageElement}
+                onImageActivate={resolvedOnImageActivate}
+                onRegisterImageElement={resolvedOnRegisterImageElement}
               />
             </motion.div>
           </AnimatePresence>

@@ -384,6 +384,7 @@ export default function ReaderFlowBlock({
                   chapterIndex: imageItem.chapterIndex,
                   imageKey: imageItem.imageKey,
                 }, element)}
+                data-reader-image-activate=""
                 type="button"
                 aria-label={t('reader.imageViewer.title')}
                 className="absolute -inset-3 z-10 cursor-zoom-in rounded-2xl bg-transparent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
