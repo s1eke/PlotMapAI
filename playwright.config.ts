@@ -1,8 +1,10 @@
 import { defineConfig, devices } from '@playwright/test';
 
-const PORT = 4173;
+const PORT = Number.parseInt(process.env.PLAYWRIGHT_PORT ?? '4273', 10);
 const HOST = '127.0.0.1';
 const BASE_URL = `http://${HOST}:${PORT}`;
+const SHOULD_REUSE_EXISTING_SERVER =
+  process.env.CI !== 'true' && process.env.PLAYWRIGHT_REUSE_SERVER === '1';
 
 export default defineConfig({
   testDir: './tests/playwright',
@@ -41,7 +43,7 @@ export default defineConfig({
   webServer: {
     command: `npm run build && npm run preview -- --host ${HOST} --port ${PORT}`,
     url: BASE_URL,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: SHOULD_REUSE_EXISTING_SERVER,
     timeout: 180_000,
   },
 });

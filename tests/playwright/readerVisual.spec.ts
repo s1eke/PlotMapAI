@@ -124,19 +124,25 @@ test.describe('reader visual regression', () => {
     });
     await openReaderFromDetailPage(page);
 
-    await page.getByTestId('reader-viewport').evaluate((element) => {
-      const viewport = element;
-      const target = viewport.querySelector('[data-testid="reader-rich-table"]');
+    const viewport = page.getByTestId('reader-viewport');
+    const targetTable = page.getByTestId('reader-rich-table');
+
+    const scrollTop = await viewport.evaluate((element) => {
+      const viewportElement = element;
+      const target = viewportElement.querySelector('[data-testid="reader-rich-table"]');
       if (!(target instanceof HTMLElement)) {
-        return;
+        return viewportElement.scrollTop;
       }
 
-      const viewportRect = viewport.getBoundingClientRect();
+      const viewportRect = viewportElement.getBoundingClientRect();
       const targetRect = target.getBoundingClientRect();
-      viewport.scrollTop += targetRect.top - viewportRect.top - 120;
+      viewportElement.scrollTop += targetRect.top - viewportRect.top - 120;
+      return viewportElement.scrollTop;
     });
+    expect(scrollTop).toBeGreaterThan(0);
 
-    await expect(page.getByTestId('reader-viewport')).toHaveScreenshot('12-scroll-paper-semantic-lower.png');
+    await expect(targetTable).toBeVisible();
+    await expect(viewport).toHaveScreenshot('12-scroll-paper-semantic-lower.png');
   });
 
   test('renders poem blocks in paged night theme through the standard rich-content pipeline', async ({ page }) => {
