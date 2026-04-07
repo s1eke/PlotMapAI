@@ -38,4 +38,62 @@ describe('normalizeRichBlocks', () => {
       ],
     }]);
   });
+
+  it('preserves empty table cells so column positions remain stable', () => {
+    const blocks = normalizeRichBlocks([{
+      type: 'table',
+      rows: [
+        [
+          {
+            children: [{ type: 'text', text: ' Route ' }],
+          },
+          {
+            children: [{ type: 'text', text: ' Status ' }],
+          },
+          {
+            children: [{ type: 'text', text: ' Notes ' }],
+          },
+        ],
+        [
+          {
+            children: [{ type: 'text', text: ' North Lock ' }],
+          },
+          {
+            children: [{ type: 'text', text: '   ' }],
+          },
+          {
+            children: [{ type: 'text', text: ' Open after dusk ' }],
+          },
+        ],
+      ],
+    }]);
+
+    expect(blocks).toEqual([{
+      type: 'table',
+      rows: [
+        [
+          {
+            children: [{ type: 'text', text: 'Route' }],
+          },
+          {
+            children: [{ type: 'text', text: 'Status' }],
+          },
+          {
+            children: [{ type: 'text', text: 'Notes' }],
+          },
+        ],
+        [
+          {
+            children: [{ type: 'text', text: 'North Lock' }],
+          },
+          {
+            children: [],
+          },
+          {
+            children: [{ type: 'text', text: 'Open after dusk' }],
+          },
+        ],
+      ],
+    }]);
+  });
 });

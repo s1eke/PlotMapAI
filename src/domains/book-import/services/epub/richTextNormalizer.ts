@@ -202,8 +202,7 @@ function normalizeBlock(block: RichBlock): RichBlock | null {
       .map((row) => row
         .map((cell) => ({
           children: normalizeRichInlines(cell.children),
-        }))
-        .filter((cell) => cell.children.length > 0))
+        })))
       .filter((row) => row.length > 0);
 
     if (rows.length === 0) {
