@@ -10,9 +10,11 @@ const READER_SOURCE_DIRECTORIES = [
 ];
 const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx']);
 const RESTRICTED_READER_IMPORT = /from\s+['"](@domains\/reader-(?:content|session|shell)(?:\/[^'"]*)?)['"]/g;
+const READER_FAMILY_DEEP_IMPORT = /from\s+['"](@domains\/reader-[^/'"]+\/[^'"]+)['"]/g;
 const PASS_THROUGH_EXPORT_LINE = /^export\s+(type\s+)?\{[^}]+\}\s+from\s+['"][^'"]+['"];?$/;
 const PASS_THROUGH_EXPORT_STAR_LINE = /^export\s+\*\s+from\s+['"][^'"]+['"];?$/;
 const READER_LAYOUT_ENGINE_ROOT_BARREL_PATH = 'src/domains/reader-layout-engine/index.ts';
+const READER_CONTENT_ROOT_BARREL_PATH = 'src/domains/reader-content/index.ts';
 const ALLOWED_READER_LAYOUT_ENGINE_ROOT_EXPORT_LINES = new Set([
   "export { PagedReaderContent } from './paged-runtime';",
   "export { usePagedReaderController as usePagedReaderViewportController } from './paged-runtime';",
@@ -24,6 +26,17 @@ const ALLOWED_READER_LAYOUT_ENGINE_ROOT_EXPORT_LINES = new Set([
   "export { resolveReaderContentRootProps } from './layout-core';",
   "export type { ReaderContentRootProps, ReaderContentRootTheme } from './layout-core';",
   "export { clearReaderRenderCacheMemoryForNovel, deletePersistedReaderRenderCache } from './render-cache';",
+]);
+const ALLOWED_READER_CONTENT_ROOT_EXPORT_LINES = new Set([
+  "export type { Chapter, ChapterContent, ReaderChapterCacheApi } from '@shared/contracts/reader';",
+  "export { useReaderChapterData } from './hooks/useReaderChapterData';",
+  'export type {',
+  'ReaderHydrateDataResult,',
+  'ReaderLoadActiveChapterParams,',
+  'ReaderLoadActiveChapterResult,',
+  'ReaderLoadActiveChapterRuntime,',
+  'UseReaderChapterDataResult,',
+  '} from \'./hooks/useReaderChapterData\';',
 ]);
 
 function isReaderFamilyPath(filePath) {
@@ -84,6 +97,19 @@ export function findRestrictedReaderImports(filePath, source) {
   return matches;
 }
 
+export function findReaderFamilyDeepImports(filePath, source) {
+  if (!isReaderFamilyPath(filePath)) {
+    return [];
+  }
+
+  const matches = [];
+  for (const match of source.matchAll(READER_FAMILY_DEEP_IMPORT)) {
+    matches.push(match[1]);
+  }
+
+  return matches;
+}
+
 export function isPassThroughReaderFile(filePath, source) {
   if (!filePath.startsWith('src/domains/reader-')) {
     return false;
@@ -118,6 +144,18 @@ export function findInvalidReaderLayoutEngineRootExports(filePath, source) {
     .filter((line) => !ALLOWED_READER_LAYOUT_ENGINE_ROOT_EXPORT_LINES.has(line));
 }
 
+export function findInvalidReaderContentRootExports(filePath, source) {
+  if (filePath !== READER_CONTENT_ROOT_BARREL_PATH) {
+    return [];
+  }
+
+  return stripComments(source)
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .filter((line) => !ALLOWED_READER_CONTENT_ROOT_EXPORT_LINES.has(line));
+}
+
 export function evaluateReaderArchitecture(
   files,
   options = {},
@@ -125,7 +163,9 @@ export function evaluateReaderArchitecture(
   const maxFileLines = options.maxFileLines ?? READER_FILE_LINE_LIMIT;
   const oversizedFiles = [];
   const restrictedImports = [];
+  const readerFamilyDeepImports = [];
   const passThroughFiles = [];
+  const invalidReaderContentRootExports = [];
   const invalidRootBarrelExports = [];
 
   Object.entries(files).forEach(([filePath, source]) => {
@@ -138,9 +178,17 @@ export function evaluateReaderArchitecture(
       restrictedImports.push({ filePath, specifier });
     });
 
+    findReaderFamilyDeepImports(filePath, source).forEach((specifier) => {
+      readerFamilyDeepImports.push({ filePath, specifier });
+    });
+
     if (isPassThroughReaderFile(filePath, source)) {
       passThroughFiles.push(filePath);
     }
+
+    findInvalidReaderContentRootExports(filePath, source).forEach((line) => {
+      invalidReaderContentRootExports.push({ filePath, line });
+    });
 
     findInvalidReaderLayoutEngineRootExports(filePath, source).forEach((line) => {
       invalidRootBarrelExports.push({ filePath, line });
@@ -148,11 +196,18 @@ export function evaluateReaderArchitecture(
   });
 
   return {
+    invalidReaderContentRootExports: invalidReaderContentRootExports.sort((left, right) => (
+      left.filePath.localeCompare(right.filePath) || left.line.localeCompare(right.line)
+    )),
     invalidRootBarrelExports: invalidRootBarrelExports.sort((left, right) => (
       left.filePath.localeCompare(right.filePath) || left.line.localeCompare(right.line)
     )),
     oversizedFiles: oversizedFiles.sort((left, right) => right.lineCount - left.lineCount),
     passThroughFiles: passThroughFiles.sort(),
+    readerFamilyDeepImports: readerFamilyDeepImports.sort((left, right) => (
+      left.filePath.localeCompare(right.filePath)
+      || left.specifier.localeCompare(right.specifier)
+    )),
     restrictedImports: restrictedImports.sort((left, right) => (
       left.filePath.localeCompare(right.filePath)
       || left.specifier.localeCompare(right.specifier)
@@ -197,8 +252,10 @@ export function runReaderArchitectureCheck(
   const files = collectReaderFiles(rootDirectory, requestedPaths);
   const result = evaluateReaderArchitecture(files);
   const warningCount =
-    result.invalidRootBarrelExports.length
+    result.invalidReaderContentRootExports.length
+    + result.invalidRootBarrelExports.length
     + result.oversizedFiles.length
+    + result.readerFamilyDeepImports.length
     + result.restrictedImports.length
     + result.passThroughFiles.length;
 
@@ -211,8 +268,16 @@ export function runReaderArchitectureCheck(
     result.restrictedImports.map(({ filePath, specifier }) => `${filePath} -> ${specifier}`),
   );
   printWarningSection(
+    'reader-family code importing reader-domain internals instead of barrels/relative paths',
+    result.readerFamilyDeepImports.map(({ filePath, specifier }) => `${filePath} -> ${specifier}`),
+  );
+  printWarningSection(
     'pass-through re-export files in the Reader family',
     result.passThroughFiles,
+  );
+  printWarningSection(
+    'reader-content root barrel exporting non-stable symbols',
+    result.invalidReaderContentRootExports.map(({ filePath, line }) => `${filePath} -> ${line}`),
   );
   printWarningSection(
     'reader-layout-engine root barrel exporting non-stable symbols',

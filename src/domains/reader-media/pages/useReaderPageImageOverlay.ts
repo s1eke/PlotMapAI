@@ -1,13 +1,14 @@
 import type {
   ReaderImageActivationPayload,
   ReaderImageGalleryEntry,
-} from '../utils/readerImageGallery';
+} from '@shared/contracts/reader';
 import type { ReaderImageViewerProps } from '../components/reader/ReaderImageViewer';
 
 import { useEffect, useMemo } from 'react';
+import { useReaderContentRuntime } from '@shared/reader-runtime';
+import { createReaderImageEntryId } from '@shared/reader-content';
 
 import { preloadReaderImageResources, clearReaderImageResourcesForNovel } from '../utils/readerImageResourceCache';
-import { createReaderImageEntryId } from '../utils/readerImageGallery';
 import { useReaderPageImageGalleryIndex } from './useReaderPageImageGalleryIndex';
 import { useReaderPageImageViewerSession } from './useReaderPageImageViewerSession';
 
@@ -33,6 +34,7 @@ export function useReaderPageImageOverlay({
   isEnabled,
   novelId,
 }: UseReaderPageImageOverlayParams): UseReaderPageImageOverlayResult {
+  const readerContentRuntime = useReaderContentRuntime();
   const galleryIndex = useReaderPageImageGalleryIndex(novelId);
   const viewerSession = useReaderPageImageViewerSession({
     dismissBlockedInteraction,
@@ -93,12 +95,13 @@ export function useReaderPageImageOverlay({
       imageKeys.add(nextEntry.imageKey);
     }
 
-    preloadReaderImageResources(novelId, imageKeys);
+    preloadReaderImageResources(readerContentRuntime, novelId, imageKeys);
   }, [
     activeImageEntry,
     activeImageIndex,
     entries,
     novelId,
+    readerContentRuntime,
     sessionState.isOpen,
   ]);
 

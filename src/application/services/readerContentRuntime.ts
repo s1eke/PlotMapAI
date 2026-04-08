@@ -1,19 +1,19 @@
 import type { BookChapter } from '@shared/contracts';
-import type { Chapter, ChapterContent } from '@shared/contracts/reader';
+import type {
+  Chapter,
+  ChapterContent,
+  ReaderContentRuntimeValue,
+  ReaderTextProcessingOptions,
+} from '@shared/contracts/reader';
+import type { TextProcessingProgress } from '@shared/text-processing';
 
 import {
   bookContentRepository,
   chapterRichContentRepository,
 } from '@domains/book-content';
 import { novelRepository } from '@domains/library';
-import type {
-  ReaderContentController,
-  ReaderTextProcessingOptions,
-} from '@domains/reader-content';
-import * as readerContentDomain from '@domains/reader-content';
 import { purificationRuleRepository } from '@domains/settings';
 import { AppErrorCode, createAppError } from '@shared/errors';
-import type { TextProcessingProgress } from '@shared/text-processing';
 
 import {
   applyPlainTextOnlyContent,
@@ -23,7 +23,7 @@ import {
   resolveProjectedRichBlocks,
 } from './chapterTextProjection';
 
-export const applicationReaderContentController: ReaderContentController = {
+export const applicationReaderContentRuntime: ReaderContentRuntimeValue = {
   async loadPurifiedBookChapters(
     novelId: number,
     options: ReaderTextProcessingOptions = {},
@@ -143,11 +143,9 @@ export const applicationReaderContentController: ReaderContentController = {
   },
 };
 
-readerContentDomain.registerReaderContentController?.(applicationReaderContentController);
-
 export async function loadPurifiedBookChapters(
   novelId: number,
   options: ReaderTextProcessingOptions = {},
 ): Promise<BookChapter[]> {
-  return applicationReaderContentController.loadPurifiedBookChapters(novelId, options);
+  return applicationReaderContentRuntime.loadPurifiedBookChapters(novelId, options);
 }

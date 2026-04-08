@@ -1,5 +1,5 @@
 import type { ChapterContent } from '@shared/contracts/reader';
-import type { ReaderImageDimensions } from './readerImageResourceCache';
+import type { ReaderImageDimensions } from '@domains/reader-media';
 import type {
   ReaderLayoutSignature,
   ReaderRenderVariant,

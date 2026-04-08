@@ -4,7 +4,7 @@ import {
   ensureReaderPreferencesHydrated,
   getReaderPreferencesSnapshot,
   hasConfiguredReaderPageTurnMode,
-} from '@domains/reader-shell/hooks/readerPreferencesStore';
+} from '@domains/reader-shell';
 import {
   flushPersistence,
   getStoredReaderStateSnapshot,

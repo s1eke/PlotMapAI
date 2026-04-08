@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createReaderContextWrapper } from '@test/readerRuntimeTestUtils';
 
 import { READER_CONTENT_CLASS_NAMES } from '@shared/reader-content';
 
@@ -33,6 +34,7 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('@domains/reader-media', async (importOriginal) => ({
   ...await importOriginal<typeof import('@domains/reader-media')>(),
+  preloadReaderImageResources: preloadReaderImageResourcesSpy,
   useReaderImageResource: useReaderImageResourceMock,
 }));
 
@@ -208,14 +210,6 @@ vi.mock('motion/react', async () => {
   };
 });
 
-vi.mock('../../../utils/readerImageResourceCache', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../utils/readerImageResourceCache')>();
-  return {
-    ...actual,
-    preloadReaderImageResources: preloadReaderImageResourcesSpy,
-  };
-});
-
 function createChapter({
   index = 0,
   title = `Chapter ${index + 1}`,
@@ -293,7 +287,10 @@ function buildPagedContentProps(
 function renderPagedContent(
   overrides: Partial<React.ComponentProps<typeof PagedReaderContent>> = {},
 ) {
-  return render(<PagedReaderContent {...buildPagedContentProps(overrides)} />);
+  const { Wrapper } = createReaderContextWrapper();
+  return render(<PagedReaderContent {...buildPagedContentProps(overrides)} />, {
+    wrapper: Wrapper,
+  });
 }
 
 function buildMultiPageLayout() {
@@ -828,7 +825,10 @@ describe('PagedReaderContent', () => {
       pageTurnMode: 'none',
       pageTurnToken: 1,
     });
-    const rendered = render(<PagedReaderContent {...initialProps} />);
+    const { Wrapper } = createReaderContextWrapper();
+    const rendered = render(<PagedReaderContent {...initialProps} />, {
+      wrapper: Wrapper,
+    });
 
     expect(screen.getByRole('button', { name: 'reader.imageViewer.title' })).toBeInTheDocument();
 
@@ -869,7 +869,10 @@ describe('PagedReaderContent', () => {
       onRequestNextPage,
       pageIndex: 0,
     });
-    const rendered = render(<PagedReaderContent {...initialProps} />);
+    const { Wrapper } = createReaderContextWrapper();
+    const rendered = render(<PagedReaderContent {...initialProps} />, {
+      wrapper: Wrapper,
+    });
     const interactiveLayer = getPagedInteractiveLayer(rendered.container);
 
     fireEvent.pointerDown(interactiveLayer, {
@@ -1031,6 +1034,12 @@ describe('PagedReaderContent', () => {
       }),
     });
 
-    expect(preloadReaderImageResourcesSpy).toHaveBeenCalledWith(1, ['current', 'shared', 'prev', 'next']);
+    expect(preloadReaderImageResourcesSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        getImageBlob: expect.any(Function),
+      }),
+      1,
+      ['current', 'shared', 'prev', 'next'],
+    );
   });
 });

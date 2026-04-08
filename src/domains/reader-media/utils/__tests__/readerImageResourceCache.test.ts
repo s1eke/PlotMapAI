@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { readerContentService } from '@domains/reader-content';
 import {
   acquireReaderImageResource,
   areReaderImageResourcesReady,
@@ -11,15 +10,12 @@ import {
   resetReaderImageResourceCacheForTests,
 } from '../readerImageResourceCache';
 
-vi.mock('@domains/reader-content', () => ({
-  readerContentService: {
-    getImageBlob: vi.fn(),
-  },
-}));
-
 describe('readerImageResourceCache', () => {
   const originalCreateObjectURL = URL.createObjectURL;
   const originalRevokeObjectURL = URL.revokeObjectURL;
+  const imageBlobLoader = {
+    getImageBlob: vi.fn(),
+  };
 
   beforeEach(() => {
     vi.useFakeTimers();
@@ -48,16 +44,16 @@ describe('readerImageResourceCache', () => {
   });
 
   it('reuses one object URL for concurrent acquisitions and revokes it after the last release', async () => {
-    vi.mocked(readerContentService.getImageBlob).mockResolvedValue(new Blob(['image-data']));
+    imageBlobLoader.getImageBlob.mockResolvedValue(new Blob(['image-data']));
 
     const [firstUrl, secondUrl] = await Promise.all([
-      acquireReaderImageResource(1, 'hero'),
-      acquireReaderImageResource(1, 'hero'),
+      acquireReaderImageResource(imageBlobLoader, 1, 'hero'),
+      acquireReaderImageResource(imageBlobLoader, 1, 'hero'),
     ]);
 
     expect(firstUrl).toBe('blob:10');
     expect(secondUrl).toBe('blob:10');
-    expect(readerContentService.getImageBlob).toHaveBeenCalledTimes(1);
+    expect(imageBlobLoader.getImageBlob).toHaveBeenCalledTimes(1);
     expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
 
     releaseReaderImageResource(1, 'hero');
@@ -71,23 +67,23 @@ describe('readerImageResourceCache', () => {
   });
 
   it('preloads unique image keys without creating duplicate URLs', async () => {
-    vi.mocked(readerContentService.getImageBlob).mockResolvedValue(new Blob(['image-data']));
+    imageBlobLoader.getImageBlob.mockResolvedValue(new Blob(['image-data']));
 
-    await preloadReaderImageResources(1, ['hero', 'hero', 'cover']);
+    await preloadReaderImageResources(imageBlobLoader, 1, ['hero', 'hero', 'cover']);
 
-    expect(readerContentService.getImageBlob).toHaveBeenCalledTimes(2);
+    expect(imageBlobLoader.getImageBlob).toHaveBeenCalledTimes(2);
     expect(URL.createObjectURL).toHaveBeenCalledTimes(2);
     expect(peekReaderImageResource(1, 'hero')).toBe('blob:10');
     expect(areReaderImageResourcesReady(1, ['hero', 'cover'])).toBe(true);
   });
 
   it('clears all URLs for a novel without touching other novels', async () => {
-    vi.mocked(readerContentService.getImageBlob)
+    imageBlobLoader.getImageBlob
       .mockResolvedValueOnce(new Blob(['one']))
       .mockResolvedValueOnce(new Blob(['two']));
 
-    await acquireReaderImageResource(1, 'hero');
-    await acquireReaderImageResource(2, 'villain');
+    await acquireReaderImageResource(imageBlobLoader, 1, 'hero');
+    await acquireReaderImageResource(imageBlobLoader, 2, 'villain');
 
     clearReaderImageResourcesForNovel(1);
 
@@ -96,7 +92,7 @@ describe('readerImageResourceCache', () => {
   });
 
   it('keeps preloaded resources alive until decode finishes', async () => {
-    vi.mocked(readerContentService.getImageBlob).mockResolvedValue(new Blob(['image-data']));
+    imageBlobLoader.getImageBlob.mockResolvedValue(new Blob(['image-data']));
 
     let resolveDecode!: () => void;
     const decodePromise = new Promise<void>((resolve) => {
@@ -112,7 +108,7 @@ describe('readerImageResourceCache', () => {
       }
     });
 
-    const preloadPromise = preloadReaderImageResources(1, ['hero']);
+    const preloadPromise = preloadReaderImageResources(imageBlobLoader, 1, ['hero']);
     await Promise.resolve();
     await Promise.resolve();
 
@@ -128,7 +124,7 @@ describe('readerImageResourceCache', () => {
   });
 
   it('assigns image.src only once when decode() is unavailable', async () => {
-    vi.mocked(readerContentService.getImageBlob).mockResolvedValue(new Blob(['image-data']));
+    imageBlobLoader.getImageBlob.mockResolvedValue(new Blob(['image-data']));
 
     let srcAssignments = 0;
     vi.stubGlobal('Image', class {
@@ -149,7 +145,7 @@ describe('readerImageResourceCache', () => {
       }
     });
 
-    await preloadReaderImageResources(1, ['hero']);
+    await preloadReaderImageResources(imageBlobLoader, 1, ['hero']);
 
     expect(srcAssignments).toBe(1);
   });

@@ -1,4 +1,8 @@
 import type { CSSProperties } from 'react';
+import type {
+  ReaderImageActivationPayload,
+  ReaderImageGalleryEntry,
+} from '@shared/contracts/reader';
 
 import { useTranslation } from 'react-i18next';
 
@@ -6,10 +10,6 @@ import { READER_CONTENT_CLASS_NAMES } from '@shared/reader-content';
 import { cn } from '@shared/utils/cn';
 
 import { useReaderImageResource } from '@domains/reader-media';
-import type {
-  ReaderImageActivationPayload,
-  ReaderImageGalleryEntry,
-} from '../../utils/readerImageGallery';
 import { getReaderContentBlockClassName } from '../../utils/readerContentStyling';
 import type { RenderImageItem } from './readerFlowBlockShared';
 import {

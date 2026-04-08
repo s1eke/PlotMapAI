@@ -113,7 +113,7 @@ vi.mock('../useReaderRenderCache', async () => {
 import { SCROLL_READING_ANCHOR_RATIO } from '@shared/utils/readerPosition';
 import {
   ReaderContextProvider,
-} from '@domains/reader-shell/pages/reader-page/ReaderContext';
+} from '@domains/reader-shell';
 import { createDeterministicScrollLayout } from '../../test/deterministicRenderCacheStub';
 import { useScrollReaderController } from '../useScrollReaderController';
 

@@ -1,13 +1,40 @@
 import type { MutableRefObject } from 'react';
+import type { TextProcessingProgress } from '@shared/text-processing';
 
+import type { BookChapter } from '../book';
+import type { Chapter, ChapterContent } from './content';
 import type { ReaderLocator, ScrollModeAnchor } from './layout';
+import type { ReaderImageGalleryEntry } from './media';
 import type { PageTarget, ChapterChangeSource } from './session';
 
 export type RestoreSettledResult = 'completed' | 'skipped' | 'failed';
 
+export interface ReaderTextProcessingOptions {
+  signal?: AbortSignal;
+  onProgress?: (progress: TextProcessingProgress) => void;
+}
+
 export interface ReaderViewportContextValue {
   contentRef: MutableRefObject<HTMLDivElement | null>;
   pagedViewportRef: MutableRefObject<HTMLDivElement | null>;
+}
+
+export interface ReaderContentRuntimeValue {
+  getChapters: (
+    novelId: number,
+    options?: ReaderTextProcessingOptions,
+  ) => Promise<Chapter[]>;
+  getChapterContent: (
+    novelId: number,
+    chapterIndex: number,
+    options?: ReaderTextProcessingOptions,
+  ) => Promise<ChapterContent>;
+  getImageBlob: (novelId: number, imageKey: string) => Promise<Blob | null>;
+  getImageGalleryEntries: (novelId: number) => Promise<ReaderImageGalleryEntry[]>;
+  loadPurifiedBookChapters: (
+    novelId: number,
+    options?: ReaderTextProcessingOptions,
+  ) => Promise<BookChapter[]>;
 }
 
 export interface ReaderNavigationRuntimeValue {

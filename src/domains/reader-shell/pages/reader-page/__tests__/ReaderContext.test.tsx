@@ -5,10 +5,24 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { ReaderProvider, useReaderContext } from '../ReaderContext';
 
+function createContentRuntime() {
+  return {
+    getChapters: vi.fn(async () => []),
+    getChapterContent: vi.fn(async () => {
+      throw new Error('not configured');
+    }),
+    getImageBlob: vi.fn(async () => null),
+    getImageGalleryEntries: vi.fn(async () => []),
+    loadPurifiedBookChapters: vi.fn(async () => []),
+  };
+}
+
 function createWrapper(novelId = 1) {
+  const contentRuntime = createContentRuntime();
+
   return function Wrapper({ children }: { children: ReactNode }) {
     return (
-      <ReaderProvider novelId={novelId}>
+      <ReaderProvider contentRuntime={contentRuntime} novelId={novelId}>
         {children}
       </ReaderProvider>
     );
@@ -24,6 +38,7 @@ describe('ReaderProvider', () => {
     const initialBindings = {
       contentRef: result.current.contentRef,
       pagedViewportRef: result.current.pagedViewportRef,
+      getChapters: result.current.getChapters,
       getPendingPageTarget: result.current.getPendingPageTarget,
       setPendingPageTarget: result.current.setPendingPageTarget,
       getPagedState: result.current.getPagedState,
@@ -34,6 +49,7 @@ describe('ReaderProvider', () => {
 
     expect(result.current.contentRef).toBe(initialBindings.contentRef);
     expect(result.current.pagedViewportRef).toBe(initialBindings.pagedViewportRef);
+    expect(result.current.getChapters).toBe(initialBindings.getChapters);
     expect(result.current.getPendingPageTarget).toBe(initialBindings.getPendingPageTarget);
     expect(result.current.setPendingPageTarget).toBe(initialBindings.setPendingPageTarget);
     expect(result.current.getPagedState).toBe(initialBindings.getPagedState);
@@ -59,6 +75,7 @@ describe('ReaderProvider', () => {
     expect(result.current.getPendingPageTarget()).toBe('end');
     expect(result.current.getChapterChangeSource()).toBe('navigation');
     expect(result.current.getPagedState()).toEqual({ pageCount: 4, pageIndex: 2 });
+    expect(result.current.getImageGalleryEntries).toBeTypeOf('function');
     expect(result.current.isScrollSyncSuppressed()).toBe(true);
     expect(onRestoreSettled).toHaveBeenCalledWith('completed');
   });

@@ -2,6 +2,7 @@ import type { ChapterContent } from '@shared/contracts/reader';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { useReaderContentRuntime } from '@shared/reader-runtime';
 import { extractImageKeysFromChapter } from '@shared/text-processing';
 
 import {
@@ -107,6 +108,7 @@ export function usePagedReaderImagePrewarm(params: {
   novelId: number;
   previousChapterPreview?: ChapterContent | null;
 }): void {
+  const readerContentRuntime = useReaderContentRuntime();
   const {
     chapter,
     nextChapterPreview,
@@ -128,6 +130,6 @@ export function usePagedReaderImagePrewarm(params: {
       return;
     }
 
-    preloadReaderImageResources(novelId, Array.from(imageKeys.values()));
-  }, [chapter, nextChapterPreview, novelId, previousChapterPreview]);
+    preloadReaderImageResources(readerContentRuntime, novelId, Array.from(imageKeys.values()));
+  }, [chapter, nextChapterPreview, novelId, previousChapterPreview, readerContentRuntime]);
 }

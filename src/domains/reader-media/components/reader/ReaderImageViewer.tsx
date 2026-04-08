@@ -1,14 +1,14 @@
-import type { ReaderImageGalleryEntry } from '../../utils/readerImageGallery';
+import type { ReaderImageGalleryEntry } from '@shared/contracts/reader';
 import type { ReaderImageViewerSurfaceTransition } from '../../utils/readerImageViewerTypes';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useMotionValue } from 'motion/react';
+import { createReaderImageEntryId } from '@shared/reader-content';
 
 import ReaderImageViewerSurface from './ReaderImageViewerSurface';
 import { useReaderImageViewerTransition } from '../../hooks/useReaderImageViewerTransition';
-import { createReaderImageEntryId } from '../../utils/readerImageGallery';
 import {
   buildImageSwitchTransform,
   IMAGE_SWITCH_ANIMATION_DURATION_S,

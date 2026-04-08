@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useReaderContentRuntime } from '@shared/reader-runtime';
 
 import {
   acquireReaderImageResource,
@@ -7,6 +8,7 @@ import {
 } from '../utils/readerImageResourceCache';
 
 export function useReaderImageResource(novelId: number, imageKey: string): string | null {
+  const readerContentRuntime = useReaderContentRuntime();
   const resourceKey = novelId > 0 && imageKey ? `${novelId}:${imageKey}` : '';
   const cachedUrl = resourceKey ? peekReaderImageResource(novelId, imageKey) : null;
   const [resourceState, setResourceState] = useState<{ key: string; url: string | null }>({
@@ -21,7 +23,7 @@ export function useReaderImageResource(novelId: number, imageKey: string): strin
 
     let cancelled = false;
 
-    acquireReaderImageResource(novelId, imageKey).then((nextUrl) => {
+    acquireReaderImageResource(readerContentRuntime, novelId, imageKey).then((nextUrl) => {
       if (!cancelled) {
         setResourceState({
           key: `${novelId}:${imageKey}`,
@@ -41,7 +43,7 @@ export function useReaderImageResource(novelId: number, imageKey: string): strin
       cancelled = true;
       releaseReaderImageResource(novelId, imageKey);
     };
-  }, [imageKey, novelId]);
+  }, [imageKey, novelId, readerContentRuntime]);
 
   if (cachedUrl !== undefined) {
     return cachedUrl;

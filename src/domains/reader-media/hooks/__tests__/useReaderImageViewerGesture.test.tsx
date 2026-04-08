@@ -1,4 +1,4 @@
-import type { ReaderImageGalleryEntry } from '../../utils/readerImageGallery';
+import type { ReaderImageGalleryEntry } from '@shared/contracts/reader';
 import type { ReaderImageViewerViewportSize } from '../../utils/readerImageViewerTypes';
 
 import { act, fireEvent, render, screen } from '@testing-library/react';

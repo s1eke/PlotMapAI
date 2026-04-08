@@ -123,6 +123,10 @@ export default defineConfig([
               message: 'reader-family domain code must not depend on unrelated domains.',
             },
             {
+              group: ['@domains/reader-*/*'],
+              message: 'reader-family code must import sibling reader domains via barrels and same-domain modules via relative paths.',
+            },
+            {
               group: ['@domains/*/*', '!@domains/reader-*/*'],
               message: 'reader-family domain code must not depend on unrelated domain internals.',
             },

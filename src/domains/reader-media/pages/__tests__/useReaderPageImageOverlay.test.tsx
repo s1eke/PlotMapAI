@@ -1,19 +1,13 @@
-import type { ReaderImageGalleryEntry } from '../../utils/readerImageGallery';
+import type { ReaderImageGalleryEntry } from '@shared/contracts/reader';
 
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createReaderContextWrapper } from '@test/readerRuntimeTestUtils';
 
 const clearReaderImageResourcesForNovelMock = vi.hoisted(() => vi.fn());
 const preloadReaderImageResourcesMock = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 
 import { useReaderPageImageOverlay } from '../useReaderPageImageOverlay';
-import { readerContentService } from '@domains/reader-content';
-
-vi.mock('@domains/reader-content', () => ({
-  readerContentService: {
-    getImageGalleryEntries: vi.fn(),
-  },
-}));
 
 vi.mock('../../utils/readerImageResourceCache', () => ({
   clearReaderImageResourcesForNovel: clearReaderImageResourcesForNovelMock,
@@ -44,10 +38,12 @@ function createEntry(
 }
 
 describe('useReaderPageImageOverlay', () => {
+  const getImageGalleryEntries = vi.fn();
+
   beforeEach(() => {
     vi.clearAllMocks();
     window.history.replaceState({ idx: 0 }, '', '#/novel/1/read');
-    vi.mocked(readerContentService.getImageGalleryEntries).mockResolvedValue([]);
+    getImageGalleryEntries.mockResolvedValue([]);
     preloadReaderImageResourcesMock.mockResolvedValue(undefined);
   });
 
@@ -57,7 +53,10 @@ describe('useReaderPageImageOverlay', () => {
 
   it('deduplicates gallery index loading while opening the viewer', async () => {
     const deferred = createDeferred<ReaderImageGalleryEntry[]>();
-    vi.mocked(readerContentService.getImageGalleryEntries).mockReturnValueOnce(deferred.promise);
+    getImageGalleryEntries.mockReturnValueOnce(deferred.promise);
+    const { Wrapper } = createReaderContextWrapper({
+      getImageGalleryEntries,
+    });
 
     const { result } = renderHook(
       ({ isEnabled, novelId }) => useReaderPageImageOverlay({
@@ -67,6 +66,7 @@ describe('useReaderPageImageOverlay', () => {
       }),
       {
         initialProps: { isEnabled: true, novelId: 1 },
+        wrapper: Wrapper,
       },
     );
 
@@ -91,7 +91,7 @@ describe('useReaderPageImageOverlay', () => {
       });
     });
 
-    expect(readerContentService.getImageGalleryEntries).toHaveBeenCalledTimes(1);
+    expect(getImageGalleryEntries).toHaveBeenCalledTimes(1);
     expect(result.current.imageViewerProps.isIndexLoading).toBe(true);
 
     deferred.resolve([createEntry(0, 0, 'cover', 0)]);
@@ -103,9 +103,12 @@ describe('useReaderPageImageOverlay', () => {
   it('ignores stale gallery results after switching novels', async () => {
     const firstRequest = createDeferred<ReaderImageGalleryEntry[]>();
     const secondRequest = createDeferred<ReaderImageGalleryEntry[]>();
-    vi.mocked(readerContentService.getImageGalleryEntries)
+    getImageGalleryEntries
       .mockReturnValueOnce(firstRequest.promise)
       .mockReturnValueOnce(secondRequest.promise);
+    const { Wrapper } = createReaderContextWrapper({
+      getImageGalleryEntries,
+    });
 
     const { result, rerender } = renderHook(
       ({ isEnabled, novelId }) => useReaderPageImageOverlay({
@@ -115,6 +118,7 @@ describe('useReaderPageImageOverlay', () => {
       }),
       {
         initialProps: { isEnabled: true, novelId: 1 },
+        wrapper: Wrapper,
       },
     );
 
@@ -131,9 +135,12 @@ describe('useReaderPageImageOverlay', () => {
   });
 
   it('restores focus to the activating element when the viewer closes', async () => {
-    vi.mocked(readerContentService.getImageGalleryEntries).mockResolvedValueOnce([
+    getImageGalleryEntries.mockResolvedValueOnce([
       createEntry(0, 0, 'cover', 0),
     ]);
+    const { Wrapper } = createReaderContextWrapper({
+      getImageGalleryEntries,
+    });
 
     const { result } = renderHook(
       ({ isEnabled, novelId }) => useReaderPageImageOverlay({
@@ -143,6 +150,7 @@ describe('useReaderPageImageOverlay', () => {
       }),
       {
         initialProps: { isEnabled: true, novelId: 1 },
+        wrapper: Wrapper,
       },
     );
 
@@ -178,9 +186,12 @@ describe('useReaderPageImageOverlay', () => {
   });
 
   it('closes the viewer when browser back pops the image-viewer history entry', async () => {
-    vi.mocked(readerContentService.getImageGalleryEntries).mockResolvedValueOnce([
+    getImageGalleryEntries.mockResolvedValueOnce([
       createEntry(0, 0, 'cover', 0),
     ]);
+    const { Wrapper } = createReaderContextWrapper({
+      getImageGalleryEntries,
+    });
 
     const { result } = renderHook(
       ({ isEnabled, novelId }) => useReaderPageImageOverlay({
@@ -190,6 +201,7 @@ describe('useReaderPageImageOverlay', () => {
       }),
       {
         initialProps: { isEnabled: true, novelId: 1 },
+        wrapper: Wrapper,
       },
     );
 
@@ -228,10 +240,13 @@ describe('useReaderPageImageOverlay', () => {
   });
 
   it('syncs history back when the viewer closes directly', async () => {
-    vi.mocked(readerContentService.getImageGalleryEntries).mockResolvedValueOnce([
+    getImageGalleryEntries.mockResolvedValueOnce([
       createEntry(0, 0, 'cover', 0),
     ]);
     const historyBackSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {});
+    const { Wrapper } = createReaderContextWrapper({
+      getImageGalleryEntries,
+    });
 
     const { result } = renderHook(
       ({ isEnabled, novelId }) => useReaderPageImageOverlay({
@@ -241,6 +256,7 @@ describe('useReaderPageImageOverlay', () => {
       }),
       {
         initialProps: { isEnabled: true, novelId: 1 },
+        wrapper: Wrapper,
       },
     );
 
@@ -276,11 +292,14 @@ describe('useReaderPageImageOverlay', () => {
   });
 
   it('navigates using the full-book image order', async () => {
-    vi.mocked(readerContentService.getImageGalleryEntries).mockResolvedValueOnce([
+    getImageGalleryEntries.mockResolvedValueOnce([
       createEntry(0, 0, 'first', 0),
       createEntry(1, 0, 'second', 0),
       createEntry(1, 1, 'third', 1),
     ]);
+    const { Wrapper } = createReaderContextWrapper({
+      getImageGalleryEntries,
+    });
 
     const { result } = renderHook(
       ({ isEnabled, novelId }) => useReaderPageImageOverlay({
@@ -290,6 +309,7 @@ describe('useReaderPageImageOverlay', () => {
       }),
       {
         initialProps: { isEnabled: true, novelId: 1 },
+        wrapper: Wrapper,
       },
     );
 
@@ -330,11 +350,14 @@ describe('useReaderPageImageOverlay', () => {
   });
 
   it('preloads the current image with adjacent neighbors once the viewer opens', async () => {
-    vi.mocked(readerContentService.getImageGalleryEntries).mockResolvedValueOnce([
+    getImageGalleryEntries.mockResolvedValueOnce([
       createEntry(0, 0, 'first', 0),
       createEntry(1, 0, 'second', 0),
       createEntry(1, 1, 'third', 1),
     ]);
+    const { Wrapper } = createReaderContextWrapper({
+      getImageGalleryEntries,
+    });
 
     const { result } = renderHook(
       ({ isEnabled, novelId }) => useReaderPageImageOverlay({
@@ -344,6 +367,7 @@ describe('useReaderPageImageOverlay', () => {
       }),
       {
         initialProps: { isEnabled: true, novelId: 1 },
+        wrapper: Wrapper,
       },
     );
 
@@ -371,10 +395,15 @@ describe('useReaderPageImageOverlay', () => {
       expect(preloadReaderImageResourcesMock).toHaveBeenCalledTimes(1);
     });
 
-    const [preloadedNovelId, preloadedKeys] = preloadReaderImageResourcesMock.mock.calls[0] as [
-      number,
-      Set<string>,
-    ];
+    const [preloadedRuntime, preloadedNovelId, preloadedKeys] =
+      preloadReaderImageResourcesMock.mock.calls[0] as [
+        { getImageBlob: unknown },
+        number,
+        Set<string>,
+      ];
+    expect(preloadedRuntime).toMatchObject({
+      getImageBlob: expect.any(Function),
+    });
     expect(preloadedNovelId).toBe(1);
     expect(Array.from(preloadedKeys)).toEqual(['second', 'first', 'third']);
   });

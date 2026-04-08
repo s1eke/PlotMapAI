@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react';
 import type {
+  ReaderContentRuntimeValue,
   ReaderLayoutQueriesValue,
   ReaderNavigationRuntimeValue,
   ReaderPersistenceRuntimeValue,
@@ -25,6 +26,8 @@ interface ReaderRuntimeProviderProps {
 
 const ReaderViewportContext =
   createContext<ReaderViewportContextValue | undefined>(undefined);
+const ReaderContentRuntimeContext =
+  createContext<ReaderContentRuntimeValue | undefined>(undefined);
 const ReaderNavigationRuntimeContext =
   createContext<ReaderNavigationRuntimeValue | undefined>(undefined);
 const ReaderLayoutQueriesContext =
@@ -45,6 +48,17 @@ export function ReaderViewportContextProvider({
     <ReaderViewportContext.Provider value={value}>
       {children}
     </ReaderViewportContext.Provider>
+  );
+}
+
+export function ReaderContentRuntimeContextProvider({
+  children,
+  value,
+}: ReaderScopedProviderProps<ReaderContentRuntimeValue>) {
+  return (
+    <ReaderContentRuntimeContext.Provider value={value}>
+      {children}
+    </ReaderContentRuntimeContext.Provider>
   );
 }
 
@@ -265,6 +279,13 @@ function useRequiredContext<T>(
 
 export function useReaderViewportContext(): ReaderViewportContextValue {
   return useRequiredContext(useContext(ReaderViewportContext), 'useReaderViewportContext');
+}
+
+export function useReaderContentRuntime(): ReaderContentRuntimeValue {
+  return useRequiredContext(
+    useContext(ReaderContentRuntimeContext),
+    'useReaderContentRuntime',
+  );
 }
 
 export function useReaderNavigationRuntime(): ReaderNavigationRuntimeValue {

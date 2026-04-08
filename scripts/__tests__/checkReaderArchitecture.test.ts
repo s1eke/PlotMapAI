@@ -5,7 +5,9 @@ import { describe, expect, it } from 'vitest';
 import {
   READER_FILE_LINE_LIMIT,
   evaluateReaderArchitecture,
+  findInvalidReaderContentRootExports,
   findInvalidReaderLayoutEngineRootExports,
+  findReaderFamilyDeepImports,
   findRestrictedReaderImports,
   isPassThroughReaderFile,
 } from '../checkReaderArchitecture.mjs';
@@ -63,6 +65,30 @@ describe('checkReaderArchitecture', () => {
     ]);
   });
 
+  it('flags reader-content root barrel exports outside the stable public surface', () => {
+    expect(findInvalidReaderContentRootExports(
+      'src/domains/reader-content/index.ts',
+      [
+        'export type { Chapter, ChapterContent, ReaderChapterCacheApi } from \'@shared/contracts/reader\';',
+        'export { readerContentService } from \'./readerContentService\';',
+      ].join('\n'),
+    )).toEqual([
+      'export { readerContentService } from \'./readerContentService\';',
+    ]);
+  });
+
+  it('flags reader-family deep imports into domain internals', () => {
+    expect(findReaderFamilyDeepImports(
+      'src/domains/reader-layout-engine/hooks/useScrollReaderController.ts',
+      [
+        'import { ReaderContextProvider } from \'@domains/reader-shell/pages/reader-page/ReaderContext\';',
+        'import { something } from \'@domains/reader-media\';',
+      ].join('\n'),
+    )).toEqual([
+      '@domains/reader-shell/pages/reader-page/ReaderContext',
+    ]);
+  });
+
   it('includes invalid reader-layout-engine root barrel exports in the aggregated result', () => {
     const result = evaluateReaderArchitecture({
       'src/domains/reader-layout-engine/index.ts': [
@@ -76,6 +102,30 @@ describe('checkReaderArchitecture', () => {
       expect.objectContaining({
         filePath: 'src/domains/reader-layout-engine/index.ts',
         line: 'export { buildStaticPagedChapterTree } from \'./layout-core\';',
+      }),
+    ]);
+  });
+
+  it('includes reader-family deep imports and invalid reader-content barrel exports in the aggregated result', () => {
+    const result = evaluateReaderArchitecture({
+      'src/domains/reader-layout-engine/hooks/useScrollReaderController.ts':
+        'import { ReaderContextProvider } from \'@domains/reader-shell/pages/reader-page/ReaderContext\';\n',
+      'src/domains/reader-content/index.ts': [
+        'export type { Chapter, ChapterContent, ReaderChapterCacheApi } from \'@shared/contracts/reader\';',
+        'export { readerContentService } from \'./readerContentService\';',
+      ].join('\n'),
+    });
+
+    expect(result.readerFamilyDeepImports).toEqual([
+      expect.objectContaining({
+        filePath: 'src/domains/reader-layout-engine/hooks/useScrollReaderController.ts',
+        specifier: '@domains/reader-shell/pages/reader-page/ReaderContext',
+      }),
+    ]);
+    expect(result.invalidReaderContentRootExports).toEqual([
+      expect.objectContaining({
+        filePath: 'src/domains/reader-content/index.ts',
+        line: 'export { readerContentService } from \'./readerContentService\';',
       }),
     ]);
   });

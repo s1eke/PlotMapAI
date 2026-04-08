@@ -2,6 +2,7 @@ import type { ReactElement } from 'react';
 
 import { useParams } from 'react-router-dom';
 
+import { applicationReaderContentRuntime } from '@application/services/readerContentRuntime';
 import { ReaderProvider } from '@domains/reader-shell';
 
 import ReaderScreen from './ReaderScreen';
@@ -18,7 +19,7 @@ export default function ReaderPage(): ReactElement {
   const novelId = Number(id);
 
   return (
-    <ReaderProvider novelId={novelId}>
+    <ReaderProvider contentRuntime={applicationReaderContentRuntime} novelId={novelId}>
       <ReaderPageContent novelId={novelId} />
     </ReaderProvider>
   );

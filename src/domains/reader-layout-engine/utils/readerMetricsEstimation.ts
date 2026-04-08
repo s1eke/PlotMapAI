@@ -1,10 +1,10 @@
+import type { ReaderImageDimensions } from '@domains/reader-media';
 import type {
   ReaderBlock,
   ReaderImageLayoutConstraints,
   ReaderRenderQueryManifest,
   ReaderTypographyMetrics,
 } from './readerLayoutTypes';
-import type { ReaderImageDimensions } from './readerImageResourceCache';
 
 import {
   getApproximateMaxCharsPerLine,

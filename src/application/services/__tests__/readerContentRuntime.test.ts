@@ -4,11 +4,11 @@ import { db } from '@infra/db';
 import { AppErrorCode } from '@shared/errors';
 
 import {
-  applicationReaderContentController,
+  applicationReaderContentRuntime,
   loadPurifiedBookChapters,
-} from '../readerContentController';
+} from '../readerContentRuntime';
 
-describe('applicationReaderContentController', () => {
+describe('applicationReaderContentRuntime', () => {
   beforeEach(async () => {
     vi.restoreAllMocks();
     await db.delete();
@@ -96,7 +96,7 @@ describe('applicationReaderContentController', () => {
   });
 
   it('projects plain chapter text into paragraph rich blocks', async () => {
-    await expect(applicationReaderContentController.getChapterContent(1, 0)).resolves.toEqual({
+    await expect(applicationReaderContentRuntime.getChapterContent(1, 0)).resolves.toEqual({
       index: 0,
       title: 'Chapter 1',
       plainText: 'Hello world',
@@ -117,7 +117,7 @@ describe('applicationReaderContentController', () => {
   });
 
   it('returns stored rich blocks for rich chapters', async () => {
-    await expect(applicationReaderContentController.getChapterContent(1, 1)).resolves.toEqual({
+    await expect(applicationReaderContentRuntime.getChapterContent(1, 1)).resolves.toEqual({
       index: 1,
       title: 'Chapter 2',
       plainText: 'Plain text',
@@ -160,11 +160,11 @@ describe('applicationReaderContentController', () => {
       createdAt: new Date().toISOString(),
     });
 
-    await expect(applicationReaderContentController.getChapters(1)).resolves.toEqual([
+    await expect(applicationReaderContentRuntime.getChapters(1)).resolves.toEqual([
       { index: 0, title: 'Chapter 1', wordCount: 11 },
       { index: 1, title: 'Chapter 2', wordCount: 10 },
     ]);
-    await expect(applicationReaderContentController.getChapterContent(1, 0)).resolves.toEqual({
+    await expect(applicationReaderContentRuntime.getChapterContent(1, 0)).resolves.toEqual({
       index: 0,
       title: 'Chapter 1',
       plainText: 'Hi world',
@@ -182,10 +182,10 @@ describe('applicationReaderContentController', () => {
       hasPrev: false,
       hasNext: true,
     });
-    await expect(applicationReaderContentController.getImageGalleryEntries(1)).resolves.toEqual([
+    await expect(applicationReaderContentRuntime.getImageGalleryEntries(1)).resolves.toEqual([
       { chapterIndex: 0, blockIndex: 2, imageKey: 'map', order: 0 },
     ]);
-    await expect(applicationReaderContentController.getImageBlob(1, 'map')).resolves.toBeTruthy();
+    await expect(applicationReaderContentRuntime.getImageBlob(1, 'map')).resolves.toBeTruthy();
   });
 
   it('loads purified book chapters for downstream analysis and graph workflows', async () => {
@@ -228,7 +228,7 @@ describe('applicationReaderContentController', () => {
   it('fails when structured chapter content is missing for a reader request', async () => {
     await db.chapterRichContents.where('[novelId+chapterIndex]').equals([1, 0]).delete();
 
-    await expect(applicationReaderContentController.getChapterContent(1, 0)).rejects.toMatchObject({
+    await expect(applicationReaderContentRuntime.getChapterContent(1, 0)).rejects.toMatchObject({
       code: AppErrorCode.CHAPTER_STRUCTURED_CONTENT_MISSING,
       details: {
         chapterIndex: 0,
@@ -259,7 +259,7 @@ describe('applicationReaderContentController', () => {
       createdAt: new Date().toISOString(),
     });
 
-    await expect(applicationReaderContentController.getChapters(1)).resolves.toEqual([
+    await expect(applicationReaderContentRuntime.getChapters(1)).resolves.toEqual([
       { index: 0, title: 'Section 1', wordCount: 11 },
       { index: 1, title: 'Section 2', wordCount: 10 },
     ]);

@@ -2,12 +2,11 @@ import type { MutableRefObject } from 'react';
 import type {
   ReaderImageActivationPayload,
   ReaderImageGalleryEntry,
-} from '../utils/readerImageGallery';
+} from '@shared/contracts/reader';
 import type { ReaderImageViewerSessionState } from '../utils/readerImageViewerTypes';
 
 import { startTransition, useCallback, useEffect, useRef, useState } from 'react';
-
-import { createReaderImageEntryId } from '../utils/readerImageGallery';
+import { createReaderImageEntryId } from '@shared/reader-content';
 
 interface UseReaderPageImageViewerSessionParams {
   dismissBlockedInteraction: () => void;

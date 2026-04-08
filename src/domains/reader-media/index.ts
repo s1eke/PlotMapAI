@@ -4,6 +4,8 @@ export { useReaderPageImageOverlay } from './pages/useReaderPageImageOverlay';
 export { useReaderImageResource } from './hooks/useReaderImageResource';
 export {
   areReaderImageResourcesReady,
+  type ReaderImageDimensions,
   clearReaderImageResourcesForNovel,
+  peekReaderImageDimensions,
   preloadReaderImageResources,
 } from './utils/readerImageResourceCache';

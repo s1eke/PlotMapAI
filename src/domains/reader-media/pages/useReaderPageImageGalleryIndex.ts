@@ -1,9 +1,9 @@
 import type { MutableRefObject } from 'react';
-import type { ReaderImageGalleryEntry } from '../utils/readerImageGallery';
+import type { ReaderImageGalleryEntry } from '@shared/contracts/reader';
 
 import { startTransition, useCallback, useEffect, useRef, useState } from 'react';
 
-import { readerContentService } from '@domains/reader-content';
+import { useReaderContentRuntime } from '@shared/reader-runtime';
 
 interface UseReaderPageImageGalleryIndexResult {
   entries: ReaderImageGalleryEntry[];
@@ -16,6 +16,7 @@ interface UseReaderPageImageGalleryIndexResult {
 export function useReaderPageImageGalleryIndex(
   novelId: number,
 ): UseReaderPageImageGalleryIndexResult {
+  const readerContentRuntime = useReaderContentRuntime();
   const [entries, setEntries] = useState<ReaderImageGalleryEntry[]>([]);
   const [isIndexResolved, setIsIndexResolved] = useState(false);
   const [isIndexLoading, setIsIndexLoading] = useState(false);
@@ -57,7 +58,7 @@ export function useReaderPageImageGalleryIndex(
     const loadToken = imageGalleryIndexLoadTokenRef.current;
     setIsIndexLoading(true);
 
-    const loadPromise = readerContentService.getImageGalleryEntries(novelId)
+    const loadPromise = readerContentRuntime.getImageGalleryEntries(novelId)
       .then((loadedEntries) => {
         if (imageGalleryIndexLoadTokenRef.current !== loadToken) {
           return false;
@@ -81,7 +82,7 @@ export function useReaderPageImageGalleryIndex(
 
     imageGalleryIndexPromiseRef.current = trackedPromise;
     return trackedPromise;
-  }, [isIndexResolved, novelId]);
+  }, [isIndexResolved, novelId, readerContentRuntime]);
 
   return {
     entries,

@@ -1,10 +1,10 @@
-import * as readerDomain from '../index';
-
 import { describe, expect, it } from 'vitest';
+import * as readerContentDomain from '../index';
 
-describe('@domains/reader barrel', () => {
-  it('does not expose internal session selectors or test resets', () => {
-    expect(readerDomain).not.toHaveProperty('useReaderSessionSelector');
-    expect(readerDomain).not.toHaveProperty('resetReaderSessionStoreForTests');
+describe('@domains/reader-content barrel', () => {
+  it('does not expose the removed implicit runtime registration APIs', () => {
+    expect(readerContentDomain).not.toHaveProperty('readerContentService');
+    expect(readerContentDomain).not.toHaveProperty('registerReaderContentController');
+    expect(readerContentDomain).not.toHaveProperty('resetReaderContentControllerForTests');
   });
 });

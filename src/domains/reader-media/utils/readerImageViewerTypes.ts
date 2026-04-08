@@ -1,4 +1,4 @@
-import type { ReaderImageGalleryEntry } from './readerImageGallery';
+import type { ReaderImageGalleryEntry } from '@shared/contracts/reader';
 
 export interface ReaderImageViewerSessionState {
   activeEntry: ReaderImageGalleryEntry | null;

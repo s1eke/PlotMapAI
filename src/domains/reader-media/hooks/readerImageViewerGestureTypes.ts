@@ -8,7 +8,7 @@ import type {
   SyntheticEvent,
   WheelEvent as ReactWheelEvent,
 } from 'react';
-import type { ReaderImageGalleryEntry } from '../utils/readerImageGallery';
+import type { ReaderImageGalleryEntry } from '@shared/contracts/reader';
 import type {
   ReaderImageViewerNaturalImageSize,
   ReaderImageViewerPoint,

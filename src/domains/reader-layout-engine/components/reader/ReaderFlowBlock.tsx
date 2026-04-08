@@ -1,10 +1,10 @@
 import type { CSSProperties } from 'react';
-import type { StaticReaderNode } from '../../utils/readerLayout';
-
 import type {
   ReaderImageActivationPayload,
   ReaderImageGalleryEntry,
-} from '../../utils/readerImageGallery';
+} from '@shared/contracts/reader';
+import type { StaticReaderNode } from '../../utils/readerLayout';
+
 import { ReaderFlowBlockImage } from './ReaderFlowBlockImage';
 import { ReaderFlowBlockText } from './ReaderFlowBlockText';
 import type { RenderImageItem, RenderTextItem } from './readerFlowBlockShared';

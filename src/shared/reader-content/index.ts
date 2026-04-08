@@ -30,3 +30,7 @@ export {
   type ReaderContentMode,
   type ReaderContentSourceStructureSpec,
 } from './readerContentContract';
+export {
+  createReaderImageEntryId,
+  sortReaderImageGalleryEntries,
+} from './readerImageGallery';

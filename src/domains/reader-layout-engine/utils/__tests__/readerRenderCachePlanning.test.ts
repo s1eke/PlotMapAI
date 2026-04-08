@@ -6,7 +6,7 @@ const imageCacheMock = vi.hoisted(() => ({
   peekReaderImageDimensions: vi.fn().mockReturnValue(undefined),
 }));
 
-vi.mock('../readerImageResourceCache', () => imageCacheMock);
+vi.mock('@domains/reader-media', () => imageCacheMock);
 
 import type { ChapterContent } from '@shared/contracts/reader';
 import {

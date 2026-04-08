@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react';
 import type {
+  ReaderContentRuntimeValue,
   ReaderLayoutQueriesValue,
   ReaderNavigationRuntimeValue,
   ReaderPersistenceRuntimeValue,
@@ -11,10 +12,12 @@ import type {
 import { useEffect, useMemo } from 'react';
 
 import {
+  ReaderContentRuntimeContextProvider,
   ReaderLayoutQueriesContextProvider,
   ReaderNavigationRuntimeContextProvider,
   ReaderPersistenceRuntimeContextProvider,
   ReaderRuntimeProvider,
+  useReaderContentRuntime,
   ReaderViewportContextProvider,
   useReaderLayoutQueries,
   useReaderNavigationRuntime,
@@ -28,10 +31,16 @@ import { flushPersistence } from '@domains/reader-session';
 
 interface ReaderProviderProps {
   children: ReactNode;
+  contentRuntime: ReaderContentRuntimeValue;
   novelId: number;
 }
 
+interface ReaderPersistenceBoundaryProps {
+  children: ReactNode;
+}
+
 export interface ReaderContextValue extends
+  ReaderContentRuntimeValue,
   ReaderViewportContextValue,
   ReaderNavigationRuntimeValue,
   ReaderLayoutQueriesValue,
@@ -42,7 +51,7 @@ interface ReaderContextProviderProps {
   value: ReaderContextValue;
 }
 
-function ReaderPersistenceBoundary({ children }: ReaderProviderProps) {
+function ReaderPersistenceBoundary({ children }: ReaderPersistenceBoundaryProps) {
   const persistence = useReaderPersistenceRuntime();
 
   useEffect(() => {
@@ -81,6 +90,20 @@ export function ReaderContextProvider({
   children,
   value,
 }: ReaderContextProviderProps) {
+  const contentRuntimeValue = useMemo<ReaderContentRuntimeValue>(() => ({
+    getChapters: value.getChapters,
+    getChapterContent: value.getChapterContent,
+    getImageBlob: value.getImageBlob,
+    getImageGalleryEntries: value.getImageGalleryEntries,
+    loadPurifiedBookChapters: value.loadPurifiedBookChapters,
+  }), [
+    value.getChapters,
+    value.getChapterContent,
+    value.getImageBlob,
+    value.getImageGalleryEntries,
+    value.loadPurifiedBookChapters,
+  ]);
+
   const viewportValue = useMemo<ReaderViewportContextValue>(() => ({
     contentRef: value.contentRef,
     pagedViewportRef: value.pagedViewportRef,
@@ -153,25 +176,29 @@ export function ReaderContextProvider({
   ]);
 
   return (
-    <ReaderViewportContextProvider value={viewportValue}>
-      <ReaderNavigationRuntimeContextProvider value={navigationValue}>
-        <ReaderLayoutQueriesContextProvider value={layoutQueriesValue}>
-          <ReaderPersistenceRuntimeContextProvider value={persistenceValue}>
-            {children}
-          </ReaderPersistenceRuntimeContextProvider>
-        </ReaderLayoutQueriesContextProvider>
-      </ReaderNavigationRuntimeContextProvider>
-    </ReaderViewportContextProvider>
+    <ReaderContentRuntimeContextProvider value={contentRuntimeValue}>
+      <ReaderViewportContextProvider value={viewportValue}>
+        <ReaderNavigationRuntimeContextProvider value={navigationValue}>
+          <ReaderLayoutQueriesContextProvider value={layoutQueriesValue}>
+            <ReaderPersistenceRuntimeContextProvider value={persistenceValue}>
+              {children}
+            </ReaderPersistenceRuntimeContextProvider>
+          </ReaderLayoutQueriesContextProvider>
+        </ReaderNavigationRuntimeContextProvider>
+      </ReaderViewportContextProvider>
+    </ReaderContentRuntimeContextProvider>
   );
 }
 
 export function useReaderContext(): ReaderContextValue {
+  const contentRuntime = useReaderContentRuntime();
   const viewport = useReaderViewportContext();
   const navigation = useReaderNavigationRuntime();
   const layoutQueries = useReaderLayoutQueries();
   const persistence = useReaderPersistenceRuntime();
 
   return {
+    ...contentRuntime,
     ...viewport,
     ...navigation,
     ...layoutQueries,
@@ -181,13 +208,16 @@ export function useReaderContext(): ReaderContextValue {
 
 export function ReaderProvider({
   children,
+  contentRuntime,
   novelId,
 }: ReaderProviderProps) {
   return (
     <ReaderRuntimeProvider key={novelId}>
-      <ReaderPersistenceBoundary novelId={novelId}>
-        {children}
-      </ReaderPersistenceBoundary>
+      <ReaderContentRuntimeContextProvider value={contentRuntime}>
+        <ReaderPersistenceBoundary>
+          {children}
+        </ReaderPersistenceBoundary>
+      </ReaderContentRuntimeContextProvider>
     </ReaderRuntimeProvider>
   );
 }

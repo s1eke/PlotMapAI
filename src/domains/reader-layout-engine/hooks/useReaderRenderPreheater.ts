@@ -13,6 +13,7 @@ import type {
 
 import { useEffect, useRef, useState } from 'react';
 import { debugLog } from '@shared/debug';
+import { useReaderContentRuntime } from '@shared/reader-runtime';
 
 import {
   createChapterContentHash,
@@ -82,6 +83,7 @@ export function useReaderRenderPreheater({
   typography,
   variantSignatures,
 }: UseReaderRenderPreheaterParams): ReaderRenderPreheaterResult {
+  const readerContentRuntime = useReaderContentRuntime();
   const [pendingPreheatCount, setPendingPreheatCount] = useState(0);
   const [isPreheating, setIsPreheating] = useState(false);
   const fetchChapterContentRef = useRef(fetchChapterContent);
@@ -256,7 +258,7 @@ export function useReaderRenderPreheater({
           }
 
           if (target.variantFamily !== 'summary-shell') {
-            await warmReaderRenderImages(novelId, chapter);
+            await warmReaderRenderImages(readerContentRuntime, novelId, chapter);
           }
 
           const builtEntry = buildStaticRenderTree({
@@ -327,6 +329,7 @@ export function useReaderRenderPreheater({
     novelId,
     preheatTargets,
     preferRichScrollRendering,
+    readerContentRuntime,
     typography,
     variantSignatures,
   ]);

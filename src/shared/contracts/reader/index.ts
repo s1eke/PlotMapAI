@@ -30,9 +30,11 @@ export {
   type ReaderPageTurnMode,
 } from './preferences';
 export type {
+  ReaderContentRuntimeValue,
   ReaderLayoutQueriesValue,
   ReaderNavigationRuntimeValue,
   ReaderPersistenceRuntimeValue,
+  ReaderTextProcessingOptions,
   ReaderViewportContextValue,
   RestoreSettledResult,
 } from './runtime';

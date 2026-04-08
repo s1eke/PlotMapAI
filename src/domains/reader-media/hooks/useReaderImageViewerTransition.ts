@@ -1,12 +1,12 @@
-import type { ReaderImageGalleryEntry } from '../utils/readerImageGallery';
+import type { ReaderImageGalleryEntry } from '@shared/contracts/reader';
 import type {
   ReaderImageViewerSurfaceTransition,
   ReaderImageViewerViewportSize,
 } from '../utils/readerImageViewerTypes';
 
 import { useCallback, useMemo, useRef, useState } from 'react';
+import { createReaderImageEntryId } from '@shared/reader-content';
 
-import { createReaderImageEntryId } from '../utils/readerImageGallery';
 import {
   DOUBLE_TAP_MAX_DELAY_MS,
   getImageSwitchOffset,

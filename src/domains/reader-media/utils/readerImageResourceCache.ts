@@ -1,6 +1,10 @@
-import { readerContentService } from '@domains/reader-content';
+import type { ReaderContentRuntimeValue } from '@shared/contracts/reader';
 
 const RELEASE_DELAY_MS = 10_000;
+
+export interface ReaderImageBlobLoader {
+  getImageBlob: ReaderContentRuntimeValue['getImageBlob'];
+}
 
 export interface ReaderImageDimensions {
   width: number;
@@ -88,7 +92,10 @@ function scheduleRelease(cacheKey: string, entry: ReaderImageResourceEntry): voi
   }, RELEASE_DELAY_MS);
 }
 
-async function ensureLoaded(entry: ReaderImageResourceEntry): Promise<string | null> {
+async function ensureLoaded(
+  imageBlobLoader: ReaderImageBlobLoader,
+  entry: ReaderImageResourceEntry,
+): Promise<string | null> {
   const resourceEntry = entry;
   if (resourceEntry.isDisposed) {
     return null;
@@ -105,7 +112,7 @@ async function ensureLoaded(entry: ReaderImageResourceEntry): Promise<string | n
   }
 
   const cacheKey = getCacheKey(resourceEntry.novelId, resourceEntry.imageKey);
-  resourceEntry.loadPromise = readerContentService.getImageBlob(
+  resourceEntry.loadPromise = imageBlobLoader.getImageBlob(
     resourceEntry.novelId,
     resourceEntry.imageKey,
   )
@@ -177,6 +184,7 @@ async function decodeImage(url: string): Promise<ReaderImageDimensions | null> {
 }
 
 export async function acquireReaderImageResource(
+  imageBlobLoader: ReaderImageBlobLoader,
   novelId: number,
   imageKey: string,
 ): Promise<string | null> {
@@ -185,7 +193,7 @@ export async function acquireReaderImageResource(
   resourceEntry.refCount += 1;
 
   try {
-    return await ensureLoaded(resourceEntry);
+    return await ensureLoaded(imageBlobLoader, resourceEntry);
   } catch (error) {
     resourceEntry.refCount = Math.max(0, resourceEntry.refCount - 1);
     if (resourceEntry.refCount === 0) {
@@ -240,6 +248,7 @@ export function areReaderImageResourcesReady(
 }
 
 export function preloadReaderImageResources(
+  imageBlobLoader: ReaderImageBlobLoader,
   novelId: number,
   imageKeys: Iterable<string>,
 ): Promise<void> {
@@ -251,7 +260,7 @@ export function preloadReaderImageResources(
     entry.refCount += 1;
 
     try {
-      const url = await ensureLoaded(entry);
+      const url = await ensureLoaded(imageBlobLoader, entry);
       if (!url || entry.isDecoded) {
         return;
       }

@@ -74,9 +74,6 @@ export type { ReaderContentRootProps, ReaderContentRootTheme } from '../utils/re
 export {
   createReaderImageEntryId,
   sortReaderImageGalleryEntries,
-} from '../utils/readerImageGallery';
-export type {
-  ReaderImageActivationPayload,
-  ReaderImageGalleryEntry,
-} from '../utils/readerImageGallery';
-export { preloadReaderImageResources } from '../utils/readerImageResourceCache';
+} from '@shared/reader-content';
+export type { ReaderImageActivationPayload, ReaderImageGalleryEntry } from '@shared/contracts/reader';
+export { preloadReaderImageResources } from '@domains/reader-media';

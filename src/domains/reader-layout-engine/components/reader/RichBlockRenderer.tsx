@@ -1,12 +1,12 @@
 import type { CSSProperties } from 'react';
 import type { RichInline } from '@shared/contracts';
 import type {
-  StaticScrollBlockNode,
-} from '../../utils/readerLayout';
-import type {
   ReaderImageActivationPayload,
   ReaderImageGalleryEntry,
-} from '../../utils/readerImageGallery';
+} from '@shared/contracts/reader';
+import type {
+  StaticScrollBlockNode,
+} from '../../utils/readerLayout';
 
 import { useTranslation } from 'react-i18next';
 

@@ -10,11 +10,12 @@ import type {
 import type {
   ReaderImageViewerTransformController,
 } from './readerImageViewerGestureTypes';
+import type { ReaderImageGalleryEntry } from '@shared/contracts/reader';
 
 import { useCallback } from 'react';
 import { flushSync } from 'react-dom';
+import { createReaderImageEntryId } from '@shared/reader-content';
 
-import { createReaderImageEntryId } from '../utils/readerImageGallery';
 import {
   applyScaleAroundPoint,
   clampTranslate,
@@ -34,7 +35,7 @@ interface UseReaderImageViewerStageHandlersResult {
 export function useReaderImageViewerStageHandlers(params: {
   activeIndex: number;
   consumeDeferredStageClick: () => boolean;
-  entries: Array<import('../utils/readerImageGallery').ReaderImageGalleryEntry>;
+  entries: ReaderImageGalleryEntry[];
   hasImageResource: boolean;
   isNavigationTransitionPending: boolean;
   onClearNavigationTransition: () => void;

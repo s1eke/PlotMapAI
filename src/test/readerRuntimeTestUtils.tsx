@@ -1,11 +1,15 @@
 import type { ReactNode } from 'react';
 import type {
   ChapterChangeSource,
+  Chapter,
+  ChapterContent,
   PageTarget,
   ReaderLocator,
+  ReaderImageGalleryEntry,
   RestoreSettledResult,
   ScrollModeAnchor,
 } from '@shared/contracts/reader';
+import type { BookChapter } from '@shared/contracts';
 
 import {
   ReaderContextProvider,
@@ -14,6 +18,26 @@ import {
 
 function createNoopCleanup(): () => void {
   return () => {};
+}
+
+async function resolveEmptyChapters(): Promise<Chapter[]> {
+  return [];
+}
+
+async function resolveMissingChapter(): Promise<ChapterContent> {
+  throw new Error('No reader content runtime stub configured for getChapterContent().');
+}
+
+async function resolveMissingImageBlob(): Promise<Blob | null> {
+  return null;
+}
+
+async function resolveEmptyImageGallery(): Promise<ReaderImageGalleryEntry[]> {
+  return [];
+}
+
+async function resolveEmptyPurifiedBookChapters(): Promise<BookChapter[]> {
+  return [];
 }
 
 export function createReaderContextValue(
@@ -37,6 +61,12 @@ export function createReaderContextValue(
   return {
     contentRef,
     pagedViewportRef,
+    getChapters: overrides.getChapters ?? resolveEmptyChapters,
+    getChapterContent: overrides.getChapterContent ?? resolveMissingChapter,
+    getImageBlob: overrides.getImageBlob ?? resolveMissingImageBlob,
+    getImageGalleryEntries: overrides.getImageGalleryEntries ?? resolveEmptyImageGallery,
+    loadPurifiedBookChapters:
+      overrides.loadPurifiedBookChapters ?? resolveEmptyPurifiedBookChapters,
     getChapterChangeSource: overrides.getChapterChangeSource ?? (() => chapterChangeSource),
     setChapterChangeSource: overrides.setChapterChangeSource ?? ((nextSource) => {
       chapterChangeSource = nextSource;

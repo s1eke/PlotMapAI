@@ -12,6 +12,7 @@ import {
   isDebugFeatureEnabled,
   setDebugSnapshot,
 } from '@shared/debug';
+import { useReaderContentRuntime } from '@shared/reader-runtime';
 
 import { clearReaderRenderCacheMemoryForNovel } from '../utils/readerRenderCache';
 import {
@@ -41,6 +42,7 @@ export function useReaderRenderCache({
   scrollChapters,
   viewMode,
 }: UseReaderRenderCacheParams): UseReaderRenderCacheResult {
+  const readerContentRuntime = useReaderContentRuntime();
   const [imageRevision, setImageRevision] = useState(0);
   const [cacheRevision, setCacheRevision] = useState(0);
   const [readerTelemetryEnabled, setReaderTelemetryEnabled] = useState(() => isDebugFeatureEnabled('readerTelemetry'));
@@ -113,7 +115,7 @@ export function useReaderRenderCache({
     }
 
     let cancelled = false;
-    preloadReaderImageResources(novelId, imageKeys)
+    preloadReaderImageResources(readerContentRuntime, novelId, imageKeys)
       .finally(() => {
         if (!cancelled) {
           setImageRevision((previous) => previous + 1);
@@ -123,7 +125,7 @@ export function useReaderRenderCache({
     return () => {
       cancelled = true;
     };
-  }, [loadedImageKeySignature, novelId]);
+  }, [loadedImageKeySignature, novelId, readerContentRuntime]);
 
   const visibleTargets = useMemo(() => buildVisibleRenderTargets({
     currentChapter,

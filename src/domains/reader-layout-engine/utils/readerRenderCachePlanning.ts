@@ -1,12 +1,10 @@
 import type { ChapterContent } from '@shared/contracts/reader';
+import type { ReaderImageDimensions } from '@domains/reader-media';
 import type {
   ReaderLayoutSignature,
   ReaderRenderVariant,
   StaticPagedChapterTree,
 } from './readerLayout';
-import type {
-  ReaderImageDimensions,
-} from './readerImageResourceCache';
 import type {
   ReaderLayoutFeatureSet,
   ReaderRenderCacheSource,
@@ -23,7 +21,7 @@ import {
   READER_RENDERER_VERSION,
   resolveReaderLayoutFeatureSet,
 } from './readerRenderCache';
-import { peekReaderImageDimensions } from './readerImageResourceCache';
+import { peekReaderImageDimensions } from '@domains/reader-media';
 
 export interface ReaderVisibleRenderTarget {
   chapter: ChapterContent;

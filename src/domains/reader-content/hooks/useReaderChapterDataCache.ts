@@ -6,13 +6,13 @@ import type {
   ReaderMode,
 } from '@shared/contracts/reader';
 
+import { useReaderContentRuntime } from '@shared/reader-runtime';
 import { extractImageKeysFromChapter } from '@shared/text-processing';
 import { isPagedReaderMode } from '@shared/utils/readerMode';
 import {
   areReaderImageResourcesReady,
   preloadReaderImageResources,
 } from '@domains/reader-media';
-import { readerContentService } from '@domains/reader-content';
 
 interface UseReaderChapterDataCacheParams {
   chaptersLength: number;
@@ -44,6 +44,7 @@ export function useReaderChapterDataCache({
   onChapterContentResolved,
   t,
 }: UseReaderChapterDataCacheParams): UseReaderChapterDataCacheResult {
+  const readerContentRuntime = useReaderContentRuntime();
   const chapterCacheRef = useRef<Map<number, ChapterContent>>(new Map());
   const preloadTimeoutIdsRef = useRef<number[]>([]);
   const preloadControllersRef = useRef<AbortController[]>([]);
@@ -82,8 +83,8 @@ export function useReaderChapterDataCache({
       return;
     }
 
-    await preloadReaderImageResources(novelId, imageKeys);
-  }, [getChapterImageKeys, mode, novelId]);
+    await preloadReaderImageResources(readerContentRuntime, novelId, imageKeys);
+  }, [getChapterImageKeys, mode, novelId, readerContentRuntime]);
 
   const clearScheduledPreloads = useCallback(() => {
     preloadTimeoutIdsRef.current.forEach((timeoutId) => {
@@ -106,7 +107,7 @@ export function useReaderChapterDataCache({
       return cached;
     }
 
-    const data = await readerContentService.getChapterContent(novelId, index, {
+    const data = await readerContentRuntime.getChapterContent(novelId, index, {
       signal: options.signal,
       onProgress: (progress) => {
         const message = t('reader.processingChapter', { percent: progress.progress });
@@ -116,7 +117,7 @@ export function useReaderChapterDataCache({
     cache.setCachedChapter(data);
     onChapterContentResolved?.(index);
     return data;
-  }, [cache, novelId, onChapterContentResolved, t]);
+  }, [cache, novelId, onChapterContentResolved, readerContentRuntime, t]);
 
   const preloadAdjacent = useCallback((index: number, prune = true) => {
     clearScheduledPreloads();
@@ -139,7 +140,7 @@ export function useReaderChapterDataCache({
         if (cache.hasCachedChapter(adjacentIndex)) return;
         const controller = new AbortController();
         preloadControllersRef.current.push(controller);
-        readerContentService.getChapterContent(novelId, adjacentIndex, {
+        readerContentRuntime.getChapterContent(novelId, adjacentIndex, {
           signal: controller.signal,
         })
           .then((data) => {
@@ -175,6 +176,7 @@ export function useReaderChapterDataCache({
     mode,
     novelId,
     onChapterContentResolved,
+    readerContentRuntime,
     warmChapterImages,
   ]);
 

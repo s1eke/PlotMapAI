@@ -3,7 +3,6 @@ import { createRoot } from 'react-dom/client';
 import './index.css';
 import './domains/reader-shell/styles/readerContent.css';
 import './i18n/config';
-import '@application/services/readerContentController';
 import App from '@app/App';
 import { initializeAppSafely } from '@app/bootstrap/startup';
 

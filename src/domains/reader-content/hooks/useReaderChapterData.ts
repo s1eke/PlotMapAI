@@ -17,6 +17,7 @@ import type {
 
 import { reportAppError } from '@shared/debug';
 import { AppErrorCode, toAppError, type AppError } from '@shared/errors';
+import { useReaderContentRuntime } from '@shared/reader-runtime';
 import {
   createRestoreTargetFromNavigationIntent,
   createRestoreTargetFromPersistedState,
@@ -25,7 +26,6 @@ import { extractImageKeysFromChapter } from '@shared/text-processing';
 import {
   areReaderImageResourcesReady,
 } from '@domains/reader-media';
-import { readerContentService } from '@domains/reader-content';
 import { useReaderChapterDataCache } from './useReaderChapterDataCache';
 
 export interface ReaderHydrateDataResult {
@@ -104,6 +104,7 @@ export function useReaderChapterData({
     setChapterIndex,
     setMode,
   } = sessionCommands;
+  const readerContentRuntime = useReaderContentRuntime();
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [currentChapter, setCurrentChapter] = useState<ChapterContent | null>(null);
   const [loadingMessage, setLoadingMessage] = useState<string | null>(null);
@@ -179,7 +180,7 @@ export function useReaderChapterData({
       setMode(nextStoredState.mode ?? 'scroll');
       setChapterIndex(nextStoredState.chapterIndex ?? 0);
 
-      const toc = await readerContentService.getChapters(resolvedNovelId, {
+      const toc = await readerContentRuntime.getChapters(resolvedNovelId, {
         signal: controller.signal,
         onProgress: (progress) => {
           setLoadingMessage(t('reader.processingContents', { percent: progress.progress }));
@@ -255,6 +256,7 @@ export function useReaderChapterData({
     hasUserInteractedRef,
     latestReaderStateRef,
     loadPersistedReaderState,
+    readerContentRuntime,
     resolvedNovelId,
     setChapterIndex,
     setMode,
@@ -340,7 +342,7 @@ export function useReaderChapterData({
 
       setReaderError(null);
       setLoadingMessage(t('reader.processingChapter', { percent: 0 }));
-      const chapter = await readerContentService.getChapterContent(
+      const chapter = await readerContentRuntime.getChapterContent(
         resolvedNovelId,
         params.chapterIndex,
         {
@@ -378,6 +380,7 @@ export function useReaderChapterData({
     chapters.length,
     onChapterContentResolved,
     preloadAdjacent,
+    readerContentRuntime,
     resetInteractionState,
     resolvedNovelId,
     t,

@@ -1,5 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createReaderContextWrapper } from '@test/readerRuntimeTestUtils';
 
 const debugLogMock = vi.hoisted(() => vi.fn());
 const imageCacheMock = vi.hoisted(() => ({
@@ -201,7 +202,7 @@ vi.mock('@shared/debug', () => ({
   debugLog: debugLogMock,
 }));
 
-vi.mock('../../utils/readerImageResourceCache', () => imageCacheMock);
+vi.mock('@domains/reader-media', () => imageCacheMock);
 vi.mock('../../utils/readerRenderCache', () => renderCacheMock);
 
 import type { ChapterContent } from '@shared/contracts/reader';
@@ -305,6 +306,7 @@ function renderReaderRenderPreheaterHook(options?: {
     paragraphSpacingRatio: 0.8,
   };
   const variantSignatures = createVariantSignatures();
+  const { Wrapper } = createReaderContextWrapper();
 
   const renderResult = renderHook(() => useReaderRenderPreheater({
     currentChapterIndex: 0,
@@ -317,7 +319,9 @@ function renderReaderRenderPreheaterHook(options?: {
     readerTelemetryEnabled: options?.readerTelemetryEnabled ?? false,
     typography,
     variantSignatures,
-  }));
+  }), {
+    wrapper: Wrapper,
+  });
 
   return {
     fetchChapterContent,
@@ -463,6 +467,9 @@ describe('useReaderRenderPreheater', () => {
     );
 
     expect(renderCacheMock.warmReaderRenderImages).toHaveBeenCalledWith(
+      expect.objectContaining({
+        getImageBlob: expect.any(Function),
+      }),
       1,
       expect.objectContaining({ index: 1 }),
     );

@@ -6,6 +6,7 @@ import type {
   ReaderImageViewerPoint,
   ReaderImageViewerTransformState,
 } from '../utils/readerImageViewerTypes';
+import type { ReaderImageGalleryEntry } from '@shared/contracts/reader';
 
 import { peekReaderImageDimensions } from '../utils/readerImageResourceCache';
 import {
@@ -14,7 +15,7 @@ import {
 
 export function createInitialNaturalImageSize(
   novelId: number,
-  entry: import('../utils/readerImageGallery').ReaderImageGalleryEntry,
+  entry: ReaderImageGalleryEntry,
 ) {
   const cachedDimensions = peekReaderImageDimensions(novelId, entry.imageKey);
   if (!cachedDimensions || cachedDimensions.width <= 0 || cachedDimensions.height <= 0) {

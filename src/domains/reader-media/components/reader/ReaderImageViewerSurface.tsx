@@ -1,5 +1,5 @@
 import type { MotionValue } from 'motion/react';
-import type { ReaderImageGalleryEntry } from '../../utils/readerImageGallery';
+import type { ReaderImageGalleryEntry } from '@shared/contracts/reader';
 import type { ReaderImageViewerViewportSize } from '../../utils/readerImageViewerTypes';
 
 import { Loader2 } from 'lucide-react';

@@ -1,4 +1,5 @@
-import type { ChapterContent } from '@shared/contracts/reader';
+import type { ChapterContent, ReaderContentRuntimeValue } from '@shared/contracts/reader';
+import { preloadReaderImageResources } from '@domains/reader-media';
 import type {
   ReaderLayoutSignature,
   ReaderRenderQueryManifest,
@@ -20,7 +21,6 @@ import {
   createReaderRenderQueryManifest,
   serializeReaderLayoutSignature,
 } from './readerLayout';
-import { preloadReaderImageResources } from './readerImageResourceCache';
 import { READER_RENDERER_VERSION } from './readerRenderCacheCore';
 
 export function createReaderRenderCacheEntry<TTree extends StaticChapterRenderTree>(params: {
@@ -101,6 +101,7 @@ export function createReaderRenderCacheManifestFromEntry<TTree extends StaticCha
 }
 
 export async function warmReaderRenderImages(
+  readerContentRuntime: Pick<ReaderContentRuntimeValue, 'getImageBlob'>,
   novelId: number,
   chapter: Pick<ChapterContent, 'contentFormat' | 'plainText' | 'richBlocks'>,
 ): Promise<void> {
@@ -109,7 +110,7 @@ export async function warmReaderRenderImages(
     return;
   }
 
-  await preloadReaderImageResources(novelId, imageKeys);
+  await preloadReaderImageResources(readerContentRuntime, novelId, imageKeys);
 }
 
 export function coercePagedTree(
