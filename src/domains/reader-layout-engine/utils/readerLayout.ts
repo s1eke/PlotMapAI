@@ -18,11 +18,13 @@ export {
   buildStaticScrollChapterTree,
   buildStaticSummaryShellTree,
   composePaginatedChapterLayout,
-  createReaderRenderQueryManifest,
   createScrollImageLayoutConstraints,
-  estimateReaderRenderQueryManifest,
   getPagedContentHeight,
-} from './readerPagination';
+} from './readerStaticTree';
+export {
+  createReaderRenderQueryManifest,
+  estimateReaderRenderQueryManifest,
+} from './readerRenderManifest';
 export {
   getChapterBoundaryLocator,
   getChapterEndLocator,

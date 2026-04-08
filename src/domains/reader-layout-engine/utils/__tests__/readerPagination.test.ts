@@ -6,10 +6,12 @@ import { createReaderTypographyMetrics } from '../readerMeasurement';
 import {
   buildStaticPagedChapterTree,
   composePaginatedChapterLayout,
+  getPagedContentHeight,
+} from '../readerStaticTree';
+import {
   createReaderRenderQueryManifest,
   estimateReaderRenderQueryManifest,
-  getPagedContentHeight,
-} from '../readerPagination';
+} from '../readerRenderManifest';
 import type {
   MeasuredChapterLayout,
   ReaderMeasuredLine,
@@ -154,6 +156,7 @@ function createMeasuredLayout(metrics: VirtualBlockMetrics[]): MeasuredChapterLa
     blockCount: metrics.length,
     chapterIndex: 0,
     metrics,
+    renderMode: 'rich',
     textWidth: 320,
     totalHeight: metrics.reduce((total, metric) => total + metric.height, 0),
   };
