@@ -1,6 +1,8 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { READER_CONTENT_CLASS_NAMES } from '@domains/reader-shell/constants/readerContentContract';
+
 const useReaderImageResourceMock = vi.hoisted(() => vi.fn());
 
 vi.mock('react-i18next', () => ({
@@ -76,6 +78,87 @@ describe('ReaderFlowBlock', () => {
     expect(fragment).not.toHaveStyle({ textAlign: 'justify' });
   });
 
+  it('renders rich inline styling for paged text fragments', () => {
+    render(
+      <ReaderFlowBlock
+        imageRenderMode="paged"
+        novelId={1}
+        item={{
+          blockIndex: 3,
+          chapterIndex: 0,
+          contentHeight: 64,
+          font: '400 18px sans-serif',
+          fontSizePx: 18,
+          height: 64,
+          indent: 2,
+          key: '0:text:3:0',
+          kind: 'text',
+          lineHeightPx: 32,
+          lineStartIndex: 0,
+          lines: [
+            {
+              end: { graphemeIndex: 5, segmentIndex: 0 },
+              lineIndex: 0,
+              start: { graphemeIndex: 0, segmentIndex: 0 },
+              text: 'Bold ',
+              width: 200,
+            },
+            {
+              end: { graphemeIndex: 9, segmentIndex: 0 },
+              lineIndex: 1,
+              start: { graphemeIndex: 5, segmentIndex: 0 },
+              text: 'Link',
+              width: 180,
+            },
+          ],
+          marginAfter: 0,
+          marginBefore: 0,
+          renderRole: 'rich-text',
+          richLineFragments: [
+            [
+              {
+                marks: ['bold'],
+                text: 'Bold',
+                type: 'text',
+              },
+              {
+                text: ' ',
+                type: 'text',
+              },
+            ],
+            [
+              {
+                children: [
+                  {
+                    marks: ['italic'],
+                    text: 'Link',
+                    type: 'text',
+                  },
+                ],
+                href: '#target',
+                type: 'link',
+              },
+            ],
+          ],
+          text: 'Bold Link',
+        }}
+      />,
+    );
+
+    const fragment = screen.getByTestId('reader-flow-text-fragment');
+    expect(fragment.querySelector('strong')).not.toBeNull();
+    expect(screen.getByRole('link', { name: 'Link' })).toHaveAttribute('href', '#target');
+    expect(screen.getByRole('link', { name: 'Link' })).toHaveClass(
+      READER_CONTENT_CLASS_NAMES.inlineLink,
+    );
+    expect(fragment.querySelector('em')).not.toBeNull();
+    expect(fragment.firstElementChild).toHaveStyle({ paddingLeft: '2em' });
+    expect(fragment).toHaveClass(
+      READER_CONTENT_CLASS_NAMES.block,
+      READER_CONTENT_CLASS_NAMES.blockParagraph,
+    );
+  });
+
   it('renders heading fragments as a single h2 node', () => {
     render(
       <ReaderFlowBlock
@@ -120,6 +203,10 @@ describe('ReaderFlowBlock', () => {
     expect(fragment).toHaveAttribute('data-testid', 'reader-flow-text-fragment');
     expect(fragment.textContent).toBe('Chapter One');
     expect(fragment.children).toHaveLength(0);
+    expect(fragment).toHaveClass(
+      READER_CONTENT_CLASS_NAMES.block,
+      READER_CONTENT_CLASS_NAMES.blockHeading,
+    );
   });
 
   it('prefers the original heading text when line fragments are incomplete', () => {
@@ -200,6 +287,72 @@ describe('ReaderFlowBlock', () => {
     expect(image).toHaveAttribute('src', 'blob:reader-image');
     expect(image).toHaveAttribute('loading', 'eager');
     expect(image).toHaveClass('object-contain', 'object-center');
+    expect(container.firstElementChild).toHaveClass(
+      READER_CONTENT_CLASS_NAMES.block,
+      READER_CONTENT_CLASS_NAMES.blockImage,
+    );
+  });
+
+  it('renders rich image captions with explicit sup and bold styling', () => {
+    useReaderImageResourceMock.mockReturnValue('blob:reader-image');
+
+    render(
+      <ReaderFlowBlock
+        imageRenderMode="paged"
+        novelId={1}
+        item={{
+          blockIndex: 8,
+          captionFont: '400 18px sans-serif',
+          captionFontSizePx: 18,
+          captionLineHeightPx: 24,
+          captionLines: [{
+            end: { graphemeIndex: 8, segmentIndex: 0 },
+            lineIndex: 0,
+            start: { graphemeIndex: 0, segmentIndex: 0 },
+            text: 'A2 bold',
+            width: 120,
+          }],
+          captionRichLineFragments: [[
+            {
+              text: 'A',
+              type: 'text',
+            },
+            {
+              marks: ['sup'],
+              text: '2',
+              type: 'text',
+            },
+            {
+              text: ' ',
+              type: 'text',
+            },
+            {
+              marks: ['bold'],
+              text: 'bold',
+              type: 'text',
+            },
+          ]],
+          captionSpacing: 8,
+          chapterIndex: 0,
+          displayHeight: 180,
+          displayWidth: 240,
+          edge: 'start',
+          height: 220,
+          imageKey: 'captioned',
+          key: '0:image:8',
+          kind: 'image',
+          marginAfter: 0,
+          marginBefore: 0,
+        }}
+      />,
+    );
+
+    const caption = screen.getByTestId('reader-flow-image-caption');
+    expect(caption.querySelector('sup')).not.toBeNull();
+    expect(caption.querySelector('strong')).not.toBeNull();
+    expect(caption.querySelector('sup')).toHaveStyle({
+      fontSize: '13.5px',
+    });
   });
 
   it('uses an expanded hit target for images and prevents bubbling to the reader viewport', () => {
@@ -243,5 +396,90 @@ describe('ReaderFlowBlock', () => {
       sourceElement: hitTarget,
     }));
     expect(onParentClick).not.toHaveBeenCalled();
+  });
+
+  it('renders table blocks with semantic table and cell classes', () => {
+    render(
+      <ReaderFlowBlock
+        imageRenderMode="paged"
+        novelId={1}
+        item={{
+          blockIndex: 5,
+          chapterIndex: 0,
+          contentHeight: 64,
+          font: '400 18px sans-serif',
+          fontSizePx: 18,
+          height: 64,
+          key: '0:text:5:0',
+          kind: 'text',
+          lineHeightPx: 32,
+          lineStartIndex: 0,
+          lines: [],
+          marginAfter: 0,
+          marginBefore: 0,
+          renderRole: 'table',
+          tableRows: [[{
+            children: [{
+              text: 'Alpha',
+              type: 'text',
+            }],
+          }]],
+          text: 'Alpha',
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId('reader-flow-table')).toHaveClass(
+      READER_CONTENT_CLASS_NAMES.block,
+      READER_CONTENT_CLASS_NAMES.blockTable,
+    );
+    const tableCell = screen.getByText('Alpha').closest('td');
+    expect(tableCell).not.toBeNull();
+    expect(tableCell).toHaveClass(READER_CONTENT_CLASS_NAMES.tableCell);
+  });
+
+  it('renders unsupported list items with semantic fallback and marker classes', () => {
+    const { container } = render(
+      <ReaderFlowBlock
+        imageRenderMode="paged"
+        novelId={1}
+        item={{
+          blockIndex: 6,
+          chapterIndex: 0,
+          contentHeight: 32,
+          font: '400 18px sans-serif',
+          fontSizePx: 18,
+          height: 32,
+          key: '0:text:6:0',
+          kind: 'text',
+          lineHeightPx: 32,
+          lineStartIndex: 0,
+          lines: [{
+            end: { graphemeIndex: 4, segmentIndex: 0 },
+            lineIndex: 0,
+            start: { graphemeIndex: 0, segmentIndex: 0 },
+            text: 'Beta',
+            width: 80,
+          }],
+          listContext: {
+            depth: 1,
+            itemIndex: 0,
+            ordered: true,
+          },
+          marginAfter: 0,
+          marginBefore: 0,
+          originalTag: 'table',
+          renderRole: 'unsupported',
+          showListMarker: true,
+          text: 'Beta',
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId('reader-flow-table-fallback')).toHaveClass(
+      READER_CONTENT_CLASS_NAMES.block,
+      READER_CONTENT_CLASS_NAMES.blockUnsupported,
+    );
+    expect(container.querySelector(`.${READER_CONTENT_CLASS_NAMES.listMarker}`)).toHaveTextContent('1.');
   });
 });

@@ -19,7 +19,12 @@ const handlers = {
   'purify-titles': async (payload, emitProgress, signal) => {
     signal.throwIfAborted();
     emitProgress({ progress: 25, stage: 'preparing' });
-    const result = purifyTitles(payload.titles, payload.rules, payload.bookTitle);
+    const result = purifyTitles(
+      payload.titles,
+      payload.rules,
+      payload.bookTitle,
+      payload.executionStage,
+    );
     signal.throwIfAborted();
     emitProgress({ progress: 100, stage: 'finalizing' });
     return result;
@@ -27,7 +32,12 @@ const handlers = {
   'purify-chapter': async (payload, emitProgress, signal) => {
     signal.throwIfAborted();
     emitProgress({ progress: 20, stage: 'preparing' });
-    const result = purifyChapter(payload.chapter, payload.rules, payload.bookTitle);
+    const result = purifyChapter(
+      payload.chapter,
+      payload.rules,
+      payload.bookTitle,
+      payload.executionStage,
+    );
     signal.throwIfAborted();
     emitProgress({ progress: 100, stage: 'finalizing' });
     return result;
@@ -42,7 +52,12 @@ const handlers = {
           stage: 'purifying',
         });
       }
-      return purifyChapter(chapter, payload.rules, payload.bookTitle);
+      return purifyChapter(
+        chapter,
+        payload.rules,
+        payload.bookTitle,
+        payload.executionStage,
+      );
     });
     signal.throwIfAborted();
     emitProgress({ progress: 100, stage: 'finalizing' });

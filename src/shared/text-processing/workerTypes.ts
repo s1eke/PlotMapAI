@@ -5,11 +5,21 @@ import type {
   WorkerTaskSpec,
 } from '@infra/workers';
 
-import type { ChapterDetectionRule, ParsedTextDocument, PurifiedChapter, PurifiedTitle, PurifyRule } from './types';
+import type {
+  ChapterDetectionRule,
+  ParsedTextDocument,
+  PurifiedChapter,
+  PurifiedTitle,
+  PurifyRule,
+  PurificationExecutionStage,
+} from './types';
 
 export interface TextProcessingProgress {
+  current?: number;
+  detail?: string;
   progress: number;
   stage: string;
+  total?: number;
 }
 
 export interface ParseTxtPayload {
@@ -21,18 +31,21 @@ export interface PurifyTitlesPayload {
   titles: PurifiedTitle[];
   rules: PurifyRule[];
   bookTitle: string;
+  executionStage?: PurificationExecutionStage;
 }
 
 export interface PurifyChapterPayload {
   chapter: PurifiedChapter;
   rules: PurifyRule[];
   bookTitle: string;
+  executionStage?: PurificationExecutionStage;
 }
 
 export interface PurifyChaptersPayload {
   chapters: PurifiedChapter[];
   rules: PurifyRule[];
   bookTitle: string;
+  executionStage?: PurificationExecutionStage;
 }
 
 export interface TextProcessingTaskMap {

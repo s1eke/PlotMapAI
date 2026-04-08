@@ -15,7 +15,6 @@ import {
   getPageStartLocator,
 } from '../utils/readerLayout';
 import {
-  getPageIndexFromProgress,
   resolvePagedTargetPage,
   SCROLL_READING_ANCHOR_RATIO,
 } from '@shared/utils/readerPosition';
@@ -127,18 +126,12 @@ export function resolvePagedViewportState(params: {
   const restoredPageIndex = restoredLocator
     ? findPageIndexForLocator(params.currentPagedLayout, restoredLocator)
     : null;
-  const chapterProgress = params.pendingRestoreTarget?.chapterProgress;
-  const hasRestorableProgress = params.pendingRestoreTarget?.chapterIndex === params.chapterIndex
-    && typeof chapterProgress === 'number';
+  const locatorPageIndex = params.pendingRestoreTarget?.locator?.pageIndex;
   let targetPage = resolvePagedTargetPage(params.pendingPageTarget, params.pageIndex, pageCount);
-  if (hasRestorableProgress) {
-    targetPage = getPageIndexFromProgress(
-      chapterProgress,
-      pageCount,
-    );
-  }
   if (restoredPageIndex !== null) {
     targetPage = restoredPageIndex;
+  } else if (typeof locatorPageIndex === 'number') {
+    targetPage = Math.max(0, Math.min(pageCount - 1, locatorPageIndex));
   }
 
   return {

@@ -53,7 +53,7 @@ vi.mock('../useScrollModeChapters', () => ({
     _preloadAdjacent: (index: number, prune?: boolean) => void,
     _scrollModeChapters: number[],
     _setScrollModeChapters: Dispatch<SetStateAction<number[]>>,
-    _contentVersion: number,
+    _chapterDataRevision: number,
     onReadingAnchorChange?: (anchor: { chapterIndex: number; chapterProgress: number }) => void,
   ) => {
     scrollModeState.setOnReadingAnchorChange(onReadingAnchorChange);
@@ -177,7 +177,10 @@ function createChapter(index: number, totalChapters: number, content?: string): 
   return {
     index,
     title: `Chapter ${index + 1}`,
-    content: content ?? `Paragraph ${index + 1}\nParagraph ${index + 1} continued`,
+    plainText: content ?? `Paragraph ${index + 1}\nParagraph ${index + 1} continued`,
+    richBlocks: [],
+    contentFormat: 'plain',
+    contentVersion: 1,
     wordCount: 120,
     totalChapters,
     hasPrev: index > 0,
@@ -400,7 +403,7 @@ function createHookProps(overrides: CreateHookPropsOptions = {}) {
   return {
     enabled: true,
     chapters,
-    contentVersion: 0,
+    chapterDataRevision: 0,
     currentChapter,
     fetchChapterContent: vi.fn(async (index: number) => createChapter(index, chapters.length)),
     novelId: 1,
@@ -483,7 +486,7 @@ describe('useScrollReaderController', () => {
 
     rerender({
       ...props,
-      contentVersion: 1,
+      chapterDataRevision: 1,
     });
 
     await waitFor(() => {
@@ -531,7 +534,7 @@ describe('useScrollReaderController', () => {
         { index: 2, title: 'Chapter 3', wordCount: 100 },
       ],
       currentChapter,
-      contentVersion: 0,
+      chapterDataRevision: 0,
       harness: contextValue,
     });
 
@@ -556,7 +559,7 @@ describe('useScrollReaderController', () => {
 
     rerender({
       ...props,
-      contentVersion: 0,
+      chapterDataRevision: 0,
     });
 
     chapterCacheRef.current.set(0, createChapter(0, 3));
@@ -564,7 +567,7 @@ describe('useScrollReaderController', () => {
 
     rerender({
       ...props,
-      contentVersion: 1,
+      chapterDataRevision: 1,
     });
 
     await waitFor(() => {
@@ -609,7 +612,7 @@ describe('useScrollReaderController', () => {
         { index: 2, title: 'Chapter 3', wordCount: 100 },
       ],
       currentChapter,
-      contentVersion: 0,
+      chapterDataRevision: 0,
       harness: contextValue,
     });
 
@@ -634,7 +637,7 @@ describe('useScrollReaderController', () => {
 
     rerender({
       ...props,
-      contentVersion: 0,
+      chapterDataRevision: 0,
     });
 
     chapterCacheRef.current.set(2, createChapter(2, 3));
@@ -642,7 +645,7 @@ describe('useScrollReaderController', () => {
 
     rerender({
       ...props,
-      contentVersion: 1,
+      chapterDataRevision: 1,
     });
 
     await waitFor(() => {

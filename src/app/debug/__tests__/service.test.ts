@@ -61,6 +61,48 @@ describe('debug', () => {
     expect(mod.getRecentLogs().length).toBe(0);
   });
 
+  it('stores keyed debug snapshots and notifies subscribers in debug mode', async () => {
+    vi.stubEnv('VITE_DEBUG', 'true');
+    const mod = await import('@shared/debug');
+    mod.clearDebugSnapshots();
+    const listener = vi.fn();
+    const unsubscribe = mod.debugSnapshotSubscribe(listener);
+
+    mod.setDebugSnapshot('reader-layout', { contentFormat: 'rich', novelId: 7 });
+    mod.setDebugSnapshot('storage', { readerRenderCacheCount: 12 });
+
+    expect(mod.getDebugSnapshot('reader-layout')).toMatchObject({
+      key: 'reader-layout',
+      value: { contentFormat: 'rich', novelId: 7 },
+    });
+    expect(mod.getDebugSnapshots()).toEqual([
+      expect.objectContaining({ key: 'reader-layout' }),
+      expect.objectContaining({ key: 'storage' }),
+    ]);
+    expect(listener).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ key: 'reader-layout' }),
+      ]),
+      'reader-layout',
+    );
+
+    unsubscribe();
+    mod.setDebugSnapshot('book-import', { operation: 'import' });
+    expect(listener).toHaveBeenCalledTimes(2);
+  });
+
+  it('clearDebugSnapshots removes stored diagnostics', async () => {
+    vi.stubEnv('VITE_DEBUG', 'true');
+    const mod = await import('@shared/debug');
+    mod.setDebugSnapshot('reader-layout', { novelId: 1 });
+    expect(mod.getDebugSnapshots()).toHaveLength(1);
+
+    mod.clearDebugSnapshots();
+
+    expect(mod.getDebugSnapshots()).toEqual([]);
+    expect(mod.getDebugSnapshot('reader-layout')).toBeNull();
+  });
+
   it('MAX_LOGS is exported and is a positive number', async () => {
     vi.stubEnv('VITE_DEBUG', '');
     const mod = await import('@shared/debug');
@@ -71,9 +113,11 @@ describe('debug', () => {
     vi.stubEnv('VITE_DEBUG', 'true');
     const mod = await import('@shared/debug');
     expect(mod.getDebugFeatureFlags()).toEqual({
+      readerLegacyPlainScroll: false,
       readerTelemetry: false,
     });
     expect(mod.isDebugFeatureEnabled('readerTelemetry')).toBe(false);
+    expect(mod.isDebugFeatureEnabled('readerLegacyPlainScroll')).toBe(false);
   });
 
   it('setDebugFeatureEnabled updates feature flags and notifies subscribers', async () => {
@@ -82,16 +126,23 @@ describe('debug', () => {
     const listener = vi.fn();
     const unsubscribe = mod.debugFeatureSubscribe(listener);
 
+    mod.setDebugFeatureEnabled('readerLegacyPlainScroll', true);
     mod.setDebugFeatureEnabled('readerTelemetry', true);
 
     expect(mod.isDebugFeatureEnabled('readerTelemetry')).toBe(true);
+    expect(mod.isDebugFeatureEnabled('readerLegacyPlainScroll')).toBe(true);
     expect(listener).toHaveBeenCalledWith({
+      readerLegacyPlainScroll: true,
+      readerTelemetry: false,
+    });
+    expect(listener).toHaveBeenCalledWith({
+      readerLegacyPlainScroll: true,
       readerTelemetry: true,
     });
 
     unsubscribe();
     mod.setDebugFeatureEnabled('readerTelemetry', false);
-    expect(listener).toHaveBeenCalledTimes(1);
+    expect(listener).toHaveBeenCalledTimes(2);
   });
 
   it('registerPwaDebugTools exposes window debug methods in debug mode', async () => {

@@ -12,11 +12,22 @@ export const DOUBLE_TAP_ZOOM_SCALE = 2;
 export const DOUBLE_TAP_MAX_DELAY_MS = 320;
 export const DOUBLE_TAP_MAX_DISTANCE_PX = 28;
 export const TAP_GESTURE_TOLERANCE_PX = 10;
+export const PAN_DIRECTION_LOCK_DISTANCE_PX = 12;
+export const PAN_DIRECTION_LOCK_RATIO = 1.15;
 export const SWIPE_NAVIGATION_THRESHOLD_PX = 56;
 export const EDGE_SWIPE_THRESHOLD_PX = 72;
 export const OVERDRAG_DAMPING = 0.32;
 export const TRANSLATE_SWIPE_DAMPING = 0.48;
 export const TRANSLATE_VERTICAL_DAMPING = 0.18;
+export const DRAG_DISMISS_HORIZONTAL_PARALLAX_RATIO = 0.24;
+export const DRAG_DISMISS_MIN_SCALE = 0.88;
+export const DRAG_DISMISS_MIN_BACKDROP_OPACITY = 0.18;
+export const DRAG_DISMISS_MIN_DISTANCE_PX = 120;
+export const DRAG_DISMISS_DISTANCE_RATIO = 0.18;
+export const DRAG_DISMISS_VELOCITY_PX_PER_S = 1000;
+export const DRAG_DISMISS_EXIT_DURATION_S = 0.18;
+export const DRAG_DISMISS_EXIT_Y_DISTANCE_RATIO = 0.34;
+export const DRAG_DISMISS_EXIT_SCALE = 0.84;
 export const TRANSFORM_EASE = 'cubic-bezier(0.22, 1, 0.36, 1)';
 export const TRANSFORM_ANIMATION_MS = 220;
 export const SINGLE_CLICK_CLOSE_DELAY_MS = DOUBLE_TAP_MAX_DELAY_MS;
@@ -39,6 +50,13 @@ interface ImageSwitchTransform {
   [key: string]: number;
   opacity: number;
   x: number;
+}
+
+export interface ReaderImageViewerDragDismissTransform {
+  progress: number;
+  scale: number;
+  translateX: number;
+  translateY: number;
 }
 
 export interface ApplyScaleAroundPointParams {
@@ -141,6 +159,43 @@ export function isTapWithinThreshold(
 ): boolean {
   return Math.abs(endPoint.x - startPoint.x) <= TAP_GESTURE_TOLERANCE_PX
     && Math.abs(endPoint.y - startPoint.y) <= TAP_GESTURE_TOLERANCE_PX;
+}
+
+export function getDragDismissThresholdPx(viewport: ReaderImageViewerViewportSize): number {
+  return Math.max(DRAG_DISMISS_MIN_DISTANCE_PX, viewport.height * DRAG_DISMISS_DISTANCE_RATIO);
+}
+
+export function getDragDismissProgress(
+  translateY: number,
+  viewport: ReaderImageViewerViewportSize,
+): number {
+  return clamp(Math.max(0, translateY) / getDragDismissThresholdPx(viewport), 0, 1);
+}
+
+export function buildDragDismissTransform(
+  rawDeltaX: number,
+  rawDeltaY: number,
+  viewport: ReaderImageViewerViewportSize,
+): ReaderImageViewerDragDismissTransform {
+  const translateY = Math.max(0, rawDeltaY);
+  const progress = getDragDismissProgress(translateY, viewport);
+
+  return {
+    progress,
+    scale: clamp(1 - progress * (1 - DRAG_DISMISS_MIN_SCALE), DRAG_DISMISS_MIN_SCALE, 1),
+    translateX: rawDeltaX * DRAG_DISMISS_HORIZONTAL_PARALLAX_RATIO,
+    translateY,
+  };
+}
+
+export function getDragDismissExitTranslateY(
+  translateY: number,
+  viewport: ReaderImageViewerViewportSize,
+): number {
+  return Math.max(
+    translateY + viewport.height * 0.16,
+    viewport.height * DRAG_DISMISS_EXIT_Y_DISTANCE_RATIO,
+  );
 }
 
 export function getTranslateBounds(targetRect: DOMRect, scale: number): ReaderImageViewerPoint {

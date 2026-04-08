@@ -8,25 +8,36 @@ import type {
   ReaderImageDimensions,
 } from './readerImageResourceCache';
 import type {
+  ReaderLayoutFeatureSet,
   ReaderRenderCacheSource,
   ReaderRenderStorageKind,
 } from './readerRenderCache';
 
-import { extractImageKeysFromText } from './chapterImages';
+import { extractImageKeysFromChapter } from './chapterImages';
 import {
   createChapterContentHash,
   serializeReaderLayoutSignature,
 } from './readerLayout';
-import { buildReaderRenderCacheKey } from './readerRenderCache';
+import {
+  buildReaderRenderCacheKey,
+  READER_RENDERER_VERSION,
+  resolveReaderLayoutFeatureSet,
+} from './readerRenderCache';
 import { peekReaderImageDimensions } from './readerImageResourceCache';
 
 export interface ReaderVisibleRenderTarget {
   chapter: ChapterContent;
   contentHash: string;
+  contentFormat: ChapterContent['contentFormat'];
+  contentVersion: number;
   exactKey: string;
+  layoutFeatureSet: ReaderLayoutFeatureSet;
   layoutKey: string;
+  rendererVersion: number;
   variantFamily: ReaderRenderVariant;
 }
+
+export type ScrollRenderMode = 'legacy-plain' | 'rich';
 
 export interface ReaderRenderPreheatTarget {
   chapterIndex: number;
@@ -65,19 +76,19 @@ export function collectLoadedImageKeys(params: {
   const keys = new Set<string>();
 
   if (params.currentChapter) {
-    for (const imageKey of extractImageKeysFromText(params.currentChapter.content)) {
+    for (const imageKey of extractImageKeysFromChapter(params.currentChapter)) {
       keys.add(imageKey);
     }
   }
 
   for (const chapter of params.pagedChapters) {
-    for (const imageKey of extractImageKeysFromText(chapter.content)) {
+    for (const imageKey of extractImageKeysFromChapter(chapter)) {
       keys.add(imageKey);
     }
   }
 
   for (const renderableChapter of params.scrollChapters) {
-    for (const imageKey of extractImageKeysFromText(renderableChapter.chapter.content)) {
+    for (const imageKey of extractImageKeysFromChapter(renderableChapter.chapter)) {
       keys.add(imageKey);
     }
   }
@@ -87,11 +98,11 @@ export function collectLoadedImageKeys(params: {
 
 export function buildChapterImageDimensionsMap(
   novelId: number,
-  chapter: Pick<ChapterContent, 'content'>,
+  chapter: Pick<ChapterContent, 'contentFormat' | 'plainText' | 'richBlocks'>,
 ): Map<string, ReaderImageDimensions | null | undefined> {
   const dimensions = new Map<string, ReaderImageDimensions | null | undefined>();
 
-  for (const imageKey of extractImageKeysFromText(chapter.content)) {
+  for (const imageKey of extractImageKeysFromChapter(chapter)) {
     dimensions.set(imageKey, peekReaderImageDimensions(novelId, imageKey));
   }
 
@@ -100,12 +111,13 @@ export function buildChapterImageDimensionsMap(
 
 export function buildChapterImageLayoutKey(
   novelId: number,
-  chapter: Pick<ChapterContent, 'content'>,
+  chapter: Pick<ChapterContent, 'contentFormat' | 'plainText' | 'richBlocks'>,
   baseLayoutKey: string,
 ): string {
-  const imageKeys = extractImageKeysFromText(chapter.content);
+  let layoutKey = baseLayoutKey;
+  const imageKeys = extractImageKeysFromChapter(chapter);
   if (imageKeys.length === 0) {
-    return baseLayoutKey;
+    return layoutKey;
   }
 
   const imageFingerprint = imageKeys
@@ -122,7 +134,8 @@ export function buildChapterImageLayoutKey(
     })
     .join(',');
 
-  return `${baseLayoutKey}::img:${imageFingerprint}`;
+  layoutKey = `${layoutKey}::img:${imageFingerprint}`;
+  return layoutKey;
 }
 
 export function buildVisibleRenderTargets(params: {
@@ -130,6 +143,7 @@ export function buildVisibleRenderTargets(params: {
   isPagedMode: boolean;
   novelId: number;
   pagedChapters: ChapterContent[];
+  scrollRenderMode: ScrollRenderMode;
   scrollChapters: Array<{ chapter: ChapterContent; index: number }>;
   variantSignatures: Record<ReaderRenderVariant, ReaderLayoutSignature>;
   viewMode: 'original' | 'summary';
@@ -143,6 +157,10 @@ export function buildVisibleRenderTargets(params: {
 
     const signature = params.variantSignatures['summary-shell'];
     const contentHash = createChapterContentHash(params.currentChapter);
+    const layoutFeatureSet = resolveReaderLayoutFeatureSet({
+      chapter: params.currentChapter,
+      variantFamily: 'summary-shell',
+    });
     const layoutKey = buildChapterImageLayoutKey(
       params.novelId,
       params.currentChapter,
@@ -152,14 +170,22 @@ export function buildVisibleRenderTargets(params: {
     targets.push({
       chapter: params.currentChapter,
       contentHash,
+      contentFormat: params.currentChapter.contentFormat,
+      contentVersion: params.currentChapter.contentVersion,
       exactKey: buildReaderRenderCacheKey({
         chapterIndex: params.currentChapter.index,
         contentHash,
+        contentFormat: params.currentChapter.contentFormat,
+        contentVersion: params.currentChapter.contentVersion,
+        layoutFeatureSet,
         layoutKey,
         novelId: params.novelId,
+        rendererVersion: READER_RENDERER_VERSION,
         variantFamily: 'summary-shell',
       }),
+      layoutFeatureSet,
       layoutKey,
+      rendererVersion: READER_RENDERER_VERSION,
       variantFamily: 'summary-shell',
     });
 
@@ -171,6 +197,10 @@ export function buildVisibleRenderTargets(params: {
 
     for (const chapter of params.pagedChapters) {
       const contentHash = createChapterContentHash(chapter);
+      const layoutFeatureSet = resolveReaderLayoutFeatureSet({
+        chapter,
+        variantFamily: 'original-paged',
+      });
       const layoutKey = buildChapterImageLayoutKey(
         params.novelId,
         chapter,
@@ -180,14 +210,22 @@ export function buildVisibleRenderTargets(params: {
       targets.push({
         chapter,
         contentHash,
+        contentFormat: chapter.contentFormat,
+        contentVersion: chapter.contentVersion,
         exactKey: buildReaderRenderCacheKey({
           chapterIndex: chapter.index,
           contentHash,
+          contentFormat: chapter.contentFormat,
+          contentVersion: chapter.contentVersion,
+          layoutFeatureSet,
           layoutKey,
           novelId: params.novelId,
+          rendererVersion: READER_RENDERER_VERSION,
           variantFamily: 'original-paged',
         }),
+        layoutFeatureSet,
         layoutKey,
+        rendererVersion: READER_RENDERER_VERSION,
         variantFamily: 'original-paged',
       });
     }
@@ -199,6 +237,11 @@ export function buildVisibleRenderTargets(params: {
 
   for (const renderableChapter of params.scrollChapters) {
     const contentHash = createChapterContentHash(renderableChapter.chapter);
+    const layoutFeatureSet = resolveReaderLayoutFeatureSet({
+      chapter: renderableChapter.chapter,
+      preferRichScrollRendering: params.scrollRenderMode === 'rich',
+      variantFamily: 'original-scroll',
+    });
     const layoutKey = buildChapterImageLayoutKey(
       params.novelId,
       renderableChapter.chapter,
@@ -208,14 +251,22 @@ export function buildVisibleRenderTargets(params: {
     targets.push({
       chapter: renderableChapter.chapter,
       contentHash,
+      contentFormat: renderableChapter.chapter.contentFormat,
+      contentVersion: renderableChapter.chapter.contentVersion,
       exactKey: buildReaderRenderCacheKey({
         chapterIndex: renderableChapter.index,
         contentHash,
+        contentFormat: renderableChapter.chapter.contentFormat,
+        contentVersion: renderableChapter.chapter.contentVersion,
+        layoutFeatureSet,
         layoutKey,
         novelId: params.novelId,
+        rendererVersion: READER_RENDERER_VERSION,
         variantFamily: 'original-scroll',
       }),
+      layoutFeatureSet,
       layoutKey,
+      rendererVersion: READER_RENDERER_VERSION,
       variantFamily: 'original-scroll',
     });
   }
@@ -292,4 +343,3 @@ export function countPageItems(tree: StaticPagedChapterTree): number {
     pageTotal + page.columns.reduce((columnTotal, column) => columnTotal + column.items.length, 0)
   ), 0);
 }
-

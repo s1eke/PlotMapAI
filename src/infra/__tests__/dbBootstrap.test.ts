@@ -20,12 +20,12 @@ import {
   resetDatabaseForRecovery,
 } from '@infra/db';
 import { ANALYSIS_DB_SCHEMA } from '@infra/db/analysis';
-import { LIBRARY_DB_SCHEMA } from '@infra/db/library';
+import { LEGACY_LIBRARY_DB_SCHEMA } from '@infra/db/library';
 import { READER_DB_SCHEMA } from '@infra/db/reader';
 import { SETTINGS_DB_SCHEMA } from '@infra/db/settings';
 
-const BASELINE_SCHEMA = {
-  ...LIBRARY_DB_SCHEMA,
+const LEGACY_BASELINE_SCHEMA = {
+  ...LEGACY_LIBRARY_DB_SCHEMA,
   ...SETTINGS_DB_SCHEMA,
   ...ANALYSIS_DB_SCHEMA,
   ...READER_DB_SCHEMA,
@@ -50,7 +50,7 @@ function createLegacyDatabase(version: number): Promise<void> {
 
 async function createVersionOneDatabaseWithLegacyNovel(): Promise<void> {
   const legacyDb = new Dexie(PLOTMAPAI_DB_NAME);
-  legacyDb.version(1).stores(BASELINE_SCHEMA);
+  legacyDb.version(1).stores(LEGACY_BASELINE_SCHEMA);
   await legacyDb.open();
 
   const novelId = await legacyDb.table('novels').add({
@@ -86,6 +86,36 @@ async function createVersionOneDatabaseWithLegacyNovel(): Promise<void> {
   legacyDb.close();
 }
 
+async function createVersionTwoDatabaseWithPlainNovel(): Promise<void> {
+  const legacyDb = new Dexie(PLOTMAPAI_DB_NAME);
+  legacyDb.version(2).stores(LEGACY_BASELINE_SCHEMA);
+  await legacyDb.open();
+
+  const novelId = await legacyDb.table('novels').add({
+    author: '',
+    chapterCount: 1,
+    coverPath: '',
+    createdAt: '2026-04-02T00:00:00.000Z',
+    description: '',
+    fileHash: 'legacy-v2-hash',
+    fileType: 'txt',
+    originalEncoding: 'utf-8',
+    originalFilename: 'legacy-v2.txt',
+    tags: [],
+    title: 'Legacy V2 Novel',
+    totalWords: 100,
+  });
+  await legacyDb.table('chapters').add({
+    chapterIndex: 0,
+    content: 'Plain chapter only',
+    novelId,
+    title: 'Chapter 1',
+    wordCount: 17,
+  });
+
+  legacyDb.close();
+}
+
 function readObjectStoreNames(): Promise<string[]> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(PLOTMAPAI_DB_NAME);
@@ -108,10 +138,10 @@ describe('prepareDatabase', () => {
     mockReportAppError.mockReset();
   });
 
-  it('opens the formal v2 baseline schema in a fresh environment', async () => {
+  it('opens the formal v5 baseline schema in a fresh environment', async () => {
     await prepareDatabase();
 
-    expect(db.verno).toBe(2);
+    expect(db.verno).toBe(5);
     expect(db.tables.map((table) => table.name).sort()).toEqual([
       'analysisChunks',
       'analysisJobs',
@@ -119,6 +149,7 @@ describe('prepareDatabase', () => {
       'appSettings',
       'chapterAnalyses',
       'chapterImages',
+      'chapterRichContents',
       'chapters',
       'coverImages',
       'novelImageGalleryEntries',
@@ -140,7 +171,8 @@ describe('prepareDatabase', () => {
     await expect(readObjectStoreNames()).resolves.toContain('legacyStore');
     expect(mockDebugLog).toHaveBeenCalledWith('Storage', 'Database recovery required', expect.objectContaining({
       databaseName: PLOTMAPAI_DB_NAME,
-      targetVersion: 2,
+      expectedNativeVersion: 50,
+      targetVersion: 5,
     }));
     expect(mockReportAppError).toHaveBeenCalledTimes(1);
   });
@@ -154,7 +186,7 @@ describe('prepareDatabase', () => {
     await resetDatabaseForRecovery();
     await prepareDatabase();
 
-    expect(db.verno).toBe(2);
+    expect(db.verno).toBe(5);
     expect(db.tables.some((table) => table.name === 'legacyStore')).toBe(false);
     expect(db.tables.some((table) => table.name === 'novels')).toBe(true);
   });
@@ -166,10 +198,26 @@ describe('prepareDatabase', () => {
 
     const novel = await db.novels.get(1);
 
-    expect(db.verno).toBe(2);
+    expect(db.verno).toBe(5);
     expect(novel).toMatchObject({
       chapterCount: 2,
       title: 'Legacy DB Novel',
     });
+    await expect(db.chapterRichContents.count()).resolves.toBe(0);
+  });
+
+  it('upgrades v2 plain-only databases without creating rich content rows', async () => {
+    await createVersionTwoDatabaseWithPlainNovel();
+
+    await prepareDatabase();
+
+    const novel = await db.novels.get(1);
+
+    expect(db.verno).toBe(5);
+    expect(novel).toMatchObject({
+      chapterCount: 1,
+      title: 'Legacy V2 Novel',
+    });
+    await expect(db.chapterRichContents.count()).resolves.toBe(0);
   });
 });

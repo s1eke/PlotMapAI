@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { loadPurifiedBookChapters } from '@application/services/readerContentController';
+import { loadAnalysisBookChapters } from '@application/services/analysisTextProjectionService';
 import { analysisService, buildRuntimeAnalysisConfig } from '@domains/analysis';
 import { novelRepository } from '@domains/library';
 import { getAiConfig } from '@domains/settings';
@@ -20,8 +20,8 @@ vi.mock('@domains/library', () => ({
   },
 }));
 
-vi.mock('@application/services/readerContentController', () => ({
-  loadPurifiedBookChapters: vi.fn(),
+vi.mock('@application/services/analysisTextProjectionService', () => ({
+  loadAnalysisBookChapters: vi.fn(),
 }));
 
 vi.mock('@domains/settings', () => ({
@@ -51,7 +51,7 @@ describe('application analysis use-cases', () => {
       title: 'Mock Novel',
       totalWords: 100,
     });
-    vi.mocked(loadPurifiedBookChapters).mockResolvedValue([
+    vi.mocked(loadAnalysisBookChapters).mockResolvedValue([
       {
         chapterIndex: 0,
         content: 'chapter content',
@@ -98,7 +98,7 @@ describe('application analysis use-cases', () => {
     });
   });
 
-  it('startNovelAnalysis loads ai config, purified chapters, and novel metadata before delegating', async () => {
+  it('startNovelAnalysis loads ai config, projected chapters, and novel metadata before delegating', async () => {
     await startNovelAnalysis(1);
 
     expect(buildRuntimeAnalysisConfig).toHaveBeenCalledWith({

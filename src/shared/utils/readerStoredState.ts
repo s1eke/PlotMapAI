@@ -49,6 +49,7 @@ export function sanitizeLocator(raw: unknown): ReaderLocator | undefined {
       : undefined,
     kind: parsed.kind,
     lineIndex: typeof parsed.lineIndex === 'number' ? parsed.lineIndex : undefined,
+    pageIndex: typeof parsed.pageIndex === 'number' ? parsed.pageIndex : undefined,
     startCursor: startCursor
       && typeof startCursor.segmentIndex === 'number'
       && typeof startCursor.graphemeIndex === 'number'

@@ -9,6 +9,7 @@ import type {
 import type { ReaderRenderCacheSource } from '../utils/readerRenderCache';
 import type { ReaderVisibleRenderTarget } from '../utils/readerRenderCachePlanning';
 import type { ReaderVisibleRenderResultsResult } from './readerRenderCacheTypes';
+import type { RichBlock } from '@shared/contracts';
 
 import { useEffect, useMemo } from 'react';
 import { debugLog } from '@shared/debug';
@@ -39,6 +40,7 @@ interface UseReaderVisibleRenderResultsParams {
   activeVariant: ReaderRenderVariant;
   currentChapterIndex: number | null;
   novelId: number;
+  preferRichScrollRendering: boolean;
   revisionKey: string;
   scrollChapterCount: number;
   typography: ReaderTypographyMetrics;
@@ -46,10 +48,45 @@ interface UseReaderVisibleRenderResultsParams {
   visibleTargets: ReaderVisibleRenderTarget[];
 }
 
+function countRichBlocks(blocks: RichBlock[]): number {
+  return blocks.reduce((total, block) => {
+    if (block.type === 'blockquote') {
+      return total + 1 + countRichBlocks(block.children);
+    }
+
+    if (block.type === 'list') {
+      return total + 1 + block.items.reduce(
+        (itemTotal, item) => itemTotal + countRichBlocks(item),
+        0,
+      );
+    }
+
+    return total + 1;
+  }, 0);
+}
+
+function countUnsupportedBlocks(blocks: RichBlock[]): number {
+  return blocks.reduce((total, block) => {
+    if (block.type === 'blockquote') {
+      return total + countUnsupportedBlocks(block.children);
+    }
+
+    if (block.type === 'list') {
+      return total + block.items.reduce(
+        (itemTotal, item) => itemTotal + countUnsupportedBlocks(item),
+        0,
+      );
+    }
+
+    return total + (block.type === 'unsupported' ? 1 : 0);
+  }, 0);
+}
+
 export function useReaderVisibleRenderResults({
   activeVariant,
   currentChapterIndex,
   novelId,
+  preferRichScrollRendering,
   revisionKey,
   scrollChapterCount,
   typography,
@@ -65,8 +102,12 @@ export function useReaderVisibleRenderResults({
       const memoryEntry = getReaderRenderCacheEntryFromMemory({
         chapterIndex: target.chapter.index,
         contentHash: target.contentHash,
+        contentFormat: target.contentFormat,
+        contentVersion: target.contentVersion,
+        layoutFeatureSet: target.layoutFeatureSet,
         layoutKey: target.layoutKey,
         novelId,
+        rendererVersion: target.rendererVersion,
         variantFamily: target.variantFamily,
       });
 
@@ -86,6 +127,7 @@ export function useReaderVisibleRenderResults({
           layoutKey: target.layoutKey,
           layoutSignature: variantSignatures[target.variantFamily],
           novelId,
+          preferRichScrollRendering,
           typography,
           variantFamily: target.variantFamily,
         }),
@@ -96,6 +138,7 @@ export function useReaderVisibleRenderResults({
     });
   }, [
     novelId,
+    preferRichScrollRendering,
     revisionKey,
     typography,
     variantSignatures,
@@ -202,13 +245,39 @@ export function useReaderVisibleRenderResults({
   }, [visibleResults]);
 
   const layoutSnapshot = useMemo(() => {
+    const activeTarget = visibleTargets.find(
+      (target) => target.chapter.index === currentChapterIndex,
+    )
+      ?? visibleTargets[0]
+      ?? null;
+    const activeRichBlocks = activeTarget?.chapter.richBlocks ?? [];
+    const pagedDowngradeCount =
+      activeTarget?.variantFamily === 'original-paged' && activeTarget.contentFormat === 'rich'
+        ? countUnsupportedBlocks(activeRichBlocks)
+        : 0;
+
     return {
       activeVariant,
+      activeContentFormat: activeTarget?.contentFormat ?? null,
+      activeContentVersion: activeTarget?.contentVersion ?? null,
+      activeLayoutFeatureSet: activeTarget?.layoutFeatureSet ?? null,
+      activeRendererVersion: activeTarget?.rendererVersion ?? null,
       cacheModel: 'layered-render-cache' as const,
+      contentFormat: activeTarget?.contentFormat ?? null,
+      contentVersion: activeTarget?.contentVersion ?? null,
       currentPagedPageCount: layoutMetrics.currentPagedPageCount,
       currentPagedPageItemCount: layoutMetrics.currentPagedPageItemCount,
+      layoutFeatureSet: activeTarget?.layoutFeatureSet ?? null,
+      novelId,
+      pagedDowngradeCount,
+      pagedFallbackCount: pagedDowngradeCount,
+      rendererVersion: activeTarget?.rendererVersion ?? null,
+      richBlockCount: activeTarget?.contentFormat === 'rich' ? countRichBlocks(activeRichBlocks) : 0,
       scrollBlockCount: layoutMetrics.scrollBlockCount,
       scrollChapterCount,
+      unsupportedBlockCount: activeTarget?.contentFormat === 'rich'
+        ? countUnsupportedBlocks(activeRichBlocks)
+        : 0,
       visibleCacheSources: {
         built: layoutMetrics.visibleCacheSources.built,
         dexie: layoutMetrics.visibleCacheSources.dexie,
@@ -217,13 +286,16 @@ export function useReaderVisibleRenderResults({
     };
   }, [
     activeVariant,
+    currentChapterIndex,
     layoutMetrics.currentPagedPageCount,
     layoutMetrics.currentPagedPageItemCount,
     layoutMetrics.scrollBlockCount,
     layoutMetrics.visibleCacheSources.built,
     layoutMetrics.visibleCacheSources.dexie,
     layoutMetrics.visibleCacheSources.memory,
+    novelId,
     scrollChapterCount,
+    visibleTargets,
   ]);
 
   return {

@@ -26,6 +26,8 @@ import {
   isMaterializedReaderRenderCacheEntry,
   persistReaderRenderCacheEntry,
   primeReaderRenderCacheEntry,
+  READER_RENDERER_VERSION,
+  resolveReaderLayoutFeatureSet,
   warmReaderRenderImages,
 } from '../utils/readerRenderCache';
 import {
@@ -38,8 +40,12 @@ interface UseReaderRenderPreheaterParams {
   fetchChapterContent: UseReaderRenderCacheParams['fetchChapterContent'];
   loadedChaptersRef: MutableRefObject<Map<number, ChapterContent>>;
   novelId: number;
-  onMaterializedEntry: () => void;
+  onMaterializedEntry: (entry: {
+    chapterIndex: number;
+    variantFamily: ReaderRenderVariant;
+  }) => void;
   preheatTargets: ReaderRenderPreheatTarget[];
+  preferRichScrollRendering: boolean;
   readerTelemetryEnabled: boolean;
   typography: ReaderTypographyMetrics;
   variantSignatures: Record<ReaderRenderVariant, ReaderLayoutSignature>;
@@ -71,6 +77,7 @@ export function useReaderRenderPreheater({
   novelId,
   onMaterializedEntry,
   preheatTargets,
+  preferRichScrollRendering,
   readerTelemetryEnabled,
   typography,
   variantSignatures,
@@ -156,6 +163,11 @@ export function useReaderRenderPreheater({
           }
 
           const contentHash = createChapterContentHash(chapter);
+          const layoutFeatureSet = resolveReaderLayoutFeatureSet({
+            chapter,
+            preferRichScrollRendering,
+            variantFamily: target.variantFamily,
+          });
           const layoutKey = buildChapterImageLayoutKey(
             novelId,
             chapter,
@@ -165,8 +177,12 @@ export function useReaderRenderPreheater({
           const lookup = {
             chapterIndex: chapter.index,
             contentHash,
+            contentFormat: chapter.contentFormat,
+            contentVersion: chapter.contentVersion,
+            layoutFeatureSet,
             layoutKey,
             novelId,
+            rendererVersion: READER_RENDERER_VERSION,
             variantFamily: target.variantFamily,
           } as const;
 
@@ -205,7 +221,10 @@ export function useReaderRenderPreheater({
               && target.storageKind === 'render-tree'
               && isMaterializedReaderRenderCacheEntry(dexieRecord)
             ) {
-              onMaterializedEntryRef.current();
+              onMaterializedEntryRef.current({
+                chapterIndex: chapter.index,
+                variantFamily: target.variantFamily,
+              });
             }
 
             return;
@@ -218,6 +237,7 @@ export function useReaderRenderPreheater({
               layoutKey,
               layoutSignature: signature,
               novelId,
+              preferRichScrollRendering,
               typography,
               variantFamily: target.variantFamily,
             });
@@ -245,6 +265,7 @@ export function useReaderRenderPreheater({
             layoutKey,
             layoutSignature: signature,
             novelId,
+            preferRichScrollRendering,
             typography,
             variantFamily: target.variantFamily,
           });
@@ -262,7 +283,10 @@ export function useReaderRenderPreheater({
           await persistReaderRenderCacheEntry(builtEntry);
 
           if (!cancelled) {
-            onMaterializedEntryRef.current();
+            onMaterializedEntryRef.current({
+              chapterIndex: chapter.index,
+              variantFamily: target.variantFamily,
+            });
           }
         } catch (error) {
           debugLog('READER', 'Reader render preheat failed', {
@@ -302,6 +326,7 @@ export function useReaderRenderPreheater({
     loadedChaptersRef,
     novelId,
     preheatTargets,
+    preferRichScrollRendering,
     typography,
     variantSignatures,
   ]);

@@ -8,63 +8,167 @@ const imageCacheMock = vi.hoisted(() => ({
 
 const renderCacheMock = vi.hoisted(() => {
   const memory = new Map<string, unknown>();
+  const READER_RENDERER_VERSION = 2;
+  const createContentHash = (chapter: {
+    contentFormat: 'plain' | 'rich';
+    contentVersion: number;
+    index: number;
+    plainText: string;
+    richBlocks: unknown[];
+    title: string;
+  }) => {
+    const source = chapter.contentFormat === 'rich'
+      ? `${chapter.index}\u0000${chapter.title}\u0000${chapter.plainText}\u0000${chapter.contentFormat}\u0000${chapter.contentVersion}\u0000${JSON.stringify(chapter.richBlocks)}`
+      : `${chapter.index}\u0000${chapter.title}\u0000${chapter.plainText}\u0000${chapter.contentFormat}\u0000${chapter.contentVersion}`;
+    let hashA = 0x811c9dc5;
+    let hashB = 0x01000193;
+    const UINT32_MOD = 0x1_0000_0000;
+
+    const normalizeUint32 = (value: number) => {
+      const normalized = value % UINT32_MOD;
+      return normalized >= 0 ? normalized : normalized + UINT32_MOD;
+    };
+
+    for (let index = 0; index < source.length; index += 1) {
+      const value = source.charCodeAt(index);
+      hashA = normalizeUint32(Math.imul(hashA, 0x01000193) + value);
+      hashB = normalizeUint32(Math.imul(hashB, 0x27d4eb2d) + value);
+    }
+
+    return `${hashA.toString(16).padStart(8, '0')}${hashB.toString(16).padStart(8, '0')}`;
+  };
+  const resolveLayoutFeatureSet = (params: {
+    chapter: {
+      contentFormat: 'plain' | 'rich';
+      richBlocks: unknown[];
+    };
+    preferRichScrollRendering?: boolean;
+    variantFamily: 'original-paged' | 'original-scroll' | 'summary-shell';
+  }) => {
+    if (params.variantFamily === 'summary-shell') {
+      return 'summary-shell';
+    }
+
+    if (params.variantFamily === 'original-paged') {
+      return 'paged-pagination-block';
+    }
+
+    return params.chapter.contentFormat === 'rich'
+      && params.chapter.richBlocks.length > 0
+      && params.preferRichScrollRendering !== false
+      ? 'scroll-rich-inline'
+      : 'scroll-legacy-plain';
+  };
   const buildKey = (params: {
     chapterIndex: number;
+    contentFormat: 'plain' | 'rich';
     contentHash: string;
+    contentVersion: number;
+    layoutFeatureSet: string;
     layoutKey: string;
     novelId: number;
+    rendererVersion: number;
     variantFamily: string;
-  }) => `${params.novelId}:${params.chapterIndex}:${params.variantFamily}:${params.layoutKey}:${params.contentHash}`;
+  }) => (
+    `${params.novelId}:${params.chapterIndex}:${params.variantFamily}:${params.contentFormat}:${params.contentVersion}:${params.rendererVersion}:${params.layoutFeatureSet}:${params.layoutKey}:${params.contentHash}`
+  );
 
   return {
+    READER_RENDERER_VERSION,
     reset() {
       memory.clear();
     },
     buildStaticRenderManifest: vi.fn((params: {
-      chapter: { index: number };
+      chapter: {
+        contentFormat: 'plain' | 'rich';
+        contentVersion: number;
+        index: number;
+        plainText: string;
+        richBlocks: unknown[];
+        title: string;
+      };
       layoutKey: string;
       layoutSignature: object;
       novelId: number;
+      preferRichScrollRendering?: boolean;
       variantFamily: 'original-paged' | 'original-scroll' | 'summary-shell';
-    }) => ({
-      chapterIndex: params.chapter.index,
-      contentHash: `hash:${params.chapter.index}`,
-      layoutKey: params.layoutKey,
-      layoutSignature: params.layoutSignature,
-      novelId: params.novelId,
-      queryManifest: { pageCount: 2 },
-      storageKind: 'manifest',
-      tree: null,
-      updatedAt: '2026-04-01T00:00:00.000Z',
-      variantFamily: params.variantFamily,
-    })),
-    buildStaticRenderTree: vi.fn((params: {
-      chapter: { index: number; title: string };
-      layoutKey: string;
-      layoutSignature: object;
-      novelId: number;
-      variantFamily: 'original-paged' | 'original-scroll' | 'summary-shell';
-    }) => ({
-      chapterIndex: params.chapter.index,
-      contentHash: `hash:${params.chapter.index}`,
-      layoutKey: params.layoutKey,
-      layoutSignature: params.layoutSignature,
-      novelId: params.novelId,
-      queryManifest: {},
-      storageKind: 'render-tree',
-      tree: {
-        chapterIndex: params.chapter.index,
-        title: params.chapter.title,
+    }) => {
+      const contentHash = createContentHash(params.chapter);
+      const layoutFeatureSet = resolveLayoutFeatureSet({
+        chapter: params.chapter,
+        preferRichScrollRendering: params.preferRichScrollRendering,
         variantFamily: params.variantFamily,
-      },
-      updatedAt: '2026-04-01T00:00:00.000Z',
-      variantFamily: params.variantFamily,
-    })),
+      });
+
+      return {
+        chapterIndex: params.chapter.index,
+        contentFormat: params.chapter.contentFormat,
+        contentHash,
+        contentVersion: params.chapter.contentVersion,
+        layoutFeatureSet,
+        layoutKey: params.layoutKey,
+        layoutSignature: params.layoutSignature,
+        novelId: params.novelId,
+        queryManifest: { pageCount: 2 },
+        rendererVersion: READER_RENDERER_VERSION,
+        storageKind: 'manifest',
+        tree: null,
+        updatedAt: '2026-04-01T00:00:00.000Z',
+        variantFamily: params.variantFamily,
+      };
+    }),
+    buildStaticRenderTree: vi.fn((params: {
+      chapter: {
+        contentFormat: 'plain' | 'rich';
+        contentVersion: number;
+        index: number;
+        plainText: string;
+        richBlocks: unknown[];
+        title: string;
+      };
+      layoutKey: string;
+      layoutSignature: object;
+      novelId: number;
+      preferRichScrollRendering?: boolean;
+      variantFamily: 'original-paged' | 'original-scroll' | 'summary-shell';
+    }) => {
+      const contentHash = createContentHash(params.chapter);
+      const layoutFeatureSet = resolveLayoutFeatureSet({
+        chapter: params.chapter,
+        preferRichScrollRendering: params.preferRichScrollRendering,
+        variantFamily: params.variantFamily,
+      });
+
+      return {
+        chapterIndex: params.chapter.index,
+        contentFormat: params.chapter.contentFormat,
+        contentHash,
+        contentVersion: params.chapter.contentVersion,
+        layoutFeatureSet,
+        layoutKey: params.layoutKey,
+        layoutSignature: params.layoutSignature,
+        novelId: params.novelId,
+        queryManifest: {},
+        rendererVersion: READER_RENDERER_VERSION,
+        storageKind: 'render-tree',
+        tree: {
+          chapterIndex: params.chapter.index,
+          title: params.chapter.title,
+          variantFamily: params.variantFamily,
+        },
+        updatedAt: '2026-04-01T00:00:00.000Z',
+        variantFamily: params.variantFamily,
+      };
+    }),
     getReaderRenderCacheEntryFromMemory: vi.fn((params: {
       chapterIndex: number;
+      contentFormat: 'plain' | 'rich';
       contentHash: string;
+      contentVersion: number;
+      layoutFeatureSet: string;
       layoutKey: string;
       novelId: number;
+      rendererVersion: number;
       variantFamily: string;
     }) => memory.get(buildKey(params)) ?? null),
     getReaderRenderCacheRecordFromDexie: vi.fn().mockResolvedValue(null),
@@ -74,11 +178,16 @@ const renderCacheMock = vi.hoisted(() => {
       ),
     ),
     persistReaderRenderCacheEntry: vi.fn().mockResolvedValue(undefined),
+    resolveReaderLayoutFeatureSet: vi.fn(resolveLayoutFeatureSet),
     primeReaderRenderCacheEntry: vi.fn((entry: {
       chapterIndex: number;
+      contentFormat: 'plain' | 'rich';
       contentHash: string;
+      contentVersion: number;
+      layoutFeatureSet: string;
       layoutKey: string;
       novelId: number;
+      rendererVersion: number;
       variantFamily: string;
     }) => {
       memory.set(buildKey(entry), entry);
@@ -103,7 +212,10 @@ function createChapter(index: number, totalChapters: number): ChapterContent {
   return {
     index,
     title: `Chapter ${index + 1}`,
-    content: `Content for chapter ${index + 1}`,
+    plainText: `Content for chapter ${index + 1}`,
+    richBlocks: [],
+    contentFormat: 'plain',
+    contentVersion: 1,
     wordCount: 120,
     totalChapters,
     hasPrev: index > 0,
@@ -201,6 +313,7 @@ function renderReaderRenderPreheaterHook(options?: {
     novelId: options?.novelId ?? 1,
     onMaterializedEntry,
     preheatTargets,
+    preferRichScrollRendering: true,
     readerTelemetryEnabled: options?.readerTelemetryEnabled ?? false,
     typography,
     variantSignatures,
@@ -266,11 +379,15 @@ describe('useReaderRenderPreheater', () => {
   it('short-circuits on materialized dexie hits and surfaces them to the visible cache layer', async () => {
     const dexieEntry = {
       chapterIndex: 1,
-      contentHash: 'hash:1',
+      contentFormat: 'plain' as const,
+      contentHash: '7df65d4673d7f45e',
+      contentVersion: 1,
+      layoutFeatureSet: 'paged-pagination-block' as const,
       layoutKey: 'cached-layout',
       layoutSignature: createVariantSignatures()['original-paged'],
       novelId: 1,
       queryManifest: {},
+      rendererVersion: 2,
       storageKind: 'render-tree' as const,
       tree: {
         chapterIndex: 1,
@@ -313,11 +430,15 @@ describe('useReaderRenderPreheater', () => {
   it('upgrades manifest-only dexie hits into full render trees for render-tree targets', async () => {
     renderCacheMock.getReaderRenderCacheRecordFromDexie.mockResolvedValueOnce({
       chapterIndex: 1,
-      contentHash: 'hash:1',
+      contentFormat: 'plain' as const,
+      contentHash: '7df65d4673d7f45e',
+      contentVersion: 1,
+      layoutFeatureSet: 'paged-pagination-block' as const,
       layoutKey: 'manifest-layout',
       layoutSignature: createVariantSignatures()['original-paged'],
       novelId: 1,
       queryManifest: { pageCount: 2 },
+      rendererVersion: 2,
       storageKind: 'manifest',
       tree: null,
       updatedAt: '2026-04-01T00:00:00.000Z',

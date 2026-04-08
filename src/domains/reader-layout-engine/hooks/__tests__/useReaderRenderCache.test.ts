@@ -2,22 +2,28 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const debugLogMock = vi.hoisted(() => vi.fn());
+const setDebugSnapshotMock = vi.hoisted(() => vi.fn());
 const debugFeatureState = vi.hoisted(() => {
-  const listeners = new Set<(featureFlags: { readerTelemetry: boolean }) => void>();
+  const listeners = new Set<(featureFlags: {
+    readerLegacyPlainScroll: boolean;
+    readerTelemetry: boolean;
+  }) => void>();
   let featureFlags = {
+    readerLegacyPlainScroll: false,
     readerTelemetry: false,
   };
 
   return {
     getFlags: vi.fn(() => ({ ...featureFlags })),
-    isEnabled: vi.fn((flag: 'readerTelemetry') => featureFlags[flag]),
+    isEnabled: vi.fn((flag: 'readerLegacyPlainScroll' | 'readerTelemetry') => featureFlags[flag]),
     reset() {
       featureFlags = {
+        readerLegacyPlainScroll: false,
         readerTelemetry: false,
       };
       listeners.clear();
     },
-    set(flag: 'readerTelemetry', enabled: boolean) {
+    set(flag: 'readerLegacyPlainScroll' | 'readerTelemetry', enabled: boolean) {
       featureFlags = {
         ...featureFlags,
         [flag]: enabled,
@@ -26,7 +32,10 @@ const debugFeatureState = vi.hoisted(() => {
         listener({ ...featureFlags });
       }
     },
-    subscribe: vi.fn((listener: (featureFlags: { readerTelemetry: boolean }) => void) => {
+    subscribe: vi.fn((listener: (featureFlags: {
+      readerLegacyPlainScroll: boolean;
+      readerTelemetry: boolean;
+    }) => void) => {
       listeners.add(listener);
       return () => {
         listeners.delete(listener);
@@ -52,25 +61,98 @@ interface MaterializedEntry {
 
 const renderCacheMock = vi.hoisted(() => {
   const memory = new Map<string, unknown>();
+  const READER_RENDERER_VERSION = 2;
+  const createContentHash = (chapter: {
+    contentFormat: 'plain' | 'rich';
+    contentVersion: number;
+    index: number;
+    plainText: string;
+    richBlocks: unknown[];
+    title: string;
+  }) => {
+    const source = chapter.contentFormat === 'rich'
+      ? `${chapter.index}\u0000${chapter.title}\u0000${chapter.plainText}\u0000${chapter.contentFormat}\u0000${chapter.contentVersion}\u0000${JSON.stringify(chapter.richBlocks)}`
+      : `${chapter.index}\u0000${chapter.title}\u0000${chapter.plainText}\u0000${chapter.contentFormat}\u0000${chapter.contentVersion}`;
+    let hashA = 0x811c9dc5;
+    let hashB = 0x01000193;
+    const UINT32_MOD = 0x1_0000_0000;
+
+    const normalizeUint32 = (value: number) => {
+      const normalized = value % UINT32_MOD;
+      return normalized >= 0 ? normalized : normalized + UINT32_MOD;
+    };
+
+    for (let index = 0; index < source.length; index += 1) {
+      const value = source.charCodeAt(index);
+      hashA = normalizeUint32(Math.imul(hashA, 0x01000193) + value);
+      hashB = normalizeUint32(Math.imul(hashB, 0x27d4eb2d) + value);
+    }
+
+    return `${hashA.toString(16).padStart(8, '0')}${hashB.toString(16).padStart(8, '0')}`;
+  };
+  const resolveLayoutFeatureSet = (params: {
+    chapter: {
+      contentFormat: 'plain' | 'rich';
+      richBlocks: unknown[];
+    };
+    preferRichScrollRendering?: boolean;
+    variantFamily: 'original-paged' | 'original-scroll' | 'summary-shell';
+  }) => {
+    if (params.variantFamily === 'summary-shell') {
+      return 'summary-shell';
+    }
+
+    if (params.variantFamily === 'original-paged') {
+      return 'paged-pagination-block';
+    }
+
+    return params.chapter.contentFormat === 'rich'
+      && params.chapter.richBlocks.length > 0
+      && params.preferRichScrollRendering !== false
+      ? 'scroll-rich-inline'
+      : 'scroll-legacy-plain';
+  };
   const buildKey = (params: {
     chapterIndex: number;
+    contentFormat: 'plain' | 'rich';
+    contentHash: string;
+    contentVersion: number;
+    layoutFeatureSet: string;
     layoutKey: string;
     novelId: number;
+    rendererVersion: number;
     variantFamily: string;
-  }) => `${params.novelId}:${params.chapterIndex}:${params.variantFamily}:${params.layoutKey}`;
+  }) => (
+    `${params.novelId}:${params.chapterIndex}:${params.variantFamily}:${params.contentFormat}:${params.contentVersion}:${params.rendererVersion}:${params.layoutFeatureSet}:${params.layoutKey}:${params.contentHash}`
+  );
 
   return {
+    READER_RENDERER_VERSION,
     reset() {
       memory.clear();
     },
     buildReaderRenderCacheKey: vi.fn(buildKey),
     buildStaticRenderTree: vi.fn((params: {
-      chapter: { index: number; title: string };
+      chapter: {
+        contentFormat: 'plain' | 'rich';
+        contentVersion: number;
+        index: number;
+        plainText: string;
+        richBlocks: unknown[];
+        title: string;
+      };
       layoutKey?: string;
       layoutSignature: object;
       novelId: number;
+      preferRichScrollRendering?: boolean;
       variantFamily: 'original-paged' | 'original-scroll' | 'summary-shell';
     }) => {
+      const contentHash = createContentHash(params.chapter);
+      const layoutFeatureSet = resolveLayoutFeatureSet({
+        chapter: params.chapter,
+        preferRichScrollRendering: params.preferRichScrollRendering,
+        variantFamily: params.variantFamily,
+      });
       let tree;
       if (params.variantFamily === 'original-paged') {
         tree = {
@@ -86,6 +168,7 @@ const renderCacheMock = vi.hoisted(() => {
           blockCount: 0,
           chapterIndex: params.chapter.index,
           metrics: [],
+          renderMode: params.preferRichScrollRendering === false ? 'legacy-plain' : 'rich',
           textWidth: 400,
           totalHeight: 0,
         };
@@ -99,11 +182,15 @@ const renderCacheMock = vi.hoisted(() => {
 
       return {
         chapterIndex: params.chapter.index,
-        contentHash: `hash:${params.chapter.index}`,
+        contentFormat: params.chapter.contentFormat,
+        contentHash,
+        contentVersion: params.chapter.contentVersion,
+        layoutFeatureSet,
         layoutKey: params.layoutKey ?? `${params.variantFamily}:${params.novelId}`,
         layoutSignature: params.layoutSignature,
         novelId: params.novelId,
         queryManifest: {},
+        rendererVersion: READER_RENDERER_VERSION,
         storageKind: 'render-tree',
         tree,
         updatedAt: '2026-03-31T00:00:00.000Z',
@@ -111,26 +198,47 @@ const renderCacheMock = vi.hoisted(() => {
       };
     }),
     buildStaticRenderManifest: vi.fn((params: {
-      chapter: { index: number };
+      chapter: {
+        contentFormat: 'plain' | 'rich';
+        contentVersion: number;
+        index: number;
+        plainText: string;
+        richBlocks: unknown[];
+        title: string;
+      };
       layoutKey?: string;
       layoutSignature: object;
       novelId: number;
+      preferRichScrollRendering?: boolean;
       variantFamily: 'original-paged' | 'original-scroll' | 'summary-shell';
-    }) => ({
-      chapterIndex: params.chapter.index,
-      contentHash: `hash:${params.chapter.index}`,
-      layoutKey: params.layoutKey ?? `${params.variantFamily}:${params.novelId}`,
-      layoutSignature: params.layoutSignature,
-      novelId: params.novelId,
-      queryManifest: {
-        blockCount: 2,
-        lineCount: 6,
-      },
-      storageKind: 'manifest',
-      tree: null,
-      updatedAt: '2026-03-31T00:00:00.000Z',
-      variantFamily: params.variantFamily,
-    })),
+    }) => {
+      const contentHash = createContentHash(params.chapter);
+      const layoutFeatureSet = resolveLayoutFeatureSet({
+        chapter: params.chapter,
+        preferRichScrollRendering: params.preferRichScrollRendering,
+        variantFamily: params.variantFamily,
+      });
+
+      return {
+        chapterIndex: params.chapter.index,
+        contentFormat: params.chapter.contentFormat,
+        contentHash,
+        contentVersion: params.chapter.contentVersion,
+        layoutFeatureSet,
+        layoutKey: params.layoutKey ?? `${params.variantFamily}:${params.novelId}`,
+        layoutSignature: params.layoutSignature,
+        novelId: params.novelId,
+        queryManifest: {
+          blockCount: 2,
+          lineCount: 6,
+        },
+        rendererVersion: READER_RENDERER_VERSION,
+        storageKind: 'manifest',
+        tree: null,
+        updatedAt: '2026-03-31T00:00:00.000Z',
+        variantFamily: params.variantFamily,
+      };
+    }),
     clearReaderRenderCacheMemoryForNovel: vi.fn((novelId: number) => {
       for (const key of Array.from(memory.keys())) {
         if (String(key).startsWith(`${novelId}:`)) {
@@ -151,18 +259,29 @@ const renderCacheMock = vi.hoisted(() => {
     getReaderRenderCacheEntryFromDexie: vi.fn().mockResolvedValue(null),
     getReaderRenderCacheEntryFromMemory: vi.fn((params: {
       chapterIndex: number;
+      contentFormat: 'plain' | 'rich';
+      contentHash: string;
+      contentVersion: number;
+      layoutFeatureSet: string;
       layoutKey: string;
       novelId: number;
+      rendererVersion: number;
       variantFamily: string;
     }) => memory.get(buildKey(params)) ?? null),
     isMaterializedReaderRenderCacheEntry: vi.fn((entry: MaterializedEntry | null | undefined) => (
       entry?.storageKind === 'render-tree' && Boolean(entry.tree)
     )),
     persistReaderRenderCacheEntry: vi.fn().mockResolvedValue(undefined),
+    resolveReaderLayoutFeatureSet: vi.fn(resolveLayoutFeatureSet),
     primeReaderRenderCacheEntry: vi.fn((entry: {
       chapterIndex: number;
+      contentFormat: 'plain' | 'rich';
+      contentHash: string;
+      contentVersion: number;
+      layoutFeatureSet: string;
       layoutKey: string;
       novelId: number;
+      rendererVersion: number;
       variantFamily: string;
     }) => {
       memory.set(buildKey(entry), entry);
@@ -176,6 +295,7 @@ vi.mock('@shared/debug', () => ({
   debugFeatureSubscribe: debugFeatureState.subscribe,
   debugLog: debugLogMock,
   isDebugFeatureEnabled: debugFeatureState.isEnabled,
+  setDebugSnapshot: setDebugSnapshotMock,
 }));
 
 vi.mock('../../utils/readerImageResourceCache', () => imageCacheMock);
@@ -183,13 +303,21 @@ vi.mock('../../utils/readerImageResourceCache', () => imageCacheMock);
 vi.mock('../../utils/readerRenderCache', () => renderCacheMock);
 
 import type { Chapter, ChapterContent } from '../../readerContentService';
+import {
+  createReaderLayoutSignature,
+  createReaderViewportMetrics,
+  serializeReaderLayoutSignature,
+} from '../../utils/readerLayout';
 import { useReaderRenderCache } from '../useReaderRenderCache';
 
 function createChapter(index: number, totalChapters: number): ChapterContent {
   return {
     index,
     title: `Chapter ${index + 1}`,
-    content: `Content for chapter ${index + 1}`,
+    plainText: `Content for chapter ${index + 1}`,
+    richBlocks: [],
+    contentFormat: 'plain',
+    contentVersion: 1,
     wordCount: 120,
     totalChapters,
     hasPrev: index > 0,
@@ -376,7 +504,7 @@ describe('useReaderRenderCache', () => {
   it('rebuilds visible image chapters when decoded image dimensions become available', async () => {
     const currentChapter = {
       ...createChapter(0, 1),
-      content: 'Before image\n[IMG:cover]\nAfter image',
+      plainText: 'Before image\n[IMG:cover]\nAfter image',
     };
     const preload = createDeferred<undefined>();
 
@@ -440,7 +568,7 @@ describe('useReaderRenderCache', () => {
   it('does not retrigger image preload forever when chapter arrays get recreated on rerender', async () => {
     const currentChapter = {
       ...createChapter(0, 1),
-      content: 'Before image\n[IMG:cover]\nAfter image',
+      plainText: 'Before image\n[IMG:cover]\nAfter image',
     };
     const viewport = createViewport();
     const contentRef = { current: viewport };
@@ -583,16 +711,34 @@ describe('useReaderRenderCache', () => {
     });
 
     await waitFor(() => {
+      expect(setDebugSnapshotMock).toHaveBeenCalledWith(
+        'reader-layout',
+        expect.objectContaining({
+          contentFormat: 'plain',
+          layoutFeatureSet: 'scroll-legacy-plain',
+          novelId: 1,
+          pendingPreheatCount: expect.any(Number),
+          richBlockCount: 0,
+          unsupportedBlockCount: 0,
+        }),
+      );
       expect(debugLogMock).toHaveBeenCalledWith(
         'READER',
         'Reader layout snapshot',
         expect.objectContaining({
           activeVariant: 'original-scroll',
           cacheModel: 'layered-render-cache',
+          contentFormat: 'plain',
           currentPagedPageCount: 0,
           currentPagedPageItemCount: 0,
+          layoutFeatureSet: 'scroll-legacy-plain',
+          novelId: 1,
+          pagedDowngradeCount: 0,
+          pagedFallbackCount: 0,
+          richBlockCount: 0,
           scrollBlockCount: 0,
           scrollChapterCount: 1,
+          unsupportedBlockCount: 0,
           visibleCacheSources: {
             built: 1,
             dexie: 0,
@@ -603,10 +749,29 @@ describe('useReaderRenderCache', () => {
     });
   });
 
-  it('does not emit extra layout snapshots when only pending preheat state changes', async () => {
+  it('keeps visible layout snapshot payload stable when only pending preheat state changes', async () => {
     vi.useFakeTimers();
     debugFeatureState.set('readerTelemetry', true);
     const currentChapter = createChapter(0, 1);
+    const viewportMetrics = createReaderViewportMetrics(600, 800, 600, 800, 18);
+    const scrollLayoutSignature = createReaderLayoutSignature({
+      textWidth: viewportMetrics.scrollTextWidth,
+      pageHeight: viewportMetrics.scrollViewportHeight,
+      columnCount: 1,
+      columnGap: 0,
+      fontSize: 18,
+      lineSpacing: 1.8,
+      paragraphSpacing: 16,
+    });
+    const visibleScrollEntry = renderCacheMock.buildStaticRenderTree({
+      chapter: currentChapter,
+      layoutKey: serializeReaderLayoutSignature(scrollLayoutSignature),
+      layoutSignature: scrollLayoutSignature,
+      novelId: 1,
+      preferRichScrollRendering: true,
+      variantFamily: 'original-scroll',
+    });
+    renderCacheMock.primeReaderRenderCacheEntry(visibleScrollEntry);
     const stalledPagedPersist = createDeferred<undefined>();
     const stalledSummaryPersist = createDeferred<undefined>();
     renderCacheMock.persistReaderRenderCacheEntry.mockImplementation((entry: {
@@ -645,6 +810,8 @@ describe('useReaderRenderCache', () => {
 
     expect(result.current.isPreheating).toBe(true);
     expect(result.current.pendingPreheatCount).toBe(1);
+    const baselineSnapshot = getLayoutSnapshotCalls().at(-1)?.[2];
+    expect(baselineSnapshot).toBeDefined();
     debugLogMock.mockClear();
 
     await act(async () => {
@@ -653,7 +820,18 @@ describe('useReaderRenderCache', () => {
     });
 
     expect(result.current.pendingPreheatCount).toBe(0);
-    expect(getLayoutSnapshotCalls()).toHaveLength(0);
+    expect(getLayoutSnapshotCalls()).toHaveLength(1);
+    const nextSnapshot = getLayoutSnapshotCalls().at(-1)?.[2];
+    expect(nextSnapshot).toBeDefined();
+
+    if (!baselineSnapshot || !nextSnapshot) {
+      throw new Error('Expected layout snapshots to be defined');
+    }
+
+    const { pendingPreheatCount: _baselinePending, ...baselineVisiblePayload } = baselineSnapshot;
+    const { pendingPreheatCount: _nextPending, ...nextVisiblePayload } = nextSnapshot;
+
+    expect(nextVisiblePayload).toEqual(baselineVisiblePayload);
 
     await act(async () => {
       stalledSummaryPersist.resolve();
@@ -724,11 +902,15 @@ describe('useReaderRenderCache', () => {
       if (params.chapterIndex === 0 && params.variantFamily === 'original-paged') {
         return {
           chapterIndex: 0,
-          contentHash: 'hash:0',
+          contentFormat: 'plain' as const,
+          contentHash: '30d34e7ff4bcc85d',
+          contentVersion: 1,
+          layoutFeatureSet: 'paged-pagination-block' as const,
           layoutKey: 'original-paged:1',
           layoutSignature: {},
           novelId: 1,
           queryManifest: { pageCount: 3 },
+          rendererVersion: 2,
           storageKind: 'manifest',
           tree: null,
           updatedAt: '2026-03-31T00:00:00.000Z',
@@ -816,5 +998,38 @@ describe('useReaderRenderCache', () => {
 
     expect(result.current.isPreheating).toBe(false);
     expect(result.current.pendingPreheatCount).toBe(0);
+  });
+
+  it('switches scroll layouts back to legacy plain mode when the debug rollback flag is enabled', async () => {
+    const currentChapter = {
+      ...createChapter(0, 1),
+      contentFormat: 'rich' as const,
+      richBlocks: [{
+        type: 'paragraph' as const,
+        children: [{
+          type: 'text' as const,
+          text: 'Rich content',
+        }],
+      }],
+    };
+
+    const { result } = renderReaderRenderCacheHook({
+      chapters: [{ index: 0, title: 'Chapter 1', wordCount: 120 }],
+      currentChapter,
+      scrollChapters: [{ chapter: currentChapter, index: 0 }],
+    });
+
+    await waitFor(() => {
+      expect(result.current.scrollLayouts.get(0)?.renderMode).toBe('rich');
+    });
+
+    await act(async () => {
+      debugFeatureState.set('readerLegacyPlainScroll', true);
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(result.current.scrollLayouts.get(0)?.renderMode).toBe('legacy-plain');
+    });
   });
 });

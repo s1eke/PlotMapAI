@@ -8,6 +8,8 @@ export {
 export {
   createReaderTypographyMetrics,
   getReaderLayoutPretextCacheSizeForTests,
+  measurePagedReaderChapterLayout,
+  measureScrollReaderChapterLayout,
   measureReaderChapterLayout,
   resetReaderLayoutPretextCacheForTests,
 } from './readerMeasurement';
@@ -64,4 +66,7 @@ export type {
   VirtualBlockMetrics,
   VisibleBlockRange,
 } from './readerLayoutTypes';
-export type { ReaderTextLayoutEngine } from './readerMeasurement';
+export type {
+  ReaderRichTextLayoutResult,
+  ReaderTextLayoutEngine,
+} from './readerMeasurement';

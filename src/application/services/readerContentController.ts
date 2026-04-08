@@ -1,7 +1,10 @@
 import type { BookChapter } from '@shared/contracts';
 import type { Chapter, ChapterContent } from '@shared/contracts/reader';
 
-import { bookContentRepository } from '@domains/book-content';
+import {
+  bookContentRepository,
+  chapterRichContentRepository,
+} from '@domains/book-content';
 import { novelRepository } from '@domains/library';
 import type {
   ReaderContentController,
@@ -10,55 +13,38 @@ import type {
 import * as readerContentDomain from '@domains/reader-content';
 import { purificationRuleRepository } from '@domains/settings';
 import { AppErrorCode, createAppError } from '@shared/errors';
-import {
-  runPurifyChapterTask,
-  runPurifyChaptersTask,
-  runPurifyTitlesTask,
-} from '@shared/text-processing';
+import type { TextProcessingProgress } from '@shared/text-processing';
 
-function toBookChapter(chapter: BookChapter): BookChapter {
-  return {
-    chapterIndex: chapter.chapterIndex,
-    title: chapter.title,
-    content: chapter.content,
-    wordCount: chapter.wordCount,
-  };
-}
+import {
+  applyPlainTextOnlyContent,
+  applyReaderHeadingRules,
+  buildPostAstPlainProjection,
+  buildProjectedBookChapters,
+  resolveProjectedRichBlocks,
+} from './chapterTextProjection';
 
 export const applicationReaderContentController: ReaderContentController = {
   async loadPurifiedBookChapters(
     novelId: number,
     options: ReaderTextProcessingOptions = {},
   ): Promise<BookChapter[]> {
-    const [bookTitle, rawChapters, rules] = await Promise.all([
+    const [bookTitle, rawChapters, richChapters, rules] = await Promise.all([
       novelRepository.getNovelTitle(novelId),
       bookContentRepository.listNovelChapters(novelId),
+      chapterRichContentRepository.listNovelChapterRichContents(novelId),
       purificationRuleRepository.getEnabledPurificationRules(),
     ]);
 
-    if (rules.length === 0) {
-      return rawChapters.map(toBookChapter);
-    }
+    options.signal?.throwIfAborted?.();
 
-    const purified = await runPurifyChaptersTask(
-      {
-        chapters: rawChapters.map((chapter) => ({
-          chapterIndex: chapter.chapterIndex,
-          title: chapter.title,
-          content: chapter.content,
-          wordCount: chapter.wordCount,
-        })),
-        rules,
-        bookTitle,
-      },
-      options,
-    );
-
-    return rawChapters.map((chapter, index) => ({
-      ...toBookChapter(chapter),
-      title: purified[index]?.title ?? chapter.title,
-      content: purified[index]?.content ?? chapter.content,
-    }));
+    return buildProjectedBookChapters({
+      bookTitle,
+      rawChapters,
+      richChapters,
+      rules,
+      signal: options.signal,
+      onProgress: options.onProgress as ((progress: TextProcessingProgress) => void) | undefined,
+    });
   },
 
   async getChapters(
@@ -71,30 +57,11 @@ export const applicationReaderContentController: ReaderContentController = {
       purificationRuleRepository.getEnabledPurificationRules(),
     ]);
 
-    if (rules.length === 0) {
-      return rawChapters.map((chapter) => ({
-        index: chapter.chapterIndex,
-        title: chapter.title,
-        wordCount: chapter.wordCount,
-      }));
-    }
+    options.signal?.throwIfAborted?.();
 
-    const titles = await runPurifyTitlesTask(
-      {
-        titles: rawChapters.map((chapter) => ({
-          index: chapter.chapterIndex,
-          title: chapter.title,
-          wordCount: chapter.wordCount,
-        })),
-        rules,
-        bookTitle,
-      },
-      options,
-    );
-
-    return titles.map((chapter) => ({
-      index: chapter.index,
-      title: chapter.title,
+    return rawChapters.map((chapter) => ({
+      index: chapter.chapterIndex,
+      title: applyReaderHeadingRules(chapter.title, bookTitle, rules),
       wordCount: chapter.wordCount,
     }));
   },
@@ -104,9 +71,10 @@ export const applicationReaderContentController: ReaderContentController = {
     chapterIndex: number,
     options: ReaderTextProcessingOptions = {},
   ): Promise<ChapterContent> {
-    const [bookTitle, chapter, totalChapters, rules] = await Promise.all([
+    const [bookTitle, chapter, chapterRichContent, totalChapters, rules] = await Promise.all([
       novelRepository.getNovelTitle(novelId),
       bookContentRepository.getNovelChapter(novelId, chapterIndex),
+      chapterRichContentRepository.getNovelChapterRichContent(novelId, chapterIndex),
       bookContentRepository.countNovelChapters(novelId),
       purificationRuleRepository.getEnabledPurificationRules(),
     ]);
@@ -122,33 +90,47 @@ export const applicationReaderContentController: ReaderContentController = {
       });
     }
 
-    let { title, content } = chapter;
-
-    if (rules.length > 0) {
-      const purified = await runPurifyChapterTask(
-        {
-          chapter: {
-            chapterIndex: chapter.chapterIndex,
-            title,
-            content,
-            wordCount: chapter.wordCount,
-          },
-          rules,
-          bookTitle,
+    if (!chapterRichContent) {
+      throw createAppError({
+        code: AppErrorCode.CHAPTER_STRUCTURED_CONTENT_MISSING,
+        kind: 'storage',
+        source: 'reader',
+        userMessageKey: 'reader.reparse.required',
+        debugMessage: 'Structured chapter content is missing for the requested chapter.',
+        details: {
+          chapterIndex,
+          novelId,
+          missingTable: 'chapterRichContents',
         },
-        options,
-      );
-      ({ title, content } = purified);
+      });
     }
+
+    options.signal?.throwIfAborted?.();
+
+    const title = applyReaderHeadingRules(chapter.title, bookTitle, rules);
+    const projection = buildPostAstPlainProjection({
+      chapter,
+      chapterRichContent,
+      bookTitle,
+      rules,
+    });
+    const plainText = applyPlainTextOnlyContent(projection.plainText, bookTitle, rules);
 
     return {
       index: chapter.chapterIndex,
       title,
-      content,
       wordCount: chapter.wordCount,
       totalChapters,
       hasPrev: chapterIndex > 0,
       hasNext: chapterIndex < totalChapters - 1,
+      plainText,
+      richBlocks: resolveProjectedRichBlocks({
+        contentFormat: chapterRichContent.contentFormat,
+        plainText,
+        richBlocks: projection.richBlocks,
+      }),
+      contentFormat: chapterRichContent.contentFormat,
+      contentVersion: chapterRichContent.contentVersion,
     };
   },
 

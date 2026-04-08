@@ -2,10 +2,11 @@ import type { MouseEvent } from 'react';
 import type { ReaderPageViewModel } from './types';
 import type { ReaderAnalysisBridgeController, ReaderPageTurnMode } from '@domains/reader-shell';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { analyzeChapter } from '@application/use-cases/analysis';
+import { loadReaderSession } from '@application/use-cases/library';
 import { appPaths } from '@app/router/paths';
 import { ChapterAnalysisPanel, analysisService } from '@domains/analysis';
 import { useReaderChapterData } from '@domains/reader-content';
@@ -25,8 +26,10 @@ import {
   useReaderRestoreController,
   useReaderSession,
 } from '@domains/reader-session';
+import { AppErrorCode } from '@shared/errors';
 import { useReaderViewportContext } from '@shared/reader-runtime';
 import { resolveContentModeFromPageTurnMode } from '@shared/utils/readerMode';
+import { useReaderReparseRecoveryController } from './useReaderReparseRecoveryController';
 
 const readerAnalysisController: ReaderAnalysisBridgeController = {
   analyzeChapter,
@@ -66,9 +69,10 @@ export function useReaderPageViewModel(novelId: number): ReaderPageViewModel {
     mode,
     viewMode,
   } = sessionSnapshot;
-  const [chapterContentVersion, setChapterContentVersion] = useState(0);
+  const [chapterDataRevision, setChapterDataRevision] = useState(0);
+  const [readerFileType, setReaderFileType] = useState('epub');
   const handleChapterContentResolved = useCallback((): void => {
-    setChapterContentVersion((previousVersion) => previousVersion + 1);
+    setChapterDataRevision((previousVersion) => previousVersion + 1);
   }, []);
   const resetInteractionState = useCallback((): void => {
     wheelDeltaRef.current = 0;
@@ -86,11 +90,6 @@ export function useReaderPageViewModel(novelId: number): ReaderPageViewModel {
     chapterIndex,
     viewMode,
   });
-  const { handleMobileBack } = useReaderMobileBack({
-    fallbackHref: novelDetailHref,
-    isSidebarOpen: sidebar.isSidebarOpen,
-    closeSidebar,
-  });
 
   const chapterData = useReaderChapterData({
     novelId,
@@ -99,6 +98,22 @@ export function useReaderPageViewModel(novelId: number): ReaderPageViewModel {
     onChapterContentResolved: handleChapterContentResolved,
     resetInteractionState,
   });
+
+  useEffect(() => {
+    let active = true;
+
+    loadReaderSession(novelId)
+      .then(({ novel }) => {
+        if (active) {
+          setReaderFileType(novel.fileType);
+        }
+      })
+      .catch(() => undefined);
+
+    return () => {
+      active = false;
+    };
+  }, [novelId]);
 
   const restoreFlow = useReaderRestoreController({
     sessionSnapshot,
@@ -109,7 +124,7 @@ export function useReaderPageViewModel(novelId: number): ReaderPageViewModel {
   });
   const layoutController = useReaderLayoutController({
     analysis,
-    chapterContentVersion,
+    chapterDataRevision,
     chapterData,
     novelId,
     preferences,
@@ -117,6 +132,13 @@ export function useReaderPageViewModel(novelId: number): ReaderPageViewModel {
     session,
   });
   const { lifecycle, navigation, restore, viewport } = layoutController;
+  const reparseRecoveryController = useReaderReparseRecoveryController({
+    fileType: readerFileType,
+    novelId,
+    onReparsed: () => {
+      window.location.reload();
+    },
+  });
 
   const {
     isChromeVisible,
@@ -143,6 +165,13 @@ export function useReaderPageViewModel(novelId: number): ReaderPageViewModel {
     dismissBlockedInteraction,
     isEnabled: viewMode === 'original',
     novelId,
+  });
+  const { handleMobileBack } = useReaderMobileBack({
+    closeImageViewer: imageOverlay.closeImageViewer,
+    fallbackHref: novelDetailHref,
+    isImageViewerOpen: imageOverlay.isImageViewerOpen,
+    isSidebarOpen: sidebar.isSidebarOpen,
+    closeSidebar,
   });
   const isContentInteractionLocked =
     isChromeVisible || sidebar.isSidebarOpen || imageOverlay.isImageViewerOpen;
@@ -233,6 +262,10 @@ export function useReaderPageViewModel(novelId: number): ReaderPageViewModel {
     imageViewerProps: imageOverlay.imageViewerProps,
     pageBgClassName: preferences.currentTheme.bg,
     readerError: lifecycle.readerError,
+    reparseRecovery: {
+      ...reparseRecoveryController,
+      visible: lifecycle.readerError?.code === AppErrorCode.CHAPTER_STRUCTURED_CONTENT_MISSING,
+    },
     sidebarProps: {
       chapters: chapterData.chapters,
       currentIndex: chapterIndex,

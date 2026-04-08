@@ -29,6 +29,7 @@ import {
 } from '../hooks/useReaderLifecycleController';
 import { useReaderNavigation } from '../hooks/useReaderNavigation';
 import { useScrollReaderController } from '../hooks/useScrollReaderController';
+import { resolveReaderContentRootProps } from '../utils/readerContentStyling';
 
 interface ReaderLayoutControllerImageHandlers extends Pick<
   ComponentProps<typeof PagedReaderContent>,
@@ -40,7 +41,7 @@ interface UseReaderLayoutControllerParams {
     ReaderAnalysisBridgeState,
     'isChapterAnalysisLoading' | 'summaryPanel' | 'summaryRestoreSignal'
   >;
-  chapterContentVersion: number;
+  chapterDataRevision: number;
   chapterData: UseReaderChapterDataResult;
   novelId: number;
   preferences: Pick<
@@ -94,6 +95,15 @@ function buildPagedContentProps(
   }
 
   return {
+    ...resolveReaderContentRootProps({
+      contentWidth: pagedController.currentPagedLayout?.columnWidth ?? 0,
+      fontSize: preferences.fontSize,
+      lineSpacing: preferences.lineSpacing,
+      mode: 'paged',
+      paragraphSpacing: preferences.paragraphSpacing,
+      readerTheme: preferences.readerTheme,
+      theme: preferences.currentTheme,
+    }),
     chapter: renderableChapter,
     currentLayout: pagedController.currentPagedLayout,
     disableAnimation: isRestoringPosition,
@@ -133,6 +143,15 @@ function buildScrollContentProps(
   }
 
   return {
+    ...resolveReaderContentRootProps({
+      contentWidth: scrollController.renderableScrollLayouts[0]?.layout.textWidth ?? 0,
+      fontSize: preferences.fontSize,
+      lineSpacing: preferences.lineSpacing,
+      mode: 'scroll',
+      paragraphSpacing: preferences.paragraphSpacing,
+      readerTheme: preferences.readerTheme,
+      theme: preferences.currentTheme,
+    }),
     chapters: scrollController.renderableScrollLayouts,
     headerBgClassName: preferences.headerBg,
     novelId,
@@ -167,7 +186,7 @@ function buildSummaryContentProps(
 
 export function useReaderLayoutController({
   analysis,
-  chapterContentVersion,
+  chapterDataRevision,
   chapterData,
   novelId,
   preferences,
@@ -182,7 +201,7 @@ export function useReaderLayoutController({
     novelId,
     chapters: chapterData.chapters,
     currentChapter: chapterData.currentChapter,
-    contentVersion: chapterContentVersion,
+    chapterDataRevision,
     sessionSnapshot,
     sessionCommands,
     cache: chapterData.cache,
@@ -204,7 +223,7 @@ export function useReaderLayoutController({
     novelId,
     chapters: chapterData.chapters,
     currentChapter: chapterData.currentChapter,
-    contentVersion: chapterContentVersion,
+    chapterDataRevision,
     sessionSnapshot,
     sessionCommands,
     cache: chapterData.cache,

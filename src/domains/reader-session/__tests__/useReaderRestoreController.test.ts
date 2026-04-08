@@ -67,7 +67,10 @@ function createCurrentChapter(index = 5) {
   return {
     index,
     title: `Chapter ${index + 1}`,
-    content: 'content',
+    plainText: 'content',
+    richBlocks: [],
+    contentFormat: 'plain' as const,
+    contentVersion: 1,
     wordCount: 100,
     totalChapters: 10,
     hasPrev: true,
@@ -202,7 +205,7 @@ describe('useReaderRestoreFlow', () => {
     resetReaderSessionStoreForTests();
   });
 
-  it('reuses the shared restorable-position semantics for non-forced pending restore targets', () => {
+  it('keeps summary progress restore targets but clears original-mode progress-only ones', () => {
     const { hookProps, runtime } = createHookHarness();
     const { result } = renderHook(() => useReaderRestoreFlow(hookProps), {
       wrapper: runtime.Wrapper,
@@ -220,13 +223,14 @@ describe('useReaderRestoreFlow', () => {
     act(() => {
       result.current.setPendingRestoreTarget(createRestoreTarget({
         chapterProgress: 0.4,
+        mode: 'summary',
       }));
     });
 
     expect(getReaderSessionSnapshot().pendingRestoreTarget).toMatchObject({
       chapterIndex: 5,
       chapterProgress: 0.4,
-      mode: 'scroll',
+      mode: 'summary',
     });
   });
 

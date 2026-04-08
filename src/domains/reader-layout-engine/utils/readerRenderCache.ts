@@ -16,7 +16,7 @@ import type {
 
 import { db } from '@infra/db';
 
-import { extractImageKeysFromText } from './chapterImages';
+import { extractImageKeysFromChapter } from './chapterImages';
 import {
   buildStaticPagedChapterTree,
   buildStaticScrollChapterTree,
@@ -32,22 +32,34 @@ import {
   toPersistedReaderRenderCacheRecord,
 } from './readerRenderCacheMapper';
 import { preloadReaderImageResources } from './readerImageResourceCache';
+import { shouldUseRichScrollBlocks } from './richScroll';
 
 const MEMORY_CACHE_LIMIT = 36;
+export const READER_RENDER_CACHE_PERSISTED_LIMIT = 240;
 const READER_RENDER_CACHE_CLEANUP_INTERVAL_MS = 60 * 60 * 1000;
 const READER_RENDER_CACHE_TOUCH_INTERVAL_MS = 24 * 60 * 60 * 1000;
 export const READER_RENDER_CACHE_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 
 export type ReaderRenderCacheSource = 'memory' | 'dexie' | 'built';
 export type ReaderRenderStorageKind = 'render-tree' | 'manifest';
+export type ReaderLayoutFeatureSet =
+  | 'scroll-legacy-plain'
+  | 'scroll-rich-inline'
+  | 'paged-pagination-block'
+  | 'summary-shell';
+export const READER_RENDERER_VERSION = 4;
 
 interface ReaderRenderCacheRecordBase {
   chapterIndex: number;
   contentHash: string;
+  contentFormat: ChapterContent['contentFormat'];
+  contentVersion: number;
+  layoutFeatureSet: ReaderLayoutFeatureSet;
   layoutKey: string;
   layoutSignature: ReaderLayoutSignature;
   novelId: number;
   queryManifest: ReaderRenderQueryManifest;
+  rendererVersion: number;
   storageKind: ReaderRenderStorageKind;
   updatedAt: string;
   variantFamily: ReaderRenderVariant;
@@ -74,8 +86,12 @@ export type ReaderRenderCacheRecord<
 interface ReaderRenderCacheLookupParams {
   chapterIndex: number;
   contentHash: string;
+  contentFormat: ChapterContent['contentFormat'];
+  contentVersion: number;
+  layoutFeatureSet: ReaderLayoutFeatureSet;
   layoutKey: string;
   novelId: number;
+  rendererVersion: number;
   variantFamily: ReaderRenderVariant;
 }
 
@@ -90,8 +106,37 @@ function buildFamilyKey(params: {
   return `${params.novelId}:${params.chapterIndex}:${params.variantFamily}`;
 }
 
+export function resolveReaderLayoutFeatureSet(params: {
+  chapter: Pick<ChapterContent, 'contentFormat' | 'richBlocks'>;
+  preferRichScrollRendering?: boolean;
+  variantFamily: ReaderRenderVariant;
+}): ReaderLayoutFeatureSet {
+  if (params.variantFamily === 'summary-shell') {
+    return 'summary-shell';
+  }
+
+  if (params.variantFamily === 'original-paged') {
+    return 'paged-pagination-block';
+  }
+
+  return shouldUseRichScrollBlocks(
+    params.chapter,
+    params.preferRichScrollRendering,
+  )
+    ? 'scroll-rich-inline'
+    : 'scroll-legacy-plain';
+}
+
 export function buildReaderRenderCacheKey(params: ReaderRenderCacheLookupParams): string {
-  return `${buildFamilyKey(params)}:${params.layoutKey}:${params.contentHash}`;
+  return [
+    buildFamilyKey(params),
+    params.contentFormat,
+    params.contentVersion,
+    params.rendererVersion,
+    params.layoutFeatureSet,
+    params.layoutKey,
+    params.contentHash,
+  ].join(':');
 }
 
 function getReaderRenderCacheTimestampMs(timestamp: string): number {
@@ -141,6 +186,25 @@ async function refreshPersistedReaderRenderCacheIfNeeded(
     expiresAt,
     updatedAt,
   };
+}
+
+async function prunePersistedReaderRenderCacheIfNeeded(
+  readerRenderCacheTable: typeof db.readerRenderCache = db.readerRenderCache,
+): Promise<void> {
+  const overflow = await readerRenderCacheTable.count() - READER_RENDER_CACHE_PERSISTED_LIMIT;
+  if (overflow <= 0) {
+    return;
+  }
+
+  const oldestIds = await readerRenderCacheTable
+    .orderBy('updatedAt')
+    .limit(overflow)
+    .primaryKeys();
+  if (oldestIds.length === 0) {
+    return;
+  }
+
+  await readerRenderCacheTable.bulkDelete(oldestIds as number[]);
 }
 
 function evictMemoryRenderCacheIfNeeded(): void {
@@ -213,8 +277,12 @@ export async function getReaderRenderCacheRecordFromDexie<TTree extends StaticCh
   }
 
   if (
-    familyRecord.layoutKey !== params.layoutKey
+    familyRecord.contentFormat !== params.contentFormat
+    || familyRecord.contentVersion !== params.contentVersion
+    || familyRecord.layoutFeatureSet !== params.layoutFeatureSet
+    || familyRecord.layoutKey !== params.layoutKey
     || familyRecord.contentHash !== params.contentHash
+    || familyRecord.rendererVersion !== params.rendererVersion
   ) {
     return null;
   }
@@ -261,11 +329,13 @@ export async function persistReaderRenderCacheEntry<TTree extends StaticChapterR
         createReaderRenderCacheExpiresAt(entry.updatedAt),
       ),
     );
+    await prunePersistedReaderRenderCacheIfNeeded(db.readerRenderCache);
   });
 }
 
 export function createReaderRenderCacheEntry<TTree extends StaticChapterRenderTree>(params: {
   chapter: ChapterContent;
+  layoutFeatureSet: ReaderLayoutFeatureSet;
   layoutKey?: string;
   layoutSignature: ReaderLayoutSignature;
   tree: TTree;
@@ -274,10 +344,14 @@ export function createReaderRenderCacheEntry<TTree extends StaticChapterRenderTr
   return {
     chapterIndex: params.chapter.index,
     contentHash: createChapterContentHash(params.chapter),
+    contentFormat: params.chapter.contentFormat,
+    contentVersion: params.chapter.contentVersion,
+    layoutFeatureSet: params.layoutFeatureSet,
     layoutKey: params.layoutKey ?? serializeReaderLayoutSignature(params.layoutSignature),
     layoutSignature: params.layoutSignature,
     novelId: 0,
     queryManifest: createReaderRenderQueryManifest(params.variantFamily, params.tree),
+    rendererVersion: READER_RENDERER_VERSION,
     storageKind: 'render-tree',
     tree: params.tree,
     updatedAt: new Date().toISOString(),
@@ -286,7 +360,11 @@ export function createReaderRenderCacheEntry<TTree extends StaticChapterRenderTr
 }
 
 export function createReaderRenderCacheManifestEntry(params: {
-  chapter: Pick<ChapterContent, 'content' | 'index' | 'title'>;
+  chapter: Pick<
+    ChapterContent,
+    'contentFormat' | 'contentVersion' | 'index' | 'plainText' | 'richBlocks' | 'title'
+  >;
+  layoutFeatureSet: ReaderLayoutFeatureSet;
   layoutKey?: string;
   layoutSignature: ReaderLayoutSignature;
   novelId: number;
@@ -296,10 +374,14 @@ export function createReaderRenderCacheManifestEntry(params: {
   return {
     chapterIndex: params.chapter.index,
     contentHash: createChapterContentHash(params.chapter),
+    contentFormat: params.chapter.contentFormat,
+    contentVersion: params.chapter.contentVersion,
+    layoutFeatureSet: params.layoutFeatureSet,
     layoutKey: params.layoutKey ?? serializeReaderLayoutSignature(params.layoutSignature),
     layoutSignature: params.layoutSignature,
     novelId: params.novelId,
     queryManifest: params.queryManifest,
+    rendererVersion: READER_RENDERER_VERSION,
     storageKind: 'manifest',
     tree: null,
     updatedAt: new Date().toISOString(),
@@ -313,9 +395,15 @@ export function buildStaticRenderTree(params: {
   layoutKey?: string;
   layoutSignature: ReaderLayoutSignature;
   novelId: number;
+  preferRichScrollRendering?: boolean;
   typography: ReaderTypographyMetrics;
   variantFamily: ReaderRenderVariant;
 }): ReaderRenderCacheEntry {
+  const layoutFeatureSet = resolveReaderLayoutFeatureSet({
+    chapter: params.chapter,
+    preferRichScrollRendering: params.preferRichScrollRendering,
+    variantFamily: params.variantFamily,
+  });
   let tree: StaticChapterRenderTree;
   if (params.variantFamily === 'original-scroll') {
     tree = buildStaticScrollChapterTree(
@@ -327,6 +415,8 @@ export function buildStaticRenderTree(params: {
         params.layoutSignature.textWidth,
         params.layoutSignature.pageHeight,
       ),
+      undefined,
+      params.preferRichScrollRendering,
     );
   } else if (params.variantFamily === 'original-paged') {
     tree = buildStaticPagedChapterTree(
@@ -344,6 +434,7 @@ export function buildStaticRenderTree(params: {
 
   const entry = createReaderRenderCacheEntry({
     chapter: params.chapter,
+    layoutFeatureSet,
     layoutKey: params.layoutKey,
     layoutSignature: params.layoutSignature,
     tree,
@@ -362,10 +453,14 @@ export function createReaderRenderCacheManifestFromEntry<TTree extends StaticCha
   return {
     chapterIndex: entry.chapterIndex,
     contentHash: entry.contentHash,
+    contentFormat: entry.contentFormat,
+    contentVersion: entry.contentVersion,
+    layoutFeatureSet: entry.layoutFeatureSet,
     layoutKey: entry.layoutKey,
     layoutSignature: entry.layoutSignature,
     novelId: entry.novelId,
     queryManifest: entry.queryManifest,
+    rendererVersion: entry.rendererVersion,
     storageKind: 'manifest',
     tree: null,
     updatedAt: entry.updatedAt,
@@ -379,11 +474,18 @@ export function buildStaticRenderManifest(params: {
   layoutKey?: string;
   layoutSignature: ReaderLayoutSignature;
   novelId: number;
+  preferRichScrollRendering?: boolean;
   typography: ReaderTypographyMetrics;
   variantFamily: ReaderRenderVariant;
 }): ReaderRenderCacheManifestEntry {
+  const layoutFeatureSet = resolveReaderLayoutFeatureSet({
+    chapter: params.chapter,
+    preferRichScrollRendering: params.preferRichScrollRendering,
+    variantFamily: params.variantFamily,
+  });
   return createReaderRenderCacheManifestEntry({
     chapter: params.chapter,
+    layoutFeatureSet,
     layoutKey: params.layoutKey,
     layoutSignature: params.layoutSignature,
     novelId: params.novelId,
@@ -391,6 +493,7 @@ export function buildStaticRenderManifest(params: {
       chapter: params.chapter,
       imageDimensionsByKey: params.imageDimensionsByKey,
       layoutSignature: params.layoutSignature,
+      preferRichScrollRendering: params.preferRichScrollRendering,
       typography: params.typography,
       variantFamily: params.variantFamily,
     }),
@@ -400,9 +503,9 @@ export function buildStaticRenderManifest(params: {
 
 export async function warmReaderRenderImages(
   novelId: number,
-  chapter: Pick<ChapterContent, 'content'>,
+  chapter: Pick<ChapterContent, 'contentFormat' | 'plainText' | 'richBlocks'>,
 ): Promise<void> {
-  const imageKeys = extractImageKeysFromText(chapter.content);
+  const imageKeys = extractImageKeysFromChapter(chapter);
   if (imageKeys.length === 0) {
     return;
   }

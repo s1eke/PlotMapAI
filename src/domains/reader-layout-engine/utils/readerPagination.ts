@@ -25,14 +25,27 @@ import {
   getItemStartLocator,
 } from './readerLocator';
 import {
+  buildPagedReaderBlocks,
   buildReaderBlocks,
   getApproximateMaxCharsPerLine,
   resolveReaderImageSize,
 } from './readerLayoutShared';
-import { measureReaderChapterLayout } from './readerMeasurement';
+import {
+  measurePagedReaderChapterLayout,
+  measureScrollReaderChapterLayout,
+} from './readerMeasurement';
+import {
+  getRichScrollHorizontalTextWidth,
+  shouldUseRichScrollBlocks,
+} from './richScroll';
+import { createRichLineFragments } from './richLineFragments';
+import { READER_CONTENT_TOKEN_DEFAULTS } from '@shared/reader-content';
+import { getRichInlinePlainText } from '@shared/text-processing';
 
 interface EstimatedReaderBlockMetric {
   block: ReaderBlock;
+  captionHeight?: number;
+  captionSpacing?: number;
   contentHeight: number;
   displayHeight?: number;
   displayWidth?: number;
@@ -64,14 +77,16 @@ export function buildStaticScrollChapterTree(
   imageDimensionsByKey: Map<string, ReaderImageDimensions | null | undefined>,
   imageLayoutConstraints?: ReaderImageLayoutConstraints,
   textLayoutEngine?: ReaderTextLayoutEngine,
+  preferRichScrollRendering = true,
 ): StaticScrollChapterTree {
-  return measureReaderChapterLayout(
+  return measureScrollReaderChapterLayout(
     chapter,
     width,
     typography,
     imageDimensionsByKey,
     imageLayoutConstraints,
     textLayoutEngine,
+    preferRichScrollRendering,
   );
 }
 
@@ -93,9 +108,9 @@ function finalizePageLocators(page: PageSlice): void {
   for (const column of pageSlice.columns) {
     for (const item of column.items) {
       if (!startLocator) {
-        startLocator = getItemStartLocator(item);
+        startLocator = getItemStartLocator(item, pageSlice.pageIndex);
       }
-      endLocator = getItemEndLocator(item);
+      endLocator = getItemEndLocator(item, pageSlice.pageIndex);
     }
   }
 
@@ -136,12 +151,22 @@ function getMinimumRenderableHeight(
   pageHeight: number,
 ): number {
   if (metric.block.kind === 'image') {
+    const captionHeight = metric.captionHeight ?? 0;
+    const captionSpacing = captionHeight > 0 ? (metric.captionSpacing ?? 0) : 0;
     const displayHeight = metric.displayHeight ?? metric.contentHeight;
-    const maxImageHeight = pageHeight - metric.marginBefore - metric.marginAfter;
+    const maxImageHeight = pageHeight
+      - metric.marginBefore
+      - metric.marginAfter
+      - captionSpacing
+      - captionHeight;
     const resolvedDisplayHeight = displayHeight > maxImageHeight && maxImageHeight > 0
       ? maxImageHeight
       : displayHeight;
-    return metric.marginBefore + resolvedDisplayHeight;
+    return metric.marginBefore + resolvedDisplayHeight + captionSpacing + captionHeight;
+  }
+
+  if (metric.block.kind === 'text' && metric.block.renderRole === 'table') {
+    return metric.marginBefore + metric.contentHeight;
   }
 
   return metric.marginBefore + metric.lineHeightPx;
@@ -152,15 +177,66 @@ function getEstimatedMinimumRenderableHeight(
   pageHeight: number,
 ): number {
   if (metric.block.kind === 'image') {
+    const captionHeight = metric.captionHeight ?? 0;
+    const captionSpacing = captionHeight > 0 ? (metric.captionSpacing ?? 0) : 0;
     const displayHeight = metric.displayHeight ?? metric.contentHeight;
-    const maxImageHeight = pageHeight - metric.marginBefore - metric.marginAfter;
+    const maxImageHeight = pageHeight
+      - metric.marginBefore
+      - metric.marginAfter
+      - captionSpacing
+      - captionHeight;
     const resolvedDisplayHeight = displayHeight > maxImageHeight && maxImageHeight > 0
       ? maxImageHeight
       : displayHeight;
-    return metric.marginBefore + resolvedDisplayHeight;
+    return metric.marginBefore + resolvedDisplayHeight + captionSpacing + captionHeight;
+  }
+
+  if (metric.block.kind === 'text' && metric.block.renderRole === 'table') {
+    return metric.marginBefore + metric.contentHeight;
   }
 
   return metric.marginBefore + metric.lineHeightPx;
+}
+
+function estimateTableContentHeight(
+  tableRows: NonNullable<ReaderBlock['tableRows']>,
+  maxWidth: number,
+  lineHeightPx: number,
+  fontSizePx: number,
+): { contentHeight: number; rowHeights: number[] } {
+  if (tableRows.length === 0) {
+    return {
+      contentHeight: 0,
+      rowHeights: [],
+    };
+  }
+
+  const columnCount = Math.max(...tableRows.map((row) => row.length), 1);
+  const totalHorizontalPadding =
+    columnCount * READER_CONTENT_TOKEN_DEFAULTS.tableCellPaddingXPx * 2
+    + (columnCount + 1) * READER_CONTENT_TOKEN_DEFAULTS.tableBorderWidthPx;
+  const cellMaxWidth = Math.max(
+    READER_CONTENT_TOKEN_DEFAULTS.tableMinCellWidthPx,
+    (maxWidth - totalHorizontalPadding) / columnCount,
+  );
+  const rowHeights = tableRows.map((row) => {
+    const maxCellHeight = Math.max(...row.map((cell) => {
+      const lineCount = Math.max(
+        estimateTextLineCount(getRichInlinePlainText(cell.children), cellMaxWidth, fontSizePx),
+        1,
+      );
+      return lineCount * lineHeightPx + READER_CONTENT_TOKEN_DEFAULTS.tableCellPaddingYPx * 2;
+    }), lineHeightPx + READER_CONTENT_TOKEN_DEFAULTS.tableCellPaddingYPx * 2);
+
+    return maxCellHeight;
+  });
+  const borderHeight =
+    (tableRows.length + 1) * READER_CONTENT_TOKEN_DEFAULTS.tableBorderWidthPx;
+
+  return {
+    contentHeight: rowHeights.reduce((total, height) => total + height, 0) + borderHeight,
+    rowHeights,
+  };
 }
 
 export function composePaginatedChapterLayout(
@@ -240,15 +316,25 @@ export function composePaginatedChapterLayout(
     }
 
     if (metric.block.kind === 'image') {
+      const captionHeight = metric.captionHeight ?? 0;
+      const captionSpacing = captionHeight > 0 ? (metric.captionSpacing ?? 0) : 0;
       let displayHeight = metric.displayHeight ?? metric.contentHeight;
       let displayWidth = metric.displayWidth ?? measuredLayout.textWidth;
-      const maxImageHeight = safeColumnHeight - metric.marginBefore - metric.marginAfter;
+      const maxImageHeight = safeColumnHeight
+        - metric.marginBefore
+        - metric.marginAfter
+        - captionSpacing
+        - captionHeight;
       if (displayHeight > maxImageHeight && maxImageHeight > 0) {
         const scale = maxImageHeight / displayHeight;
         displayHeight *= scale;
         displayWidth *= scale;
       }
-      const imageContentHeight = metric.marginBefore + displayHeight;
+      const imageContentHeight =
+        metric.marginBefore
+        + displayHeight
+        + captionSpacing
+        + captionHeight;
       ensureRoom(imageContentHeight);
       let remainingHeight = safeColumnHeight - currentColumnHeight;
       if (remainingHeight <= 0) {
@@ -276,7 +362,16 @@ export function composePaginatedChapterLayout(
 
       const imageHeight = imageContentHeight + marginAfter;
       const item = {
+        align: metric.block.align,
+        anchorId: metric.block.anchorId,
         blockIndex: metric.block.blockIndex,
+        captionFont: metric.captionFont,
+        captionFontSizePx: metric.captionFontSizePx,
+        captionHeight,
+        captionLineHeightPx: metric.captionLineHeightPx,
+        captionLines: metric.captionLines,
+        captionRichLineFragments: metric.captionRichLineFragments,
+        captionSpacing,
         chapterIndex: metric.block.chapterIndex,
         displayHeight,
         displayWidth,
@@ -287,10 +382,75 @@ export function composePaginatedChapterLayout(
         kind: 'image' as const,
         marginAfter,
         marginBefore: metric.marginBefore,
+        sourceBlockType: metric.block.sourceBlockType,
       };
       getCurrentColumn().items.push(item);
       getCurrentColumn().height += imageHeight;
       currentColumnHeight += imageHeight;
+      continue;
+    }
+
+    if (metric.block.kind === 'text' && metric.block.renderRole === 'table') {
+      const tableContentHeight = metric.marginBefore + metric.contentHeight;
+      ensureRoom(tableContentHeight);
+      let remainingHeight = safeColumnHeight - currentColumnHeight;
+      if (remainingHeight <= 0) {
+        advanceColumn();
+        remainingHeight = safeColumnHeight;
+      }
+
+      let { marginAfter } = metric;
+      const nextMinimumHeight = nextMeaningfulMetric
+        ? getMinimumRenderableHeight(nextMeaningfulMetric, safeColumnHeight)
+        : null;
+      if (
+        marginAfter > 0
+        && (
+          tableContentHeight + marginAfter > remainingHeight + 0.5
+          || (
+            nextMinimumHeight !== null
+            && remainingHeight + 0.5 >= tableContentHeight + nextMinimumHeight
+            && tableContentHeight + marginAfter + nextMinimumHeight > remainingHeight + 0.5
+          )
+        )
+      ) {
+        marginAfter = 0;
+      }
+
+      if (tableContentHeight + marginAfter > remainingHeight + 0.5 && currentColumnHeight > 0) {
+        advanceColumn();
+        continue;
+      }
+
+      const item = {
+        align: metric.block.align,
+        anchorId: metric.block.anchorId,
+        blockquoteDepth: metric.block.blockquoteDepth,
+        blockIndex: metric.block.blockIndex,
+        chapterIndex: metric.block.chapterIndex,
+        container: metric.block.container,
+        contentHeight: metric.contentHeight,
+        font: metric.font,
+        fontSizePx: metric.fontSizePx,
+        height: tableContentHeight + marginAfter,
+        key: `${metric.block.key}:table`,
+        kind: 'text' as const,
+        lineHeightPx: metric.lineHeightPx,
+        lineStartIndex: 0,
+        lines: [],
+        listContext: metric.block.listContext,
+        marginAfter,
+        marginBefore: metric.marginBefore,
+        renderRole: 'table' as const,
+        showListMarker: metric.block.showListMarker,
+        sourceBlockType: metric.block.sourceBlockType,
+        tableRowHeights: metric.tableRowHeights,
+        tableRows: metric.block.tableRows,
+        text: metric.block.text ?? '',
+      };
+      getCurrentColumn().items.push(item);
+      getCurrentColumn().height += item.height;
+      currentColumnHeight += item.height;
       continue;
     }
 
@@ -336,19 +496,33 @@ export function composePaginatedChapterLayout(
 
       const lines = metric.lines.slice(lineIndex, lineIndex + lineCount);
       const item = {
+        align: metric.block.align,
+        anchorId: metric.block.anchorId,
+        blockquoteDepth: metric.block.blockquoteDepth,
         blockIndex: metric.block.blockIndex,
         chapterIndex: metric.block.chapterIndex,
+        container: metric.block.container,
         contentHeight: lines.length * metric.lineHeightPx,
         font: metric.font,
         fontSizePx: metric.fontSizePx,
+        headingLevel: metric.block.headingLevel,
         height: fragmentContentHeight + marginAfter,
+        indent: metric.block.indent,
         key: `${metric.block.key}:${lineIndex}`,
         kind: metric.block.kind,
         lineHeightPx: metric.lineHeightPx,
         lineStartIndex: lineIndex,
         lines,
+        listContext: metric.block.listContext,
         marginAfter,
         marginBefore,
+        originalTag: metric.block.originalTag,
+        renderRole: metric.block.renderRole,
+        richLineFragments: metric.richLineFragments
+          ? metric.richLineFragments.slice(lineIndex, lineIndex + lineCount)
+          : createRichLineFragments(metric.block.richChildren, lines),
+        showListMarker: metric.block.showListMarker,
+        sourceBlockType: metric.block.sourceBlockType,
         text: metric.block.text ?? '',
       };
       getCurrentColumn().items.push(item);
@@ -383,12 +557,11 @@ export function buildStaticPagedChapterTree(
   imageDimensionsByKey: Map<string, ReaderImageDimensions | null | undefined>,
   textLayoutEngine?: ReaderTextLayoutEngine,
 ): StaticPagedChapterTree {
-  const measuredLayout = measureReaderChapterLayout(
+  const measuredLayout = measurePagedReaderChapterLayout(
     chapter,
     columnWidth,
     typography,
     imageDimensionsByKey,
-    undefined,
     textLayoutEngine,
   );
 
@@ -424,17 +597,43 @@ function estimateReaderBlockMetric(
   width: number,
   typography: ReaderTypographyMetrics,
   imageDimensionsByKey: Map<string, ReaderImageDimensions | null | undefined>,
+  richAware = false,
   imageLayoutConstraints?: ReaderImageLayoutConstraints,
 ): EstimatedReaderBlockMetric {
   if (block.kind === 'heading' || block.kind === 'text') {
+    const maxWidth = richAware
+      ? getRichScrollHorizontalTextWidth(block, width)
+      : width;
     const fontSizePx = block.kind === 'heading'
       ? typography.headingFontSize
       : typography.bodyFontSize;
     const lineHeightPx = block.kind === 'heading'
       ? typography.headingLineHeightPx
       : typography.bodyLineHeightPx;
-    const lineCount = estimateTextLineCount(block.text ?? '', width, fontSizePx);
-    const contentHeight = lineCount * lineHeightPx;
+    if (block.renderRole === 'table' && block.tableRows) {
+      const tableMetrics = estimateTableContentHeight(
+        block.tableRows,
+        maxWidth,
+        lineHeightPx,
+        fontSizePx,
+      );
+      return {
+        block,
+        contentHeight: tableMetrics.contentHeight,
+        height: block.marginBefore + tableMetrics.contentHeight + block.marginAfter,
+        lineCount: 0,
+        lineHeightPx,
+        marginAfter: block.marginAfter,
+        marginBefore: block.marginBefore,
+      };
+    }
+
+    const lineCount = block.renderRole === 'hr'
+      ? 0
+      : estimateTextLineCount(block.text ?? '', maxWidth, fontSizePx);
+    const contentHeight = block.renderRole === 'hr'
+      ? 1
+      : lineCount * lineHeightPx;
     return {
       block,
       contentHeight,
@@ -447,21 +646,37 @@ function estimateReaderBlockMetric(
   }
 
   if (block.kind === 'image') {
+    const availableWidth = richAware
+      ? getRichScrollHorizontalTextWidth(block, width)
+      : width;
     const resolvedImageSize = resolveReaderImageSize(
-      width,
+      availableWidth,
       block.imageKey,
       imageDimensionsByKey,
       imageLayoutConstraints,
     );
     const displayWidth = resolvedImageSize.width;
     const displayHeight = resolvedImageSize.height;
+    const captionHeight = estimateTextLineCount(
+      getRichInlinePlainText(block.imageCaption ?? []),
+      displayWidth,
+      typography.bodyFontSize,
+    ) * typography.bodyLineHeightPx;
+    const captionSpacing = captionHeight > 0 ? 8 : 0;
 
     return {
       block,
-      contentHeight: displayHeight,
+      captionHeight,
+      captionSpacing,
+      contentHeight: displayHeight + captionSpacing + captionHeight,
       displayHeight,
       displayWidth,
-      height: block.marginBefore + displayHeight + block.marginAfter,
+      height:
+        block.marginBefore
+        + displayHeight
+        + captionSpacing
+        + captionHeight
+        + block.marginAfter,
       lineCount: 0,
       lineHeightPx: typography.bodyLineHeightPx,
       marginAfter: block.marginAfter,
@@ -591,13 +806,23 @@ function estimatePaginatedManifestPageCount(
     }
 
     if (metric.block.kind === 'image') {
+      const captionHeight = metric.captionHeight ?? 0;
+      const captionSpacing = captionHeight > 0 ? (metric.captionSpacing ?? 0) : 0;
       let displayHeight = metric.displayHeight ?? metric.contentHeight;
-      const maxImageHeight = safeColumnHeight - metric.marginBefore - metric.marginAfter;
+      const maxImageHeight = safeColumnHeight
+        - metric.marginBefore
+        - metric.marginAfter
+        - captionSpacing
+        - captionHeight;
       if (displayHeight > maxImageHeight && maxImageHeight > 0) {
         displayHeight = maxImageHeight;
       }
 
-      const imageContentHeight = metric.marginBefore + displayHeight;
+      const imageContentHeight =
+        metric.marginBefore
+        + displayHeight
+        + captionSpacing
+        + captionHeight;
       ensureRoom(imageContentHeight);
       let remainingHeight = safeColumnHeight - currentColumnHeight;
       if (remainingHeight <= 0) {
@@ -624,6 +849,43 @@ function estimatePaginatedManifestPageCount(
       }
 
       currentColumnHeight += imageContentHeight + marginAfter;
+      pageHasContent = true;
+      continue;
+    }
+
+    if (metric.block.kind === 'text' && metric.block.renderRole === 'table') {
+      const tableContentHeight = metric.marginBefore + metric.contentHeight;
+      ensureRoom(tableContentHeight);
+      let remainingHeight = safeColumnHeight - currentColumnHeight;
+      if (remainingHeight <= 0) {
+        advanceColumn();
+        remainingHeight = safeColumnHeight;
+      }
+
+      let { marginAfter } = metric;
+      const nextMinimumHeight = nextMeaningfulMetric
+        ? getEstimatedMinimumRenderableHeight(nextMeaningfulMetric, safeColumnHeight)
+        : null;
+      if (
+        marginAfter > 0
+        && (
+          tableContentHeight + marginAfter > remainingHeight + 0.5
+          || (
+            nextMinimumHeight !== null
+            && remainingHeight + 0.5 >= tableContentHeight + nextMinimumHeight
+            && tableContentHeight + marginAfter + nextMinimumHeight > remainingHeight + 0.5
+          )
+        )
+      ) {
+        marginAfter = 0;
+      }
+
+      if (tableContentHeight + marginAfter > remainingHeight + 0.5 && currentColumnHeight > 0) {
+        advanceColumn();
+        continue;
+      }
+
+      currentColumnHeight += tableContentHeight + marginAfter;
       pageHasContent = true;
       continue;
     }
@@ -687,6 +949,7 @@ export function estimateReaderRenderQueryManifest(params: {
   chapter: ChapterContent;
   imageDimensionsByKey: Map<string, ReaderImageDimensions | null | undefined>;
   layoutSignature: ReaderLayoutSignature;
+  preferRichScrollRendering?: boolean;
   typography: ReaderTypographyMetrics;
   variantFamily: ReaderRenderVariant;
 }): ReaderRenderQueryManifest {
@@ -694,7 +957,34 @@ export function estimateReaderRenderQueryManifest(params: {
     return {};
   }
 
-  const blocks = buildReaderBlocks(params.chapter, params.typography.paragraphSpacing);
+  const preferRichScrollRendering = params.preferRichScrollRendering ?? true;
+
+  if (
+    params.variantFamily === 'original-scroll'
+    && shouldUseRichScrollBlocks(params.chapter, preferRichScrollRendering)
+  ) {
+    const scrollTree = buildStaticScrollChapterTree(
+      params.chapter,
+      params.layoutSignature.textWidth,
+      params.typography,
+      params.imageDimensionsByKey,
+      createScrollImageLayoutConstraints(
+        params.layoutSignature.textWidth,
+        params.layoutSignature.pageHeight,
+      ),
+      undefined,
+      preferRichScrollRendering,
+    );
+
+    return createReaderRenderQueryManifest('original-scroll', scrollTree);
+  }
+
+  const richAwarePaged =
+    params.variantFamily === 'original-paged'
+    && shouldUseRichScrollBlocks(params.chapter);
+  const blocks = params.variantFamily === 'original-paged'
+    ? buildPagedReaderBlocks(params.chapter, params.typography.paragraphSpacing)
+    : buildReaderBlocks(params.chapter, params.typography.paragraphSpacing);
   const scrollImageLayoutConstraints = params.variantFamily === 'original-scroll'
     ? createScrollImageLayoutConstraints(
       params.layoutSignature.textWidth,
@@ -706,6 +996,7 @@ export function estimateReaderRenderQueryManifest(params: {
     params.layoutSignature.textWidth,
     params.typography,
     params.imageDimensionsByKey,
+    richAwarePaged,
     scrollImageLayoutConstraints,
   ));
   const firstMeaningfulMetric = estimatedMetrics.find((metric) => metric.block.kind !== 'blank');

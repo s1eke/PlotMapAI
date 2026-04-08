@@ -22,7 +22,9 @@ describe('useReaderMobileBack', () => {
   it('closes the sidebar before navigating', () => {
     const closeSidebar = vi.fn();
     const { result } = renderHook(() => useReaderMobileBack({
+      closeImageViewer: vi.fn(),
       fallbackHref: '/novel/1',
+      isImageViewerOpen: false,
       isSidebarOpen: true,
       closeSidebar,
     }));
@@ -35,10 +37,32 @@ describe('useReaderMobileBack', () => {
     expect(navigateMock).not.toHaveBeenCalled();
   });
 
+  it('closes the image viewer before touching sidebar or navigation', () => {
+    const closeImageViewer = vi.fn();
+    const closeSidebar = vi.fn();
+    const { result } = renderHook(() => useReaderMobileBack({
+      closeImageViewer,
+      fallbackHref: '/novel/1',
+      isImageViewerOpen: true,
+      isSidebarOpen: true,
+      closeSidebar,
+    }));
+
+    act(() => {
+      result.current.handleMobileBack();
+    });
+
+    expect(closeImageViewer).toHaveBeenCalledTimes(1);
+    expect(closeSidebar).not.toHaveBeenCalled();
+    expect(navigateMock).not.toHaveBeenCalled();
+  });
+
   it('navigates back when browser history is available', () => {
     window.history.replaceState({ idx: 1 }, '', '#/novel/1/read');
     const { result } = renderHook(() => useReaderMobileBack({
+      closeImageViewer: vi.fn(),
       fallbackHref: '/novel/1',
+      isImageViewerOpen: false,
       isSidebarOpen: false,
       closeSidebar: vi.fn(),
     }));
@@ -53,7 +77,9 @@ describe('useReaderMobileBack', () => {
 
   it('falls back to the novel detail page when there is no history entry', () => {
     const { result } = renderHook(() => useReaderMobileBack({
+      closeImageViewer: vi.fn(),
       fallbackHref: '/novel/1',
+      isImageViewerOpen: false,
       isSidebarOpen: false,
       closeSidebar: vi.fn(),
     }));

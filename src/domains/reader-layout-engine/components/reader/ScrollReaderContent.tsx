@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import type { ChapterContent } from '../../readerContentService';
 import type {
   StaticScrollChapterTree,
@@ -8,8 +9,10 @@ import type {
   ReaderImageGalleryEntry,
 } from '../../utils/readerImageGallery';
 
+import { READER_CONTENT_CLASS_NAMES } from '@domains/reader-shell/constants/readerContentContract';
 import { cn } from '@shared/utils/cn';
 
+import RichBlockRenderer from './RichBlockRenderer';
 import ReaderFlowBlock from './ReaderFlowBlock';
 
 interface ScrollReaderChapter {
@@ -30,6 +33,8 @@ interface ScrollReaderContentProps {
   onChapterBodyElement?: (chapterIndex: number, element: HTMLDivElement | null) => void;
   onChapterElement: (chapterIndex: number, element: HTMLDivElement | null) => void;
   readerTheme: string;
+  rootClassName: string;
+  rootStyle: CSSProperties;
   textClassName: string;
   visibleBlockRangeByChapter?: ReadonlyMap<number, VisibleBlockRange>;
 }
@@ -43,11 +48,16 @@ export default function ScrollReaderContent({
   onChapterBodyElement,
   onChapterElement,
   readerTheme,
+  rootClassName,
+  rootStyle,
   textClassName,
   visibleBlockRangeByChapter,
 }: ScrollReaderContentProps) {
   return (
-    <div className={cn('relative mx-auto w-full max-w-[1200px] px-4 sm:px-8 md:px-12', textClassName)}>
+    <div
+      className={cn(rootClassName, 'relative mx-auto w-full max-w-[1200px] px-4 sm:px-8 md:px-12')}
+      style={rootStyle}
+    >
       <div className="pt-6">
         {chapters.map(({ chapter, index, layout }) => {
           const visibleRange = visibleBlockRangeByChapter?.get(index);
@@ -62,15 +72,21 @@ export default function ScrollReaderContent({
             <div
               key={index}
               ref={(element) => onChapterElement(index, element)}
-              className="mb-12"
+              className={cn(READER_CONTENT_CLASS_NAMES.chapter, 'mb-12')}
             >
               <div
                 className={cn(
+                  READER_CONTENT_CLASS_NAMES.chapterHeader,
                   'sticky top-0 z-10 -mx-4 border-b border-border-color/20 px-4 py-3 backdrop-blur-sm sm:-mx-8 sm:px-8 md:-mx-12 md:px-12',
                   headerBgClassName,
                 )}
               >
-                <h1 className={cn('break-words whitespace-normal text-sm font-medium leading-snug transition-colors', readerTheme === 'auto' ? 'text-text-secondary' : 'opacity-60')}>
+                <h1 className={cn(
+                  'break-words whitespace-normal text-sm font-medium leading-snug transition-colors',
+                  textClassName,
+                  readerTheme === 'auto' ? 'text-text-secondary' : 'opacity-60',
+                )}
+                >
                   {chapter.title}
                 </h1>
               </div>
@@ -78,25 +94,45 @@ export default function ScrollReaderContent({
               <div
                 data-testid="scroll-reader-content-body"
                 ref={(element) => onChapterBodyElement?.(index, element)}
-                className="mx-auto w-full max-w-[920px] selection:bg-accent/30"
+                className={cn(
+                  READER_CONTENT_CLASS_NAMES.content,
+                  'mx-auto w-full max-w-[920px]',
+                )}
                 style={{ height: layout.totalHeight, position: 'relative' }}
               >
                 {visibleMetrics.map((metric) => (
-                  <ReaderFlowBlock
-                    chapterTitle={chapter.title}
-                    key={metric.block.key}
-                    imageRenderMode="scroll"
-                    item={metric}
-                    novelId={novelId}
-                    onImageActivate={onImageActivate}
-                    onRegisterImageElement={onRegisterImageElement}
-                    positionStyle={{
-                      left: 0,
-                      position: 'absolute',
-                      right: 0,
-                      top: metric.top,
-                    }}
-                  />
+                  layout.renderMode === 'rich' ? (
+                    <RichBlockRenderer
+                      chapterTitle={chapter.title}
+                      key={metric.block.key}
+                      item={metric}
+                      novelId={novelId}
+                      onImageActivate={onImageActivate}
+                      onRegisterImageElement={onRegisterImageElement}
+                      positionStyle={{
+                        left: 0,
+                        position: 'absolute',
+                        right: 0,
+                        top: metric.top,
+                      }}
+                    />
+                  ) : (
+                    <ReaderFlowBlock
+                      chapterTitle={chapter.title}
+                      key={metric.block.key}
+                      imageRenderMode="scroll"
+                      item={metric}
+                      novelId={novelId}
+                      onImageActivate={onImageActivate}
+                      onRegisterImageElement={onRegisterImageElement}
+                      positionStyle={{
+                        left: 0,
+                        position: 'absolute',
+                        right: 0,
+                        top: metric.top,
+                      }}
+                    />
+                  )
                 ))}
               </div>
             </div>

@@ -1,6 +1,11 @@
 import { db } from '@infra/db';
+import { CURRENT_PURIFICATION_RULE_VERSION } from '@shared/text-processing';
 
 import type { PurificationRuleRecord } from '@infra/db/settings';
+import type {
+  PurificationExecutionStage,
+  PurificationTargetScope,
+} from '@shared/text-processing';
 
 import { loadYaml } from './yaml';
 
@@ -13,8 +18,8 @@ interface DefaultPurificationRuleRecord {
   isRegex: boolean;
   isEnabled: boolean;
   order: number;
-  scopeTitle: boolean;
-  scopeContent: boolean;
+  targetScope: PurificationTargetScope;
+  executionStage: PurificationExecutionStage;
   exclusiveGroup?: string;
   timeoutMs?: number;
 }
@@ -40,8 +45,9 @@ function mapDefaultPurificationRule(
     isRegex: rule.isRegex,
     isEnabled: rule.isEnabled,
     order: rule.order,
-    scopeTitle: rule.scopeTitle,
-    scopeContent: rule.scopeContent,
+    targetScope: rule.targetScope,
+    executionStage: rule.executionStage,
+    ruleVersion: CURRENT_PURIFICATION_RULE_VERSION,
     bookScope: '',
     excludeBookScope: '',
     exclusiveGroup: rule.exclusiveGroup ?? '',
@@ -74,6 +80,9 @@ export async function ensureDefaultPurificationRules(): Promise<void> {
         await db.purificationRules.update(existingRule.id, {
           isDefault: true,
           exclusiveGroup: rule.exclusiveGroup ?? '',
+          targetScope: rule.targetScope,
+          executionStage: rule.executionStage,
+          ruleVersion: CURRENT_PURIFICATION_RULE_VERSION,
         });
       }
       continue;

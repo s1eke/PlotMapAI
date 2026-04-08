@@ -178,6 +178,206 @@ describe('readerPagination', () => {
     });
   });
 
+  it('preserves rich inline fragments for paged text items', () => {
+    const measuredLayout = createMeasuredLayout([{
+      block: {
+        blockIndex: 1,
+        chapterIndex: 0,
+        key: '0:rich-text:1',
+        kind: 'text',
+        marginAfter: 0,
+        marginBefore: 0,
+        paragraphIndex: 1,
+        renderRole: 'rich-text',
+        richChildren: [
+          {
+            marks: ['bold'],
+            text: 'Al',
+            type: 'text',
+          },
+          {
+            text: 'pha ',
+            type: 'text',
+          },
+          {
+            children: [
+              {
+                text: 'Beta',
+                type: 'text',
+              },
+            ],
+            href: '#anchor',
+            type: 'link',
+          },
+        ],
+        text: 'Alpha Beta',
+      },
+      contentHeight: 32,
+      font: '400 16px sans-serif',
+      fontSizePx: 16,
+      fontWeight: 400,
+      height: 32,
+      lineHeightPx: 16,
+      lines: [
+        {
+          end: {
+            graphemeIndex: 5,
+            segmentIndex: 0,
+          },
+          lineIndex: 0,
+          start: {
+            graphemeIndex: 0,
+            segmentIndex: 0,
+          },
+          text: 'Alpha',
+          width: 80,
+        },
+        {
+          end: {
+            graphemeIndex: 10,
+            segmentIndex: 0,
+          },
+          lineIndex: 1,
+          start: {
+            graphemeIndex: 6,
+            segmentIndex: 0,
+          },
+          text: 'Beta',
+          width: 64,
+        },
+      ],
+      marginAfter: 0,
+      marginBefore: 0,
+      top: 0,
+    }]);
+
+    const paginatedLayout = composePaginatedChapterLayout(measuredLayout, 64, 1, 32);
+    const pageItem = paginatedLayout.pageSlices[0]?.columns[0]?.items[0];
+
+    expect(pageItem).toMatchObject({
+      kind: 'text',
+      renderRole: 'rich-text',
+    });
+    expect('richLineFragments' in (pageItem ?? {})).toBe(true);
+    expect(pageItem?.kind === 'text' ? pageItem.richLineFragments : undefined).toEqual([
+      [
+        {
+          marks: ['bold'],
+          text: 'Al',
+          type: 'text',
+        },
+        {
+          text: 'pha',
+          type: 'text',
+        },
+      ],
+      [
+        {
+          children: [
+            {
+              text: 'Beta',
+              type: 'text',
+            },
+          ],
+          href: '#anchor',
+          type: 'link',
+        },
+      ],
+    ]);
+  });
+
+  it('keeps inline EPUB marks when building a paged tree from rich chapter content', () => {
+    const textLayoutEngine = createFakeReaderTextLayoutEngine({ maxCharsPerLine: 40 });
+    const chapter = {
+      index: 0,
+      title: 'Chapter 1',
+      plainText: 'Bold and italic Link',
+      richBlocks: [{
+        type: 'paragraph' as const,
+        children: [
+          {
+            marks: ['bold'] as const,
+            text: 'Bold',
+            type: 'text' as const,
+          },
+          {
+            text: ' and ',
+            type: 'text' as const,
+          },
+          {
+            marks: ['italic'] as const,
+            text: 'italic',
+            type: 'text' as const,
+          },
+          {
+            text: ' ',
+            type: 'text' as const,
+          },
+          {
+            children: [{
+              text: 'Link',
+              type: 'text' as const,
+            }],
+            href: '#note',
+            type: 'link' as const,
+          },
+        ],
+      }],
+      contentFormat: 'rich' as const,
+      contentVersion: 1,
+      wordCount: 40,
+      totalChapters: 1,
+      hasPrev: false,
+      hasNext: false,
+    };
+    const typography = createReaderTypographyMetrics(18, 1.6, 16, 420);
+
+    const tree = buildStaticPagedChapterTree(
+      chapter,
+      320,
+      220,
+      1,
+      0,
+      typography,
+      new Map(),
+      textLayoutEngine,
+    );
+    const pageItem = tree.pageSlices
+      .flatMap((page) => page.columns.flatMap((column) => column.items))
+      .find((item) => item.kind === 'text' && item.renderRole === 'rich-text');
+
+    expect(pageItem && 'richLineFragments' in pageItem ? pageItem.richLineFragments : undefined).toEqual([
+      [
+        {
+          marks: ['bold'],
+          text: 'Bold',
+          type: 'text',
+        },
+        {
+          text: ' and ',
+          type: 'text',
+        },
+        {
+          marks: ['italic'],
+          text: 'italic',
+          type: 'text',
+        },
+        {
+          text: ' ',
+          type: 'text',
+        },
+        {
+          children: [{
+            text: 'Link',
+            type: 'text',
+          }],
+          href: '#note',
+          type: 'link',
+        },
+      ],
+    ]);
+  });
+
   it('drops terminal paragraph spacing when that keeps the next paragraph on the same page', () => {
     const measuredLayout = createMeasuredLayout([
       createTextMetric({ blockIndex: 1, lineCount: 1, marginAfter: 16, top: 0 }),
@@ -236,10 +436,13 @@ describe('readerPagination', () => {
     const chapter = {
       index: 0,
       title: 'Chapter 1',
-      content: Array.from(
+      plainText: Array.from(
         { length: 18 },
         (_, paragraphIndex) => `Paragraph ${paragraphIndex + 1} ${'alpha beta gamma delta '.repeat(6)}`,
       ).join('\n'),
+      richBlocks: [],
+      contentFormat: 'plain' as const,
+      contentVersion: 1,
       wordCount: 2400,
       totalChapters: 1,
       hasPrev: false,

@@ -1,4 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import {
+  READER_CONTENT_VISUAL_TOKEN_NAMES,
+  READER_CONTENT_VISUAL_TOKENS,
+} from '@shared/reader-content';
 import { READER_SLIDER_CONFIG, MOBILE_SLIDER_KEYS, OVERFLOW_SLIDER_KEYS } from '../readerSliderConfig';
 import { READER_THEME_DISPLAY } from '../readerThemeConfig';
 import { READER_THEMES } from '../readerThemes';
@@ -94,7 +98,26 @@ describe('READER_THEMES', () => {
       expect(theme.text.length).toBeGreaterThan(0);
       expect(typeof theme.sidebarBg).toBe('string');
       expect(theme.sidebarBg.length).toBeGreaterThan(0);
+      expect(typeof theme.headerBg).toBe('string');
+      expect(theme.headerBg.length).toBeGreaterThan(0);
+      expect(Object.keys(theme.contentVariables).sort()).toEqual(
+        [...READER_CONTENT_VISUAL_TOKENS].sort(),
+      );
     }
+  });
+
+  it('binds the auto theme content tokens to global semantic variables', () => {
+    const autoTheme = READER_THEMES.auto;
+
+    expect(autoTheme.contentVariables[READER_CONTENT_VISUAL_TOKEN_NAMES.bg]).toContain('var(');
+    expect(autoTheme.contentVariables[READER_CONTENT_VISUAL_TOKEN_NAMES.surface]).toContain('var(');
+    expect(autoTheme.contentVariables[READER_CONTENT_VISUAL_TOKEN_NAMES.text]).toContain('var(');
+    expect(autoTheme.contentVariables[READER_CONTENT_VISUAL_TOKEN_NAMES.textMuted]).toContain('var(');
+    expect(autoTheme.contentVariables[READER_CONTENT_VISUAL_TOKEN_NAMES.border]).toContain('var(');
+    expect(autoTheme.contentVariables[READER_CONTENT_VISUAL_TOKEN_NAMES.accent]).toContain('var(');
+    expect(autoTheme.contentVariables[READER_CONTENT_VISUAL_TOKEN_NAMES.link]).toContain('var(');
+    expect(autoTheme.contentVariables[READER_CONTENT_VISUAL_TOKEN_NAMES.selectionBg]).toContain('var(');
+    expect(autoTheme.contentVariables[READER_CONTENT_VISUAL_TOKEN_NAMES.focusRing]).toContain('var(');
   });
 
   it('theme display ids match reader theme keys', () => {

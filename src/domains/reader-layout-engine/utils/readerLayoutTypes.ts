@@ -1,4 +1,12 @@
 import type { LayoutCursor, LayoutLine } from '@chenglou/pretext';
+import type {
+  PaginationContainer,
+  PaginationListContext,
+  RichBlock,
+  RichInline,
+  RichTableCell,
+  RichTextAlign,
+} from '@shared/contracts';
 
 export const PAGED_VIEWPORT_TOP_PADDING_PX = 16;
 
@@ -12,18 +20,33 @@ export interface ReaderLocator {
   startCursor?: LayoutCursor;
   endCursor?: LayoutCursor;
   edge?: 'start' | 'end';
+  pageIndex?: number;
 }
 
 export interface ReaderBlock {
+  align?: RichTextAlign;
+  anchorId?: string;
   chapterIndex: number;
+  blockquoteDepth?: number;
   blockIndex: number;
+  container?: PaginationContainer;
+  headingLevel?: 1 | 2 | 3 | 4 | 5 | 6;
+  imageCaption?: RichInline[];
   key: string;
   kind: 'heading' | 'text' | 'image' | 'blank';
+  listContext?: PaginationListContext;
   text?: string;
   imageKey?: string;
   marginBefore: number;
   marginAfter: number;
+  originalTag?: string;
   paragraphIndex: number;
+  renderRole?: 'hr' | 'plain' | 'rich-text' | 'table' | 'unsupported';
+  richChildren?: RichInline[];
+  showListMarker?: boolean;
+  sourceBlockType?: RichBlock['type'];
+  tableRows?: RichTableCell[][];
+  indent?: number;
 }
 
 export interface ReaderTypographyMetrics {
@@ -69,6 +92,13 @@ export interface ReaderMeasuredLine extends LayoutLine {
 
 export interface VirtualBlockMetrics {
   block: ReaderBlock;
+  captionFont?: string;
+  captionFontSizePx?: number;
+  captionHeight?: number;
+  captionLines?: ReaderMeasuredLine[];
+  captionRichLineFragments?: RichInline[][];
+  captionLineHeightPx?: number;
+  captionSpacing?: number;
   contentHeight: number;
   displayHeight?: number;
   displayWidth?: number;
@@ -80,36 +110,62 @@ export interface VirtualBlockMetrics {
   lines: ReaderMeasuredLine[];
   marginAfter: number;
   marginBefore: number;
+  richLineFragments?: RichInline[][];
   top: number;
+  tableRowHeights?: number[];
 }
 
 export interface MeasuredChapterLayout {
   blockCount: number;
   chapterIndex: number;
   metrics: VirtualBlockMetrics[];
+  renderMode: 'legacy-plain' | 'rich';
   textWidth: number;
   totalHeight: number;
 }
 
 export interface ReaderTextPageItem {
+  align?: RichTextAlign;
+  anchorId?: string;
+  blockquoteDepth?: number;
   blockIndex: number;
   chapterIndex: number;
+  container?: PaginationContainer;
   contentHeight: number;
   font: string;
   fontSizePx: number;
+  headingLevel?: 1 | 2 | 3 | 4 | 5 | 6;
   height: number;
+  indent?: number;
   key: string;
   kind: 'heading' | 'text';
   lineHeightPx: number;
   lineStartIndex: number;
   lines: ReaderMeasuredLine[];
+  listContext?: PaginationListContext;
   marginAfter: number;
   marginBefore: number;
+  originalTag?: string;
+  renderRole?: 'hr' | 'plain' | 'rich-text' | 'table' | 'unsupported';
+  richLineFragments?: RichInline[][];
+  showListMarker?: boolean;
+  sourceBlockType?: RichBlock['type'];
+  tableRowHeights?: number[];
+  tableRows?: RichTableCell[][];
   text: string;
 }
 
 export interface ReaderImagePageItem {
+  align?: RichTextAlign;
+  anchorId?: string;
   blockIndex: number;
+  captionFont?: string;
+  captionFontSizePx?: number;
+  captionHeight?: number;
+  captionLineHeightPx?: number;
+  captionLines?: ReaderMeasuredLine[];
+  captionRichLineFragments?: RichInline[][];
+  captionSpacing?: number;
   chapterIndex: number;
   displayHeight: number;
   displayWidth: number;
@@ -120,6 +176,7 @@ export interface ReaderImagePageItem {
   kind: 'image';
   marginAfter: number;
   marginBefore: number;
+  sourceBlockType?: RichBlock['type'];
 }
 
 export interface ReaderBlankPageItem {

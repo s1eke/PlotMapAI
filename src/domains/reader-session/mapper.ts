@@ -23,6 +23,7 @@ export function toReaderLocator(record?: ReaderLocatorRecord | null): ReaderLoca
   return {
     chapterIndex: record.chapterIndex,
     blockIndex: record.blockIndex,
+    pageIndex: record.pageIndex,
     kind: record.kind,
     lineIndex: record.lineIndex,
     startCursor: record.startCursor ? { ...record.startCursor } : undefined,
@@ -39,6 +40,7 @@ export function toReaderLocatorRecord(locator?: ReaderLocator): ReaderLocatorRec
   return {
     chapterIndex: locator.chapterIndex,
     blockIndex: locator.blockIndex,
+    pageIndex: locator.pageIndex,
     kind: locator.kind,
     lineIndex: locator.lineIndex,
     startCursor: locator.startCursor ? { ...locator.startCursor } : undefined,

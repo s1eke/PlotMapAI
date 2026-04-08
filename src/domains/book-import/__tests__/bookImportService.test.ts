@@ -15,8 +15,8 @@ describe('bookImportService', () => {
     vi.mocked(parseBook).mockResolvedValue({
       author: 'Parsed Author',
       chapters: [
-        { content: 'Content 1', title: 'Ch1' },
-        { content: 'Content 2', title: 'Ch2' },
+        { content: 'Content 1', title: 'Ch1', contentFormat: 'plain', richBlocks: [] },
+        { content: 'Content 2', title: 'Ch2', contentFormat: 'plain', richBlocks: [] },
       ],
       coverBlob: null,
       description: 'Parsed desc',
@@ -59,6 +59,24 @@ describe('bookImportService', () => {
         wordCount: 9,
       },
     ]);
+    expect(result.chapterRichContents).toEqual([
+      {
+        chapterIndex: 0,
+        richBlocks: [],
+        plainText: 'Content 1',
+        contentFormat: 'plain',
+        contentVersion: 1,
+        importFormatVersion: 1,
+      },
+      {
+        chapterIndex: 1,
+        richBlocks: [],
+        plainText: 'Content 2',
+        contentFormat: 'plain',
+        contentVersion: 1,
+        importFormatVersion: 1,
+      },
+    ]);
   });
 
   it('builds the full-book image index during parsing', async () => {
@@ -68,10 +86,14 @@ describe('bookImportService', () => {
         {
           content: 'Ch1\n[IMG:cover]\nBody\n[IMG:map]',
           title: 'Ch1',
+          contentFormat: 'plain',
+          richBlocks: [],
         },
         {
           content: 'Body\n[IMG:diagram]',
           title: 'Ch2',
+          contentFormat: 'plain',
+          richBlocks: [],
         },
       ],
       coverBlob: null,
@@ -95,12 +117,144 @@ describe('bookImportService', () => {
     ]);
   });
 
+  it('builds image gallery entries from rich chapter blocks for epub imports', async () => {
+    vi.mocked(parseBook).mockResolvedValueOnce({
+      author: 'Parsed Author',
+      chapters: [
+        {
+          content: 'Intro\n\nWorld map',
+          title: 'Illustrated Ch1',
+          contentFormat: 'rich',
+          richBlocks: [
+            {
+              type: 'paragraph',
+              children: [{
+                type: 'text',
+                text: 'Intro',
+              }],
+            },
+            {
+              type: 'image',
+              key: 'map',
+              caption: [{
+                type: 'text',
+                text: 'World map',
+              }],
+            },
+          ],
+        },
+      ],
+      coverBlob: null,
+      description: 'Parsed desc',
+      encoding: 'utf-8',
+      fileHash: 'epub-rich-hash',
+      images: [{
+        imageKey: 'map',
+        blob: new Blob(['image']),
+      }],
+      rawText: 'raw',
+      tags: ['fiction'],
+      title: 'Illustrated Novel',
+      totalWords: 20,
+    });
+    const file = new File(['content'], 'illustrated.epub', { type: 'application/epub+zip' });
+
+    const result = await bookImportService.parseBookImport(file, tocRules);
+
+    expect(result.imageGalleryEntries).toEqual([
+      { blockIndex: 2, chapterIndex: 0, imageKey: 'map', order: 0 },
+    ]);
+    expect(result.chapterRichContents).toEqual([
+      {
+        chapterIndex: 0,
+        richBlocks: [
+          {
+            type: 'paragraph',
+            children: [{
+              type: 'text',
+              text: 'Intro',
+            }],
+          },
+          {
+            type: 'image',
+            key: 'map',
+            caption: [{
+              type: 'text',
+              text: 'World map',
+            }],
+          },
+        ],
+        plainText: 'Intro\n\nWorld map',
+        contentFormat: 'rich',
+        contentVersion: 1,
+        importFormatVersion: 1,
+      },
+    ]);
+  });
+
+  it('keeps rich gallery block indices aligned with projected poem lines', async () => {
+    vi.mocked(parseBook).mockResolvedValueOnce({
+      author: 'Parsed Author',
+      chapters: [
+        {
+          content: 'Line 1\nLine 2\n\nImage caption',
+          title: 'Poem Chapter',
+          contentFormat: 'rich',
+          richBlocks: [
+            {
+              type: 'poem',
+              lines: [
+                [{
+                  type: 'text',
+                  text: 'Line 1',
+                }],
+                [{
+                  type: 'text',
+                  text: 'Line 2',
+                }],
+              ],
+            },
+            {
+              type: 'image',
+              key: 'poem-map',
+              caption: [{
+                type: 'text',
+                text: 'Image caption',
+              }],
+            },
+          ],
+        },
+      ],
+      coverBlob: null,
+      description: 'Parsed desc',
+      encoding: 'utf-8',
+      fileHash: 'poem-rich-hash',
+      images: [{
+        imageKey: 'poem-map',
+        blob: new Blob(['image']),
+      }],
+      rawText: 'raw',
+      tags: ['fiction'],
+      title: 'Illustrated Novel',
+      totalWords: 20,
+    });
+
+    const result = await bookImportService.parseBookImport(
+      new File(['content'], 'poem.epub', { type: 'application/epub+zip' }),
+      tocRules,
+    );
+
+    expect(result.imageGalleryEntries).toEqual([
+      { blockIndex: 3, chapterIndex: 0, imageKey: 'poem-map', order: 0 },
+    ]);
+  });
+
   it('normalizes chapter content without a duplicated leading title line', async () => {
     vi.mocked(parseBook).mockResolvedValueOnce({
       author: 'Parsed Author',
       chapters: [
-        { content: 'Ch1\n\nBody 1', title: 'Ch1' },
-        { content: 'Body 2', title: 'Ch2' },
+        { content: 'Ch1\n\nBody 1', title: 'Ch1', contentFormat: 'plain', richBlocks: [] },
+        { content: 'Body 2', title: 'Ch2', contentFormat: 'plain', richBlocks: [] },
       ],
       coverBlob: null,
       description: 'Parsed desc',
@@ -119,6 +273,24 @@ describe('bookImportService', () => {
     expect(result.chapters).toEqual([
       { chapterIndex: 0, content: 'Body 1', title: 'Ch1', wordCount: 6 },
       { chapterIndex: 1, content: 'Body 2', title: 'Ch2', wordCount: 6 },
+    ]);
+    expect(result.chapterRichContents).toEqual([
+      {
+        chapterIndex: 0,
+        richBlocks: [],
+        plainText: 'Body 1',
+        contentFormat: 'plain',
+        contentVersion: 1,
+        importFormatVersion: 1,
+      },
+      {
+        chapterIndex: 1,
+        richBlocks: [],
+        plainText: 'Body 2',
+        contentFormat: 'plain',
+        contentVersion: 1,
+        importFormatVersion: 1,
+      },
     ]);
   });
 

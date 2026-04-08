@@ -1,4 +1,8 @@
 import type { EntityTable } from 'dexie';
+import type {
+  RichBlock,
+  RichContentFormat,
+} from '@shared/contracts';
 
 export interface NovelRecord {
   id: number;
@@ -25,6 +29,18 @@ export interface ChapterRecord {
   wordCount: number;
 }
 
+export interface ChapterRichContentRecord {
+  id: number;
+  novelId: number;
+  chapterIndex: number;
+  contentRich: RichBlock[];
+  contentPlain: string;
+  contentFormat: RichContentFormat;
+  contentVersion: number;
+  importFormatVersion: number;
+  updatedAt: string;
+}
+
 export interface CoverImageRecord {
   id: number;
   novelId: number;
@@ -47,7 +63,7 @@ export interface NovelImageGalleryEntryRecord {
   order: number;
 }
 
-export const LIBRARY_DB_SCHEMA = {
+export const LEGACY_LIBRARY_DB_SCHEMA = {
   novels: '++id, createdAt',
   chapters: '++id, novelId, [novelId+chapterIndex]',
   coverImages: '++id, novelId',
@@ -56,9 +72,15 @@ export const LIBRARY_DB_SCHEMA = {
     '++id, novelId, [novelId+chapterIndex], [novelId+chapterIndex+blockIndex], [novelId+imageKey]',
 } as const;
 
+export const LIBRARY_DB_SCHEMA = {
+  ...LEGACY_LIBRARY_DB_SCHEMA,
+  chapterRichContents: '++id, novelId, &[novelId+chapterIndex], updatedAt',
+} as const;
+
 export interface LibraryTables {
   novels: EntityTable<NovelRecord, 'id'>;
   chapters: EntityTable<ChapterRecord, 'id'>;
+  chapterRichContents: EntityTable<ChapterRichContentRecord, 'id'>;
   coverImages: EntityTable<CoverImageRecord, 'id'>;
   chapterImages: EntityTable<ChapterImageRecord, 'id'>;
   novelImageGalleryEntries: EntityTable<NovelImageGalleryEntryRecord, 'id'>;

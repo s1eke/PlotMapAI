@@ -17,7 +17,10 @@ function makeChapter(overrides: Partial<ChapterContent> = {}): ChapterContent {
   return {
     index: 0,
     title: 'Ch',
-    content: 'text',
+    plainText: 'text',
+    richBlocks: [],
+    contentFormat: 'plain',
+    contentVersion: 1,
     wordCount: 100,
     totalChapters: 3,
     hasPrev: false,

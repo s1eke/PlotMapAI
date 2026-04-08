@@ -112,7 +112,13 @@
     "pausingAnalysis": "暂停中...",
     "resumeAnalysis": "继续分析",
     "restartAnalysis": "重新开始分析",
-    "characterGraphEntry": "人物图谱"
+    "characterGraphEntry": "人物图谱",
+    "contentFormat": "内容格式",
+    "contentFormatPlain": "纯文本",
+    "contentFormatRich": "富文本",
+    "contentVersion": "内容版本",
+    "importFormatVersion": "导入格式版本",
+    "lastParsedAt": "最近解析时间"
   },
   "characterGraph": {
     "title": "人物图谱",
@@ -247,9 +253,73 @@
       "title": "图片查看器",
       "loadingMore": "正在加载更多图片"
     },
+    "reparse": {
+      "required": "当前书籍缺少增强排版数据，请重新解析源文件。",
+      "description": "请选择最初导入的源文件。系统会覆盖当前书籍的解析内容、插图、分析产物和阅读进度。",
+      "action": "重新解析源文件",
+      "succeeded": "已重新解析当前书籍，正在重新打开阅读页。",
+      "failed": "重新解析源文件失败。",
+      "fileTypeMismatch": "请选择与当前书籍相同类型的源文件。"
+    },
     "loadError": "加载阅读内容失败。",
     "exit": "退出阅读",
     "goBack": "返回"
+  },
+  "debug": {
+    "panelTitle": "调试面板",
+    "titleWithCount": "调试（{{count}}）",
+    "clearLogs": "清空日志",
+    "filters": {
+      "all": "全部",
+      "errors": "错误",
+      "logs": "日志"
+    },
+    "features": {
+      "readerTelemetry": {
+        "label": "Reader 遥测",
+        "description": "输出更详细的阅读布局快照和预热来源日志"
+      },
+      "readerLegacyPlainScroll": {
+        "label": "旧版纯文本滚动",
+        "description": "临时强制滚动模式退回纯文本块渲染器"
+      }
+    },
+    "actions": {
+      "goBack": "返回上一页",
+      "installPrompt": "安装提示",
+      "iosHint": "iOS 提示",
+      "updateToast": "更新提示",
+      "resetPwa": "重置 PWA"
+    },
+    "diagnostics": {
+      "title": "诊断",
+      "empty": "暂无诊断快照",
+      "labels": {
+        "bookImport": "导入诊断",
+        "readerLayout": "Reader 诊断",
+        "storage": "存储诊断"
+      },
+      "preview": {
+        "storageUsage": "占用 {{usage}} / {{quota}}",
+        "storageCounts": "渲染缓存 {{renderCacheCount}} · 富内容 {{richCount}} · 图片 {{imageCount}}",
+        "storageNovelCache": "当前书籍缓存 {{count}}",
+        "readerFormat": "格式 {{format}}",
+        "readerLayout": "布局 {{layout}}",
+        "readerPendingPreheat": "待预热 {{count}}",
+        "importOperation": "操作 {{operation}}",
+        "importFile": "文件 {{file}}",
+        "importStage": "阶段 {{stage}}"
+      }
+    },
+    "logsEmpty": "暂无日志",
+    "errorDetails": {
+      "retryable": "retryable={{value}}",
+      "source": "source: {{value}}",
+      "userVisible": "userVisible: {{value}}",
+      "debugVisible": "debugVisible: {{value}}",
+      "messageKey": "messageKey: {{value}}",
+      "cause": "cause: {{value}}"
+    }
   },
   "settings": {
     "title": "设置",
@@ -298,8 +368,27 @@
       "useRegex": "正则表达式",
       "isEnabled": "已启用",
       "scope": "作用范围",
+      "scopeText": "正文文本",
+      "scopeHeading": "标题文本",
+      "scopeCaption": "图片说明",
+      "scopeAll": "全部文本位",
+      "scopeLabel": {
+        "text": "正文文本",
+        "heading": "标题文本",
+        "caption": "图片说明",
+        "all": "全部文本位"
+      },
       "scopeTitle": "标题",
       "scopeContent": "正文",
+      "executionStage": "执行阶段",
+      "stagePreAst": "导入期 pre-ast",
+      "stagePostAst": "阅读期 post-ast",
+      "stagePlainTextOnly": "纯文本投影",
+      "stageLabel": {
+        "pre-ast": "pre-ast",
+        "post-ast": "post-ast",
+        "plain-text-only": "plain-text-only"
+      },
       "bookScope": "仅限书名",
       "excludeBookScope": "排除书名",
       "order": "执行顺序",
@@ -435,6 +524,7 @@
     "JOB_NOT_FOUND": "当前小说还没有分析任务。",
     "JOB_CREATE_FAILED": "无法创建分析任务。",
     "CHAPTER_NOT_FOUND": "章节不存在。",
+    "CHAPTER_STRUCTURED_CONTENT_MISSING": "当前书籍缺少增强排版数据，请重新解析源文件。",
     "CHAPTER_MISSING": "找不到指定章节，无法继续分析。",
     "INTERNAL_ERROR": "系统内部错误：{{message}}",
     "CHUNK_COMPLETED": "该章节块分析已完成。",

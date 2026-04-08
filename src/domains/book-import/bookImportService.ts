@@ -1,9 +1,14 @@
-import type { ChapterDetectionRule } from '@shared/text-processing';
-import type { BookChapter } from '@shared/contracts';
+import type { ChapterDetectionRule, PurifyRule } from '@shared/text-processing';
+import type {
+  BookChapter,
+  RichBlock,
+  RichContentFormat,
+} from '@shared/contracts';
 
 import { debugLog } from '@shared/debug';
 import { AppErrorCode, createAppError, toAppError } from '@shared/errors';
 import {
+  buildRichPaginationBlockSequence,
   buildChapterImageGalleryEntries,
   normalizeImportedChapters,
   sortChapterImageGalleryEntries,
@@ -12,15 +17,29 @@ import {
 import { parseBook } from './services/bookParser';
 import type { BookImportProgress } from './services/progress';
 
+const INITIAL_CHAPTER_CONTENT_VERSION = 1;
+const IMPORT_FORMAT_VERSION = 1;
+
+export interface PreparedChapterRichContent {
+  chapterIndex: number;
+  contentFormat: RichContentFormat;
+  contentVersion: number;
+  importFormatVersion: number;
+  plainText: string;
+  richBlocks: RichBlock[];
+}
+
 export interface ImportBookOptions {
   signal?: AbortSignal;
   onProgress?: (progress: BookImportProgress) => void;
+  purificationRules?: PurifyRule[];
 }
 
 export interface PreparedBookImport {
   author: string;
   chapterCount: number;
   chapters: BookChapter[];
+  chapterRichContents: PreparedChapterRichContent[];
   coverBlob: Blob | null;
   description: string;
   fileHash: string;
@@ -47,6 +66,60 @@ function emitProgress(
   progress: BookImportProgress,
 ): void {
   onProgress?.(progress);
+}
+
+function buildRichChapterImageGalleryEntries(params: {
+  chapterIndex: number;
+  richBlocks: RichBlock[];
+}): Array<{
+  blockIndex: number;
+  chapterIndex: number;
+  imageKey: string;
+  order: number;
+}> {
+  const isImageEntry = (
+    entry: ReturnType<typeof buildRichPaginationBlockSequence>[number],
+  ): entry is ReturnType<typeof buildRichPaginationBlockSequence>[number] & {
+    block: Extract<ReturnType<typeof buildRichPaginationBlockSequence>[number]['block'], { type: 'image' }>;
+  } => entry.block.type === 'image';
+
+  return buildRichPaginationBlockSequence({
+    chapterIndex: params.chapterIndex,
+    richBlocks: params.richBlocks,
+  })
+    .filter(isImageEntry)
+    .map((entry, order) => ({
+      blockIndex: entry.blockIndex,
+      chapterIndex: params.chapterIndex,
+      imageKey: entry.block.key,
+      order,
+    }));
+}
+
+function buildPreparedChapterImageGalleryEntries(params: {
+  chapterIndex: number;
+  content: string;
+  contentFormat: RichContentFormat;
+  richBlocks: RichBlock[];
+  title: string;
+}): Array<{
+  blockIndex: number;
+  chapterIndex: number;
+  imageKey: string;
+  order: number;
+}> {
+  if (params.contentFormat === 'rich' && params.richBlocks.length > 0) {
+    return buildRichChapterImageGalleryEntries({
+      chapterIndex: params.chapterIndex,
+      richBlocks: params.richBlocks,
+    });
+  }
+
+  return buildChapterImageGalleryEntries({
+    content: params.content,
+    index: params.chapterIndex,
+    title: params.title,
+  });
 }
 
 export const bookImportService = {
@@ -76,6 +149,7 @@ export const bookImportService = {
       parsed = await parseBook(file, tocRules, {
         signal: options.signal,
         onProgress: options.onProgress,
+        purificationRules: options.purificationRules,
       });
     } catch (error) {
       throw toAppError(error, {
@@ -91,19 +165,47 @@ export const bookImportService = {
 
     const normalizedChapters = normalizeImportedChapters(parsed.chapters);
     const totalWords = normalizedChapters.reduce((sum, chapter) => sum + chapter.content.length, 0);
+    const chapters = normalizedChapters.map((chapter, chapterIndex) => ({
+      chapterIndex,
+      title: chapter.title,
+      content: chapter.content,
+      wordCount: chapter.content.length,
+    }));
+    const chapterRichContents = normalizedChapters.map((chapter, chapterIndex) => ({
+      chapterIndex,
+      richBlocks: chapter.richBlocks,
+      plainText: chapter.content,
+      contentFormat: chapter.contentFormat,
+      contentVersion: INITIAL_CHAPTER_CONTENT_VERSION,
+      importFormatVersion: IMPORT_FORMAT_VERSION,
+    }));
 
     const imageGalleryEntries = sortChapterImageGalleryEntries(
       normalizedChapters.flatMap((chapter, chapterIndex) => {
         options.signal?.throwIfAborted?.();
-        return buildChapterImageGalleryEntries({
+        return buildPreparedChapterImageGalleryEntries({
+          chapterIndex,
           content: chapter.content,
-          index: chapterIndex,
+          contentFormat: chapter.contentFormat,
+          richBlocks: chapter.richBlocks,
           title: chapter.title,
         });
       }),
     );
-    emitProgress(options.onProgress, { progress: 96, stage: 'finalizing' });
-    emitProgress(options.onProgress, { progress: 100, stage: 'finalizing' });
+    emitProgress(options.onProgress, {
+      progress: 96,
+      stage: 'finalizing',
+      detail: 'Building gallery index',
+      current: normalizedChapters.length,
+      total: normalizedChapters.length,
+    });
+    emitProgress(options.onProgress, {
+      progress: 100,
+      stage: 'finalizing',
+      detail: 'Prepared import payload',
+      current: normalizedChapters.length,
+      total: normalizedChapters.length,
+    });
 
     return {
       title: parsed.title,
@@ -117,12 +219,8 @@ export const bookImportService = {
       originalEncoding: parsed.encoding || 'utf-8',
       totalWords,
       chapterCount: normalizedChapters.length,
-      chapters: normalizedChapters.map((chapter, chapterIndex) => ({
-        chapterIndex,
-        title: chapter.title,
-        content: chapter.content,
-        wordCount: chapter.content.length,
-      })),
+      chapters,
+      chapterRichContents,
       images: parsed.images.map((image) => ({
         imageKey: image.imageKey,
         blob: image.blob,

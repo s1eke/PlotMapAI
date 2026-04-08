@@ -60,8 +60,9 @@ describe('purificationRuleRepository', () => {
       isRegex: true,
       isEnabled: true,
       order: 0,
-      scopeTitle: true,
-      scopeContent: true,
+      targetScope: 'all',
+      executionStage: 'post-ast',
+      ruleVersion: 2,
       bookScope: '',
       excludeBookScope: '',
       exclusiveGroup: '',
@@ -123,8 +124,9 @@ describe('purificationRuleRepository', () => {
       replacement: 'updated',
       isRegex: true,
       isEnabled: true,
-      scopeTitle: true,
-      scopeContent: true,
+      targetScope: 'all',
+      executionStage: 'post-ast',
+      ruleVersion: 2,
     });
     expect(rules[0].exclusiveGroup).toBeUndefined();
   });
@@ -146,8 +148,9 @@ describe('purificationRuleRepository', () => {
       exclusiveGroup: 'cleanup',
     });
     const yaml = await purificationRuleRepository.exportPurificationRulesYaml();
-    expect(yaml).toContain('Test');
-    expect(yaml).toContain('t');
+    expect(yaml).toContain('version: 2');
+    expect(yaml).toContain('kind: purification-rules');
     expect(yaml).toContain('exclusive_group: cleanup');
+    expect(yaml).toContain('target_scope: all');
   });
 });

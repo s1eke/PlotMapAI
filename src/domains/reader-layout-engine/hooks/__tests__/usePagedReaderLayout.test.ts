@@ -1,4 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react';
+import type { PaginatedChapterLayout } from '../../utils/readerLayout';
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -87,11 +88,21 @@ function createContent(getScrollWidth: () => number): HTMLDivElement {
 }
 
 function createHookProps(overrides?: {
+  currentPagedLayout?: PaginatedChapterLayout | null;
   enabled?: boolean;
   pageIndex?: number;
   pageTarget?: 'start' | 'end' | null;
   paragraphSpacing?: number;
-  pendingRestoreTarget?: { chapterIndex: number; mode: 'paged'; chapterProgress?: number } | null;
+  pendingRestoreTarget?: {
+    chapterIndex: number;
+    mode: 'paged';
+    locator?: {
+      blockIndex: number;
+      chapterIndex: number;
+      kind: 'heading' | 'text' | 'image';
+      pageIndex?: number;
+    };
+  } | null;
   pagedViewportElement?: HTMLDivElement | null;
   pagedContentElement?: HTMLDivElement | null;
   setPageCount?: Dispatch<SetStateAction<number>>;
@@ -100,6 +111,7 @@ function createHookProps(overrides?: {
   return {
     chapterIndex: 0,
     currentChapter: { title: 'Chapter 1' },
+    currentPagedLayout: overrides?.currentPagedLayout ?? null,
     isLoading: false,
     enabled: overrides?.enabled ?? true,
     pagedViewportElement: overrides?.pagedViewportElement ?? null,
@@ -316,7 +328,7 @@ describe('usePagedReaderLayout', () => {
     animationFrames.restore();
   });
 
-  it('restores the target page from paged restore progress', async () => {
+  it('restores the target page from locator pageIndex when available', async () => {
     const animationFrames = createAnimationFrameController();
     const viewport = createViewport(600, 800);
     const content = createContent(() => 1896);
@@ -332,7 +344,12 @@ describe('usePagedReaderLayout', () => {
         pendingRestoreTarget: {
           chapterIndex: 0,
           mode: 'paged',
-          chapterProgress: 1,
+          locator: {
+            blockIndex: 6,
+            chapterIndex: 0,
+            kind: 'text',
+            pageIndex: 2,
+          },
         },
         setPageCount,
         setPageIndex,

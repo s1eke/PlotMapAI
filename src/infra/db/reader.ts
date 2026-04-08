@@ -1,4 +1,12 @@
 import type { EntityTable } from 'dexie';
+import type {
+  PaginationContainer,
+  PaginationListContext,
+  RichBlock,
+  RichInline,
+  RichTableCell,
+  RichTextAlign,
+} from '@shared/contracts';
 
 export interface ReaderLocatorRecord {
   chapterIndex: number;
@@ -14,6 +22,7 @@ export interface ReaderLocatorRecord {
     graphemeIndex: number;
   };
   edge?: 'start' | 'end';
+  pageIndex?: number;
 }
 
 export interface ReaderLayoutCursorRecord {
@@ -40,6 +49,12 @@ export interface ReaderRenderQueryManifestRecord {
   endLocator?: ReaderLocatorRecord | null;
 }
 
+export type ReaderLayoutFeatureSetRecord =
+  | 'scroll-legacy-plain'
+  | 'scroll-rich-inline'
+  | 'paged-pagination-block'
+  | 'summary-shell';
+
 export interface StaticTextLineRecord {
   lineIndex: number;
   text: string;
@@ -49,10 +64,24 @@ export interface StaticTextLineRecord {
 }
 
 export interface StaticReaderBlockRecord {
+  align?: RichTextAlign;
+  anchorId?: string;
+  blockquoteDepth?: number;
   chapterIndex: number;
   blockIndex: number;
+  container?: PaginationContainer;
+  headingLevel?: 1 | 2 | 3 | 4 | 5 | 6;
+  imageCaption?: RichInline[];
+  indent?: number;
   key: string;
   kind: 'heading' | 'text' | 'image' | 'blank';
+  listContext?: PaginationListContext;
+  originalTag?: string;
+  renderRole?: 'hr' | 'plain' | 'rich-text' | 'table' | 'unsupported';
+  richChildren?: RichInline[];
+  showListMarker?: boolean;
+  sourceBlockType?: RichBlock['type'];
+  tableRows?: RichTableCell[][];
   text?: string;
   imageKey?: string;
   marginBefore: number;
@@ -62,6 +91,7 @@ export interface StaticReaderBlockRecord {
 
 export interface StaticScrollBlockRecord {
   block: StaticReaderBlockRecord;
+  captionRichLineFragments?: RichInline[][];
   contentHeight: number;
   displayHeight?: number;
   displayWidth?: number;
@@ -73,6 +103,8 @@ export interface StaticScrollBlockRecord {
   lines: StaticTextLineRecord[];
   marginAfter: number;
   marginBefore: number;
+  richLineFragments?: RichInline[][];
+  tableRowHeights?: number[];
   top: number;
 }
 
@@ -85,22 +117,46 @@ export interface StaticScrollChapterTreeRecord {
 }
 
 export interface StaticTextPageItemRecord {
+  align?: RichTextAlign;
+  anchorId?: string;
+  blockquoteDepth?: number;
   chapterIndex: number;
   blockIndex: number;
+  container?: PaginationContainer;
   contentHeight: number;
   font: string;
   fontSizePx: number;
   height: number;
+  headingLevel?: 1 | 2 | 3 | 4 | 5 | 6;
+  indent?: number;
   key: string;
   kind: 'heading' | 'text';
   lineHeightPx: number;
   lineStartIndex: number;
   lines: StaticTextLineRecord[];
+  listContext?: PaginationListContext;
   marginAfter: number;
   marginBefore: number;
+  originalTag?: string;
+  renderRole?: 'hr' | 'plain' | 'rich-text' | 'table' | 'unsupported';
+  richLineFragments?: RichInline[][];
+  showListMarker?: boolean;
+  sourceBlockType?: RichBlock['type'];
+  tableRowHeights?: number[];
+  tableRows?: RichTableCell[][];
+  text?: string;
 }
 
 export interface StaticImagePageItemRecord {
+  align?: RichTextAlign;
+  anchorId?: string;
+  captionFont?: string;
+  captionFontSizePx?: number;
+  captionHeight?: number;
+  captionLineHeightPx?: number;
+  captionLines?: StaticTextLineRecord[];
+  captionRichLineFragments?: RichInline[][];
+  captionSpacing?: number;
   chapterIndex: number;
   blockIndex: number;
   displayHeight: number;
@@ -112,6 +168,7 @@ export interface StaticImagePageItemRecord {
   kind: 'image';
   marginAfter: number;
   marginBefore: number;
+  sourceBlockType?: RichBlock['type'];
 }
 
 export interface StaticBlankPageItemRecord {
@@ -174,6 +231,10 @@ export interface ReaderRenderCacheRecord {
   layoutKey: string;
   layoutSignature: ReaderLayoutSignatureRecord;
   contentHash: string;
+  contentFormat: 'plain' | 'rich';
+  contentVersion: number;
+  rendererVersion: number;
+  layoutFeatureSet: ReaderLayoutFeatureSetRecord;
   tree?: ReaderRenderTreeRecord | null;
   queryManifest: ReaderRenderQueryManifestRecord;
   updatedAt: string;

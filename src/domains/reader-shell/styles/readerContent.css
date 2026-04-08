@@ -1,0 +1,110 @@
+.pm-reader {
+  color: var(--pm-reader-text);
+  font-family: var(--font-app);
+}
+
+.pm-reader ::selection {
+  background: var(--pm-reader-selection-bg);
+}
+
+.pm-reader__chapter {
+  min-width: 0;
+}
+
+.pm-reader__chapter-header {
+  color: var(--pm-reader-text-muted);
+}
+
+.pm-reader__content {
+  color: var(--pm-reader-text);
+  min-width: 0;
+}
+
+.pm-reader-block {
+  color: inherit;
+  min-width: 0;
+}
+
+.pm-reader-block--heading {
+  color: var(--pm-reader-text);
+  letter-spacing: -0.015em;
+  overflow-wrap: anywhere;
+}
+
+.pm-reader-block--paragraph {
+  color: var(--pm-reader-text);
+}
+
+.pm-reader-block--image {
+  color: var(--pm-reader-text);
+}
+
+.pm-reader-block--image img {
+  border-radius: var(--pm-reader-image-radius);
+  box-shadow: var(--pm-reader-shadow-soft);
+}
+
+.pm-reader-image-caption {
+  color: var(--pm-reader-text-muted);
+  margin-top: var(--pm-reader-image-caption-gap);
+}
+
+.pm-reader-block--table {
+  background: var(--pm-reader-surface);
+  border: 1px solid var(--pm-reader-border);
+  border-radius: 1rem;
+  box-shadow: var(--pm-reader-shadow-soft);
+}
+
+.pm-reader-table-cell {
+  border: 1px solid var(--pm-reader-border);
+  color: var(--pm-reader-text);
+  padding: var(--pm-reader-table-cell-padding-y) var(--pm-reader-table-cell-padding-x);
+  text-align: left;
+  vertical-align: top;
+}
+
+.pm-reader-block--hr {
+  background: color-mix(in srgb, var(--pm-reader-border) 72%, transparent);
+  border-radius: 999px;
+}
+
+.pm-reader-block--unsupported {
+  color: var(--pm-reader-text-muted);
+}
+
+.pm-reader-block--blockquote {
+  border-inline-start: var(--pm-reader-blockquote-border-width) solid var(--pm-reader-border);
+  min-width: 0;
+}
+
+.pm-reader-block--list-item {
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.pm-reader-list-marker {
+  color: var(--pm-reader-text-muted);
+}
+
+.pm-reader-block--poem-line {
+  min-width: 0;
+}
+
+.pm-reader-inline-link {
+  color: var(--pm-reader-link);
+  text-decoration: underline;
+  text-decoration-thickness: 0.08em;
+  text-underline-offset: 0.14em;
+  transition: color 160ms ease, box-shadow 160ms ease;
+}
+
+.pm-reader-inline-link:hover {
+  color: var(--pm-reader-accent);
+}
+
+.pm-reader-inline-link:focus-visible {
+  border-radius: 0.25rem;
+  box-shadow: 0 0 0 2px var(--pm-reader-focus-ring);
+  outline: none;
+}

@@ -9,7 +9,10 @@ import type {
   StaticScrollChapterTree,
   StaticSummaryShellTree,
 } from '../utils/readerLayout';
-import type { ReaderRenderCacheSource } from '../utils/readerRenderCache';
+import type {
+  ReaderLayoutFeatureSet,
+  ReaderRenderCacheSource,
+} from '../utils/readerRenderCache';
 
 export interface UseReaderRenderCacheParams {
   chapters: Chapter[];
@@ -46,11 +49,24 @@ export interface UseReaderRenderCacheResult {
 
 export interface ReaderVisibleLayoutSnapshot {
   activeVariant: ReaderRenderVariant;
+  activeContentFormat: ChapterContent['contentFormat'] | null;
+  activeContentVersion: number | null;
+  activeLayoutFeatureSet: ReaderLayoutFeatureSet | null;
+  activeRendererVersion: number | null;
   cacheModel: 'layered-render-cache';
+  contentFormat: ChapterContent['contentFormat'] | null;
+  contentVersion: number | null;
   currentPagedPageCount: number;
   currentPagedPageItemCount: number;
+  layoutFeatureSet: ReaderLayoutFeatureSet | null;
+  novelId: number;
+  pagedDowngradeCount: number;
+  pagedFallbackCount: number;
+  rendererVersion: number | null;
+  richBlockCount: number;
   scrollBlockCount: number;
   scrollChapterCount: number;
+  unsupportedBlockCount: number;
   visibleCacheSources: Record<ReaderRenderCacheSource, number>;
 }
 

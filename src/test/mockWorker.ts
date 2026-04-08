@@ -1,6 +1,7 @@
 import type {
   BookImportProgress,
 } from '@domains/book-import/services/progress';
+import type { ParseEpubPayload } from '@domains/book-import/workers/epubClient';
 import type {
   GraphLayoutPayload,
   GraphLayoutProgress,
@@ -59,9 +60,10 @@ const TASK_HANDLERS: Record<string, WorkerTaskHandler> = {
     });
   },
   'parse-epub': (payload, emitProgress, signal) =>
-    parseEpubCore(payload as File, {
+    parseEpubCore((payload as ParseEpubPayload).file, {
       signal,
       onProgress: emitProgress as (progress: BookImportProgress) => void,
+      purificationRules: (payload as ParseEpubPayload).purificationRules,
     }),
   'parse-txt': (payload, emitProgress, signal) => {
     const parsePayload = payload as ParseTxtPayload;
@@ -78,6 +80,7 @@ const TASK_HANDLERS: Record<string, WorkerTaskHandler> = {
       purifyPayload.chapter,
       purifyPayload.rules,
       purifyPayload.bookTitle,
+      purifyPayload.executionStage,
     );
     throwIfAborted(signal);
     emitProgress({ progress: 100, stage: 'finalizing' } satisfies TextProcessingProgress);
@@ -96,7 +99,12 @@ const TASK_HANDLERS: Record<string, WorkerTaskHandler> = {
       }
 
       throwIfAborted(signal);
-      return purifyChapter(chapter, purifyPayload.rules, purifyPayload.bookTitle);
+      return purifyChapter(
+        chapter,
+        purifyPayload.rules,
+        purifyPayload.bookTitle,
+        purifyPayload.executionStage,
+      );
     });
 
     throwIfAborted(signal);
@@ -111,6 +119,7 @@ const TASK_HANDLERS: Record<string, WorkerTaskHandler> = {
       purifyPayload.titles,
       purifyPayload.rules,
       purifyPayload.bookTitle,
+      purifyPayload.executionStage,
     );
     throwIfAborted(signal);
     emitProgress({ progress: 100, stage: 'finalizing' } satisfies TextProcessingProgress);

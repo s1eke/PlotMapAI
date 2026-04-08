@@ -4,7 +4,7 @@ import type { ReaderImageViewerSurfaceTransition } from '../../utils/readerImage
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, motion, useMotionValue } from 'motion/react';
 
 import ReaderImageViewerSurface from './ReaderImageViewerSurface';
 import { useReaderImageViewerTransition } from '../../hooks/useReaderImageViewerTransition';
@@ -58,11 +58,21 @@ export default function ReaderImageViewer({
   onRequestNavigate,
 }: ReaderImageViewerProps) {
   const { t } = useTranslation();
+  const dragDismissProgress = useMotionValue(0);
+  const backdropStyle = {
+    '--reader-image-dismiss-progress': dragDismissProgress,
+    opacity: 'calc(1 - var(--reader-image-dismiss-progress) * 0.82)',
+  };
+  const imageIndexStyle = {
+    '--reader-image-dismiss-progress': dragDismissProgress,
+    opacity: 'calc(1 - var(--reader-image-dismiss-progress))',
+  };
   const [viewportSize, setViewportSize] = useState(() => readReaderImageViewerViewportSize());
   const originRect = useMemo(() => getOriginRect(activeEntry), [activeEntry, getOriginRect]);
   const {
     clearNavigationTransition,
     consumeDeferredStageClick,
+    isNavigationTransitionPending,
     prepareNavigationTransition,
     resolvedSurfaceTransition,
     suppressDeferredStageClick,
@@ -73,8 +83,20 @@ export default function ReaderImageViewer({
 
   const handleRequestClose = useCallback(() => {
     clearNavigationTransition();
+    dragDismissProgress.set(0);
+    onRequestClose();
+  }, [clearNavigationTransition, dragDismissProgress, onRequestClose]);
+
+  const handleRequestDismissClose = useCallback(() => {
+    clearNavigationTransition();
     onRequestClose();
   }, [clearNavigationTransition, onRequestClose]);
+
+  useEffect(() => {
+    if (isOpen) {
+      dragDismissProgress.set(0);
+    }
+  }, [activeEntry, dragDismissProgress, isOpen]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -112,7 +134,7 @@ export default function ReaderImageViewer({
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault();
-        onRequestClose();
+        handleRequestClose();
       }
     };
 
@@ -120,7 +142,7 @@ export default function ReaderImageViewer({
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isOpen, onRequestClose]);
+  }, [handleRequestClose, isOpen]);
 
   if (typeof document === 'undefined') {
     return null;
@@ -136,12 +158,16 @@ export default function ReaderImageViewer({
           aria-label={t('reader.imageViewer.title')}
         >
           <motion.div
-            className="absolute inset-0 bg-black/88 backdrop-blur-[3px]"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-          />
+          >
+            <motion.div
+              className="absolute inset-0 bg-black/88 backdrop-blur-[3px]"
+              style={backdropStyle}
+            />
+          </motion.div>
 
           <div className="absolute inset-0 overflow-hidden">
             <AnimatePresence initial={false} custom={resolvedSurfaceTransition}>
@@ -149,7 +175,7 @@ export default function ReaderImageViewer({
                 key={`${novelId}:${createReaderImageEntryId(activeEntry)}`}
                 data-reader-image-transition-direction={resolvedSurfaceTransition.direction}
                 data-reader-image-transition-kind={resolvedSurfaceTransition.kind}
-                className="absolute inset-0"
+                className="absolute inset-0 z-[2] overflow-hidden bg-black"
                 custom={resolvedSurfaceTransition}
                 variants={IMAGE_SWITCH_VARIANTS}
                 initial="initial"
@@ -167,13 +193,16 @@ export default function ReaderImageViewer({
                   canNavigateNext={canNavigateNext}
                   canNavigatePrev={canNavigatePrev}
                   consumeDeferredStageClick={consumeDeferredStageClick}
+                  dismissProgress={dragDismissProgress}
                   entries={entries}
-                  entryTransitionMode={resolvedSurfaceTransition.kind === 'slide' ? 'none' : 'anchor'}
+                  entryTransitionMode={isNavigationTransitionPending ? 'none' : 'anchor'}
                   getOriginRect={getOriginRect}
+                  isNavigationTransitionPending={isNavigationTransitionPending}
                   novelId={novelId}
                   onClearNavigationTransition={clearNavigationTransition}
                   onPrepareNavigationTransition={prepareNavigationTransition}
                   onRequestClose={handleRequestClose}
+                  onRequestDismissClose={handleRequestDismissClose}
                   onRequestNavigate={onRequestNavigate}
                   originRect={originRect}
                   suppressDeferredStageClick={suppressDeferredStageClick}
@@ -183,9 +212,10 @@ export default function ReaderImageViewer({
             </AnimatePresence>
           </div>
 
-          <div
+          <motion.div
             data-reader-image-index=""
             className="pointer-events-none absolute inset-x-0 bottom-5 z-[2] flex justify-center"
+            style={imageIndexStyle}
           >
             <div className="rounded-full bg-black/45 px-4 py-2 text-xs font-medium tracking-wide text-white/85 backdrop-blur-sm">
               {isIndexResolved || !isIndexLoading
@@ -197,7 +227,7 @@ export default function ReaderImageViewer({
                 )
                 : t('reader.imageViewer.loadingMore')}
             </div>
-          </div>
+          </motion.div>
         </div>
       ) : null}
     </AnimatePresence>,

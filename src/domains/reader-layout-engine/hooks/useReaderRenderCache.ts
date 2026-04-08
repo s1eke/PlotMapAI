@@ -10,6 +10,7 @@ import {
   debugFeatureSubscribe,
   debugLog,
   isDebugFeatureEnabled,
+  setDebugSnapshot,
 } from '@shared/debug';
 
 import { clearReaderRenderCacheMemoryForNovel } from '../utils/readerRenderCache';
@@ -18,6 +19,7 @@ import {
   buildVisibleRenderTargets,
   collectLoadedImageKeys,
   getActiveVariant,
+  type ScrollRenderMode,
 } from '../utils/readerRenderCachePlanning';
 import { preloadReaderImageResources } from '../utils/readerImageResourceCache';
 import { useReaderRenderPreheater } from './useReaderRenderPreheater';
@@ -42,6 +44,9 @@ export function useReaderRenderCache({
   const [imageRevision, setImageRevision] = useState(0);
   const [cacheRevision, setCacheRevision] = useState(0);
   const [readerTelemetryEnabled, setReaderTelemetryEnabled] = useState(() => isDebugFeatureEnabled('readerTelemetry'));
+  const [readerLegacyPlainScrollEnabled, setReaderLegacyPlainScrollEnabled] = useState(
+    () => isDebugFeatureEnabled('readerLegacyPlainScroll'),
+  );
   const pendingPreheatCountRef = useRef(0);
   const loadedChaptersRef = useRef<Map<number, ChapterContent>>(new Map());
   const currentChapterIndex = currentChapter?.index ?? null;
@@ -52,6 +57,7 @@ export function useReaderRenderCache({
   useEffect(() => {
     return debugFeatureSubscribe((featureFlags) => {
       setReaderTelemetryEnabled(featureFlags.readerTelemetry);
+      setReaderLegacyPlainScrollEnabled(featureFlags.readerLegacyPlainScroll);
     });
   }, []);
 
@@ -82,6 +88,9 @@ export function useReaderRenderCache({
     paragraphSpacing,
   });
   const activeVariant = getActiveVariant(isPagedMode, viewMode);
+  const scrollRenderMode: ScrollRenderMode = readerLegacyPlainScrollEnabled
+    ? 'legacy-plain'
+    : 'rich';
 
   const loadedImageKeys = useMemo(() => collectLoadedImageKeys({
     currentChapter,
@@ -121,6 +130,7 @@ export function useReaderRenderCache({
     isPagedMode,
     novelId,
     pagedChapters,
+    scrollRenderMode,
     scrollChapters,
     variantSignatures,
     viewMode,
@@ -131,6 +141,7 @@ export function useReaderRenderCache({
     isPagedMode,
     novelId,
     pagedChapters,
+    scrollRenderMode,
     scrollChapters,
     variantSignatures,
     viewMode,
@@ -142,9 +153,20 @@ export function useReaderRenderCache({
     currentChapterIndex,
   }), [activeVariant, chapters.length, currentChapterIndex]);
 
-  const handleMaterializedEntry = useCallback(() => {
+  const visibleTargetKeys = useMemo(() => new Set(
+    visibleTargets.map((target) => `${target.chapter.index}:${target.variantFamily}`),
+  ), [visibleTargets]);
+
+  const handleMaterializedEntry = useCallback((entry: {
+    chapterIndex: number;
+    variantFamily: string;
+  }) => {
+    if (!visibleTargetKeys.has(`${entry.chapterIndex}:${entry.variantFamily}`)) {
+      return;
+    }
+
     setCacheRevision((previous) => previous + 1);
-  }, []);
+  }, [visibleTargetKeys]);
 
   const { isPreheating, pendingPreheatCount } = useReaderRenderPreheater({
     currentChapterIndex,
@@ -153,6 +175,7 @@ export function useReaderRenderCache({
     novelId,
     onMaterializedEntry: handleMaterializedEntry,
     preheatTargets,
+    preferRichScrollRendering: !readerLegacyPlainScrollEnabled,
     readerTelemetryEnabled,
     typography,
     variantSignatures,
@@ -172,24 +195,25 @@ export function useReaderRenderCache({
     activeVariant,
     currentChapterIndex,
     novelId,
-    revisionKey: `${cacheRevision}:${imageRevision}`,
+    revisionKey: `${cacheRevision}:${imageRevision}:${scrollRenderMode}`,
     scrollChapterCount: scrollChapters.length,
+    preferRichScrollRendering: !readerLegacyPlainScrollEnabled,
     typography,
     variantSignatures,
     visibleTargets,
   });
 
   useEffect(() => {
-    if (!readerTelemetryEnabled) {
-      return;
-    }
-
     const snapshot: ReaderLayoutSnapshot = {
       ...layoutSnapshot,
+      novelId,
       pendingPreheatCount: pendingPreheatCountRef.current,
     };
-    debugLog('READER', 'Reader layout snapshot', snapshot);
-  }, [layoutSnapshot, readerTelemetryEnabled]);
+    setDebugSnapshot('reader-layout', snapshot);
+    if (readerTelemetryEnabled) {
+      debugLog('READER', 'Reader layout snapshot', snapshot);
+    }
+  }, [layoutSnapshot, novelId, readerTelemetryEnabled]);
 
   useEffect(() => {
     return () => {

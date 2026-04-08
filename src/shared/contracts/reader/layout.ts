@@ -8,6 +8,7 @@ export interface ReaderLocator {
   startCursor?: LayoutCursor;
   endCursor?: LayoutCursor;
   edge?: 'start' | 'end';
+  pageIndex?: number;
 }
 
 export interface ScrollModeAnchor {

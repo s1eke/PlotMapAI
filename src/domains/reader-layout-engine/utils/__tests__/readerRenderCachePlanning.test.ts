@@ -22,7 +22,10 @@ function createChapter(index: number, totalChapters: number): ChapterContent {
   return {
     index,
     title: `Chapter ${index + 1}`,
-    content: `Content for chapter ${index + 1}`,
+    plainText: `Content for chapter ${index + 1}`,
+    richBlocks: [],
+    contentFormat: 'plain',
+    contentVersion: 1,
     wordCount: 120,
     totalChapters,
     hasPrev: index > 0,
@@ -78,15 +81,15 @@ describe('readerRenderCachePlanning', () => {
   it('collects loaded image keys once and keeps them sorted', () => {
     const currentChapter = {
       ...createChapter(0, 3),
-      content: 'A\n[IMG:cover]\nB\n[IMG:map]',
+      plainText: 'A\n[IMG:cover]\nB\n[IMG:map]',
     };
     const pagedChapter = {
       ...createChapter(1, 3),
-      content: 'C\n[IMG:cover]\nD',
+      plainText: 'C\n[IMG:cover]\nD',
     };
     const scrollChapter = {
       ...createChapter(2, 3),
-      content: 'E\n[IMG:appendix]\nF',
+      plainText: 'E\n[IMG:appendix]\nF',
     };
 
     expect(collectLoadedImageKeys({
@@ -116,7 +119,7 @@ describe('readerRenderCachePlanning', () => {
 
     const chapter = {
       ...createChapter(0, 1),
-      content: '[IMG:cover]\n[IMG:portrait]\n[IMG:map]',
+      plainText: '[IMG:cover]\n[IMG:portrait]\n[IMG:map]',
     };
 
     expect(buildChapterImageLayoutKey(7, chapter, 'base-layout')).toBe(
@@ -131,6 +134,7 @@ describe('readerRenderCachePlanning', () => {
       isPagedMode: false,
       novelId: 11,
       pagedChapters: [createChapter(0, 3)],
+      scrollRenderMode: 'rich',
       scrollChapters: [{ chapter: createChapter(2, 3), index: 2 }],
       variantSignatures: createVariantSignatures(),
       viewMode: 'summary',
@@ -142,6 +146,46 @@ describe('readerRenderCachePlanning', () => {
       exactKey: expect.stringContaining(':summary-shell:'),
       variantFamily: 'summary-shell',
     }));
+  });
+
+  it('keeps layout keys stable while separating scroll render identities', () => {
+    const chapter = {
+      ...createChapter(0, 1),
+      contentFormat: 'rich' as const,
+      richBlocks: [{
+        type: 'paragraph' as const,
+        children: [{
+          type: 'text' as const,
+          text: 'Rich paragraph',
+        }],
+      }],
+    };
+
+    const richTargets = buildVisibleRenderTargets({
+      currentChapter: chapter,
+      isPagedMode: false,
+      novelId: 7,
+      pagedChapters: [],
+      scrollRenderMode: 'rich',
+      scrollChapters: [{ chapter, index: 0 }],
+      variantSignatures: createVariantSignatures(),
+      viewMode: 'original',
+    });
+    const legacyTargets = buildVisibleRenderTargets({
+      currentChapter: chapter,
+      isPagedMode: false,
+      novelId: 7,
+      pagedChapters: [],
+      scrollRenderMode: 'legacy-plain',
+      scrollChapters: [{ chapter, index: 0 }],
+      variantSignatures: createVariantSignatures(),
+      viewMode: 'original',
+    });
+
+    expect(richTargets[0]?.layoutKey).toBe(legacyTargets[0]?.layoutKey);
+    expect(richTargets[0]?.layoutFeatureSet).toBe('scroll-rich-inline');
+    expect(legacyTargets[0]?.layoutFeatureSet).toBe('scroll-legacy-plain');
+    expect(richTargets[0]?.exactKey).not.toBe(legacyTargets[0]?.exactKey);
   });
 
   it('builds preheat targets in the current order without duplicates', () => {

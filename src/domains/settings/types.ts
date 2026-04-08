@@ -1,4 +1,8 @@
 import type { AnalysisProviderId } from '@shared/contracts';
+import type {
+  PurificationExecutionStage,
+  PurificationTargetScope,
+} from '@shared/text-processing';
 
 export interface TocRule {
   id: number;
@@ -21,8 +25,9 @@ export interface PurificationRule {
   isRegex: boolean;
   isEnabled: boolean;
   order: number;
-  scopeTitle: boolean;
-  scopeContent: boolean;
+  targetScope: PurificationTargetScope;
+  executionStage: PurificationExecutionStage;
+  ruleVersion: number;
   bookScope?: string;
   excludeBookScope?: string;
   exclusiveGroup?: string;

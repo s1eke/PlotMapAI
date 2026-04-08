@@ -1,7 +1,7 @@
 import type { ChapterChangeSource, PageTarget } from '@shared/contracts/reader';
 
 import { act, renderHook } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createReaderContextWrapper } from '@test/readerRuntimeTestUtils';
 
 import { readerContentService } from '../../readerContentService';
@@ -33,7 +33,16 @@ function createChapter(index: number, totalChapters: number) {
   return {
     index,
     title: `Chapter ${index + 1}`,
-    content: `Content ${index + 1}`,
+    plainText: `Content ${index + 1}`,
+    richBlocks: [{
+      type: 'paragraph',
+      children: [{
+        type: 'text',
+        text: `Content ${index + 1}`,
+      }],
+    }],
+    contentFormat: 'plain' as const,
+    contentVersion: 1,
     wordCount: 120,
     totalChapters,
     hasPrev: index > 0,
@@ -42,6 +51,62 @@ function createChapter(index: number, totalChapters: number) {
 }
 
 describe('useReaderChapterData', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('caches fetched chapter content with rich metadata intact', async () => {
+    const chapter = createChapter(0, 2);
+    const { Wrapper } = createReaderContextWrapper();
+
+    vi.mocked(readerContentService.getChapterContent).mockResolvedValue(chapter);
+
+    const { result } = renderHook(() => useReaderChapterData({
+      novelId: 1,
+      onChapterContentResolved: vi.fn(),
+      sessionCommands: {
+        hasUserInteractedRef: { current: false },
+        latestReaderStateRef: { current: {} },
+        loadPersistedReaderState: vi.fn(),
+        setChapterIndex: vi.fn(),
+        setMode: vi.fn(),
+      },
+      sessionSnapshot: {
+        mode: 'scroll',
+      },
+    }), {
+      wrapper: Wrapper,
+    });
+
+    let firstResult: Awaited<ReturnType<typeof result.current.fetchChapterContent>> | null = null;
+    let secondResult: Awaited<ReturnType<typeof result.current.fetchChapterContent>> | null = null;
+
+    await act(async () => {
+      firstResult = await result.current.fetchChapterContent(0);
+      secondResult = await result.current.fetchChapterContent(0);
+    });
+
+    expect(firstResult).toEqual(chapter);
+    expect(secondResult).toEqual(chapter);
+    expect(result.current.cache.getCachedChapter(0)).toEqual(chapter);
+    expect(result.current.cache.getCachedChapter(0)).toMatchObject({
+      contentFormat: 'plain',
+      contentVersion: 1,
+      richBlocks: [{
+        type: 'paragraph',
+        children: [{
+          type: 'text',
+          text: 'Content 1',
+        }],
+      }],
+    });
+    expect(readerContentService.getChapterContent).toHaveBeenCalledTimes(1);
+    expect(readerContentService.getChapterContent).toHaveBeenCalledWith(1, 0, {
+      onProgress: expect.any(Function),
+      signal: undefined,
+    });
+  });
+
   it('keeps the navigation source in scroll mode until restore can consume the target', async () => {
     const chapters = [
       { index: 0, title: 'Chapter 1', wordCount: 100 },

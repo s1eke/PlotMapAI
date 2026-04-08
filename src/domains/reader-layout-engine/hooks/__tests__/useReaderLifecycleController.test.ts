@@ -53,7 +53,10 @@ function createChapter(index: number) {
 function createChapterContent(index: number) {
   return {
     ...createChapter(index),
-    content: `content-${index}`,
+    plainText: `content-${index}`,
+    richBlocks: [],
+    contentFormat: 'plain' as const,
+    contentVersion: 1,
     totalChapters: 10,
     hasPrev: index > 0,
     hasNext: index < 9,

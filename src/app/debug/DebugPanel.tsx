@@ -1,17 +1,24 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { ArrowLeft, Bug, ChevronDown, Download, RefreshCw, RotateCcw, Smartphone, Trash2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import {
+  clearDebugSnapshots,
   clearLogs,
   debugFeatureSubscribe,
+  debugSnapshotSubscribe,
   debugSubscribe,
   getDebugFeatureFlags,
   getRecentLogs,
+  getDebugSnapshots,
   MAX_LOGS,
+  setDebugSnapshot,
   setDebugFeatureEnabled,
   type DebugEntry,
+  type DebugSnapshotEntry,
 } from '@shared/debug';
 import Toggle from '@shared/components/Toggle';
 import { cn } from '@shared/utils/cn';
+import { db } from '@infra/db';
 
 import {
   triggerDebugInstallPrompt,
@@ -43,13 +50,145 @@ const CATEGORY_COLORS: Record<string, string> = {
   'character-graph': 'text-cyan-300',
 };
 
+const SNAPSHOT_ORDER = ['reader-layout', 'book-import', 'storage'];
+
+interface ReaderLayoutDiagnosticSnapshot {
+  novelId: number | null;
+}
+
+interface StorageDiagnosticSnapshot {
+  chapterImagesCount: number;
+  chapterRichContentsCount: number;
+  currentNovelRenderCacheCount: number | null;
+  novelId: number | null;
+  quota: number | null;
+  readerRenderCacheCount: number;
+  usage: number | null;
+}
+
 function getDebugEntryKey(entry: DebugEntry): string {
   return `${entry.kind}:${entry.time}:${entry.category}:${entry.message}`;
 }
 
+function getDebugSnapshotKey(entry: DebugSnapshotEntry): string {
+  return `${entry.key}:${entry.time}`;
+}
+
+function formatDiagnosticTime(ts: number): string {
+  const d = new Date(ts);
+  return `${d.getMinutes().toString().padStart(2, '0')}:${d.getSeconds().toString().padStart(2, '0')}.${d.getMilliseconds().toString().padStart(3, '0')}`;
+}
+
+function formatBytes(value: number | null): string {
+  if (value == null || Number.isNaN(value)) {
+    return '-';
+  }
+
+  if (value < 1024) {
+    return `${value} B`;
+  }
+
+  if (value < 1024 * 1024) {
+    return `${(value / 1024).toFixed(1)} KB`;
+  }
+
+  if (value < 1024 * 1024 * 1024) {
+    return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  return `${(value / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+}
+
+function getSnapshotLabel(
+  key: string,
+  t: ReturnType<typeof useTranslation>['t'],
+): string {
+  switch (key) {
+    case 'book-import':
+      return t('debug.diagnostics.labels.bookImport');
+    case 'reader-layout':
+      return t('debug.diagnostics.labels.readerLayout');
+    case 'storage':
+      return t('debug.diagnostics.labels.storage');
+    default:
+      return key;
+  }
+}
+
+function buildSnapshotPreview(
+  snapshot: DebugSnapshotEntry,
+  t: ReturnType<typeof useTranslation>['t'],
+): string[] {
+  if (snapshot.key === 'storage') {
+    const value = snapshot.value as Partial<StorageDiagnosticSnapshot>;
+    return [
+      t('debug.diagnostics.preview.storageUsage', {
+        quota: formatBytes(value.quota ?? null),
+        usage: formatBytes(value.usage ?? null),
+      }),
+      t('debug.diagnostics.preview.storageCounts', {
+        imageCount: value.chapterImagesCount ?? 0,
+        renderCacheCount: value.readerRenderCacheCount ?? 0,
+        richCount: value.chapterRichContentsCount ?? 0,
+      }),
+      t('debug.diagnostics.preview.storageNovelCache', {
+        count: value.currentNovelRenderCacheCount ?? 0,
+      }),
+    ];
+  }
+
+  if (snapshot.key === 'reader-layout') {
+    const value = snapshot.value as Record<string, unknown>;
+    return [
+      t('debug.diagnostics.preview.readerFormat', {
+        format: String(value.contentFormat ?? value.activeContentFormat ?? '-'),
+      }),
+      t('debug.diagnostics.preview.readerLayout', {
+        layout: String(value.layoutFeatureSet ?? value.activeLayoutFeatureSet ?? '-'),
+      }),
+      t('debug.diagnostics.preview.readerPendingPreheat', {
+        count: Number(value.pendingPreheatCount ?? 0),
+      }),
+    ];
+  }
+
+  if (snapshot.key === 'book-import') {
+    const value = snapshot.value as Record<string, unknown>;
+    const progress = typeof value.progress === 'object' && value.progress ? value.progress as Record<string, unknown> : null;
+    return [
+      t('debug.diagnostics.preview.importOperation', {
+        operation: String(value.operation ?? '-'),
+      }),
+      t('debug.diagnostics.preview.importFile', {
+        file: String(value.currentFileName ?? '-'),
+      }),
+      t('debug.diagnostics.preview.importStage', {
+        stage: String(progress?.stage ?? '-'),
+      }),
+    ];
+  }
+
+  return [];
+}
+
+async function getStorageEstimate(): Promise<{ quota?: number; usage?: number } | null> {
+  const estimate = navigator.storage?.estimate;
+  if (!estimate) {
+    return null;
+  }
+
+  try {
+    return await estimate.call(navigator.storage);
+  } catch {
+    return null;
+  }
+}
+
 export default function DebugPanel() {
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [logs, setLogs] = useState<DebugEntry[]>(() => getRecentLogs());
+  const [snapshots, setSnapshots] = useState<DebugSnapshotEntry[]>(() => getDebugSnapshots());
   const [filter, setFilter] = useState<'all' | 'errors' | 'logs'>('all');
   const [featureFlags, setFeatureFlags] = useState(() => getDebugFeatureFlags());
   const listRef = useRef<HTMLDivElement>(null);
@@ -72,6 +211,12 @@ export default function DebugPanel() {
   }, []);
 
   useEffect(() => {
+    return debugSnapshotSubscribe((entries) => {
+      setSnapshots(entries);
+    });
+  }, []);
+
+  useEffect(() => {
     if (autoScrollRef.current && listRef.current) {
       listRef.current.scrollTop = listRef.current.scrollHeight;
     }
@@ -85,14 +230,82 @@ export default function DebugPanel() {
 
   const handleClear = useCallback(() => {
     clearLogs();
+    clearDebugSnapshots();
     setLogs([]);
+    setSnapshots([]);
   }, []);
+
+  const readerSnapshot = useMemo(() => {
+    return snapshots.find((entry) => entry.key === 'reader-layout')?.value as ReaderLayoutDiagnosticSnapshot | undefined;
+  }, [snapshots]);
+  const readerNovelId = typeof readerSnapshot?.novelId === 'number'
+    ? readerSnapshot.novelId
+    : null;
+
+  const refreshStorageDiagnostics = useCallback(async (): Promise<void> => {
+    const estimate = await getStorageEstimate();
+    const [
+      readerRenderCacheCount,
+      chapterRichContentsCount,
+      chapterImagesCount,
+      currentNovelRenderCacheCount,
+    ] = await Promise.all([
+      db.readerRenderCache.count(),
+      db.chapterRichContents.count(),
+      db.chapterImages.count(),
+      readerNovelId == null
+        ? Promise.resolve(null)
+        : db.readerRenderCache.where('novelId').equals(readerNovelId).count(),
+    ]);
+
+    setDebugSnapshot('storage', {
+      chapterImagesCount,
+      chapterRichContentsCount,
+      currentNovelRenderCacheCount,
+      novelId: readerNovelId,
+      quota: estimate?.quota ?? null,
+      readerRenderCacheCount,
+      usage: estimate?.usage ?? null,
+    } satisfies StorageDiagnosticSnapshot);
+  }, [readerNovelId]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const refreshDiagnostics = (): void => {
+      refreshStorageDiagnostics().catch(() => undefined);
+    };
+
+    refreshDiagnostics();
+    const timer = window.setInterval(() => {
+      refreshDiagnostics();
+    }, 10_000);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [isOpen, refreshStorageDiagnostics]);
 
   const visibleLogs = logs.filter((entry) => {
     if (filter === 'errors') return entry.kind === 'error';
     if (filter === 'logs') return entry.kind === 'log';
     return true;
   });
+
+  const orderedSnapshots = useMemo(() => {
+    const rankByKey = new Map(SNAPSHOT_ORDER.map((key, index) => [key, index]));
+    return [...snapshots].sort((left, right) => {
+      const leftRank = rankByKey.get(left.key) ?? SNAPSHOT_ORDER.length;
+      const rightRank = rankByKey.get(right.key) ?? SNAPSHOT_ORDER.length;
+      if (leftRank !== rightRank) {
+        return leftRank - rightRank;
+      }
+
+      return right.time - left.time;
+    });
+  }, [snapshots]);
 
   const formatTime = (ts: number) => {
     const d = new Date(ts);
@@ -107,7 +320,7 @@ export default function DebugPanel() {
           'fixed bottom-4 right-4 z-[70] w-10 h-10 rounded-full flex items-center justify-center shadow-lg border border-border-color transition-colors',
           'bg-bg-secondary/90 dark:bg-brand-800/90 backdrop-blur-sm hover:bg-bg-secondary dark:hover:bg-brand-800',
         )}
-        title="Debug Panel"
+        title={t('debug.panelTitle')}
       >
         <Bug className="w-4 h-4 text-text-primary" />
         {logs.length > 0 && (
@@ -124,10 +337,12 @@ export default function DebugPanel() {
       <div className="flex items-center justify-between px-3 py-2 border-b border-border-color/50">
         <div className="flex items-center gap-2">
           <Bug className="w-4 h-4 text-accent" />
-          <span className="text-xs font-semibold text-text-primary">Debug ({logs.length})</span>
+          <span className="text-xs font-semibold text-text-primary">
+            {t('debug.titleWithCount', { count: logs.length })}
+          </span>
         </div>
         <div className="flex items-center gap-1">
-          <button onClick={handleClear} className="p-1 rounded hover:bg-white/10 text-text-secondary transition-colors" title="Clear logs">
+          <button onClick={handleClear} className="p-1 rounded hover:bg-white/10 text-text-secondary transition-colors" title={t('debug.clearLogs')}>
             <Trash2 className="w-3.5 h-3.5" />
           </button>
           <button onClick={() => setIsOpen(false)} className="p-1 rounded hover:bg-white/10 text-text-secondary transition-colors">
@@ -144,7 +359,7 @@ export default function DebugPanel() {
             filter === 'all' ? 'bg-accent text-white' : 'bg-white/5 text-text-secondary hover:bg-white/10',
           )}
         >
-          All
+          {t('debug.filters.all')}
         </button>
         <button
           type="button"
@@ -154,7 +369,7 @@ export default function DebugPanel() {
             filter === 'errors' ? 'bg-red-500 text-white' : 'bg-white/5 text-text-secondary hover:bg-white/10',
           )}
         >
-          Errors
+          {t('debug.filters.errors')}
         </button>
         <button
           type="button"
@@ -164,14 +379,14 @@ export default function DebugPanel() {
             filter === 'logs' ? 'bg-brand-700 text-white' : 'bg-white/5 text-text-secondary hover:bg-white/10',
           )}
         >
-          Logs
+          {t('debug.filters.logs')}
         </button>
       </div>
       <div className="grid grid-cols-2 gap-2 border-b border-border-color/50 p-2">
         <div className="col-span-2 flex items-center justify-between rounded-lg border border-border-color/50 px-3 py-2">
           <div className="min-w-0">
-            <div className="text-xs font-medium text-text-primary">Reader Telemetry</div>
-            <div className="text-[10px] text-text-secondary">Verbose reader layout snapshots and preheat source logs</div>
+            <div className="text-xs font-medium text-text-primary">{t('debug.features.readerTelemetry.label')}</div>
+            <div className="text-[10px] text-text-secondary">{t('debug.features.readerTelemetry.description')}</div>
           </div>
           <Toggle
             checked={featureFlags.readerTelemetry}
@@ -181,45 +396,100 @@ export default function DebugPanel() {
             className="ml-3"
           />
         </div>
+        <div className="col-span-2 flex items-center justify-between rounded-lg border border-border-color/50 px-3 py-2">
+          <div className="min-w-0">
+            <div className="text-xs font-medium text-text-primary">{t('debug.features.readerLegacyPlainScroll.label')}</div>
+            <div className="text-[10px] text-text-secondary">{t('debug.features.readerLegacyPlainScroll.description')}</div>
+          </div>
+          <Toggle
+            checked={featureFlags.readerLegacyPlainScroll}
+            onChange={(checked) => {
+              setDebugFeatureEnabled('readerLegacyPlainScroll', checked);
+            }}
+            className="ml-3"
+          />
+        </div>
         <button
           onClick={() => window.history.back()}
           className="flex items-center justify-center gap-2 rounded-lg border border-border-color/50 px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-white/10"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
-          Go Back
+          {t('debug.actions.goBack')}
         </button>
         <button
           onClick={triggerDebugInstallPrompt}
           className="flex items-center justify-center gap-2 rounded-lg border border-border-color/50 px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-white/10"
         >
           <Download className="h-3.5 w-3.5" />
-          Install Prompt
+          {t('debug.actions.installPrompt')}
         </button>
         <button
           onClick={triggerDebugIosInstallHint}
           className="flex items-center justify-center gap-2 rounded-lg border border-border-color/50 px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-white/10"
         >
           <Smartphone className="h-3.5 w-3.5" />
-          iOS Hint
+          {t('debug.actions.iosHint')}
         </button>
         <button
           onClick={triggerDebugUpdateToast}
           className="flex items-center justify-center gap-2 rounded-lg border border-border-color/50 px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-white/10"
         >
           <RefreshCw className="h-3.5 w-3.5" />
-          Update Toast
+          {t('debug.actions.updateToast')}
         </button>
         <button
           onClick={triggerDebugResetPwaPrompts}
           className="flex items-center justify-center gap-2 rounded-lg border border-border-color/50 px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-white/10"
         >
           <RotateCcw className="h-3.5 w-3.5" />
-          Reset PWA
+          {t('debug.actions.resetPwa')}
         </button>
+      </div>
+      <div className="border-b border-border-color/50 p-2">
+        <div className="mb-2 flex items-center justify-between">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-text-secondary/80">
+            {t('debug.diagnostics.title')}
+          </span>
+          <span className="text-[10px] text-text-secondary/60">
+            {orderedSnapshots.length}
+          </span>
+        </div>
+        <div className="space-y-2">
+          {orderedSnapshots.length === 0 && (
+            <div className="rounded-lg border border-white/5 bg-black/10 px-3 py-2 text-[11px] text-text-secondary">
+              {t('debug.diagnostics.empty')}
+            </div>
+          )}
+          {orderedSnapshots.map((snapshot) => (
+            <section
+              key={getDebugSnapshotKey(snapshot)}
+              className="rounded-lg border border-white/5 bg-black/10 px-3 py-2"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-[11px] font-semibold text-text-primary">
+                  {getSnapshotLabel(snapshot.key, t)}
+                </span>
+                <span className="shrink-0 text-[10px] text-text-secondary/60">
+                  {formatDiagnosticTime(snapshot.time)}
+                </span>
+              </div>
+              <div className="mt-2 space-y-1">
+                {buildSnapshotPreview(snapshot, t).map((line) => (
+                  <div key={line} className="text-[10px] text-text-secondary/90">
+                    {line}
+                  </div>
+                ))}
+              </div>
+              <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-all rounded bg-black/15 p-2 text-[10px] text-text-secondary/90">
+                {JSON.stringify(snapshot.value, null, 2)}
+              </pre>
+            </section>
+          ))}
+        </div>
       </div>
       <div ref={listRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-2 space-y-0.5 text-[11px] font-mono leading-relaxed custom-scrollbar">
         {visibleLogs.length === 0 && (
-          <div className="text-text-secondary text-center py-8">No logs yet</div>
+          <div className="text-text-secondary text-center py-8">{t('debug.logsEmpty')}</div>
         )}
         {visibleLogs.map((entry) => (
           <div
@@ -246,21 +516,21 @@ export default function DebugPanel() {
                 <summary className="cursor-pointer select-none font-semibold text-text-primary/85">
                   {entry.error.code} · {entry.error.kind}
                   {' · '}
-                  retryable={String(entry.error.retryable)}
+                  {t('debug.errorDetails.retryable', { value: String(entry.error.retryable) })}
                 </summary>
                 <div className="mt-2 space-y-1 break-all">
-                  <div>source: {entry.error.source}</div>
-                  <div>userVisible: {String(entry.error.userVisible)}</div>
-                  <div>debugVisible: {String(entry.error.debugVisible)}</div>
+                  <div>{t('debug.errorDetails.source', { value: entry.error.source })}</div>
+                  <div>{t('debug.errorDetails.userVisible', { value: String(entry.error.userVisible) })}</div>
+                  <div>{t('debug.errorDetails.debugVisible', { value: String(entry.error.debugVisible) })}</div>
                   {entry.error.userMessageKey && (
-                    <div>messageKey: {entry.error.userMessageKey}</div>
+                    <div>{t('debug.errorDetails.messageKey', { value: entry.error.userMessageKey })}</div>
                   )}
                   {entry.error.details && (
                     <pre className="whitespace-pre-wrap text-[10px] text-text-secondary/90">
                       {JSON.stringify(entry.error.details, null, 2)}
                     </pre>
                   )}
-                  {entry.error.cause?.message && <div>cause: {entry.error.cause.message}</div>}
+                  {entry.error.cause?.message && <div>{t('debug.errorDetails.cause', { value: entry.error.cause.message })}</div>}
                   {entry.error.stack && (
                     <pre className="max-h-48 overflow-auto whitespace-pre-wrap text-[10px] text-text-secondary/90">
                       {entry.error.stack}

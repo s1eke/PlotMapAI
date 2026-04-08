@@ -4,10 +4,11 @@ import { UploadCloud, FileText, Loader2 } from 'lucide-react';
 
 import { importBookAndRefreshLibrary } from '@application/use-cases/library';
 import type { BookImportProgress } from '@domains/book-import';
-import { reportAppError } from '@shared/debug';
+import { reportAppError, setDebugSnapshot } from '@shared/debug';
 import {
   AppErrorCode,
   createAppError,
+  serializeAppError,
   toAppError,
   translateAppError,
   type AppError,
@@ -31,6 +32,24 @@ interface UploadBatchState {
   totalFiles: number;
   currentFileName: string;
   progress: BookImportProgress;
+}
+
+function buildImportProgressLabel(
+  progress: BookImportProgress,
+  stageLabel: string,
+): string {
+  const detailParts = [
+    progress.current != null && progress.total != null
+      ? `${progress.current}/${progress.total}`
+      : null,
+    progress.detail ?? null,
+  ].filter((value): value is string => Boolean(value));
+
+  if (detailParts.length === 0) {
+    return stageLabel;
+  }
+
+  return `${stageLabel} · ${detailParts.join(' · ')}`;
 }
 
 function validateImportFile(file: File): AppError | null {
@@ -80,8 +99,21 @@ export default function UploadModal({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const autoProcessedFilesRef = useRef<File[] | null>(null);
+  const latestProgressRef = useRef<BookImportProgress | null>(null);
+  const progressRafRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (progressRafRef.current !== null) {
+        cancelAnimationFrame(progressRafRef.current);
+      }
+    };
+  }, []);
 
   const currentStageLabel = batchState ? t(`bookshelf.workerStages.${batchState.progress.stage}`) : null;
+  const currentProgressLabel = batchState && currentStageLabel
+    ? buildImportProgressLabel(batchState.progress, currentStageLabel)
+    : null;
   let currentFileLabel: string | null = null;
   if (batchState) {
     if (batchState.totalFiles > 1) {
@@ -137,16 +169,35 @@ export default function UploadModal({
         await importBookAndRefreshLibrary(file, {
           signal: controller.signal,
           onProgress: (progress) => {
-            setBatchState((current) => {
-              if (!current || current.currentFileIndex !== index) {
-                return current;
-              }
+            latestProgressRef.current = progress;
+            if (progressRafRef.current === null) {
+              progressRafRef.current = requestAnimationFrame(() => {
+                progressRafRef.current = null;
+                const p = latestProgressRef.current;
+                if (!p) return;
 
-              return {
-                ...current,
-                progress,
-              };
-            });
+                setBatchState((current) => {
+                  if (!current || current.currentFileIndex !== index) {
+                    return current;
+                  }
+
+                  if (
+                    current.progress.progress === p.progress &&
+                    current.progress.stage === p.stage &&
+                    current.progress.detail === p.detail &&
+                    current.progress.current === p.current &&
+                    current.progress.total === p.total
+                  ) {
+                    return current;
+                  }
+
+                  return {
+                    ...current,
+                    progress: p,
+                  };
+                });
+              });
+            }
           },
         });
         importedCount += 1;
@@ -178,6 +229,10 @@ export default function UploadModal({
       }
     } finally {
       abortControllerRef.current = null;
+      if (progressRafRef.current !== null) {
+        cancelAnimationFrame(progressRafRef.current);
+        progressRafRef.current = null;
+      }
       setIsUploading(false);
       setBatchState(null);
       if (fileInputRef.current) {
@@ -203,6 +258,18 @@ export default function UploadModal({
       }
     });
   }, [initialFiles, isOpen, isUploading, onInitialFilesHandled, processFiles]);
+
+  useEffect(() => {
+    setDebugSnapshot('book-import', {
+      active: isUploading,
+      currentFileIndex: batchState ? batchState.currentFileIndex + 1 : null,
+      currentFileName: batchState?.currentFileName ?? null,
+      error: error ? serializeAppError(error) : null,
+      operation: 'import',
+      progress: batchState?.progress ?? null,
+      totalFiles: batchState?.totalFiles ?? 0,
+    });
+  }, [batchState, error, isUploading]);
 
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
@@ -266,8 +333,11 @@ export default function UploadModal({
               {isUploading ? t('bookshelf.uploadAndProcessing') : t('bookshelf.clickOrDrag')}
             </p>
             <p className="text-sm text-text-secondary mt-1 max-w-[250px] mx-auto">
-              {isUploading && currentStageLabel
-                ? t('bookshelf.progressDetail', { percent: batchState?.progress.progress ?? 0, stage: currentStageLabel })
+              {isUploading && currentProgressLabel
+                ? t('bookshelf.progressDetail', {
+                  percent: batchState?.progress.progress ?? 0,
+                  stage: currentProgressLabel,
+                })
                 : t('bookshelf.supportHint')}
             </p>
           </div>
@@ -285,7 +355,9 @@ export default function UploadModal({
                   style={{ width: `${batchState.progress.progress}%` }}
                 />
               </div>
-              <p className="text-xs text-text-secondary">{currentStageLabel}</p>
+              <p className="text-xs text-text-secondary">
+                {currentProgressLabel ?? currentStageLabel}
+              </p>
             </div>
           ) : (
             <div className="flex items-center gap-2 mt-2 text-xs text-text-secondary">

@@ -13,7 +13,7 @@ describe('PurificationRuleModal', () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
   });
 
-  it('submits changed rule values, toggles, and scopes on success', async () => {
+  it('submits changed rule values, toggles, and stage/scope selections on success', async () => {
     const onClose = vi.fn();
     const onSave = vi.fn().mockResolvedValue(undefined);
     const user = userEvent.setup();
@@ -25,7 +25,8 @@ describe('PurificationRuleModal', () => {
     await user.type(screen.getByPlaceholderText('settings.purification.patternPlaceholder'), 'foo');
     await user.type(screen.getByPlaceholderText('settings.purification.replacementPlaceholder'), 'bar');
     await user.click(screen.getAllByRole('switch')[0]);
-    await user.click(screen.getByRole('checkbox', { name: 'settings.purification.scopeTitle' }));
+    await user.selectOptions(screen.getAllByRole('combobox')[0], 'heading');
+    await user.selectOptions(screen.getAllByRole('combobox')[1], 'plain-text-only');
 
     await user.click(screen.getByRole('button', { name: 'common.actions.add' }));
 
@@ -35,8 +36,9 @@ describe('PurificationRuleModal', () => {
       pattern: 'foo',
       replacement: 'bar',
       isRegex: false,
-      scopeTitle: false,
-      scopeContent: true,
+      targetScope: 'heading',
+      executionStage: 'plain-text-only',
+      ruleVersion: 2,
     }));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
@@ -86,8 +88,9 @@ describe('PurificationRuleModal', () => {
           isRegex: true,
           isEnabled: true,
           order: 3,
-          scopeTitle: true,
-          scopeContent: true,
+          targetScope: 'all',
+          executionStage: 'post-ast',
+          ruleVersion: 2,
           isDefault: false,
           timeoutMs: 3000,
         }}

@@ -3,12 +3,18 @@ import type { NovelView } from '@domains/library';
 import type { AppError } from '@shared/errors';
 
 import { analysisService } from '@domains/analysis';
+import { chapterRichContentRepository } from '@domains/book-content';
 import { novelRepository } from '@domains/library';
-import { ensureDefaultTocRules, tocRuleRepository } from '@domains/settings';
+import {
+  ensureDefaultPurificationRules,
+  ensureDefaultTocRules,
+  purificationRuleRepository,
+  tocRuleRepository,
+} from '@domains/settings';
 import { AppErrorCode, toAppError } from '@shared/errors';
 
+import { loadAnalysisBookChapters } from '@application/services/analysisTextProjectionService';
 import { bookLifecycleService } from '@application/services/bookLifecycleService';
-import { loadPurifiedBookChapters } from '@application/services/readerContentController';
 
 export interface BookDetailAnalysisData {
   analysisStatus: Awaited<ReturnType<typeof analysisService.getStatus>> | null;
@@ -16,12 +22,69 @@ export interface BookDetailAnalysisData {
 }
 
 export interface BookDetailPageData extends BookDetailAnalysisData {
+  contentSummary: BookDetailContentSummary;
   novel: NovelView;
 }
 
 export interface CharacterGraphPageData {
   graph: CharacterGraphResponse;
   novel: NovelView;
+}
+
+export interface BookDetailContentSummary {
+  contentFormat: 'plain' | 'rich';
+  contentVersion: number | null;
+  importFormatVersion: number | null;
+  lastParsedAt: string | null;
+}
+
+type NovelRichContentList = Awaited<
+  ReturnType<typeof chapterRichContentRepository.listNovelChapterRichContents>
+>;
+
+function buildBookDetailContentSummary(
+  richContents: NovelRichContentList,
+): BookDetailContentSummary {
+  if (richContents.length === 0) {
+    return {
+      contentFormat: 'plain',
+      contentVersion: null,
+      importFormatVersion: null,
+      lastParsedAt: null,
+    };
+  }
+
+  const contentFormat = richContents.some((chapter) => chapter.contentFormat === 'rich')
+    ? 'rich'
+    : 'plain';
+  const contentVersion = richContents.reduce<number | null>((latest, chapter) => {
+    if (latest == null) {
+      return chapter.contentVersion;
+    }
+
+    return Math.max(latest, chapter.contentVersion);
+  }, null);
+  const importFormatVersion = richContents.reduce<number | null>((latest, chapter) => {
+    if (latest == null) {
+      return chapter.importFormatVersion;
+    }
+
+    return Math.max(latest, chapter.importFormatVersion);
+  }, null);
+  const lastParsedAt = richContents.reduce<string | null>((latest, chapter) => {
+    if (latest == null || latest < chapter.updatedAt) {
+      return chapter.updatedAt;
+    }
+
+    return latest;
+  }, null);
+
+  return {
+    contentFormat,
+    contentVersion,
+    importFormatVersion,
+    lastParsedAt,
+  };
 }
 
 export async function deleteNovelAndCleanupArtifacts(
@@ -34,9 +97,38 @@ export async function importBookAndRefreshLibrary(
   file: File,
   options: import('@domains/book-import').ImportBookOptions = {},
 ): Promise<NovelView> {
-  await ensureDefaultTocRules();
-  const tocRules = await tocRuleRepository.getEnabledChapterDetectionRules();
-  return bookLifecycleService.importBook(file, tocRules, options);
+  await Promise.all([
+    ensureDefaultTocRules(),
+    ensureDefaultPurificationRules(),
+  ]);
+  const [tocRules, purificationRules] = await Promise.all([
+    tocRuleRepository.getEnabledChapterDetectionRules(),
+    purificationRuleRepository.getEnabledPurificationRules(),
+  ]);
+  return bookLifecycleService.importBook(file, tocRules, {
+    ...options,
+    purificationRules,
+  });
+}
+
+export async function reparseBookAndRefreshDetail(
+  novelId: number,
+  file: File,
+  options: import('@domains/book-import').ImportBookOptions = {},
+): Promise<NovelView> {
+  await Promise.all([
+    ensureDefaultTocRules(),
+    ensureDefaultPurificationRules(),
+  ]);
+  const [tocRules, purificationRules] = await Promise.all([
+    tocRuleRepository.getEnabledChapterDetectionRules(),
+    purificationRuleRepository.getEnabledPurificationRules(),
+  ]);
+
+  return bookLifecycleService.reparseBook(novelId, file, tocRules, {
+    ...options,
+    purificationRules,
+  });
 }
 
 export async function loadBookDetailAnalysisStatus(
@@ -62,12 +154,14 @@ export async function loadBookDetailAnalysisStatus(
 }
 
 export async function loadBookDetailPageData(novelId: number): Promise<BookDetailPageData> {
-  const [novel, analysisData] = await Promise.all([
+  const [novel, analysisData, richContents] = await Promise.all([
     novelRepository.get(novelId),
     loadBookDetailAnalysisStatus(novelId),
+    chapterRichContentRepository.listNovelChapterRichContents(novelId),
   ]);
 
   return {
+    contentSummary: buildBookDetailContentSummary(richContents),
     novel,
     ...analysisData,
   };
@@ -78,7 +172,7 @@ export async function loadCharacterGraphPageData(
 ): Promise<CharacterGraphPageData> {
   const [novel, chapters] = await Promise.all([
     novelRepository.get(novelId),
-    loadPurifiedBookChapters(novelId),
+    loadAnalysisBookChapters(novelId),
   ]);
 
   return {

@@ -16,9 +16,13 @@ export interface ReaderImageActivationPayload {
 export type ReaderImageGalleryEntry = ChapterImageGalleryEntry;
 
 export function buildReaderImageGalleryEntries(
-  chapter: Pick<ChapterContent, 'content' | 'index' | 'title'>,
+  chapter: Pick<ChapterContent, 'index' | 'plainText' | 'title'>,
 ): ReaderImageGalleryEntry[] {
-  return buildChapterImageGalleryEntries(chapter);
+  return buildChapterImageGalleryEntries({
+    content: chapter.plainText,
+    index: chapter.index,
+    title: chapter.title,
+  });
 }
 
 export function createReaderImageEntryId(entry: Pick<ReaderImageGalleryEntry, 'blockIndex' | 'chapterIndex' | 'imageKey'>): string {

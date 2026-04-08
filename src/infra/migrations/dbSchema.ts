@@ -1,14 +1,25 @@
 import type { ChapterRecord, NovelRecord } from '@infra/db/library';
+import type { PurificationRuleRecord } from '@infra/db/settings';
 import type { DbSchemaMigration } from './types';
 
 import Dexie, { type Transaction } from 'dexie';
 
 import { ANALYSIS_DB_SCHEMA } from '@infra/db/analysis';
-import { LIBRARY_DB_SCHEMA } from '@infra/db/library';
+import {
+  LEGACY_LIBRARY_DB_SCHEMA,
+  LIBRARY_DB_SCHEMA,
+} from '@infra/db/library';
 import { READER_DB_SCHEMA } from '@infra/db/reader';
 import { SETTINGS_DB_SCHEMA } from '@infra/db/settings';
 
-const BASELINE_DB_SCHEMA = {
+const LEGACY_BASELINE_DB_SCHEMA = {
+  ...LEGACY_LIBRARY_DB_SCHEMA,
+  ...SETTINGS_DB_SCHEMA,
+  ...ANALYSIS_DB_SCHEMA,
+  ...READER_DB_SCHEMA,
+} as const;
+
+const CURRENT_DB_SCHEMA = {
   ...LIBRARY_DB_SCHEMA,
   ...SETTINGS_DB_SCHEMA,
   ...ANALYSIS_DB_SCHEMA,
@@ -39,6 +50,41 @@ async function backfillNovelChapterCounts(transaction: Transaction): Promise<voi
     });
 }
 
+async function migratePurificationRulesToVersionTwo(transaction: Transaction): Promise<void> {
+  await transaction
+    .table<PurificationRuleRecord, 'id'>('purificationRules')
+    .toCollection()
+    .modify((rule) => {
+      if (rule.targetScope && rule.executionStage && rule.ruleVersion) {
+        return;
+      }
+
+      const legacyRule = rule;
+      const hasContentScope = rule.scopeContent ?? false;
+      const hasTitleScope = rule.scopeTitle ?? false;
+      let targetScope: 'all' | 'heading' | 'text' = 'text';
+      if (hasContentScope) {
+        targetScope = 'all';
+      } else if (hasTitleScope) {
+        targetScope = 'heading';
+      }
+
+      legacyRule.targetScope = targetScope;
+      legacyRule.executionStage = 'post-ast';
+      legacyRule.ruleVersion = 2;
+
+      if (!hasContentScope && !hasTitleScope) {
+        legacyRule.isEnabled = false;
+      }
+    });
+}
+
+async function clearReaderRenderCacheForIdentityUpgrade(
+  transaction: Transaction,
+): Promise<void> {
+  await transaction.table('readerRenderCache').clear();
+}
+
 export const DB_SCHEMA_MIGRATIONS: readonly DbSchemaMigration[] = [{
   version: 1,
   scope: 'db-schema',
@@ -46,7 +92,7 @@ export const DB_SCHEMA_MIGRATIONS: readonly DbSchemaMigration[] = [{
   retireWhen: {
     condition: 'Keep while any supported client may still open a version 1 database.',
   },
-  stores: BASELINE_DB_SCHEMA,
+  stores: LEGACY_BASELINE_DB_SCHEMA,
 }, {
   version: 2,
   scope: 'db-schema',
@@ -54,8 +100,34 @@ export const DB_SCHEMA_MIGRATIONS: readonly DbSchemaMigration[] = [{
   retireWhen: {
     condition: 'Remove once version 1 databases are no longer supported in the field.',
   },
-  stores: BASELINE_DB_SCHEMA,
+  stores: LEGACY_BASELINE_DB_SCHEMA,
   upgrade: backfillNovelChapterCounts,
+}, {
+  version: 3,
+  scope: 'db-schema',
+  description: 'Add chapterRichContents for structured rich chapter storage.',
+  retireWhen: {
+    condition: 'Keep while any supported client may still open a version 2 database.',
+  },
+  stores: CURRENT_DB_SCHEMA,
+}, {
+  version: 4,
+  scope: 'db-schema',
+  description: 'Migrate purification rules to targetScope/executionStage/ruleVersion model.',
+  retireWhen: {
+    condition: 'Keep while any supported client may still open a version 3 database.',
+  },
+  stores: CURRENT_DB_SCHEMA,
+  upgrade: migratePurificationRulesToVersionTwo,
+}, {
+  version: 5,
+  scope: 'db-schema',
+  description: 'Clear readerRenderCache so render identity upgrades rebuild paged and scroll layouts.',
+  retireWhen: {
+    condition: 'Keep while any supported client may still open a version 4 database.',
+  },
+  stores: CURRENT_DB_SCHEMA,
+  upgrade: clearReaderRenderCacheForIdentityUpgrade,
 }] as const;
 
 export const CURRENT_DB_SCHEMA_VERSION = DB_SCHEMA_MIGRATIONS.at(-1)?.version ?? 1;

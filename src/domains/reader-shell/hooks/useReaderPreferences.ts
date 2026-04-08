@@ -5,7 +5,7 @@ import {
   useReaderAppearanceSelector,
 } from '@shared/stores/readerAppearanceStore';
 
-import { READER_THEMES } from '../constants/readerThemes';
+import { READER_THEMES, type ReaderThemeConfig } from '../constants/readerThemes';
 import {
   ensureReaderPreferencesHydrated,
   setReaderPageTurnMode,
@@ -14,16 +14,8 @@ import {
   useReaderPreferencesSelector,
 } from './readerPreferencesStore';
 
-const HEADER_BG_MAP: Record<string, string> = {
-  auto: 'bg-bg-primary',
-  paper: 'bg-white',
-  parchment: 'bg-[#f4ecd8]',
-  green: 'bg-[#c7edcc]',
-  night: 'bg-[#1a1a1a]',
-};
-
 export interface UseReaderPreferencesResult {
-  currentTheme: typeof READER_THEMES.auto;
+  currentTheme: ReaderThemeConfig;
   fontSize: number;
   headerBg: string;
   lineSpacing: number;
@@ -55,8 +47,10 @@ export function useReaderPreferences(): UseReaderPreferencesResult {
     paragraphSpacing,
   }), [fontSize, lineSpacing, pageTurnMode, paragraphSpacing, readerTheme]);
 
-  const currentTheme = READER_THEMES[preferences.readerTheme] || READER_THEMES.auto;
-  const headerBg = HEADER_BG_MAP[preferences.readerTheme] || HEADER_BG_MAP.auto;
+  const currentTheme =
+    READER_THEMES[preferences.readerTheme as keyof typeof READER_THEMES]
+    || READER_THEMES.auto;
+  const { headerBg } = currentTheme;
 
   const handleSetFontSize = useCallback((nextFontSize: number) => {
     setTypography({ fontSize: nextFontSize });

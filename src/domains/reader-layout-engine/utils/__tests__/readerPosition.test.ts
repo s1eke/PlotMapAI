@@ -59,12 +59,12 @@ describe('readerPosition', () => {
     })).toBe(true);
     expect(hasReaderRestoreTarget({
       chapterIndex: 0,
-      mode: 'scroll',
+      mode: 'summary',
       chapterProgress: 0,
     })).toBe(true);
     expect(canSkipReaderRestore({
       chapterIndex: 0,
-      mode: 'scroll',
+      mode: 'summary',
       chapterProgress: 0,
     })).toBe(false);
     expect(hasReaderRestoreTarget({
@@ -87,12 +87,12 @@ describe('readerPosition', () => {
     expect(shouldKeepReaderRestoreMask(null)).toBe(false);
     expect(shouldKeepReaderRestoreMask({
       chapterIndex: 0,
-      mode: 'scroll',
+      mode: 'summary',
       chapterProgress: 0,
     })).toBe(false);
     expect(shouldKeepReaderRestoreMask({
       chapterIndex: 0,
-      mode: 'scroll',
+      mode: 'summary',
       chapterProgress: 0.4,
     })).toBe(true);
     expect(shouldKeepReaderRestoreMask({

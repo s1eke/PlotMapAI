@@ -37,6 +37,9 @@ const INITIAL_READER_IMAGE_VIEWER_SESSION_STATE: ReaderImageViewerSessionState =
   isOpen: false,
   originRect: null,
 };
+const READER_IMAGE_VIEWER_HISTORY_STATE_KEY = '__plotmapai_reader_image_viewer';
+
+let readerImageViewerHistorySequence = 0;
 
 function createClosedImageViewerSessionState(
   previousState: ReaderImageViewerSessionState,
@@ -46,6 +49,38 @@ function createClosedImageViewerSessionState(
     isIndexLoading: false,
     isOpen: false,
   };
+}
+
+function createReaderImageViewerHistoryToken(): string {
+  readerImageViewerHistorySequence += 1;
+  return `reader-image-viewer:${readerImageViewerHistorySequence}`;
+}
+
+function readReaderImageViewerHistoryToken(state: unknown): string | null {
+  if (!state || typeof state !== 'object') {
+    return null;
+  }
+
+  const token = (state as Record<string, unknown>)[READER_IMAGE_VIEWER_HISTORY_STATE_KEY];
+  return typeof token === 'string' ? token : null;
+}
+
+function readCurrentReaderImageViewerHistoryToken(): string | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  return readReaderImageViewerHistoryToken(window.history.state);
+}
+
+function createHistoryStateWithImageViewerToken(token: string): Record<string, unknown> {
+  const currentState = window.history.state;
+  const nextState = currentState && typeof currentState === 'object'
+    ? { ...(currentState as Record<string, unknown>) }
+    : {};
+
+  nextState[READER_IMAGE_VIEWER_HISTORY_STATE_KEY] = token;
+  return nextState;
 }
 
 export function useReaderPageImageViewerSession({
@@ -62,31 +97,63 @@ export function useReaderPageImageViewerSession({
   );
   const imageElementRegistryRef = useRef<Map<string, HTMLButtonElement>>(new Map());
   const imageViewerFocusRestoreRef = useRef<HTMLElement | null>(null);
+  const imageViewerHistoryTokenRef = useRef<string | null>(null);
+  const isSyncingImageViewerHistoryRef = useRef(false);
   const sessionStateRef = useRef(sessionState);
 
   useEffect(() => {
     sessionStateRef.current = sessionState;
   }, [sessionState]);
 
-  useEffect(() => {
-    imageElementRegistryRef.current.clear();
-    imageViewerFocusRestoreRef.current = null;
-    startTransition(() => {
-      setSessionState(INITIAL_READER_IMAGE_VIEWER_SESSION_STATE);
-    });
-  }, [novelId]);
+  const clearImageViewerHistoryTracking = useCallback((): void => {
+    imageViewerHistoryTokenRef.current = null;
+    isSyncingImageViewerHistoryRef.current = false;
+  }, []);
 
-  useEffect(() => {
-    if (isEnabled) {
-      return;
-    }
+  const closeImageViewerInternal = useCallback((syncHistory: boolean): void => {
+    const focusTarget = imageViewerFocusRestoreRef.current;
+    const historyToken = imageViewerHistoryTokenRef.current;
 
     setSessionState((previousState) => (
       previousState.isOpen
         ? createClosedImageViewerSessionState(previousState)
         : previousState
     ));
-  }, [isEnabled]);
+
+    if (
+      syncHistory
+      && historyToken
+      && readCurrentReaderImageViewerHistoryToken() === historyToken
+    ) {
+      isSyncingImageViewerHistoryRef.current = true;
+      window.history.back();
+    } else if (historyToken) {
+      clearImageViewerHistoryTracking();
+    }
+
+    window.setTimeout(() => {
+      if (focusTarget && focusTarget.isConnected) {
+        focusTarget.focus();
+      }
+    }, 0);
+  }, [clearImageViewerHistoryTracking]);
+
+  useEffect(() => {
+    imageElementRegistryRef.current.clear();
+    imageViewerFocusRestoreRef.current = null;
+    clearImageViewerHistoryTracking();
+    startTransition(() => {
+      setSessionState(INITIAL_READER_IMAGE_VIEWER_SESSION_STATE);
+    });
+  }, [clearImageViewerHistoryTracking, novelId]);
+
+  useEffect(() => {
+    if (isEnabled) {
+      return;
+    }
+
+    closeImageViewerInternal(true);
+  }, [closeImageViewerInternal, isEnabled]);
 
   useEffect(() => {
     setSessionState((previousState) => (
@@ -132,18 +199,8 @@ export function useReaderPageImageViewerSession({
   }, []);
 
   const closeImageViewer = useCallback(() => {
-    const focusTarget = imageViewerFocusRestoreRef.current;
-    setSessionState((previousState) => (
-      previousState.isOpen
-        ? createClosedImageViewerSessionState(previousState)
-        : previousState
-    ));
-    window.setTimeout(() => {
-      if (focusTarget && focusTarget.isConnected) {
-        focusTarget.focus();
-      }
-    }, 0);
-  }, []);
+    closeImageViewerInternal(true);
+  }, [closeImageViewerInternal]);
 
   const handleImageActivate = useCallback((payload: ReaderImageActivationPayload) => {
     imageViewerFocusRestoreRef.current = payload.sourceElement;
@@ -208,6 +265,58 @@ export function useReaderPageImageViewerSession({
     }));
     return true;
   }, [ensureImageGalleryEntriesLoaded, entriesRef, isIndexResolved]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !sessionState.isOpen || imageViewerHistoryTokenRef.current) {
+      return;
+    }
+
+    const historyToken = createReaderImageViewerHistoryToken();
+    window.history.pushState(
+      createHistoryStateWithImageViewerToken(historyToken),
+      '',
+      window.location.href,
+    );
+    imageViewerHistoryTokenRef.current = historyToken;
+  }, [sessionState.isOpen]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return undefined;
+    }
+
+    const handlePopState = (event: PopStateEvent) => {
+      const historyToken = imageViewerHistoryTokenRef.current;
+      if (!historyToken) {
+        return;
+      }
+
+      const nextHistoryToken = readReaderImageViewerHistoryToken(event.state);
+      if (isSyncingImageViewerHistoryRef.current) {
+        isSyncingImageViewerHistoryRef.current = false;
+        if (nextHistoryToken !== historyToken) {
+          imageViewerHistoryTokenRef.current = null;
+        }
+        return;
+      }
+
+      if (nextHistoryToken === historyToken) {
+        return;
+      }
+
+      if (sessionStateRef.current.isOpen) {
+        closeImageViewerInternal(false);
+        return;
+      }
+
+      clearImageViewerHistoryTracking();
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [clearImageViewerHistoryTracking, closeImageViewerInternal]);
 
   return {
     closeImageViewer,

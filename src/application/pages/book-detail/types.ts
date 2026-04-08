@@ -23,6 +23,7 @@ export interface BookDetailPageViewModel {
   analysisStatus: AnalysisStatusResponse | null;
   analysisStatusError: AppError | null;
   characterChartData: AnalysisOverview['characterStats'];
+  contentSummary: BookDetailContentSummary;
   coverUrl: string | null;
   deleteFlow: BookDetailDeleteFlow;
   error: AppError | null;
@@ -40,6 +41,13 @@ export interface BookDetailPageViewModel {
 
 export type BookDetailAnalysisAction = 'start' | 'pause' | 'resume' | 'restart';
 export type BookDetailActionTone = 'neutral' | 'brand' | 'brand-soft' | 'warning' | 'danger';
+
+export interface BookDetailContentSummary {
+  contentFormat: 'plain' | 'rich';
+  contentVersion: number | null;
+  importFormatVersion: number | null;
+  lastParsedAt: string | null;
+}
 
 export interface BookDetailAnalysisActionButtonModel {
   disabled: boolean;

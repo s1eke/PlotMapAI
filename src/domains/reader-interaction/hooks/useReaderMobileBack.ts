@@ -2,7 +2,9 @@ import { useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 interface UseReaderMobileBackParams {
+  closeImageViewer?: () => void;
   fallbackHref: string;
+  isImageViewerOpen?: boolean;
   isSidebarOpen: boolean;
   closeSidebar: () => void;
 }
@@ -21,13 +23,20 @@ function getHistoryIndex(): number {
 }
 
 export function useReaderMobileBack({
+  closeImageViewer,
   fallbackHref,
+  isImageViewerOpen = false,
   isSidebarOpen,
   closeSidebar,
 }: UseReaderMobileBackParams): UseReaderMobileBackResult {
   const navigate = useNavigate();
 
   const handleMobileBack = useCallback(() => {
+    if (isImageViewerOpen) {
+      closeImageViewer?.();
+      return;
+    }
+
     if (isSidebarOpen) {
       closeSidebar();
       return;
@@ -39,7 +48,7 @@ export function useReaderMobileBack({
     }
 
     navigate(fallbackHref, { replace: true });
-  }, [closeSidebar, fallbackHref, isSidebarOpen, navigate]);
+  }, [closeImageViewer, closeSidebar, fallbackHref, isImageViewerOpen, isSidebarOpen, navigate]);
 
   return {
     handleMobileBack,

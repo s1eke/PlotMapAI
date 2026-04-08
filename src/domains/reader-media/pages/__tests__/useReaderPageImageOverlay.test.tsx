@@ -46,6 +46,7 @@ function createEntry(
 describe('useReaderPageImageOverlay', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.history.replaceState({ idx: 0 }, '', '#/novel/1/read');
     vi.mocked(readerContentService.getImageGalleryEntries).mockResolvedValue([]);
     preloadReaderImageResourcesMock.mockResolvedValue(undefined);
   });
@@ -174,6 +175,104 @@ describe('useReaderPageImageOverlay', () => {
     });
 
     expect(document.activeElement).toBe(sourceElement);
+  });
+
+  it('closes the viewer when browser back pops the image-viewer history entry', async () => {
+    vi.mocked(readerContentService.getImageGalleryEntries).mockResolvedValueOnce([
+      createEntry(0, 0, 'cover', 0),
+    ]);
+
+    const { result } = renderHook(
+      ({ isEnabled, novelId }) => useReaderPageImageOverlay({
+        dismissBlockedInteraction: vi.fn(),
+        isEnabled,
+        novelId,
+      }),
+      {
+        initialProps: { isEnabled: true, novelId: 1 },
+      },
+    );
+
+    await waitFor(() => {
+      expect(result.current.imageViewerProps.isIndexResolved).toBe(true);
+    });
+
+    const sourceElement = document.createElement('button');
+    Object.defineProperty(sourceElement, 'getBoundingClientRect', {
+      configurable: true,
+      value: () => new DOMRect(0, 0, 20, 20),
+    });
+
+    act(() => {
+      result.current.handleImageActivate({
+        blockIndex: 0,
+        chapterIndex: 0,
+        imageKey: 'cover',
+        sourceElement,
+      });
+    });
+
+    await waitFor(() => {
+      expect(result.current.isImageViewerOpen).toBe(true);
+    });
+
+    act(() => {
+      window.dispatchEvent(new PopStateEvent('popstate', {
+        state: { idx: 0 },
+      }));
+    });
+
+    await waitFor(() => {
+      expect(result.current.isImageViewerOpen).toBe(false);
+    });
+  });
+
+  it('syncs history back when the viewer closes directly', async () => {
+    vi.mocked(readerContentService.getImageGalleryEntries).mockResolvedValueOnce([
+      createEntry(0, 0, 'cover', 0),
+    ]);
+    const historyBackSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {});
+
+    const { result } = renderHook(
+      ({ isEnabled, novelId }) => useReaderPageImageOverlay({
+        dismissBlockedInteraction: vi.fn(),
+        isEnabled,
+        novelId,
+      }),
+      {
+        initialProps: { isEnabled: true, novelId: 1 },
+      },
+    );
+
+    await waitFor(() => {
+      expect(result.current.imageViewerProps.isIndexResolved).toBe(true);
+    });
+
+    const sourceElement = document.createElement('button');
+    Object.defineProperty(sourceElement, 'getBoundingClientRect', {
+      configurable: true,
+      value: () => new DOMRect(0, 0, 20, 20),
+    });
+
+    act(() => {
+      result.current.handleImageActivate({
+        blockIndex: 0,
+        chapterIndex: 0,
+        imageKey: 'cover',
+        sourceElement,
+      });
+    });
+
+    await waitFor(() => {
+      expect(result.current.isImageViewerOpen).toBe(true);
+    });
+
+    act(() => {
+      result.current.closeImageViewer();
+    });
+
+    expect(historyBackSpy).toHaveBeenCalledTimes(1);
+    expect(result.current.isImageViewerOpen).toBe(false);
   });
 
   it('navigates using the full-book image order', async () => {

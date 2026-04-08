@@ -4,6 +4,8 @@ import { createFakeReaderTextLayoutEngine } from '../../test/createFakeReaderTex
 import {
   createReaderTypographyMetrics,
   createScrollImageLayoutConstraints,
+  measurePagedReaderChapterLayout,
+  measureScrollReaderChapterLayout,
   measureReaderChapterLayout,
   resetReaderLayoutPretextCacheForTests,
 } from '../readerLayout';
@@ -23,7 +25,10 @@ describe('readerMeasurement', () => {
       {
         index: 0,
         title: 'TitleOne',
-        content: 'abcdefghi\n\n[IMG:map]\njklmno',
+        plainText: 'abcdefghi\n\n[IMG:map]\njklmno',
+        richBlocks: [],
+        contentFormat: 'plain',
+        contentVersion: 1,
         wordCount: 40,
         totalChapters: 1,
         hasPrev: false,
@@ -77,7 +82,10 @@ describe('readerMeasurement', () => {
       {
         index: 0,
         title: 'Chapter 1',
-        content: '[IMG:tall-illustration]',
+        plainText: '[IMG:tall-illustration]',
+        richBlocks: [],
+        contentFormat: 'plain',
+        contentVersion: 1,
         wordCount: 10,
         totalChapters: 1,
         hasPrev: false,
@@ -96,6 +104,182 @@ describe('readerMeasurement', () => {
     expect(imageMetric).toBeDefined();
     expect(imageMetric?.displayHeight).toBe(344);
     expect(imageMetric?.displayWidth).toBe(172);
+  });
+
+  it('measures rich scroll blocks including poem lines and image captions', () => {
+    const textLayoutEngine = createFakeReaderTextLayoutEngine({ maxCharsPerLine: 8 });
+    const typography = createReaderTypographyMetrics(18, 1.8, 16, 600);
+    const measuredLayout = measureScrollReaderChapterLayout(
+      {
+        index: 0,
+        title: 'Chapter 1',
+        plainText: 'Section\nLine 1\nLine 2\nWorld map',
+        richBlocks: [
+          {
+            type: 'heading',
+            level: 2,
+            children: [{
+              type: 'text',
+              text: 'Section',
+            }],
+          },
+          {
+            type: 'poem',
+            lines: [
+              [{
+                type: 'text',
+                text: 'Line 1',
+              }],
+              [{
+                type: 'text',
+                text: 'Line 2',
+              }],
+            ],
+          },
+          {
+            type: 'image',
+            key: 'map',
+            caption: [{
+              type: 'text',
+              text: 'World map',
+            }],
+          },
+        ],
+        contentFormat: 'rich',
+        contentVersion: 1,
+        wordCount: 40,
+        totalChapters: 1,
+        hasPrev: false,
+        hasNext: false,
+      },
+      360,
+      typography,
+      new Map([
+        ['map', { width: 480, height: 240, aspectRatio: 2 }],
+      ]),
+      createScrollImageLayoutConstraints(360, 360),
+      textLayoutEngine,
+    );
+
+    expect(measuredLayout.renderMode).toBe('rich');
+    expect(
+      measuredLayout.metrics.map((metric) => metric.block.blockIndex),
+    ).toEqual([0, 1, 2, 3, 4]);
+    expect(measuredLayout.metrics.map((metric) => metric.block.kind)).toEqual([
+      'heading',
+      'heading',
+      'text',
+      'text',
+      'image',
+    ]);
+    expect(measuredLayout.metrics[2]?.block.container).toBe('poem-line');
+    expect(measuredLayout.metrics[4]).toMatchObject({
+      captionHeight: typography.bodyLineHeightPx * 2,
+      displayHeight: 180,
+      displayWidth: 360,
+    });
+  });
+
+  it('measures image captions against the rendered image width for narrow assets', () => {
+    const textLayoutEngine = createFakeReaderTextLayoutEngine();
+    const typography = createReaderTypographyMetrics(18, 1.8, 16, 600);
+    const measuredLayout = measureScrollReaderChapterLayout(
+      {
+        index: 0,
+        title: 'Chapter 1',
+        plainText: 'Signal banner stretched low across the relay hall.',
+        richBlocks: [
+          {
+            type: 'image',
+            key: 'banner',
+            caption: [{
+              type: 'text',
+              text: 'Signal banner stretched low across the relay hall.',
+            }],
+          },
+        ],
+        contentFormat: 'rich',
+        contentVersion: 1,
+        wordCount: 20,
+        totalChapters: 1,
+        hasPrev: false,
+        hasNext: false,
+      },
+      360,
+      typography,
+      new Map([
+        ['banner', { width: 180, height: 90, aspectRatio: 2 }],
+      ]),
+      createScrollImageLayoutConstraints(360, 360),
+      textLayoutEngine,
+    );
+
+    const imageMetric = measuredLayout.metrics.find((metric) => metric.block.kind === 'image');
+    expect(imageMetric).toMatchObject({
+      displayHeight: 90,
+      displayWidth: 180,
+    });
+    expect(imageMetric?.captionHeight).toBe(typography.bodyLineHeightPx * 3);
+  });
+
+  it('stores rich caption line fragments for paged rich image blocks', () => {
+    const textLayoutEngine = createFakeReaderTextLayoutEngine({ maxCharsPerLine: 24 });
+    const typography = createReaderTypographyMetrics(18, 1.8, 16, 600);
+    const measuredLayout = measurePagedReaderChapterLayout(
+      {
+        index: 0,
+        title: 'Chapter 1',
+        plainText: 'Signal 2',
+        richBlocks: [
+          {
+            type: 'image',
+            key: 'seal',
+            caption: [
+              {
+                text: 'Signal',
+                type: 'text',
+              },
+              {
+                text: ' ',
+                type: 'text',
+              },
+              {
+                marks: ['sup'],
+                text: '2',
+                type: 'text',
+              },
+            ],
+          },
+        ],
+        contentFormat: 'rich',
+        contentVersion: 1,
+        wordCount: 10,
+        totalChapters: 1,
+        hasPrev: false,
+        hasNext: false,
+      },
+      320,
+      typography,
+      new Map([
+        ['seal', { width: 320, height: 180, aspectRatio: 16 / 9 }],
+      ]),
+      textLayoutEngine,
+    );
+
+    const imageMetric = measuredLayout.metrics.find((metric) => metric.block.kind === 'image');
+    expect(imageMetric?.captionRichLineFragments).toEqual([
+      [
+        {
+          text: 'Signal ',
+          type: 'text',
+        },
+        {
+          marks: ['sup'],
+          text: '2',
+          type: 'text',
+        },
+      ],
+    ]);
   });
 
   it('falls back to sans-serif when document.body is unavailable', () => {
@@ -137,7 +321,10 @@ describe('readerMeasurement', () => {
     const measuredLayout = measureLayout({
       index: 0,
       title: 'Chapter 1',
-      content: 'abcdefghij',
+      plainText: 'abcdefghij',
+      richBlocks: [],
+      contentFormat: 'plain',
+      contentVersion: 1,
       wordCount: 10,
       totalChapters: 1,
       hasPrev: false,
@@ -184,7 +371,10 @@ describe('readerMeasurement', () => {
       measureLayout({
         index,
         title: 'Chapter 1',
-        content: `Paragraph ${index} ${'alpha beta gamma '.repeat(4)}`,
+        plainText: `Paragraph ${index} ${'alpha beta gamma '.repeat(4)}`,
+        richBlocks: [],
+        contentFormat: 'plain',
+        contentVersion: 1,
         wordCount: 100,
         totalChapters: 320,
         hasPrev: index > 0,
