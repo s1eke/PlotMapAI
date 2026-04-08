@@ -1,4 +1,4 @@
-import type { LayoutLine, PreparedTextWithSegments } from '@chenglou/pretext';
+import type { PreparedTextWithSegments } from '@chenglou/pretext';
 import type { Mark, RichInline } from '@shared/contracts';
 
 import {

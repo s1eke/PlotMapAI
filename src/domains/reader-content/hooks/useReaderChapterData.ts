@@ -275,9 +275,9 @@ export function useReaderChapterData({
 
     if (params.mode === 'scroll' && runtime.navigationSource === 'scroll') {
       setLoadingMessage(null);
-        return {
-          navigationRestoreTarget: null,
-          shouldClearNavigationSource: true,
+      return {
+        navigationRestoreTarget: null,
+        shouldClearNavigationSource: true,
         shouldResetViewport: false,
       };
     }
