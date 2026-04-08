@@ -21,6 +21,7 @@ import {
   createRestoreTargetFromNavigationIntent,
   createRestoreTargetFromPersistedState,
 } from '@shared/utils/readerPosition';
+import { extractImageKeysFromChapter } from '@shared/text-processing';
 import {
   areReaderImageResourcesReady,
 } from '@domains/reader-media';

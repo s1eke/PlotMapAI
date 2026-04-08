@@ -1,41 +1,37 @@
-import type { ChapterContent } from '@shared/contracts/reader';
+import type { ChapterContent, PageTarget } from '@shared/contracts/reader';
+import type { Variants } from 'motion/react';
 import type { ReaderPageTurnMode } from '../../constants/pageTurnMode';
-import type { PageTarget } from '@shared/contracts/reader';
-import type { AnimationPlaybackControls, PanInfo, Variants } from 'motion/react';
-import type { PageSlice, PaginatedChapterLayout } from '../../utils/readerLayout';
+import type { PaginatedChapterLayout } from '../../utils/readerLayout';
 import type {
   ReaderImageActivationPayload,
   ReaderImageGalleryEntry,
 } from '../../utils/readerImageGallery';
+import type { PendingCommittedPageOverride } from '../../utils/pagedDragRenderState';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { animate, AnimatePresence, motion, useMotionValue, useTransform } from 'motion/react';
+import { useEffect, useMemo, useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 
-import { READER_CONTENT_CLASS_NAMES } from '@shared/reader-content';
 import { cn } from '@shared/utils/cn';
 
 import {
   getPageTurnAnimation,
-  getPageTurnSettleDuration,
   type PageTurnDirection,
 } from '../../animations/pageTurnAnimations';
-import {
-  clampDragOffset,
-  getPagedDragLayerOffsets,
-  shouldCommitPageTurnDrag,
-} from '../../utils/pagedDrag';
+import { getPagedDragLayerOffsets } from '../../utils/pagedDrag';
 import {
   getEffectivePagedRenderPageIndex,
   shouldClearPendingCommittedPageOverride,
-  type PendingCommittedPageOverride,
 } from '../../utils/pagedDragRenderState';
-import { extractImageKeysFromChapter } from '@shared/text-processing';
-import { preloadReaderImageResources } from '../../utils/readerImageResourceCache';
-import { PAGED_VIEWPORT_TOP_PADDING_PX } from '../../utils/readerLayout';
-import ReaderFlowBlock from './ReaderFlowBlock';
-
-const DRAG_START_THRESHOLD_PX = 8;
-const PAGED_IMAGE_ACTIVATION_GUARD_MS = 280;
+import { PagedPageFrame } from './PagedPageFrame';
+import {
+  getFallbackViewportWidth,
+  usePagedReaderImagePrewarm,
+  usePagedViewportBridge,
+} from './pagedReaderViewport';
+import {
+  type PagePreviewTarget,
+  usePagedReaderDrag,
+} from './usePagedReaderDrag';
 
 interface PagedReaderContentProps {
   chapter: ChapterContent;
@@ -72,203 +68,105 @@ interface PagedReaderContentProps {
   twoColumnWidth?: number;
 }
 
-interface PagePreviewTarget {
+function resolveCurrentPreviewTarget(params: {
   chapter: ChapterContent;
-  layout: PaginatedChapterLayout;
-  pageIndex: number;
-  pageSlice: PageSlice;
-}
-
-interface CommittedDragTransition {
-  current: PagePreviewTarget;
-  direction: PageTurnDirection;
-  mode: Extract<ReaderPageTurnMode, 'cover' | 'slide'>;
-  preview: PagePreviewTarget;
-}
-
-interface ViewportSize {
-  height: number;
-  width: number;
-}
-
-const EMPTY_VIEWPORT_SIZE: ViewportSize = {
-  height: 0,
-  width: 0,
-};
-
-function getFallbackViewportWidth(
-  layout: PaginatedChapterLayout | null | undefined,
-  fitsTwoColumns: boolean,
-  twoColumnGap: number,
-  twoColumnWidth?: number,
-): number {
-  if (layout) {
-    return layout.columnWidth * layout.columnCount
-      + layout.columnGap * Math.max(0, layout.columnCount - 1);
+  currentLayout: PaginatedChapterLayout | null;
+  effectivePageIndex: number;
+}): PagePreviewTarget | null {
+  if (!params.currentLayout) {
+    return null;
   }
 
-  const defaultColumnWidth = twoColumnWidth ?? 600;
-  return fitsTwoColumns
-    ? defaultColumnWidth * 2 + twoColumnGap
-    : defaultColumnWidth;
+  const pageSlice = params.currentLayout.pageSlices[params.effectivePageIndex];
+  if (!pageSlice) {
+    return null;
+  }
+
+  return {
+    chapter: params.chapter,
+    layout: params.currentLayout,
+    pageIndex: params.effectivePageIndex,
+    pageSlice,
+  };
 }
 
-function assignPagedViewportRef(
-  ref: React.Ref<HTMLDivElement> | undefined,
-  element: HTMLDivElement | null,
-): void {
-  if (!ref) {
-    return;
-  }
-
-  if (typeof ref === 'function') {
-    ref(element);
-    return;
-  }
-
-  const targetRef = ref as React.MutableRefObject<HTMLDivElement | null>;
-  targetRef.current = element;
-}
-
-function resolveDragDirection(offset: number): PageTurnDirection | null {
-  if (offset > 0) {
-    return 'prev';
-  }
-  if (offset < 0) {
-    return 'next';
-  }
-  return null;
-}
-
-function resolveDragCommitOffset(
-  shouldCommit: boolean,
-  direction: PageTurnDirection,
-  viewportWidth: number,
-): number {
-  if (!shouldCommit) {
-    return 0;
-  }
-  if (direction === 'next') {
-    return -viewportWidth;
-  }
-  return viewportWidth;
-}
-
-function PagedPageFrame({
-  chapter,
-  layout,
-  novelId,
-  pageBgClassName,
-  pageIndex,
-  pageSlice,
-  pageCount,
-  pagedContentRef,
-  pagedViewportRef,
-  readerTheme,
-  rootClassName,
-  rootStyle,
-  textClassName,
-  headerBgClassName,
-  onImageActivate,
-  onRegisterImageElement,
-}: {
+function resolvePreviousPreviewTarget(params: {
   chapter: ChapterContent;
-  layout: PaginatedChapterLayout;
-  novelId: number;
-  pageBgClassName?: string;
-  pageIndex: number;
-  pageSlice: PageSlice;
-  pageCount: number;
-  pagedContentRef?: React.Ref<HTMLDivElement>;
-  pagedViewportRef?: React.Ref<HTMLDivElement>;
-  readerTheme: string;
-  rootClassName: string;
-  rootStyle: React.CSSProperties;
-  textClassName: string;
-  headerBgClassName: string;
-  onImageActivate?: (payload: ReaderImageActivationPayload) => void;
-  onRegisterImageElement?: (
-    entry: Pick<ReaderImageGalleryEntry, 'blockIndex' | 'chapterIndex' | 'imageKey'>,
-    element: HTMLButtonElement | null,
-  ) => void;
-}) {
-  return (
-    <div
-      data-testid="paged-reader-page-frame"
-      className={cn(rootClassName, 'flex h-full w-full flex-col')}
-      style={rootStyle}
-    >
-      <div className={cn(READER_CONTENT_CLASS_NAMES.chapter, 'flex h-full w-full flex-col')}>
-        <div
-          className={cn(
-            READER_CONTENT_CLASS_NAMES.chapterHeader,
-            'w-full shrink-0 border-b border-border-color/20 backdrop-blur-sm',
-            headerBgClassName,
-          )}
-        >
-          <div className={cn('mx-auto flex w-full max-w-[1400px] items-center justify-between gap-4 px-4 py-3 sm:px-8 md:px-12', textClassName)}>
-            <h1 className={cn('truncate text-sm font-medium transition-colors', readerTheme === 'auto' ? 'text-text-secondary' : 'opacity-60')}>
-              {chapter.title}
-            </h1>
-            {pageCount > 1 ? (
-              <div className="whitespace-nowrap text-xs font-medium text-text-secondary">
-                {pageIndex + 1} / {pageCount}
-              </div>
-            ) : null}
-          </div>
-        </div>
+  currentLayout: PaginatedChapterLayout | null;
+  effectivePageIndex: number;
+  previousChapterPreview?: ChapterContent | null;
+  previousLayout?: PaginatedChapterLayout | null;
+}): PagePreviewTarget | null {
+  const {
+    chapter,
+    currentLayout,
+    effectivePageIndex,
+    previousChapterPreview,
+    previousLayout,
+  } = params;
+  if (!currentLayout) {
+    return null;
+  }
 
-        <div className={cn('min-h-0 flex-1', pageBgClassName ?? headerBgClassName)}>
-          <div className={cn('mx-auto h-full w-full max-w-[1400px] px-4 sm:px-8 md:px-12', textClassName)}>
-            <div
-              ref={pagedViewportRef}
-              data-testid="paged-reader-measurement-viewport"
-              className="h-full overflow-hidden"
-              style={{ paddingTop: `${PAGED_VIEWPORT_TOP_PADDING_PX}px` }}
-            >
-              <div
-                ref={pagedContentRef}
-                data-testid="paged-reader-content-body"
-                className="flex h-full"
-                style={{
-                  gap: layout.columnCount > 1 ? `${layout.columnGap}px` : '0px',
-                }}
-              >
-                {pageSlice.columns.map((column) => (
-                  <div
-                    key={[
-                      pageIndex,
-                      column.items[0]?.key ?? 'empty',
-                      column.items[column.items.length - 1]?.key ?? 'empty',
-                    ].join(':')}
-                    className={cn(
-                      READER_CONTENT_CLASS_NAMES.content,
-                      'flex min-w-0 flex-1 flex-col overflow-hidden',
-                    )}
-                    style={{
-                      width: `${layout.columnWidth}px`,
-                    }}
-                  >
-                    {column.items.map((item) => (
-                      <ReaderFlowBlock
-                        chapterTitle={chapter.title}
-                        key={item.key}
-                        imageRenderMode="paged"
-                        item={item}
-                        novelId={novelId}
-                        onImageActivate={onImageActivate}
-                        onRegisterImageElement={onRegisterImageElement}
-                      />
-                    ))}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  if (effectivePageIndex > 0) {
+    return {
+      chapter,
+      layout: currentLayout,
+      pageIndex: effectivePageIndex - 1,
+      pageSlice: currentLayout.pageSlices[effectivePageIndex - 1],
+    };
+  }
+
+  if (!previousChapterPreview || !previousLayout || previousLayout.pageSlices.length === 0) {
+    return null;
+  }
+
+  const previousPageIndex = previousLayout.pageSlices.length - 1;
+  return {
+    chapter: previousChapterPreview,
+    layout: previousLayout,
+    pageIndex: previousPageIndex,
+    pageSlice: previousLayout.pageSlices[previousPageIndex],
+  };
+}
+
+function resolveNextPreviewTarget(params: {
+  chapter: ChapterContent;
+  currentLayout: PaginatedChapterLayout | null;
+  effectivePageIndex: number;
+  nextChapterPreview?: ChapterContent | null;
+  nextLayout?: PaginatedChapterLayout | null;
+}): PagePreviewTarget | null {
+  const {
+    chapter,
+    currentLayout,
+    effectivePageIndex,
+    nextChapterPreview,
+    nextLayout,
+  } = params;
+  if (!currentLayout) {
+    return null;
+  }
+
+  if (effectivePageIndex < currentLayout.pageSlices.length - 1) {
+    return {
+      chapter,
+      layout: currentLayout,
+      pageIndex: effectivePageIndex + 1,
+      pageSlice: currentLayout.pageSlices[effectivePageIndex + 1],
+    };
+  }
+
+  if (!nextChapterPreview || !nextLayout || nextLayout.pageSlices.length === 0) {
+    return null;
+  }
+
+  return {
+    chapter: nextChapterPreview,
+    layout: nextLayout,
+    pageIndex: 0,
+    pageSlice: nextLayout.pageSlices[0],
+  };
 }
 
 export default function PagedReaderContent({
@@ -302,76 +200,68 @@ export default function PagedReaderContent({
   twoColumnGap = 48,
   twoColumnWidth,
 }: PagedReaderContentProps) {
-  const [isDragGestureActive, setIsDragGestureActive] = useState(false);
-  const [isDragSettling, setIsDragSettling] = useState(false);
-  const [isImageActivationGuardActive, setIsImageActivationGuardActive] = useState(false);
-  const [viewportSize, setViewportSize] = useState<ViewportSize>(EMPTY_VIEWPORT_SIZE);
-  const [viewportElement, setViewportElement] = useState<HTMLDivElement | null>(null);
-  const [dragDirection, setDragDirection] = useState<PageTurnDirection | null>(null);
-  const [committedDragTransition, setCommittedDragTransition] =
-    useState<CommittedDragTransition | null>(null);
+  const { handlePagedViewportRef, viewportSize } = usePagedViewportBridge(pagedViewportRef);
   const [pendingCommittedPageOverride, setPendingCommittedPageOverride] =
     useState<PendingCommittedPageOverride | null>(null);
-  const dragAnimationRef = useRef<AnimationPlaybackControls | null>(null);
-  const imageActivationGuardTimeoutRef = useRef<number | null>(null);
-  const imageActivationGuardUntilRef = useRef(0);
-  const pagedViewportRefBridgeRef = useRef(pagedViewportRef);
-  const pageTurnTokenRef = useRef(pageTurnToken);
-  const suppressNextClickRef = useRef(false);
-  const dragOffset = useMotionValue(0);
 
-  useEffect(() => {
-    pagedViewportRefBridgeRef.current = pagedViewportRef;
-  }, [pagedViewportRef]);
+  usePagedReaderImagePrewarm({
+    chapter,
+    nextChapterPreview,
+    novelId,
+    previousChapterPreview,
+  });
 
-  const handlePagedViewportRef = useCallback((element: HTMLDivElement | null) => {
-    setViewportElement((previousElement) => (
-      previousElement === element ? previousElement : element
-    ));
-    assignPagedViewportRef(pagedViewportRefBridgeRef.current, element);
-  }, []);
   const fallbackViewportWidth = useMemo(
     () => getFallbackViewportWidth(currentLayout, fitsTwoColumns, twoColumnGap, twoColumnWidth),
     [currentLayout, fitsTwoColumns, twoColumnGap, twoColumnWidth],
   );
   const resolvedViewportWidth = viewportSize.width || fallbackViewportWidth;
 
-  useEffect(() => {
-    const imageKeys = new Set<string>();
-    for (const renderableChapter of [chapter, previousChapterPreview, nextChapterPreview]) {
-      if (!renderableChapter) {
-        continue;
-      }
-      for (const imageKey of extractImageKeysFromChapter(renderableChapter)) {
-        imageKeys.add(imageKey);
-      }
-    }
-    if (imageKeys.size === 0) {
-      return;
-    }
-    preloadReaderImageResources(novelId, Array.from(imageKeys.values()));
-  }, [chapter, nextChapterPreview, novelId, previousChapterPreview]);
+  const effectivePageIndex = useMemo(() => getEffectivePagedRenderPageIndex({
+    currentChapterIndex: chapter.index,
+    currentLayout,
+    pageIndex,
+    pendingPageTarget,
+    pendingOverride: pendingCommittedPageOverride,
+  }), [chapter.index, currentLayout, pageIndex, pendingCommittedPageOverride, pendingPageTarget]);
 
-  useEffect(() => {
-    const viewport = viewportElement;
-    if (!viewport) {
-      return;
-    }
+  const currentPreviewTarget = useMemo(() => resolveCurrentPreviewTarget({
+    chapter,
+    currentLayout,
+    effectivePageIndex,
+  }), [chapter, currentLayout, effectivePageIndex]);
+  const previousPreviewTarget = useMemo(() => resolvePreviousPreviewTarget({
+    chapter,
+    currentLayout,
+    effectivePageIndex,
+    previousChapterPreview,
+    previousLayout,
+  }), [chapter, currentLayout, effectivePageIndex, previousChapterPreview, previousLayout]);
+  const nextPreviewTarget = useMemo(() => resolveNextPreviewTarget({
+    chapter,
+    currentLayout,
+    effectivePageIndex,
+    nextChapterPreview,
+    nextLayout,
+  }), [chapter, currentLayout, effectivePageIndex, nextChapterPreview, nextLayout]);
 
-    const updateViewportSize = () => {
-      setViewportSize({
-        height: viewport.clientHeight,
-        width: viewport.clientWidth,
-      });
-    };
-
-    updateViewportSize();
-    const observer = new ResizeObserver(updateViewportSize);
-    observer.observe(viewport);
-    return () => {
-      observer.disconnect();
-    };
-  }, [viewportElement]);
+  const canDragPrev = previousPreviewTarget !== null && typeof onRequestPrevPage === 'function';
+  const canDragNext = nextPreviewTarget !== null && typeof onRequestNextPage === 'function';
+  const drag = usePagedReaderDrag({
+    canDragNext,
+    canDragPrev,
+    currentPreviewTarget,
+    disableAnimation,
+    interactionLocked,
+    nextPreviewTarget,
+    onRequestNextPage,
+    onRequestPrevPage,
+    pageTurnMode,
+    pageTurnToken,
+    previousPreviewTarget,
+    resolvedViewportWidth,
+    setPendingCommittedPageOverride,
+  });
 
   useEffect(() => {
     if (!shouldClearPendingCommittedPageOverride({
@@ -388,334 +278,12 @@ export default function PagedReaderContent({
     });
 
     return () => cancelAnimationFrame(frameId);
-  }, [chapter.index, currentLayout, pageIndex, pendingCommittedPageOverride]);
-
-  const effectivePageIndex = useMemo(() => getEffectivePagedRenderPageIndex({
-    currentChapterIndex: chapter.index,
+  }, [
+    chapter.index,
     currentLayout,
     pageIndex,
-    pendingPageTarget,
-    pendingOverride: pendingCommittedPageOverride,
-  }), [chapter.index, currentLayout, pageIndex, pendingCommittedPageOverride, pendingPageTarget]);
-
-  const currentPreviewTarget = useMemo<PagePreviewTarget | null>(() => {
-    if (!currentLayout) {
-      return null;
-    }
-
-    const pageSlice = currentLayout.pageSlices[effectivePageIndex];
-    if (!pageSlice) {
-      return null;
-    }
-
-    return {
-      chapter,
-      layout: currentLayout,
-      pageIndex: effectivePageIndex,
-      pageSlice,
-    };
-  }, [chapter, currentLayout, effectivePageIndex]);
-
-  const previousPreviewTarget = useMemo<PagePreviewTarget | null>(() => {
-    if (!currentLayout) {
-      return null;
-    }
-
-    if (effectivePageIndex > 0) {
-      return {
-        chapter,
-        layout: currentLayout,
-        pageIndex: effectivePageIndex - 1,
-        pageSlice: currentLayout.pageSlices[effectivePageIndex - 1],
-      };
-    }
-
-    if (!previousChapterPreview || !previousLayout || previousLayout.pageSlices.length === 0) {
-      return null;
-    }
-
-    const previousPageIndex = previousLayout.pageSlices.length - 1;
-    return {
-      chapter: previousChapterPreview,
-      layout: previousLayout,
-      pageIndex: previousPageIndex,
-      pageSlice: previousLayout.pageSlices[previousPageIndex],
-    };
-  }, [chapter, currentLayout, effectivePageIndex, previousChapterPreview, previousLayout]);
-
-  const nextPreviewTarget = useMemo<PagePreviewTarget | null>(() => {
-    if (!currentLayout) {
-      return null;
-    }
-
-    if (effectivePageIndex < currentLayout.pageSlices.length - 1) {
-      return {
-        chapter,
-        layout: currentLayout,
-        pageIndex: effectivePageIndex + 1,
-        pageSlice: currentLayout.pageSlices[effectivePageIndex + 1],
-      };
-    }
-
-    if (!nextChapterPreview || !nextLayout || nextLayout.pageSlices.length === 0) {
-      return null;
-    }
-
-    return {
-      chapter: nextChapterPreview,
-      layout: nextLayout,
-      pageIndex: 0,
-      pageSlice: nextLayout.pageSlices[0],
-    };
-  }, [chapter, currentLayout, effectivePageIndex, nextChapterPreview, nextLayout]);
-
-  const canDragPrev = previousPreviewTarget !== null && typeof onRequestPrevPage === 'function';
-  const canDragNext = nextPreviewTarget !== null && typeof onRequestNextPage === 'function';
-  const activeDragMode = committedDragTransition?.mode
-    ?? (pageTurnMode === 'cover' || pageTurnMode === 'slide' ? pageTurnMode : null);
-  const activeDragDirection = committedDragTransition?.direction ?? dragDirection;
-  const isDragEnabled = committedDragTransition === null
-    && !disableAnimation
-    && !interactionLocked
-    && (pageTurnMode === 'cover' || pageTurnMode === 'slide')
-    && resolvedViewportWidth > 0
-    && (canDragPrev || canDragNext);
-
-  const currentLayerX = useTransform(dragOffset, (offset) => {
-    if (!activeDragDirection || !activeDragMode) {
-      return 0;
-    }
-    return getPagedDragLayerOffsets(
-      activeDragMode,
-      activeDragDirection,
-      offset,
-      resolvedViewportWidth,
-    ).currentX;
-  });
-  const previewLayerX = useTransform(dragOffset, (offset) => {
-    if (!activeDragDirection || !activeDragMode) {
-      return 0;
-    }
-    return getPagedDragLayerOffsets(
-      activeDragMode,
-      activeDragDirection,
-      offset,
-      resolvedViewportWidth,
-    ).previewX;
-  });
-
-  const clearImageActivationGuardTimeout = useCallback(() => {
-    if (imageActivationGuardTimeoutRef.current !== null) {
-      window.clearTimeout(imageActivationGuardTimeoutRef.current);
-      imageActivationGuardTimeoutRef.current = null;
-    }
-  }, []);
-
-  const syncImageActivationGuardTimeout = useCallback(() => {
-    clearImageActivationGuardTimeout();
-    const remainingMs = imageActivationGuardUntilRef.current - Date.now();
-    if (remainingMs <= 0) {
-      imageActivationGuardUntilRef.current = 0;
-      setIsImageActivationGuardActive(false);
-      return;
-    }
-
-    setIsImageActivationGuardActive(true);
-    imageActivationGuardTimeoutRef.current = window.setTimeout(() => {
-      imageActivationGuardTimeoutRef.current = null;
-      const nextRemainingMs = imageActivationGuardUntilRef.current - Date.now();
-      if (nextRemainingMs > 0) {
-        syncImageActivationGuardTimeout();
-        return;
-      }
-
-      imageActivationGuardUntilRef.current = 0;
-      setIsImageActivationGuardActive(false);
-    }, remainingMs);
-  }, [clearImageActivationGuardTimeout]);
-
-  const scheduleImageActivationGuard = useCallback(
-    (durationMs: number = PAGED_IMAGE_ACTIVATION_GUARD_MS) => {
-      imageActivationGuardUntilRef.current = Math.max(
-        imageActivationGuardUntilRef.current,
-        Date.now() + durationMs,
-      );
-      syncImageActivationGuardTimeout();
-    },
-    [syncImageActivationGuardTimeout],
-  );
-
-  const stopDragAnimation = useCallback(() => {
-    dragAnimationRef.current?.stop();
-    dragAnimationRef.current = null;
-  }, []);
-
-  const resetDragState = useCallback(() => {
-    stopDragAnimation();
-    dragOffset.set(0);
-    setIsDragGestureActive(false);
-    setIsDragSettling(false);
-    setDragDirection(null);
-  }, [dragOffset, stopDragAnimation]);
-
-  useEffect(() => {
-    return () => {
-      stopDragAnimation();
-    };
-  }, [stopDragAnimation]);
-
-  useEffect(() => {
-    return () => {
-      clearImageActivationGuardTimeout();
-    };
-  }, [clearImageActivationGuardTimeout]);
-
-  useEffect(() => {
-    if (pageTurnToken === pageTurnTokenRef.current) {
-      return;
-    }
-
-    pageTurnTokenRef.current = pageTurnToken;
-    scheduleImageActivationGuard();
-  }, [pageTurnToken, scheduleImageActivationGuard]);
-
-  const handlePanStart = useCallback(() => {
-    if (!isDragEnabled) {
-      return;
-    }
-    stopDragAnimation();
-    setIsDragGestureActive(true);
-    setIsDragSettling(false);
-  }, [isDragEnabled, stopDragAnimation]);
-
-  const handlePan = useCallback((_event: PointerEvent, info: PanInfo) => {
-    if (!isDragEnabled) {
-      return;
-    }
-
-    const nextOffset = clampDragOffset(
-      info.offset.x,
-      resolvedViewportWidth,
-      canDragPrev,
-      canDragNext,
-    );
-    if (Math.abs(nextOffset) < DRAG_START_THRESHOLD_PX) {
-      dragOffset.set(0);
-      setDragDirection(null);
-      return;
-    }
-
-    dragOffset.set(nextOffset);
-    setDragDirection(nextOffset > 0 ? 'prev' : 'next');
-    suppressNextClickRef.current = true;
-  }, [canDragNext, canDragPrev, dragOffset, isDragEnabled, resolvedViewportWidth]);
-
-  const handlePanEnd = useCallback((_event: PointerEvent, info: PanInfo) => {
-    if (!isDragEnabled) {
-      return;
-    }
-
-    setIsDragGestureActive(false);
-    const nextOffset = clampDragOffset(
-      info.offset.x,
-      resolvedViewportWidth,
-      canDragPrev,
-      canDragNext,
-    );
-    const nextDirection = resolveDragDirection(nextOffset);
-    if (!nextDirection || Math.abs(nextOffset) < DRAG_START_THRESHOLD_PX) {
-      suppressNextClickRef.current = false;
-      resetDragState();
-      return;
-    }
-
-    const shouldCommit = shouldCommitPageTurnDrag(
-      nextOffset,
-      info.velocity.x,
-      resolvedViewportWidth,
-    );
-    const commitPreviewTarget = nextDirection === 'prev' ? previousPreviewTarget : nextPreviewTarget;
-    if (!commitPreviewTarget || !currentPreviewTarget) {
-      suppressNextClickRef.current = false;
-      resetDragState();
-      return;
-    }
-
-    const targetOffset = resolveDragCommitOffset(
-      shouldCommit,
-      nextDirection,
-      resolvedViewportWidth,
-    );
-    const animation = getPageTurnAnimation(pageTurnMode);
-    const settleDuration = getPageTurnSettleDuration(
-      pageTurnMode,
-      nextOffset,
-      targetOffset,
-      resolvedViewportWidth,
-      info.velocity.x,
-    );
-
-    setIsDragSettling(true);
-    dragAnimationRef.current = animate(dragOffset, targetOffset, {
-      ...animation.transition,
-      duration: settleDuration,
-      onComplete: () => {
-        dragAnimationRef.current = null;
-        suppressNextClickRef.current = false;
-        setCommittedDragTransition(null);
-        dragOffset.set(0);
-        setIsDragSettling(false);
-        setDragDirection(null);
-      },
-    });
-
-    if (shouldCommit) {
-      scheduleImageActivationGuard();
-      setPendingCommittedPageOverride(
-        commitPreviewTarget.chapter.index !== currentPreviewTarget.chapter.index
-          ? {
-            chapterIndex: commitPreviewTarget.chapter.index,
-            pageIndex: commitPreviewTarget.pageIndex,
-          }
-          : null,
-      );
-      setCommittedDragTransition({
-        current: currentPreviewTarget,
-        direction: nextDirection,
-        mode: pageTurnMode,
-        preview: commitPreviewTarget,
-      });
-      setDragDirection(null);
-      if (nextDirection === 'next') {
-        onRequestNextPage?.();
-      } else {
-        onRequestPrevPage?.();
-      }
-    }
-  }, [
-    canDragNext,
-    canDragPrev,
-    currentPreviewTarget,
-    dragOffset,
-    isDragEnabled,
-    nextPreviewTarget,
-    onRequestNextPage,
-    onRequestPrevPage,
-    pageTurnMode,
-    previousPreviewTarget,
-    resetDragState,
-    resolvedViewportWidth,
-    scheduleImageActivationGuard,
+    pendingCommittedPageOverride,
   ]);
-
-  const handleClickCapture = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
-    if (!suppressNextClickRef.current) {
-      return;
-    }
-    event.preventDefault();
-    event.stopPropagation();
-    suppressNextClickRef.current = false;
-  }, []);
 
   const animationMode = disableAnimation || pageTurnMode === 'scroll' || pageTurnToken === 0
     ? 'none'
@@ -727,44 +295,18 @@ export default function PagedReaderContent({
       pageTurnAnimation.animate({ direction: custom }) as never,
     exit: (custom: PageTurnDirection) => pageTurnAnimation.exit({ direction: custom }) as never,
   };
-  let livePreviewTarget = null;
-  if (dragDirection === 'prev') {
-    livePreviewTarget = previousPreviewTarget;
-  } else if (dragDirection === 'next') {
-    livePreviewTarget = nextPreviewTarget;
-  }
-
-  let activeDragTransition = committedDragTransition;
-  if (
-    !activeDragTransition
-    && dragDirection
-    && livePreviewTarget
-    && (pageTurnMode === 'cover' || pageTurnMode === 'slide')
-    && currentPreviewTarget
-  ) {
-    activeDragTransition = {
-      current: currentPreviewTarget,
-      direction: dragDirection,
-      mode: pageTurnMode,
-      preview: livePreviewTarget,
-    };
-  }
-  const dragLayerOffsets = activeDragTransition
+  const dragLayerOffsets = drag.activeDragTransition
     ? getPagedDragLayerOffsets(
-      activeDragTransition.mode,
-      activeDragTransition.direction,
+      drag.activeDragTransition.mode,
+      drag.activeDragTransition.direction,
       0,
       resolvedViewportWidth,
     )
     : null;
-  const shouldDisableImageActivation = isDragGestureActive
-    || isDragSettling
-    || committedDragTransition !== null
-    || isImageActivationGuardActive;
-  const resolvedOnImageActivate = shouldDisableImageActivation
+  const resolvedOnImageActivate = drag.shouldDisableImageActivation
     ? undefined
     : onImageActivate;
-  const resolvedOnRegisterImageElement = shouldDisableImageActivation
+  const resolvedOnRegisterImageElement = drag.shouldDisableImageActivation
     ? undefined
     : onRegisterImageElement;
 
@@ -778,38 +320,38 @@ export default function PagedReaderContent({
         data-testid="paged-reader-interactive"
         className={cn(
           'relative h-full overflow-hidden',
-          shouldDisableImageActivation && '[&_[data-reader-image-activate]]:pointer-events-none',
+          drag.shouldDisableImageActivation && '[&_[data-reader-image-activate]]:pointer-events-none',
         )}
-        style={isDragEnabled ? { touchAction: 'pan-y' } : undefined}
-        onClickCapture={handleClickCapture}
-        onPan={handlePan}
-        onPanEnd={handlePanEnd}
-        onPanStart={handlePanStart}
+        style={drag.isDragEnabled ? { touchAction: 'pan-y' } : undefined}
+        onClickCapture={drag.handleClickCapture}
+        onPan={drag.handlePan}
+        onPanEnd={drag.handlePanEnd}
+        onPanStart={drag.handlePanStart}
       >
-        {activeDragTransition && dragLayerOffsets ? (
+        {drag.activeDragTransition && dragLayerOffsets ? (
           <>
             <motion.div
               className={cn(
                 'absolute inset-0 overflow-hidden',
                 dragLayerOffsets.isPreviewOnTop ? 'z-0' : 'z-10',
               )}
-              style={{ x: currentLayerX }}
+              style={{ x: drag.currentLayerX }}
             >
               <PagedPageFrame
-                chapter={activeDragTransition.current.chapter}
-                layout={activeDragTransition.current.layout}
+                chapter={drag.activeDragTransition.current.chapter}
+                headerBgClassName={headerBgClassName}
+                layout={drag.activeDragTransition.current.layout}
                 novelId={novelId}
+                onImageActivate={resolvedOnImageActivate}
+                onRegisterImageElement={resolvedOnRegisterImageElement}
                 pageBgClassName={pageBgClassName}
-                pageCount={activeDragTransition.current.layout.pageSlices.length}
-                pageIndex={activeDragTransition.current.pageIndex}
-                pageSlice={activeDragTransition.current.pageSlice}
+                pageCount={drag.activeDragTransition.current.layout.pageSlices.length}
+                pageIndex={drag.activeDragTransition.current.pageIndex}
+                pageSlice={drag.activeDragTransition.current.pageSlice}
                 readerTheme={readerTheme}
                 rootClassName={rootClassName}
                 rootStyle={rootStyle}
                 textClassName={textClassName}
-                headerBgClassName={headerBgClassName}
-                onImageActivate={resolvedOnImageActivate}
-                onRegisterImageElement={resolvedOnRegisterImageElement}
               />
             </motion.div>
 
@@ -818,23 +360,23 @@ export default function PagedReaderContent({
                 'absolute inset-0 overflow-hidden',
                 dragLayerOffsets.isPreviewOnTop ? 'z-10' : 'z-0',
               )}
-              style={{ x: previewLayerX }}
+              style={{ x: drag.previewLayerX }}
             >
               <PagedPageFrame
-                chapter={activeDragTransition.preview.chapter}
-                layout={activeDragTransition.preview.layout}
+                chapter={drag.activeDragTransition.preview.chapter}
+                headerBgClassName={headerBgClassName}
+                layout={drag.activeDragTransition.preview.layout}
                 novelId={novelId}
+                onImageActivate={resolvedOnImageActivate}
+                onRegisterImageElement={resolvedOnRegisterImageElement}
                 pageBgClassName={pageBgClassName}
-                pageCount={activeDragTransition.preview.layout.pageSlices.length}
-                pageIndex={activeDragTransition.preview.pageIndex}
-                pageSlice={activeDragTransition.preview.pageSlice}
+                pageCount={drag.activeDragTransition.preview.layout.pageSlices.length}
+                pageIndex={drag.activeDragTransition.preview.pageIndex}
+                pageSlice={drag.activeDragTransition.preview.pageSlice}
                 readerTheme={readerTheme}
                 rootClassName={rootClassName}
                 rootStyle={rootStyle}
                 textClassName={textClassName}
-                headerBgClassName={headerBgClassName}
-                onImageActivate={resolvedOnImageActivate}
-                onRegisterImageElement={resolvedOnRegisterImageElement}
               />
             </motion.div>
           </>
@@ -852,8 +394,11 @@ export default function PagedReaderContent({
             >
               <PagedPageFrame
                 chapter={chapter}
+                headerBgClassName={headerBgClassName}
                 layout={currentPreviewTarget.layout}
                 novelId={novelId}
+                onImageActivate={resolvedOnImageActivate}
+                onRegisterImageElement={resolvedOnRegisterImageElement}
                 pageBgClassName={pageBgClassName}
                 pageCount={currentPreviewTarget.layout.pageSlices.length}
                 pageIndex={effectivePageIndex}
@@ -864,9 +409,6 @@ export default function PagedReaderContent({
                 rootClassName={rootClassName}
                 rootStyle={rootStyle}
                 textClassName={textClassName}
-                headerBgClassName={headerBgClassName}
-                onImageActivate={resolvedOnImageActivate}
-                onRegisterImageElement={resolvedOnRegisterImageElement}
               />
             </motion.div>
           </AnimatePresence>
