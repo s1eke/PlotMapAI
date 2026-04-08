@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type {
   Chapter,
   ChapterContent,
@@ -191,13 +191,13 @@ export function usePagedReaderController({
     viewMode: 'original',
   });
 
-  const currentPagedLayout = currentChapter
+  const currentPagedLayout = enabled && currentChapter
     ? renderCache.pagedLayouts.get(currentChapter.index) ?? null
     : null;
-  const previousPagedLayout = previousChapterPreview
+  const previousPagedLayout = enabled && previousChapterPreview
     ? renderCache.pagedLayouts.get(previousChapterPreview.index) ?? null
     : null;
-  const nextPagedLayout = nextChapterPreview
+  const nextPagedLayout = enabled && nextChapterPreview
     ? renderCache.pagedLayouts.get(nextChapterPreview.index) ?? null
     : null;
   const effectivePageCount = currentPagedLayout
@@ -349,7 +349,7 @@ export function usePagedReaderController({
     requestChapterNavigation,
   ]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     replayDirectionalNavigationRef.current = (direction, shouldAnimate) => {
       const didNavigate = direction === 'next'
         ? stepNextPage(false)

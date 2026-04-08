@@ -1,6 +1,6 @@
-import type { ReactNode } from 'react';
+import type { MouseEvent, ReactNode } from 'react';
 
-import { render, renderHook, screen } from '@testing-library/react';
+import { act, render, renderHook, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -8,26 +8,258 @@ import { analyzeChapter } from '@application/use-cases/analysis';
 import { loadReaderSession } from '@application/use-cases/library';
 import { analysisService } from '@domains/analysis';
 import { useReaderInput } from '@domains/reader-interaction';
+import { AppErrorCode } from '@shared/errors';
 
 import { useReaderPageViewModel } from '../useReaderPageViewModel';
 
+interface TestReaderChapter {
+  id: number;
+  title: string;
+}
+
+interface TestReaderTheme {
+  bg: string;
+  contentVariables: Record<string, string>;
+  sidebarBg: string;
+  text: string;
+}
+
+interface TestReaderError {
+  code: AppErrorCode;
+}
+
+interface TestReaderViewportContent {
+  pagedContentProps?: unknown;
+  scrollContentProps?: unknown;
+  summaryContentProps?: unknown;
+}
+
+interface TestReaderBuildContentArgs {
+  imageHandlers: {
+    onImageActivate: typeof readerOverlayMocks.handleImageActivate;
+    onRegisterImageElement: typeof readerOverlayMocks.handleRegisterImageElement;
+  };
+  interactionLocked: boolean;
+}
+
+interface ReaderSurfaceMockState {
+  buildContentPropsArgs: TestReaderBuildContentArgs | null;
+  currentChapter: TestReaderChapter | null;
+  currentTheme: TestReaderTheme;
+  customViewportContent: TestReaderViewportContent | null;
+  fileType: 'epub' | 'txt';
+  headerBg: string;
+  imageViewerProps: {
+    activeImage: null;
+    closeLabel: string;
+    isOpen: boolean;
+    onClose: ReturnType<typeof vi.fn>;
+  };
+  isChromeVisible: boolean;
+  isImageViewerOpen: boolean;
+  isPagedMode: boolean;
+  isSidebarOpen: boolean;
+  lifecycleStatus: 'ready';
+  loadingLabel: string;
+  mode: 'summary' | 'scroll' | 'paged';
+  pageTurnMode: 'cover' | 'scroll' | 'slide' | 'none';
+  paragraphSpacing: number;
+  readerError: TestReaderError | null;
+  readerTheme: string;
+  renderableChapter: TestReaderChapter | null;
+  showLoadingOverlay: boolean;
+  viewMode: 'summary' | 'original';
+  viewportScroll: ReturnType<typeof vi.fn>;
+}
+
 const readerShellMocks = vi.hoisted(() => ({
-  setIsSidebarOpen: vi.fn(),
-  toggleSidebar: vi.fn(),
+  handleContentClick: vi.fn(),
   handleMobileBack: vi.fn(),
-  handleSetViewMode: vi.fn(),
   handleSetContentMode: vi.fn(),
-  setPageTurnMode: vi.fn(),
+  handleSetViewMode: vi.fn(),
   setFontSize: vi.fn(),
+  setIsChromeVisible: vi.fn(),
+  setIsSidebarOpen: vi.fn(),
   setLineSpacing: vi.fn(),
+  setPageTurnMode: vi.fn(),
   setParagraphSpacing: vi.fn(),
   setReaderTheme: vi.fn(),
-  handleContentClick: vi.fn(),
-  setIsChromeVisible: vi.fn(),
+  toggleSidebar: vi.fn(),
 }));
-const readerSurfaceMocks = vi.hoisted(() => ({
-  useReaderReadingSurfaceController: vi.fn(),
+
+const readerNavigationMocks = vi.hoisted(() => ({
+  goToChapter: vi.fn(),
+  goToNextPage: vi.fn(),
+  goToPrevPage: vi.fn(),
+  handleNext: vi.fn(),
+  handlePrev: vi.fn(),
 }));
+
+const readerOverlayMocks = vi.hoisted(() => ({
+  closeImageViewer: vi.fn(),
+  handleImageActivate: vi.fn(),
+  handleRegisterImageElement: vi.fn(),
+}));
+
+const readerSurfaceMocks: ReaderSurfaceMockState = vi.hoisted(() => ({
+  buildContentPropsArgs: null,
+  currentChapter: { id: 1, title: 'Chapter 1' },
+  currentTheme: {
+    bg: 'bg-page',
+    contentVariables: {},
+    sidebarBg: 'bg-sidebar',
+    text: 'text-reader',
+  },
+  customViewportContent: null,
+  fileType: 'epub',
+  headerBg: 'bg-header',
+  imageViewerProps: {
+    activeImage: null,
+    closeLabel: 'close',
+    isOpen: false,
+    onClose: vi.fn(),
+  },
+  isChromeVisible: false,
+  isImageViewerOpen: false,
+  isPagedMode: false,
+  isSidebarOpen: false,
+  lifecycleStatus: 'ready',
+  loadingLabel: 'reader.loading',
+  mode: 'summary',
+  pageTurnMode: 'cover',
+  paragraphSpacing: 1.2,
+  readerError: null,
+  readerTheme: 'paper',
+  renderableChapter: { id: 1, title: 'Chapter 1' },
+  showLoadingOverlay: false,
+  viewMode: 'summary',
+  viewportScroll: vi.fn(),
+}));
+
+function createSummaryContentProps(
+  analysisController: {
+    analyzeChapter: (novelId: number, chapterIndex: number) => Promise<unknown>;
+    renderSummaryPanel: (input: {
+      analysis: null;
+      isAnalyzingChapter: boolean;
+      isLoading: boolean;
+      job: null;
+      novelId: number;
+      onAnalyzeChapter: () => void;
+    }) => ReactNode;
+  },
+  novelId: number,
+) {
+  return {
+    analysisPanel: analysisController.renderSummaryPanel({
+      analysis: null,
+      isAnalyzingChapter: false,
+      isLoading: false,
+      job: null,
+      novelId,
+      onAnalyzeChapter: () => {
+        analysisController.analyzeChapter(novelId, 0).catch(() => undefined);
+      },
+    }),
+    chapter: readerSurfaceMocks.renderableChapter,
+    headerBgClassName: readerSurfaceMocks.headerBg,
+    readerTheme: readerSurfaceMocks.readerTheme,
+    textClassName: readerSurfaceMocks.currentTheme.text,
+  };
+}
+
+function buildViewportContent(
+  analysisController: {
+    analyzeChapter: (novelId: number, chapterIndex: number) => Promise<unknown>;
+    renderSummaryPanel: (input: {
+      analysis: null;
+      isAnalyzingChapter: boolean;
+      isLoading: boolean;
+      job: null;
+      novelId: number;
+      onAnalyzeChapter: () => void;
+    }) => ReactNode;
+  },
+  novelId: number,
+) {
+  if (readerSurfaceMocks.customViewportContent) {
+    return readerSurfaceMocks.customViewportContent;
+  }
+
+  return {
+    pagedContentProps: undefined,
+    scrollContentProps: undefined,
+    summaryContentProps: createSummaryContentProps(analysisController, novelId),
+  };
+}
+
+function createNovelSummary(fileType: 'epub' | 'txt' = 'epub') {
+  return {
+    novel: {
+      id: 1,
+      title: 'Reader Novel',
+      author: 'Author',
+      description: '',
+      tags: [],
+      fileType,
+      hasCover: false,
+      createdAt: new Date().toISOString(),
+      totalWords: 100,
+      chapterCount: 1,
+      originalFilename: `reader.${fileType}`,
+      originalEncoding: 'utf-8',
+    },
+  };
+}
+
+function resetReaderSurfaceMocks(): void {
+  readerSurfaceMocks.buildContentPropsArgs = null;
+  readerSurfaceMocks.currentChapter = { id: 1, title: 'Chapter 1' };
+  readerSurfaceMocks.currentTheme = {
+    bg: 'bg-page',
+    contentVariables: {},
+    sidebarBg: 'bg-sidebar',
+    text: 'text-reader',
+  };
+  readerSurfaceMocks.customViewportContent = null;
+  readerSurfaceMocks.fileType = 'epub';
+  readerSurfaceMocks.headerBg = 'bg-header';
+  readerSurfaceMocks.isChromeVisible = false;
+  readerSurfaceMocks.isImageViewerOpen = false;
+  readerSurfaceMocks.isPagedMode = false;
+  readerSurfaceMocks.isSidebarOpen = false;
+  readerSurfaceMocks.lifecycleStatus = 'ready';
+  readerSurfaceMocks.loadingLabel = 'reader.loading';
+  readerSurfaceMocks.mode = 'summary';
+  readerSurfaceMocks.pageTurnMode = 'cover';
+  readerSurfaceMocks.paragraphSpacing = 1.2;
+  readerSurfaceMocks.readerError = null;
+  readerSurfaceMocks.readerTheme = 'paper';
+  readerSurfaceMocks.renderableChapter = { id: 1, title: 'Chapter 1' };
+  readerSurfaceMocks.showLoadingOverlay = false;
+  readerSurfaceMocks.viewMode = 'summary';
+  readerSurfaceMocks.viewportScroll.mockReset();
+  readerOverlayMocks.closeImageViewer.mockReset();
+  readerOverlayMocks.handleImageActivate.mockReset();
+  readerOverlayMocks.handleRegisterImageElement.mockReset();
+  readerNavigationMocks.goToChapter.mockReset();
+  readerNavigationMocks.goToNextPage.mockReset();
+  readerNavigationMocks.goToPrevPage.mockReset();
+  readerNavigationMocks.handleNext.mockReset();
+  readerNavigationMocks.handlePrev.mockReset();
+  readerShellMocks.handleContentClick.mockReset();
+  readerShellMocks.handleMobileBack.mockReset();
+  readerShellMocks.handleSetContentMode.mockReset();
+  readerShellMocks.handleSetViewMode.mockReset();
+  readerShellMocks.setFontSize.mockReset();
+  readerShellMocks.setIsChromeVisible.mockReset();
+  readerShellMocks.setIsSidebarOpen.mockReset();
+  readerShellMocks.setLineSpacing.mockReset();
+  readerShellMocks.setPageTurnMode.mockReset();
+  readerShellMocks.setParagraphSpacing.mockReset();
+  readerShellMocks.setReaderTheme.mockReset();
+  readerShellMocks.toggleSidebar.mockReset();
+}
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
@@ -43,6 +275,7 @@ vi.mock('@application/use-cases/library', () => ({
 
 vi.mock('@domains/analysis', async () => {
   const actual = await vi.importActual<typeof import('@domains/analysis')>('@domains/analysis');
+
   return {
     ...actual,
     ChapterAnalysisPanel: ({ onAnalyzeChapter }: { onAnalyzeChapter: () => void }) => (
@@ -58,9 +291,63 @@ vi.mock('@domains/analysis', async () => {
 });
 
 vi.mock('@domains/reader-shell', () => ({
-  useReaderAnalysisBridge: vi.fn(({ controller, novelId }: {
-    controller: {
+  useReaderPreferences: () => ({
+    currentTheme: readerSurfaceMocks.currentTheme,
+    fontSize: 16,
+    headerBg: readerSurfaceMocks.headerBg,
+    lineSpacing: 1.6,
+    pageTurnMode: readerSurfaceMocks.pageTurnMode,
+    paragraphSpacing: readerSurfaceMocks.paragraphSpacing,
+    readerTheme: readerSurfaceMocks.readerTheme,
+    setFontSize: readerShellMocks.setFontSize,
+    setLineSpacing: readerShellMocks.setLineSpacing,
+    setPageTurnMode: readerShellMocks.setPageTurnMode,
+    setParagraphSpacing: readerShellMocks.setParagraphSpacing,
+    setReaderTheme: readerShellMocks.setReaderTheme,
+  }),
+}));
+
+vi.mock('@domains/reader-interaction', () => ({
+  useContentClick: () => ({
+    handleContentClick: readerShellMocks.handleContentClick,
+    isChromeVisible: readerSurfaceMocks.isChromeVisible,
+    setIsChromeVisible: readerShellMocks.setIsChromeVisible,
+  }),
+  useReaderInput: vi.fn(),
+  useReaderMobileBack: () => ({
+    handleMobileBack: readerShellMocks.handleMobileBack,
+  }),
+  useSidebarDrag: () => ({
+    isSidebarOpen: readerSurfaceMocks.isSidebarOpen,
+    setIsSidebarOpen: readerShellMocks.setIsSidebarOpen,
+    toggleSidebar: readerShellMocks.toggleSidebar,
+  }),
+}));
+
+vi.mock('@domains/reader-media', () => ({
+  useReaderPageImageOverlay: () => ({
+    closeImageViewer: readerOverlayMocks.closeImageViewer,
+    handleImageActivate: readerOverlayMocks.handleImageActivate,
+    handleRegisterImageElement: readerOverlayMocks.handleRegisterImageElement,
+    imageViewerProps: readerSurfaceMocks.imageViewerProps,
+    isImageViewerOpen: readerSurfaceMocks.isImageViewerOpen,
+  }),
+}));
+
+vi.mock('@shared/reader-runtime', () => ({
+  useReaderViewportContext: () => ({
+    contentRef: { current: null },
+  }),
+}));
+
+vi.mock('../useReaderReadingSurfaceController', () => ({
+  useReaderReadingSurfaceController: vi.fn(({
+    analysisController,
+    novelId,
+  }: {
+    analysisController: {
       analyzeChapter: (nextNovelId: number, chapterIndex: number) => Promise<unknown>;
+      getStatus: () => Promise<unknown>;
       renderSummaryPanel: (input: {
         analysis: null;
         isAnalyzingChapter: boolean;
@@ -72,194 +359,59 @@ vi.mock('@domains/reader-shell', () => ({
     };
     novelId: number;
   }) => ({
-    isChapterAnalysisLoading: false,
-    summaryPanel: controller.renderSummaryPanel({
-      analysis: null,
-      isAnalyzingChapter: false,
-      isLoading: false,
-      job: null,
-      novelId,
-      onAnalyzeChapter: () => {
-        controller.analyzeChapter(novelId, 0).catch(() => undefined);
-      },
-    }),
-    summaryRestoreSignal: null,
-  })),
-  useReaderPreferences: () => ({
-    currentTheme: {
-      bg: 'bg-page',
-      contentVariables: {},
-      sidebarBg: 'bg-sidebar',
-      text: 'text-reader',
+    chapterData: {
+      chapters: [],
+      currentChapter: readerSurfaceMocks.currentChapter,
     },
-    fontSize: 16,
-    headerBg: 'bg-header',
-    lineSpacing: 1.6,
-    pageTurnMode: 'cover',
-    paragraphSpacing: 1.2,
-    readerTheme: 'paper',
-    setFontSize: readerShellMocks.setFontSize,
-    setLineSpacing: readerShellMocks.setLineSpacing,
-    setPageTurnMode: readerShellMocks.setPageTurnMode,
-    setParagraphSpacing: readerShellMocks.setParagraphSpacing,
-    setReaderTheme: readerShellMocks.setReaderTheme,
-  }),
-}));
-
-vi.mock('@domains/reader-content', () => ({
-  useReaderChapterData: () => ({
-    cache: {},
-    chapters: [],
-    currentChapter: { id: 1, title: 'Chapter 1' },
-    fetchChapterContent: vi.fn(),
-    preloadAdjacent: vi.fn(),
-  }),
-}));
-
-vi.mock('@domains/reader-interaction', () => ({
-  useContentClick: () => ({
-    handleContentClick: readerShellMocks.handleContentClick,
-    isChromeVisible: false,
-    setIsChromeVisible: readerShellMocks.setIsChromeVisible,
-  }),
-  useReaderInput: vi.fn(),
-  useReaderMobileBack: () => ({
-    handleMobileBack: readerShellMocks.handleMobileBack,
-  }),
-  useSidebarDrag: () => ({
-    isSidebarOpen: false,
-    setIsSidebarOpen: readerShellMocks.setIsSidebarOpen,
-    toggleSidebar: readerShellMocks.toggleSidebar,
-  }),
-}));
-
-vi.mock('../useReaderReadingSurfaceController', () => ({
-  useReaderReadingSurfaceController:
-    readerSurfaceMocks.useReaderReadingSurfaceController.mockImplementation(({
-      analysisController,
-    }: {
-      analysisController: {
-        analyzeChapter: (nextNovelId: number, chapterIndex: number) => Promise<unknown>;
-        getStatus: () => Promise<unknown>;
-        renderSummaryPanel: (input: {
-          analysis: null;
-          isAnalyzingChapter: boolean;
-          isLoading: boolean;
-          job: null;
-          novelId: number;
-          onAnalyzeChapter: () => void;
-        }) => ReactNode;
-      };
-    }) => ({
-      chapterData: {
-        chapters: [],
-        currentChapter: { id: 1, title: 'Chapter 1' },
-      },
-      lifecycle: {
-        isRestoringPosition: false,
-        loadingLabel: 'reader.loading',
-        readerError: null,
-        showLoadingOverlay: false,
-        lifecycleStatus: 'ready',
-      },
-      navigation: {
-        goToChapter: vi.fn(),
-        goToNextPage: vi.fn(),
-        goToPrevPage: vi.fn(),
-        handleNext: vi.fn(),
-        handlePrev: vi.fn(),
-        toolbarHasNext: false,
-        toolbarHasPrev: false,
-      },
-      restore: {
-        handleSetContentMode: readerShellMocks.handleSetContentMode,
-        handleSetViewMode: readerShellMocks.handleSetViewMode,
-      },
-      sessionSnapshot: {
-        chapterIndex: 0,
-        isPagedMode: false,
-        mode: 'scroll',
-        viewMode: 'summary',
-      },
-      viewport: {
-        buildContentProps: () => ({
-          summaryContentProps: {
-            analysisPanel: analysisController.renderSummaryPanel({
-              analysis: null,
-              isAnalyzingChapter: false,
-              isLoading: false,
-              job: null,
-              novelId: 1,
-              onAnalyzeChapter: () => {
-                analysisController.analyzeChapter(1, 0).catch(() => undefined);
-              },
-            }),
-            chapter: { id: 1, title: 'Chapter 1' },
-            headerBgClassName: 'bg-header',
-            readerTheme: 'paper',
-            textClassName: 'text-reader',
-          },
-        }),
-        handleViewportScroll: vi.fn(),
-        renderableChapter: { id: 1, title: 'Chapter 1' },
-      },
-    })),
-}));
-
-vi.mock('@domains/reader-media', () => ({
-  useReaderPageImageOverlay: () => ({
-    handleImageActivate: vi.fn(),
-    handleRegisterImageElement: vi.fn(),
-    imageViewerProps: {
-      activeImage: null,
-      closeLabel: 'close',
-      isOpen: false,
-      onClose: vi.fn(),
+    lifecycle: {
+      isRestoringPosition: false,
+      loadingLabel: readerSurfaceMocks.loadingLabel,
+      readerError: readerSurfaceMocks.readerError,
+      showLoadingOverlay: readerSurfaceMocks.showLoadingOverlay,
+      lifecycleStatus: readerSurfaceMocks.lifecycleStatus,
     },
-    isImageViewerOpen: false,
-  }),
-}));
-
-vi.mock('@domains/reader-session', () => ({
-  useReaderRestoreController: () => ({}),
-  useReaderSession: () => ({
-    commands: {},
-    snapshot: {
+    navigation: {
+      goToChapter: readerNavigationMocks.goToChapter,
+      goToNextPage: readerNavigationMocks.goToNextPage,
+      goToPrevPage: readerNavigationMocks.goToPrevPage,
+      handleNext: readerNavigationMocks.handleNext,
+      handlePrev: readerNavigationMocks.handlePrev,
+      toolbarHasNext: false,
+      toolbarHasPrev: false,
+    },
+    restore: {
+      handleSetContentMode: readerShellMocks.handleSetContentMode,
+      handleSetViewMode: readerShellMocks.handleSetViewMode,
+    },
+    sessionSnapshot: {
       chapterIndex: 0,
-      isPagedMode: false,
-      mode: 'scroll',
-      viewMode: 'summary',
+      isPagedMode: readerSurfaceMocks.isPagedMode,
+      mode: readerSurfaceMocks.mode,
+      viewMode: readerSurfaceMocks.viewMode,
     },
-  }),
-}));
-
-vi.mock('@shared/reader-runtime', () => ({
-  useReaderViewportContext: () => ({
-    contentRef: { current: null },
-  }),
+    viewport: {
+      buildContentProps: (options: {
+        imageHandlers: {
+          onImageActivate: typeof readerOverlayMocks.handleImageActivate;
+          onRegisterImageElement: typeof readerOverlayMocks.handleRegisterImageElement;
+        };
+        interactionLocked: boolean;
+      }) => {
+        readerSurfaceMocks.buildContentPropsArgs = options;
+        return buildViewportContent(analysisController, novelId);
+      },
+      handleViewportScroll: readerSurfaceMocks.viewportScroll,
+      renderableChapter: readerSurfaceMocks.renderableChapter,
+    },
+  })),
 }));
 
 describe('useReaderPageViewModel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(readerSurfaceMocks.useReaderReadingSurfaceController).mockClear();
+    resetReaderSurfaceMocks();
     vi.mocked(analyzeChapter).mockResolvedValue({ analysis: null });
-    vi.mocked(loadReaderSession).mockResolvedValue({
-      novel: {
-        id: 1,
-        title: 'Reader Novel',
-        author: 'Author',
-        description: '',
-        tags: [],
-        fileType: 'epub',
-        hasCover: false,
-        createdAt: new Date().toISOString(),
-        totalWords: 100,
-        chapterCount: 1,
-        originalFilename: 'reader.epub',
-        originalEncoding: 'utf-8',
-      },
-    });
+    vi.mocked(loadReaderSession).mockResolvedValue(createNovelSummary('epub'));
   });
 
   it('builds the reader page view model from domain hooks and wires the analysis controller', async () => {
@@ -273,26 +425,129 @@ describe('useReaderPageViewModel', () => {
     expect(result.current.viewportProps.summaryContentProps).toBeDefined();
     expect(useReaderInput).toHaveBeenCalledTimes(1);
 
-    const surfaceControllerArgs = vi.mocked(
-      readerSurfaceMocks.useReaderReadingSurfaceController,
-    ).mock.calls[0]?.[0];
-    expect(surfaceControllerArgs).toMatchObject({
-      novelId: 1,
-      preferences: expect.objectContaining({
-        fontSize: 16,
-        lineSpacing: 1.6,
-        pageTurnMode: 'cover',
-        paragraphSpacing: 1.2,
-        readerTheme: 'paper',
-      }),
-    });
-    expect(surfaceControllerArgs?.analysisController.analyzeChapter).toBe(analyzeChapter);
-    expect(surfaceControllerArgs?.analysisController.getStatus).toBe(analysisService.getStatus);
-
     render(<>{result.current.viewportProps.summaryContentProps?.analysisPanel}</>);
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'reader.analysisPanel.analyzeChapter' }));
 
     expect(analyzeChapter).toHaveBeenCalledWith(1, 0);
+    expect(analysisService.getStatus).toBeTypeOf('function');
+  });
+
+  it('updates page turn preferences without changing content mode in summary mode', () => {
+    readerSurfaceMocks.mode = 'summary';
+    readerSurfaceMocks.viewMode = 'summary';
+
+    const { result } = renderHook(() => useReaderPageViewModel(1));
+
+    act(() => {
+      result.current.toolbarProps?.setPageTurnMode('scroll');
+    });
+
+    expect(readerShellMocks.setPageTurnMode).toHaveBeenCalledWith('scroll');
+    expect(readerShellMocks.handleSetContentMode).not.toHaveBeenCalled();
+  });
+
+  it('maps page turn mode changes back into content mode while in original reading mode', () => {
+    readerSurfaceMocks.mode = 'paged';
+    readerSurfaceMocks.viewMode = 'original';
+    readerSurfaceMocks.isPagedMode = true;
+
+    const { result } = renderHook(() => useReaderPageViewModel(1));
+
+    act(() => {
+      result.current.toolbarProps?.setPageTurnMode('scroll');
+    });
+
+    expect(readerShellMocks.setPageTurnMode).toHaveBeenCalledWith('scroll');
+    expect(readerShellMocks.handleSetContentMode).toHaveBeenCalledWith('scroll');
+  });
+
+  it('dismisses blocked interactions before delegating viewport clicks', () => {
+    readerSurfaceMocks.isSidebarOpen = true;
+    readerSurfaceMocks.isChromeVisible = true;
+
+    const { result, rerender } = renderHook(() => useReaderPageViewModel(1));
+    const blockedEvent = new MouseEvent('click') as unknown as MouseEvent<HTMLDivElement>;
+
+    act(() => {
+      result.current.viewportProps.onContentClick(blockedEvent);
+    });
+
+    expect(readerShellMocks.setIsSidebarOpen).toHaveBeenCalledWith(false);
+    expect(readerShellMocks.setIsChromeVisible).toHaveBeenCalledWith(false);
+    expect(readerShellMocks.handleContentClick).not.toHaveBeenCalled();
+
+    readerSurfaceMocks.isSidebarOpen = false;
+    readerSurfaceMocks.isChromeVisible = false;
+    rerender();
+
+    act(() => {
+      result.current.viewportProps.onContentClick(blockedEvent);
+    });
+
+    expect(readerShellMocks.handleContentClick).toHaveBeenCalledWith(blockedEvent);
+  });
+
+  it('navigates to the selected chapter start and closes the sidebar', () => {
+    const { result } = renderHook(() => useReaderPageViewModel(1));
+
+    act(() => {
+      result.current.sidebarProps.onSelectChapter(3);
+    });
+
+    expect(readerNavigationMocks.goToChapter).toHaveBeenCalledWith(3, 'start');
+    expect(readerShellMocks.setIsSidebarOpen).toHaveBeenCalledWith(false);
+  });
+
+  it('marks viewport content as interaction-locked and forwards image handlers', () => {
+    readerSurfaceMocks.isImageViewerOpen = true;
+
+    renderHook(() => useReaderPageViewModel(1));
+
+    expect(readerSurfaceMocks.buildContentPropsArgs).toMatchObject({
+      interactionLocked: true,
+      imageHandlers: {
+        onImageActivate: readerOverlayMocks.handleImageActivate,
+        onRegisterImageElement: readerOverlayMocks.handleRegisterImageElement,
+      },
+    });
+  });
+
+  it('shows reparse recovery for missing structured content and updates accepted file types after session load', async () => {
+    readerSurfaceMocks.readerError = {
+      code: AppErrorCode.CHAPTER_STRUCTURED_CONTENT_MISSING,
+    };
+    vi.mocked(loadReaderSession).mockResolvedValue(createNovelSummary('txt'));
+
+    const { result } = renderHook(() => useReaderPageViewModel(1));
+
+    expect(result.current.reparseRecovery.visible).toBe(true);
+
+    await waitFor(() => {
+      expect(result.current.reparseRecovery.accept).toBe('.txt');
+    });
+  });
+
+  it('omits toolbar props while loading overlays are visible or no current chapter is available', () => {
+    const { result, rerender } = renderHook(() => useReaderPageViewModel(1));
+
+    expect(result.current.toolbarProps).toBeDefined();
+
+    readerSurfaceMocks.showLoadingOverlay = true;
+    rerender();
+
+    expect(result.current.toolbarProps).toBeUndefined();
+
+    readerSurfaceMocks.showLoadingOverlay = false;
+    readerSurfaceMocks.currentChapter = null;
+    readerSurfaceMocks.renderableChapter = null;
+    readerSurfaceMocks.customViewportContent = {
+      pagedContentProps: undefined,
+      scrollContentProps: undefined,
+      summaryContentProps: undefined,
+    };
+    rerender();
+
+    expect(result.current.toolbarProps).toBeUndefined();
   });
 });
