@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { READER_CONTENT_CLASS_NAMES } from '@shared/reader-content';
+import { projectTxtPlainTextToRichBlocks } from '@shared/text-processing';
 
 const useReaderImageResourceMock = vi.hoisted(() => vi.fn());
 
@@ -219,6 +220,34 @@ function createRichScrollChapterLayout() {
   };
 }
 
+function createTxtRichScrollChapterLayout(content: string) {
+  const chapter = {
+    index: 0,
+    title: 'Chapter 1',
+    plainText: content,
+    richBlocks: projectTxtPlainTextToRichBlocks(content),
+    contentFormat: 'rich' as const,
+    contentVersion: 1,
+    wordCount: content.length,
+    totalChapters: 1,
+    hasPrev: false,
+    hasNext: false,
+  };
+  const typography = createReaderTypographyMetrics(18, 1.8, 24, 920);
+
+  return {
+    chapter,
+    layout: measureScrollReaderChapterLayout(
+      chapter,
+      920,
+      typography,
+      new Map(),
+      undefined,
+      TEXT_LAYOUT_ENGINE,
+    ),
+  };
+}
+
 describe('ScrollReaderContent', () => {
   beforeEach(() => {
     useReaderImageResourceMock.mockReset();
@@ -387,7 +416,7 @@ describe('ScrollReaderContent', () => {
     const { chapter, layout } = createRichScrollChapterLayout();
     const user = userEvent.setup();
 
-    render(
+    const { container } = render(
       <ScrollReaderContent
         chapters={[{
           index: 0,
@@ -416,16 +445,15 @@ describe('ScrollReaderContent', () => {
     expect(screen.getByRole('link', { name: 'Return to the river note' })).toHaveClass(
       READER_CONTENT_CLASS_NAMES.inlineLink,
     );
-    expect(screen.getByTestId('reader-rich-table')).toBeInTheDocument();
+    expect(screen.getByTestId('reader-flow-table')).toBeInTheDocument();
     expect(screen.getByText('Route').closest('td')).toHaveClass(
       READER_CONTENT_CLASS_NAMES.tableCell,
     );
-    expect(
-      screen.getByText('Margin note: ferries only after dusk.').closest(
-        `.${READER_CONTENT_CLASS_NAMES.blockUnsupported}`,
-      ),
-    ).toBeTruthy();
-    expect(screen.getByTestId('reader-rich-hr')).toBeInTheDocument();
+    const unsupportedFragment = Array.from(
+      container.querySelectorAll('[data-testid="reader-flow-text-fragment"]'),
+    ).find((element) => element.textContent === 'Margin note: ferries only after dusk.');
+    expect(unsupportedFragment).toHaveClass(READER_CONTENT_CLASS_NAMES.blockUnsupported);
+    expect(screen.getByTestId('reader-flow-hr')).toBeInTheDocument();
     expect(document.querySelector(`.${READER_CONTENT_CLASS_NAMES.listMarker}`)).toBeTruthy();
     expect(screen.getByText('The wind remembers').closest(`.${READER_CONTENT_CLASS_NAMES.poemLine}`)).toBeTruthy();
     expect(screen.getByTestId('reader-flow-image-caption')).toHaveClass(
@@ -446,5 +474,35 @@ describe('ScrollReaderContent', () => {
       imageKey: 'map',
       sourceElement: imageButton,
     }));
+  });
+
+  it('renders TXT-derived rich paragraphs as separate flow fragments in scroll mode', () => {
+    const { chapter, layout } = createTxtRichScrollChapterLayout('第一行\n第二行');
+    const { container } = render(
+      <ScrollReaderContent
+        chapters={[{
+          index: 0,
+          chapter,
+          layout,
+        }]}
+        novelId={1}
+        readerTheme="auto"
+        rootClassName="pm-reader pm-reader--scroll pm-reader--theme-auto"
+        rootStyle={{}}
+        textClassName=""
+        headerBgClassName=""
+        onChapterElement={() => {}}
+      />,
+    );
+
+    const fragments = Array.from(
+      container.querySelectorAll('[data-testid="reader-flow-text-fragment"]'),
+    );
+    expect(fragments).toHaveLength(3);
+    expect(fragments.map((fragment) => fragment.textContent)).toEqual([
+      'Chapter 1',
+      '第一行',
+      '第二行',
+    ]);
   });
 });

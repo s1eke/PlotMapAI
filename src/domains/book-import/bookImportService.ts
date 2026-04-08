@@ -18,7 +18,14 @@ import { parseBook } from './services/bookParser';
 import type { BookImportProgress } from './services/progress';
 
 const INITIAL_CHAPTER_CONTENT_VERSION = 1;
-const IMPORT_FORMAT_VERSION = 1;
+const EPUB_IMPORT_FORMAT_VERSION = 1;
+const TXT_IMPORT_FORMAT_VERSION = 2;
+
+function resolveImportFormatVersion(fileType: string): number {
+  return fileType === 'txt'
+    ? TXT_IMPORT_FORMAT_VERSION
+    : EPUB_IMPORT_FORMAT_VERSION;
+}
 
 export interface PreparedChapterRichContent {
   chapterIndex: number;
@@ -164,6 +171,7 @@ export const bookImportService = {
     options.signal?.throwIfAborted?.();
 
     const normalizedChapters = normalizeImportedChapters(parsed.chapters);
+    const importFormatVersion = resolveImportFormatVersion(ext);
     const totalWords = normalizedChapters.reduce((sum, chapter) => sum + chapter.content.length, 0);
     const chapters = normalizedChapters.map((chapter, chapterIndex) => ({
       chapterIndex,
@@ -177,7 +185,7 @@ export const bookImportService = {
       plainText: chapter.content,
       contentFormat: chapter.contentFormat,
       contentVersion: INITIAL_CHAPTER_CONTENT_VERSION,
-      importFormatVersion: IMPORT_FORMAT_VERSION,
+      importFormatVersion,
     }));
 
     const imageGalleryEntries = sortChapterImageGalleryEntries(

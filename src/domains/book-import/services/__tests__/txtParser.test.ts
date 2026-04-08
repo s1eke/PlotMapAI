@@ -1,11 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { runParseTxtTask } from '@shared/text-processing';
+import {
+  projectTxtPlainTextToRichBlocks,
+  runParseTxtTask,
+} from '@shared/text-processing';
 
 import { parseTxt } from '../txtParser';
 
 vi.mock('@shared/text-processing', () => ({
-  projectPlainTextToRichBlocks: vi.fn((plainText: string) => [{
+  projectTxtPlainTextToRichBlocks: vi.fn((plainText: string) => [{
     type: 'paragraph' as const,
     children: [{
       type: 'text' as const,
@@ -56,5 +59,6 @@ describe('parseTxt', () => {
       total: 12,
       detail: '12 chapters',
     });
+    expect(projectTxtPlainTextToRichBlocks).toHaveBeenCalledWith('Body');
   });
 });

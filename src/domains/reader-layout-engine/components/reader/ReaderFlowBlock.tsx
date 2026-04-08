@@ -98,7 +98,7 @@ function resolveRenderTextItem(item: StaticReaderNode): RenderTextItem | null {
       marginBefore: item.marginBefore,
       originalTag: item.block.originalTag,
       renderRole: item.block.renderRole,
-      richLineFragments: undefined,
+      richLineFragments: item.richLineFragments,
       showListMarker: item.block.showListMarker,
       tableRowHeights: item.tableRowHeights,
       tableRows: item.block.tableRows,

@@ -5,7 +5,7 @@ import type { BookImportProgress } from './progress';
 
 import { debugLog } from '@shared/debug';
 import {
-  projectPlainTextToRichBlocks,
+  projectTxtPlainTextToRichBlocks,
   runParseTxtTask,
 } from '@shared/text-processing';
 
@@ -19,7 +19,7 @@ function mapParsedDocument(document: ParsedTextDocument): ParsedBook {
       title: chapter.title,
       content: chapter.content,
       contentFormat: 'rich',
-      richBlocks: projectPlainTextToRichBlocks(chapter.content),
+      richBlocks: projectTxtPlainTextToRichBlocks(chapter.content),
     })),
     rawText: document.rawText,
     encoding: document.encoding,

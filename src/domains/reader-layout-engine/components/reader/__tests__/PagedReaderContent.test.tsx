@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createReaderContextWrapper } from '@test/readerRuntimeTestUtils';
 
 import { READER_CONTENT_CLASS_NAMES } from '@shared/reader-content';
+import { projectTxtPlainTextToRichBlocks } from '@shared/text-processing';
 
 import PagedReaderContent from '../PagedReaderContent';
 import { createDeterministicPagedLayout } from '../../../test/deterministicRenderCacheStub';
@@ -238,6 +239,17 @@ function createChapter({
     totalChapters,
     hasPrev,
     hasNext,
+  };
+}
+
+function createTxtRichChapter(plainText: string) {
+  return {
+    ...createChapter({
+      plainText,
+      wordCount: plainText.length,
+    }),
+    contentFormat: 'rich' as const,
+    richBlocks: projectTxtPlainTextToRichBlocks(plainText),
   };
 }
 
@@ -555,6 +567,45 @@ describe('PagedReaderContent', () => {
     expect(pageFrame.querySelector('strong')).not.toBeNull();
     expect(pageFrame.querySelector('em')).not.toBeNull();
     expect(screen.getByRole('link', { name: 'Link' })).toHaveAttribute('href', '#anchor');
+  });
+
+  it('renders TXT-derived rich paragraphs as separate paged flow fragments', () => {
+    const chapter = createTxtRichChapter('第一行\n第二行');
+    const viewportMetrics = createReaderViewportMetrics(720, 1200, 720, 1200, 18);
+    const typography = createReaderTypographyMetrics(
+      18,
+      1.8,
+      24,
+      viewportMetrics.pagedViewportWidth,
+    );
+    const measuredLayout = measurePagedReaderChapterLayout(
+      chapter,
+      viewportMetrics.pagedColumnWidth,
+      typography,
+      new Map(),
+      TEXT_LAYOUT_ENGINE,
+    );
+    const currentLayout = composePaginatedChapterLayout(
+      measuredLayout,
+      getPagedContentHeight(viewportMetrics.pagedViewportHeight),
+      viewportMetrics.pagedColumnCount,
+      viewportMetrics.pagedColumnGap,
+    );
+
+    const { container } = renderPagedContent({
+      chapter,
+      currentLayout,
+    });
+
+    const fragments = Array.from(
+      container.querySelectorAll('[data-testid="reader-flow-text-fragment"]'),
+    );
+    expect(fragments).toHaveLength(3);
+    expect(fragments.map((fragment) => fragment.textContent)).toEqual([
+      'Chapter 1',
+      '第一行',
+      '第二行',
+    ]);
   });
 
   it('applies an opaque page background to animated layers', () => {

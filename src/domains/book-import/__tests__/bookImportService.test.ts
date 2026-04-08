@@ -66,7 +66,7 @@ describe('bookImportService', () => {
         plainText: 'Content 1',
         contentFormat: 'plain',
         contentVersion: 1,
-        importFormatVersion: 1,
+        importFormatVersion: 2,
       },
       {
         chapterIndex: 1,
@@ -74,7 +74,7 @@ describe('bookImportService', () => {
         plainText: 'Content 2',
         contentFormat: 'plain',
         contentVersion: 1,
-        importFormatVersion: 1,
+        importFormatVersion: 2,
       },
     ]);
   });
@@ -281,7 +281,7 @@ describe('bookImportService', () => {
         plainText: 'Body 1',
         contentFormat: 'plain',
         contentVersion: 1,
-        importFormatVersion: 1,
+        importFormatVersion: 2,
       },
       {
         chapterIndex: 1,
@@ -289,7 +289,7 @@ describe('bookImportService', () => {
         plainText: 'Body 2',
         contentFormat: 'plain',
         contentVersion: 1,
-        importFormatVersion: 1,
+        importFormatVersion: 2,
       },
     ]);
   });

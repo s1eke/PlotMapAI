@@ -59,7 +59,7 @@ describe('applicationReaderContentRuntime', () => {
         contentPlain: 'Hello world',
         contentFormat: 'rich',
         contentVersion: 1,
-        importFormatVersion: 1,
+        importFormatVersion: 2,
         updatedAt: new Date().toISOString(),
       },
       {
@@ -77,7 +77,7 @@ describe('applicationReaderContentRuntime', () => {
         contentPlain: 'Plain text',
         contentFormat: 'rich',
         contentVersion: 4,
-        importFormatVersion: 1,
+        importFormatVersion: 2,
         updatedAt: new Date().toISOString(),
       },
     ]);
@@ -255,6 +255,49 @@ describe('applicationReaderContentRuntime', () => {
         contentFormat: 'plain',
         novelId: 1,
       },
+    });
+  });
+
+  it('fails when a TXT chapter still uses the retired import format version', async () => {
+    const record = await db.chapterRichContents.where('[novelId+chapterIndex]').equals([1, 0]).first();
+    if (!record) {
+      throw new Error('Expected seed rich content record');
+    }
+
+    await db.chapterRichContents.update(record.id, {
+      importFormatVersion: 1,
+    });
+
+    await expect(applicationReaderContentRuntime.getChapterContent(1, 0)).rejects.toMatchObject({
+      code: AppErrorCode.CHAPTER_STRUCTURED_CONTENT_MISSING,
+      details: {
+        chapterIndex: 0,
+        contentFormat: 'rich',
+        expectedImportFormatVersion: 2,
+        importFormatVersion: 1,
+        novelId: 1,
+        recoveryReason: 'outdated-txt-import-format',
+      },
+    });
+  });
+
+  it('keeps epub chapters readable even when their import format version is 1', async () => {
+    await db.novels.update(1, {
+      fileType: 'epub',
+    });
+    const record = await db.chapterRichContents.where('[novelId+chapterIndex]').equals([1, 0]).first();
+    if (!record) {
+      throw new Error('Expected seed rich content record');
+    }
+
+    await db.chapterRichContents.update(record.id, {
+      importFormatVersion: 1,
+    });
+
+    await expect(applicationReaderContentRuntime.getChapterContent(1, 0)).resolves.toMatchObject({
+      index: 0,
+      plainText: 'Hello world',
+      title: 'Chapter 1',
     });
   });
 

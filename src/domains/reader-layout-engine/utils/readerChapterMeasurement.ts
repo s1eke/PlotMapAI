@@ -278,7 +278,7 @@ export function measureScrollReaderChapterLayout(
     chapterIndex: chapter.index,
     imageDimensionsByKey,
     imageLayoutConstraints,
-    preferRichTextLayout: false,
+    preferRichTextLayout: true,
     renderMode: 'rich',
     richAware: true,
     textLayoutEngine,

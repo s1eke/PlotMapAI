@@ -1,5 +1,4 @@
 export { default as ReaderFlowBlock } from '../components/reader/ReaderFlowBlock';
-export { default as RichBlockRenderer } from '../components/reader/RichBlockRenderer';
 export {
   calculateVisibleScrollBlockRanges,
   resolveCurrentPagedLocator,

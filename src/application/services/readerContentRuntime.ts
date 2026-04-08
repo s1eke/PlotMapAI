@@ -22,22 +22,37 @@ import {
   buildProjectedBookChapters,
 } from './chapterTextProjection';
 
+const MIN_SUPPORTED_TXT_IMPORT_FORMAT_VERSION = 2;
+
 function createStructuredContentMissingError(params: {
   chapterIndex: number;
   contentFormat?: string;
+  expectedImportFormatVersion?: number;
+  importFormatVersion?: number;
+  missingTable?: string;
   novelId: number;
+  recoveryReason?: 'outdated-txt-import-format';
 }) {
   return createAppError({
     code: AppErrorCode.CHAPTER_STRUCTURED_CONTENT_MISSING,
     kind: 'storage',
     source: 'reader',
     userMessageKey: 'reader.reparse.required',
-    debugMessage: 'Structured chapter content is missing or uses a retired format.',
+    debugMessage: params.recoveryReason === 'outdated-txt-import-format'
+      ? 'TXT structured content uses a retired import format and must be reparsed.'
+      : 'Structured chapter content is missing or uses a retired format.',
     details: {
       chapterIndex: params.chapterIndex,
       novelId: params.novelId,
-      missingTable: 'chapterRichContents',
+      ...(params.missingTable ? { missingTable: params.missingTable } : {}),
       ...(params.contentFormat ? { contentFormat: params.contentFormat } : {}),
+      ...(typeof params.importFormatVersion === 'number'
+        ? { importFormatVersion: params.importFormatVersion }
+        : {}),
+      ...(typeof params.expectedImportFormatVersion === 'number'
+        ? { expectedImportFormatVersion: params.expectedImportFormatVersion }
+        : {}),
+      ...(params.recoveryReason ? { recoveryReason: params.recoveryReason } : {}),
     },
   });
 }
@@ -90,8 +105,8 @@ export const applicationReaderContentRuntime: ReaderContentRuntimeValue = {
     chapterIndex: number,
     options: ReaderTextProcessingOptions = {},
   ): Promise<ChapterContent> {
-    const [bookTitle, chapter, chapterRichContent, totalChapters, rules] = await Promise.all([
-      novelRepository.getNovelTitle(novelId),
+    const [novel, chapter, chapterRichContent, totalChapters, rules] = await Promise.all([
+      novelRepository.get(novelId),
       bookContentRepository.getNovelChapter(novelId, chapterIndex),
       chapterRichContentRepository.getNovelChapterRichContent(novelId, chapterIndex),
       bookContentRepository.countNovelChapters(novelId),
@@ -112,6 +127,7 @@ export const applicationReaderContentRuntime: ReaderContentRuntimeValue = {
     if (!chapterRichContent) {
       throw createStructuredContentMissingError({
         chapterIndex,
+        missingTable: 'chapterRichContents',
         novelId,
       });
     }
@@ -124,16 +140,30 @@ export const applicationReaderContentRuntime: ReaderContentRuntimeValue = {
       });
     }
 
+    if (
+      novel.fileType.toLowerCase() === 'txt'
+      && chapterRichContent.importFormatVersion < MIN_SUPPORTED_TXT_IMPORT_FORMAT_VERSION
+    ) {
+      throw createStructuredContentMissingError({
+        chapterIndex,
+        contentFormat: chapterRichContent.contentFormat,
+        expectedImportFormatVersion: MIN_SUPPORTED_TXT_IMPORT_FORMAT_VERSION,
+        importFormatVersion: chapterRichContent.importFormatVersion,
+        novelId,
+        recoveryReason: 'outdated-txt-import-format',
+      });
+    }
+
     options.signal?.throwIfAborted?.();
 
-    const title = applyReaderHeadingRules(chapter.title, bookTitle, rules);
+    const title = applyReaderHeadingRules(chapter.title, novel.title, rules);
     const projection = buildPostAstPlainProjection({
       chapter,
       chapterRichContent,
-      bookTitle,
+      bookTitle: novel.title,
       rules,
     });
-    const plainText = applyPlainTextOnlyContent(projection.plainText, bookTitle, rules);
+    const plainText = applyPlainTextOnlyContent(projection.plainText, novel.title, rules);
 
     return {
       index: chapter.chapterIndex,
