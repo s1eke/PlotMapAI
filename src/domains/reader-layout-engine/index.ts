@@ -1,8 +1,14 @@
-export type { ReaderLayoutEngineController } from './reader-layout';
-export { useReaderLayoutController } from './reader-layout';
 export { default as PagedReaderContent } from './components/reader/PagedReaderContent';
 export { default as ScrollReaderContent } from './components/reader/ScrollReaderContent';
 export { default as SummaryReaderContent } from './components/reader/SummaryReaderContent';
+export {
+  usePagedReaderController as usePagedReaderViewportController,
+  type UsePagedReaderControllerResult as UsePagedReaderViewportControllerResult,
+} from './hooks/usePagedReaderController';
+export {
+  useScrollReaderController as useScrollReaderViewportController,
+  type UseScrollReaderControllerResult as UseScrollReaderViewportControllerResult,
+} from './hooks/useScrollReaderController';
 export {
   calculateVisibleScrollBlockRanges,
   clearReaderRenderCacheMemoryForNovel,
@@ -12,6 +18,11 @@ export {
   resolveCurrentScrollLocatorOffset,
   resolvePagedViewportState,
 } from './reader-layout';
+export {
+  resolveReaderContentRootProps,
+  type ReaderContentRootProps,
+  type ReaderContentRootTheme,
+} from './utils/readerContentStyling';
 export {
   PAGED_VIEWPORT_TOP_PADDING_PX,
   type MeasuredChapterLayout,

@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { READER_CONTENT_CLASS_NAMES } from '@domains/reader-shell/constants/readerContentContract';
+import { READER_CONTENT_CLASS_NAMES } from '@shared/reader-content';
 
 const useReaderImageResourceMock = vi.hoisted(() => vi.fn());
 

@@ -1,69 +1,60 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+
 import type { ChapterContent, ReaderMode, ReaderRestoreTarget } from '@shared/contracts/reader';
+import type { AppError } from '@shared/errors';
 import type {
   ReaderHydrateDataResult,
   ReaderLoadActiveChapterParams,
+  ReaderLoadActiveChapterRuntime,
   UseReaderChapterDataResult,
 } from '@domains/reader-content';
-import type { AppError } from '@shared/errors';
+import type { UseReaderRestoreControllerResult } from '@domains/reader-session';
 
+import {
+  useReaderNavigationRuntime,
+  useReaderPersistenceRuntime,
+  useReaderViewportContext,
+} from '@shared/reader-runtime';
 import { isPagedReaderMode } from '@shared/utils/readerMode';
 import { shouldKeepReaderRestoreMask } from '@shared/utils/readerPosition';
 
-export type ReaderLifecycleStatus =
-  | 'hydrating'
-  | 'loading-chapters'
-  | 'loading-chapter'
-  | 'restoring-position'
-  | 'ready'
-  | 'error';
+import type {
+  ReaderLifecycleControllerResult,
+  ReaderLifecycleStatus,
+} from './types';
 
 interface ReaderLifecycleControllerChapterData {
   chapters: UseReaderChapterDataResult['chapters'];
   currentChapter: UseReaderChapterDataResult['currentChapter'];
-  loadingMessage: UseReaderChapterDataResult['loadingMessage'];
-  readerError: UseReaderChapterDataResult['readerError'];
   hydrateReaderData: UseReaderChapterDataResult['hydrateReaderData'];
   loadActiveChapter: UseReaderChapterDataResult['loadActiveChapter'];
+  loadingMessage: UseReaderChapterDataResult['loadingMessage'];
+  readerError: UseReaderChapterDataResult['readerError'];
   resetReaderContent: UseReaderChapterDataResult['resetReaderContent'];
 }
 
 interface ReaderLifecycleControllerRestoreFlow {
-  pendingRestoreTarget: ReaderRestoreTarget | null;
-  clearPendingRestoreTarget: () => void;
-  setPendingRestoreTarget: (
-    nextTarget: ReaderRestoreTarget | null,
-    options?: { force?: boolean },
-  ) => void;
-  startRestoreMaskForTarget: (target: ReaderRestoreTarget | null | undefined) => void;
-  stopRestoreMask: () => void;
+  clearPendingRestoreTarget: UseReaderRestoreControllerResult['clearPendingRestoreTarget'];
+  pendingRestoreTarget: UseReaderRestoreControllerResult['pendingRestoreTarget'];
+  setPendingRestoreTarget: UseReaderRestoreControllerResult['setPendingRestoreTarget'];
+  startRestoreMaskForTarget: UseReaderRestoreControllerResult['startRestoreMaskForTarget'];
+  stopRestoreMask: UseReaderRestoreControllerResult['stopRestoreMask'];
 }
 
 interface UseReaderLifecycleControllerParams {
-  novelId: number;
-  chapterIndex: number;
-  mode: ReaderMode;
-  currentPagedLayoutChapterIndex: number | null;
   chapterData: ReaderLifecycleControllerChapterData;
+  chapterIndex: number;
+  currentPagedLayoutChapterIndex: number | null;
+  mode: ReaderMode;
+  novelId: number;
   restoreFlow: ReaderLifecycleControllerRestoreFlow;
 }
 
-export interface UseReaderLifecycleControllerResult {
-  lifecycleStatus: ReaderLifecycleStatus;
-  loadingLabel: string | null;
-  readerError: AppError | null;
-  showLoadingOverlay: boolean;
-  renderableChapter: ChapterContent | null;
-  isRestoringPosition: boolean;
-  isChapterNavigationReady: boolean;
-  handleRestoreSettled: (result: 'completed' | 'skipped' | 'failed') => void;
-}
-
 function createLifecycleLoadKey(params: {
-  novelId: number;
   chapterIndex: number;
   mode: ReaderMode;
+  novelId: number;
 }): string {
   return [
     params.novelId,
@@ -89,26 +80,29 @@ function buildLoadParamsFromHydratedState(
 }
 
 export function useReaderLifecycleController({
-  novelId,
-  chapterIndex,
-  mode,
-  currentPagedLayoutChapterIndex,
   chapterData,
+  chapterIndex,
+  currentPagedLayoutChapterIndex,
+  mode,
+  novelId,
   restoreFlow,
-}: UseReaderLifecycleControllerParams): UseReaderLifecycleControllerResult {
+}: UseReaderLifecycleControllerParams): ReaderLifecycleControllerResult {
   const { t } = useTranslation();
+  const navigation = useReaderNavigationRuntime();
+  const persistence = useReaderPersistenceRuntime();
+  const viewport = useReaderViewportContext();
   const {
     chapters,
     currentChapter,
-    loadingMessage,
-    readerError: chapterDataError,
     hydrateReaderData,
     loadActiveChapter,
+    loadingMessage,
+    readerError: chapterDataError,
     resetReaderContent,
   } = chapterData;
   const {
-    pendingRestoreTarget,
     clearPendingRestoreTarget,
+    pendingRestoreTarget,
     setPendingRestoreTarget,
     startRestoreMaskForTarget,
     stopRestoreMask,
@@ -125,9 +119,9 @@ export function useReaderLifecycleController({
   const clearPendingRestoreTargetRef = useRef(clearPendingRestoreTarget);
   const stopRestoreMaskRef = useRef(stopRestoreMask);
   const currentLoadKey = createLifecycleLoadKey({
-    novelId,
     chapterIndex,
     mode,
+    novelId,
   });
   const isPagedMode = isPagedReaderMode(mode);
   const isLoadingLifecyclePhase =
@@ -162,14 +156,28 @@ export function useReaderLifecycleController({
     && Boolean(renderableChapter)
     && (!isPagedMode || currentPagedLayoutChapterIndex === chapterIndex);
 
+  const resetViewportPosition = useCallback((): void => {
+    persistence.suppressScrollSyncTemporarily();
+    const contentElement = viewport.contentRef.current;
+    if (contentElement) {
+      contentElement.scrollTop = 0;
+      contentElement.scrollLeft = 0;
+    }
+
+    const pagedViewportElement = viewport.pagedViewportRef.current;
+    if (pagedViewportElement) {
+      pagedViewportElement.scrollLeft = 0;
+    }
+  }, [persistence, viewport.contentRef, viewport.pagedViewportRef]);
+
   const runChapterLoad = useCallback(async (
     params: ReaderLoadActiveChapterParams,
     initialRestoreTarget: ReaderRestoreTarget | null,
   ) => {
     const loadKey = createLifecycleLoadKey({
-      novelId,
       chapterIndex: params.chapterIndex,
       mode: params.mode,
+      novelId,
     });
     lastRequestedLoadKeyRef.current = loadKey;
     awaitingRestoreLoadKeyRef.current = null;
@@ -177,8 +185,23 @@ export function useReaderLifecycleController({
     setLifecycleStatus('loading-chapter');
 
     try {
-      const { navigationRestoreTarget } = await loadActiveChapter(params);
+      const runtime: ReaderLoadActiveChapterRuntime = {
+        navigationSource: navigation.getChapterChangeSource(),
+        pendingPageTarget: navigation.getPendingPageTarget(),
+      };
+      const {
+        navigationRestoreTarget,
+        shouldClearNavigationSource,
+        shouldResetViewport,
+      } = await loadActiveChapter(params, runtime);
       const nextRestoreTarget = navigationRestoreTarget ?? initialRestoreTarget;
+
+      if (shouldResetViewport) {
+        resetViewportPosition();
+      }
+      if (shouldClearNavigationSource) {
+        navigation.setChapterChangeSource(null);
+      }
 
       if (nextRestoreTarget) {
         setPendingRestoreTarget(nextRestoreTarget, { force: true });
@@ -204,11 +227,14 @@ export function useReaderLifecycleController({
   }, [
     clearPendingRestoreTarget,
     loadActiveChapter,
+    navigation,
     novelId,
+    resetViewportPosition,
     setPendingRestoreTarget,
     startRestoreMaskForTarget,
     stopRestoreMask,
   ]);
+
   useEffect(() => {
     hydrateReaderDataRef.current = hydrateReaderData;
     resetReaderContentRef.current = resetReaderContent;
@@ -231,6 +257,7 @@ export function useReaderLifecycleController({
     clearPendingRestoreTargetRef.current();
     stopRestoreMaskRef.current();
     resetReaderContentRef.current();
+    navigation.setChapterChangeSource(null);
     setLifecycleStatus('hydrating');
 
     if (!novelId) {
@@ -286,9 +313,7 @@ export function useReaderLifecycleController({
     return () => {
       cancelled = true;
     };
-  }, [
-    novelId,
-  ]);
+  }, [navigation, novelId]);
 
   useEffect(() => {
     if (!hasInitializedRef.current) {
@@ -304,9 +329,9 @@ export function useReaderLifecycleController({
       mode,
     };
     const nextLoadKey = createLifecycleLoadKey({
-      novelId,
       chapterIndex: nextLoadParams.chapterIndex,
       mode: nextLoadParams.mode,
+      novelId,
     });
 
     if (
@@ -333,8 +358,8 @@ export function useReaderLifecycleController({
       queuedInitialRestoreTargetRef.current = null;
     }
   }, [
-    chapters.length,
     chapterIndex,
+    chapters.length,
     currentLoadKey,
     lifecycleStatus,
     mode,
@@ -366,11 +391,11 @@ export function useReaderLifecycleController({
     currentPagedLayoutChapterIndex,
     isPagedMode,
     lifecycleStatus,
-    renderableChapter,
     pendingRestoreTarget,
+    renderableChapter,
   ]);
 
-  const handleRestoreSettled = useCallback((result: 'completed' | 'skipped' | 'failed') => {
+  const handleRestoreSettled = useCallback((result: 'completed' | 'failed' | 'skipped') => {
     if (awaitingRestoreLoadKeyRef.current !== currentLoadKey) {
       return;
     }
@@ -394,13 +419,13 @@ export function useReaderLifecycleController({
   ]);
 
   return {
+    handleRestoreSettled,
+    isChapterNavigationReady,
+    isRestoringPosition,
     lifecycleStatus,
     loadingLabel,
     readerError,
-    showLoadingOverlay,
     renderableChapter,
-    isRestoringPosition,
-    isChapterNavigationReady,
-    handleRestoreSettled,
+    showLoadingOverlay,
   };
 }

@@ -4,20 +4,11 @@ import type {
   PaginationContainer,
   RichBlock,
 } from '@shared/contracts';
+
 import type {
   ReaderContentMeasuredToken,
   ReaderContentVisualToken,
-} from '@shared/reader-content';
-import { READER_THEMES } from './readerThemes';
-
-export {
-  READER_CONTENT_MEASURED_TOKENS,
-  READER_CONTENT_VISUAL_TOKENS,
-} from '@shared/reader-content';
-export type {
-  ReaderContentMeasuredToken,
-  ReaderContentVisualToken,
-} from '@shared/reader-content';
+} from './readerContentTokens';
 
 export type ReaderContentMode = 'scroll' | 'paged';
 
@@ -70,7 +61,7 @@ export const READER_CONTENT_THEME_CLASSES = {
   parchment: 'pm-reader--theme-parchment',
   green: 'pm-reader--theme-green',
   night: 'pm-reader--theme-night',
-} as const satisfies Record<keyof typeof READER_THEMES, string>;
+} as const;
 
 export interface ReaderContentSourceStructureSpec {
   emittedContexts: readonly ReaderContentContextVariant[];

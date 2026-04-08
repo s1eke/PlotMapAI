@@ -11,7 +11,7 @@ import type {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { animate, AnimatePresence, motion, useMotionValue, useTransform } from 'motion/react';
 
-import { READER_CONTENT_CLASS_NAMES } from '@domains/reader-shell/constants/readerContentContract';
+import { READER_CONTENT_CLASS_NAMES } from '@shared/reader-content';
 import { cn } from '@shared/utils/cn';
 
 import {

@@ -9,7 +9,7 @@
     "build": "tsc -b && vite build && node scripts/checkBundleBudget.mjs",
     "analyze": "ANALYZE_BUNDLE=1 npm run build",
     "generate:pwa-icons": "node scripts/generateMaskableIcons.mjs",
-    "lint": "eslint .",
+    "lint": "eslint . && node scripts/checkReaderArchitecture.mjs",
     "preview": "vite preview",
     "test": "vitest run",
     "test:visual": "playwright test",

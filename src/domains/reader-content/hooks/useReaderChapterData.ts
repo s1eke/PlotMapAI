@@ -3,7 +3,9 @@ import { useTranslation } from 'react-i18next';
 
 import type {
   Chapter,
+  ChapterChangeSource,
   ChapterContent,
+  PageTarget,
   ReaderNavigationIntent,
   ReaderMode,
   ReaderRestoreTarget,
@@ -13,11 +15,6 @@ import type { ReaderSessionCommands, ReaderSessionSnapshot } from '@domains/read
 
 import { reportAppError } from '@shared/debug';
 import { AppErrorCode, toAppError, type AppError } from '@shared/errors';
-import {
-  useReaderNavigationRuntime,
-  useReaderPersistenceRuntime,
-  useReaderViewportContext,
-} from '@shared/reader-runtime';
 import { isPagedReaderMode } from '@shared/utils/readerMode';
 import {
   createRestoreTargetFromNavigationIntent,
@@ -44,6 +41,13 @@ export interface ReaderLoadActiveChapterParams {
 
 export interface ReaderLoadActiveChapterResult {
   navigationRestoreTarget: ReaderRestoreTarget | null;
+  shouldClearNavigationSource: boolean;
+  shouldResetViewport: boolean;
+}
+
+export interface ReaderLoadActiveChapterRuntime {
+  navigationSource?: ChapterChangeSource;
+  pendingPageTarget?: PageTarget | null;
 }
 
 export interface ReaderChapterCacheApi {
@@ -85,6 +89,7 @@ export interface UseReaderChapterDataResult {
   hydrateReaderData: () => Promise<ReaderHydrateDataResult>;
   loadActiveChapter: (
     params: ReaderLoadActiveChapterParams,
+    runtime?: ReaderLoadActiveChapterRuntime,
   ) => Promise<ReaderLoadActiveChapterResult>;
   preloadAdjacent: (index: number, prune?: boolean) => void;
   resetReaderContent: () => void;
@@ -98,9 +103,6 @@ export function useReaderChapterData({
   resetInteractionState,
 }: UseReaderChapterDataParams): UseReaderChapterDataResult {
   const { t } = useTranslation();
-  const navigation = useReaderNavigationRuntime();
-  const persistence = useReaderPersistenceRuntime();
-  const viewport = useReaderViewportContext();
   const resolvedNovelId = novelId;
   const { mode } = sessionSnapshot;
   const {
@@ -265,8 +267,6 @@ export function useReaderChapterData({
     abortActiveChapterRequest();
     clearScheduledPreloads();
     hasUserInteractedRef.current = false;
-    navigation.setChapterChangeSource(null);
-    navigation.setPendingPageTarget(null);
     cache.clearCachedChapters();
     chapterImageKeysRef.current.clear();
     setChapters([]);
@@ -280,7 +280,6 @@ export function useReaderChapterData({
     cache,
     clearScheduledPreloads,
     hasUserInteractedRef,
-    navigation,
     resetInteractionState,
   ]);
 
@@ -392,37 +391,32 @@ export function useReaderChapterData({
 
   const loadActiveChapter = useCallback(async (
     params: ReaderLoadActiveChapterParams,
+    runtime: ReaderLoadActiveChapterRuntime = {},
   ): Promise<ReaderLoadActiveChapterResult> => {
     if (!resolvedNovelId || chapters.length === 0) {
       setLoadingMessage(null);
-      return { navigationRestoreTarget: null };
+      return {
+        navigationRestoreTarget: null,
+        shouldClearNavigationSource: false,
+        shouldResetViewport: false,
+      };
     }
 
-    if (params.mode === 'scroll' && navigation.getChapterChangeSource() === 'scroll') {
-      navigation.setChapterChangeSource(null);
+    if (params.mode === 'scroll' && runtime.navigationSource === 'scroll') {
       setLoadingMessage(null);
-      return { navigationRestoreTarget: null };
+      return {
+        navigationRestoreTarget: null,
+        shouldClearNavigationSource: true,
+        shouldResetViewport: false,
+      };
     }
 
     abortActiveChapterRequest();
     const controller = new AbortController();
     activeChapterControllerRef.current = controller;
 
-    const resetViewportPosition = () => {
-      persistence.suppressScrollSyncTemporarily();
-      const contentElement = viewport.contentRef.current;
-      if (contentElement) {
-        contentElement.scrollTop = 0;
-        contentElement.scrollLeft = 0;
-      }
-      const pagedViewportElement = viewport.pagedViewportRef.current;
-      if (pagedViewportElement) {
-        pagedViewportElement.scrollLeft = 0;
-      }
-    };
-
     const shouldRestoreNavigatedChapter =
-      navigation.getChapterChangeSource() === 'navigation' && params.mode !== 'summary';
+      runtime.navigationSource === 'navigation' && params.mode !== 'summary';
 
     const applyCurrentChapter = async (
       chapter: ChapterContent,
@@ -441,20 +435,20 @@ export function useReaderChapterData({
       const navigationRestoreTarget = shouldRestoreNavigatedChapter
         ? createRestoreTargetFromNavigationIntent({
           chapterIndex: params.chapterIndex,
-          pageTarget: navigation.getPendingPageTarget() === 'end' ? 'end' : 'start',
+          pageTarget: runtime.pendingPageTarget === 'end' ? 'end' : 'start',
         } satisfies ReaderNavigationIntent, params.mode)
         : null;
       const shouldHoldNavigationSourceUntilRestore =
         shouldRestoreNavigatedChapter && params.mode === 'scroll';
 
-      resetViewportPosition();
       preloadAdjacent(params.chapterIndex);
-      if (!shouldHoldNavigationSourceUntilRestore) {
-        navigation.setChapterChangeSource(null);
-      }
       setLoadingMessage(null);
 
-      return { navigationRestoreTarget };
+      return {
+        navigationRestoreTarget,
+        shouldClearNavigationSource: !shouldHoldNavigationSourceUntilRestore,
+        shouldResetViewport: true,
+      };
     };
 
     try {
@@ -511,15 +505,11 @@ export function useReaderChapterData({
     cache,
     chapters.length,
     getChapterImageKeys,
-    navigation,
     onChapterContentResolved,
-    persistence,
     preloadAdjacent,
     resetInteractionState,
     resolvedNovelId,
     t,
-    viewport.contentRef,
-    viewport.pagedViewportRef,
     warmChapterImages,
   ]);
 

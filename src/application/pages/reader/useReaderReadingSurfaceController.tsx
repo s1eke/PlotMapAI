@@ -1,48 +1,37 @@
 import type { ComponentProps } from 'react';
-import type { UseReaderChapterDataResult } from '@domains/reader-content';
-import type {
-  UseReaderRestoreControllerResult,
-  UseReaderSessionResult,
-} from '@domains/reader-session';
-import type {
-  ReaderAnalysisBridgeState,
-  UseReaderPreferencesResult,
-} from '@domains/reader-shell';
+import type { ChapterContent } from '@shared/contracts/reader';
+import type { ReaderAnalysisBridgeController, UseReaderPreferencesResult } from '@domains/reader-shell';
+import type { UseReaderSessionResult } from '@domains/reader-session';
 
-import type { UseReaderLifecycleControllerResult } from '../hooks/useReaderLifecycleController';
-import type { UseReaderNavigationResult } from '../hooks/useReaderNavigation';
-import type {
-  UsePagedReaderControllerResult,
-} from '../hooks/usePagedReaderController';
-import type {
-  UseScrollReaderControllerResult,
-} from '../hooks/useScrollReaderController';
+import { useEffect, useState } from 'react';
 
-import { useEffect } from 'react';
-import PagedReaderContent from '../components/reader/PagedReaderContent';
-import ScrollReaderContent from '../components/reader/ScrollReaderContent';
-import SummaryReaderContent from '../components/reader/SummaryReaderContent';
-import { useReaderPersistenceRuntime } from '@shared/reader-runtime';
-import { usePagedReaderController } from '../hooks/usePagedReaderController';
 import {
-  useReaderLifecycleController,
-} from '../hooks/useReaderLifecycleController';
-import { useReaderNavigation } from '../hooks/useReaderNavigation';
-import { useScrollReaderController } from '../hooks/useScrollReaderController';
-import { resolveReaderContentRootProps } from '../utils/readerContentStyling';
+  PagedReaderContent,
+  ScrollReaderContent,
+  SummaryReaderContent,
+  resolveReaderContentRootProps,
+  usePagedReaderViewportController,
+  useScrollReaderViewportController,
+} from '@domains/reader-layout-engine';
+import { useReaderChapterData } from '@domains/reader-content';
+import { useReaderAnalysisBridge } from '@domains/reader-shell';
+import {
+  useReaderRestoreController,
+  useReaderSession,
+} from '@domains/reader-session';
+import { useReaderPersistenceRuntime } from '@shared/reader-runtime';
 
-interface ReaderLayoutControllerImageHandlers extends Pick<
-  ComponentProps<typeof PagedReaderContent>,
-  'onImageActivate' | 'onRegisterImageElement'
-> {}
+import type {
+  ReaderLayoutControllerImageHandlers,
+  ReaderNavigationControllerResult,
+  ReaderReadingSurfaceController,
+} from './types';
 
-interface UseReaderLayoutControllerParams {
-  analysis: Pick<
-    ReaderAnalysisBridgeState,
-    'isChapterAnalysisLoading' | 'summaryPanel' | 'summaryRestoreSignal'
-  >;
-  chapterDataRevision: number;
-  chapterData: UseReaderChapterDataResult;
+import { useReaderLifecycleController } from './useReaderLifecycleController';
+import { useReaderNavigation } from './useReaderNavigation';
+
+interface UseReaderReadingSurfaceControllerParams {
+  analysisController: ReaderAnalysisBridgeController;
   novelId: number;
   preferences: Pick<
     UseReaderPreferencesResult,
@@ -54,36 +43,14 @@ interface UseReaderLayoutControllerParams {
     | 'paragraphSpacing'
     | 'readerTheme'
   >;
-  restoreFlow: UseReaderRestoreControllerResult;
-  session: Pick<UseReaderSessionResult, 'commands' | 'snapshot'>;
-}
-
-export interface ReaderLayoutEngineController {
-  lifecycle: UseReaderLifecycleControllerResult;
-  navigation: UseReaderNavigationResult;
-  restore: Pick<
-    UseReaderRestoreControllerResult,
-    'handleSetContentMode' | 'handleSetViewMode'
-  >;
-  viewport: {
-    buildContentProps: (options: {
-      imageHandlers: ReaderLayoutControllerImageHandlers;
-      interactionLocked: boolean;
-    }) => {
-      pagedContentProps?: ComponentProps<typeof PagedReaderContent>;
-      scrollContentProps?: ComponentProps<typeof ScrollReaderContent>;
-      summaryContentProps?: ComponentProps<typeof SummaryReaderContent>;
-    };
-    handleViewportScroll: () => void;
-    renderableChapter: UseReaderLifecycleControllerResult['renderableChapter'];
-  };
+  resetInteractionState?: () => void;
 }
 
 function buildPagedContentProps(
-  pagedController: UsePagedReaderControllerResult,
-  preferences: UseReaderLayoutControllerParams['preferences'],
-  navigation: UseReaderNavigationResult,
-  renderableChapter: UseReaderLifecycleControllerResult['renderableChapter'],
+  pagedController: ReturnType<typeof usePagedReaderViewportController>,
+  preferences: UseReaderReadingSurfaceControllerParams['preferences'],
+  navigation: ReaderNavigationControllerResult,
+  renderableChapter: ChapterContent | null,
   novelId: number,
   imageHandlers: ReaderLayoutControllerImageHandlers,
   interactionLocked: boolean,
@@ -132,8 +99,8 @@ function buildPagedContentProps(
 }
 
 function buildScrollContentProps(
-  scrollController: UseScrollReaderControllerResult,
-  preferences: UseReaderLayoutControllerParams['preferences'],
+  scrollController: ReturnType<typeof useScrollReaderViewportController>,
+  preferences: UseReaderReadingSurfaceControllerParams['preferences'],
   novelId: number,
   imageHandlers: ReaderLayoutControllerImageHandlers,
   mode: UseReaderSessionResult['snapshot']['mode'],
@@ -166,9 +133,9 @@ function buildScrollContentProps(
 }
 
 function buildSummaryContentProps(
-  analysis: UseReaderLayoutControllerParams['analysis'],
-  preferences: UseReaderLayoutControllerParams['preferences'],
-  renderableChapter: UseReaderLifecycleControllerResult['renderableChapter'],
+  analysis: ReturnType<typeof useReaderAnalysisBridge>,
+  preferences: UseReaderReadingSurfaceControllerParams['preferences'],
+  renderableChapter: ChapterContent | null,
   viewMode: UseReaderSessionResult['snapshot']['viewMode'],
 ): ComponentProps<typeof SummaryReaderContent> | undefined {
   if (!renderableChapter || viewMode !== 'summary') {
@@ -184,19 +151,41 @@ function buildSummaryContentProps(
   };
 }
 
-export function useReaderLayoutController({
-  analysis,
-  chapterDataRevision,
-  chapterData,
+export function useReaderReadingSurfaceController({
+  analysisController,
   novelId,
   preferences,
-  restoreFlow,
-  session,
-}: UseReaderLayoutControllerParams): ReaderLayoutEngineController {
+  resetInteractionState,
+}: UseReaderReadingSurfaceControllerParams): ReaderReadingSurfaceController {
   const persistence = useReaderPersistenceRuntime();
-  const { commands: sessionCommands, snapshot: sessionSnapshot } = session;
+  const session = useReaderSession(novelId);
+  const { snapshot: sessionSnapshot, commands: sessionCommands } = session;
   const { chapterIndex, isPagedMode, mode, viewMode } = sessionSnapshot;
-  const scrollController = useScrollReaderController({
+  const [chapterDataRevision, setChapterDataRevision] = useState(0);
+
+  const chapterData = useReaderChapterData({
+    novelId,
+    onChapterContentResolved: () => {
+      setChapterDataRevision((previousVersion) => previousVersion + 1);
+    },
+    resetInteractionState,
+    sessionCommands,
+    sessionSnapshot,
+  });
+  const analysis = useReaderAnalysisBridge({
+    controller: analysisController,
+    chapterIndex,
+    novelId,
+    viewMode,
+  });
+  const restoreFlow = useReaderRestoreController({
+    currentChapter: chapterData.currentChapter,
+    isChapterAnalysisLoading: analysis.isChapterAnalysisLoading,
+    sessionCommands,
+    sessionSnapshot,
+    summaryRestoreSignal: analysis.summaryRestoreSignal,
+  });
+  const scrollController = useScrollReaderViewportController({
     enabled: mode === 'scroll',
     novelId,
     chapters: chapterData.chapters,
@@ -217,8 +206,7 @@ export function useReaderLayoutController({
     clearPendingRestoreTarget: restoreFlow.clearPendingRestoreTarget,
     stopRestoreMask: restoreFlow.stopRestoreMask,
   });
-
-  const pagedController = usePagedReaderController({
+  const pagedController = usePagedReaderViewportController({
     enabled: mode === 'paged',
     novelId,
     chapters: chapterData.chapters,
@@ -238,13 +226,12 @@ export function useReaderLayoutController({
     stopRestoreMask: restoreFlow.stopRestoreMask,
     beforeChapterChange: restoreFlow.handleBeforeChapterChange,
   });
-
   const lifecycle = useReaderLifecycleController({
-    novelId,
-    chapterIndex,
-    mode,
-    currentPagedLayoutChapterIndex: pagedController.currentPagedLayoutChapterIndex,
     chapterData,
+    chapterIndex,
+    currentPagedLayoutChapterIndex: pagedController.currentPagedLayoutChapterIndex,
+    mode,
+    novelId,
     restoreFlow,
   });
 
@@ -253,24 +240,24 @@ export function useReaderLayoutController({
   }, [lifecycle.handleRestoreSettled, persistence]);
 
   const navigation = useReaderNavigation({
+    beforeChapterChange: restoreFlow.handleBeforeChapterChange,
     chapters: chapterData.chapters,
     currentChapter: chapterData.currentChapter,
-    sessionSnapshot,
-    sessionCommands,
     pagedNavigation: {
       goToChapter: pagedController.goToChapter,
       goToNextPage: pagedController.goToNextPage,
-      goToPrevPage: pagedController.goToPrevPage,
       goToNextPageSilently: pagedController.goToNextPageSilently,
+      goToPrevPage: pagedController.goToPrevPage,
       goToPrevPageSilently: pagedController.goToPrevPageSilently,
       handleNext: pagedController.handleNext,
       handlePrev: pagedController.handlePrev,
-      toolbarHasPrev: pagedController.toolbarHasPrev,
-      toolbarHasNext: pagedController.toolbarHasNext,
       pageTurnDirection: pagedController.pageTurnDirection,
       pageTurnToken: pagedController.pageTurnToken,
+      toolbarHasNext: pagedController.toolbarHasNext,
+      toolbarHasPrev: pagedController.toolbarHasPrev,
     },
-    beforeChapterChange: restoreFlow.handleBeforeChapterChange,
+    sessionCommands,
+    sessionSnapshot,
   });
 
   const renderableChapter = mode === 'scroll'
@@ -278,11 +265,24 @@ export function useReaderLayoutController({
     : lifecycle.renderableChapter;
 
   return {
-    lifecycle,
+    chapterData: {
+      chapters: chapterData.chapters,
+      currentChapter: chapterData.currentChapter,
+    },
+    lifecycle: {
+      ...lifecycle,
+      renderableChapter,
+    },
     navigation,
     restore: {
       handleSetContentMode: restoreFlow.handleSetContentMode,
       handleSetViewMode: restoreFlow.handleSetViewMode,
+    },
+    sessionSnapshot: {
+      chapterIndex,
+      isPagedMode,
+      mode,
+      viewMode,
     },
     viewport: {
       buildContentProps: ({ imageHandlers, interactionLocked }) => ({

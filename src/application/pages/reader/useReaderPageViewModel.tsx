@@ -9,27 +9,19 @@ import { analyzeChapter } from '@application/use-cases/analysis';
 import { loadReaderSession } from '@application/use-cases/library';
 import { appPaths } from '@app/router/paths';
 import { ChapterAnalysisPanel, analysisService } from '@domains/analysis';
-import { useReaderChapterData } from '@domains/reader-content';
 import {
   useContentClick,
   useReaderInput,
   useReaderMobileBack,
   useSidebarDrag,
 } from '@domains/reader-interaction';
-import { useReaderLayoutController } from '@domains/reader-layout-engine';
 import { useReaderPageImageOverlay } from '@domains/reader-media';
-import {
-  useReaderAnalysisBridge,
-  useReaderPreferences,
-} from '@domains/reader-shell';
-import {
-  useReaderRestoreController,
-  useReaderSession,
-} from '@domains/reader-session';
+import { useReaderPreferences } from '@domains/reader-shell';
 import { AppErrorCode } from '@shared/errors';
 import { useReaderViewportContext } from '@shared/reader-runtime';
 import { resolveContentModeFromPageTurnMode } from '@shared/utils/readerMode';
 import { useReaderReparseRecoveryController } from './useReaderReparseRecoveryController';
+import { useReaderReadingSurfaceController } from './useReaderReadingSurfaceController';
 
 const readerAnalysisController: ReaderAnalysisBridgeController = {
   analyzeChapter,
@@ -61,19 +53,7 @@ export function useReaderPageViewModel(novelId: number): ReaderPageViewModel {
   const { contentRef } = useReaderViewportContext();
   const pageTurnLockedRef = useRef(false);
   const wheelDeltaRef = useRef(0);
-  const session = useReaderSession(novelId);
-  const { snapshot: sessionSnapshot, commands: sessionCommands } = session;
-  const {
-    chapterIndex,
-    isPagedMode,
-    mode,
-    viewMode,
-  } = sessionSnapshot;
-  const [chapterDataRevision, setChapterDataRevision] = useState(0);
   const [readerFileType, setReaderFileType] = useState('epub');
-  const handleChapterContentResolved = useCallback((): void => {
-    setChapterDataRevision((previousVersion) => previousVersion + 1);
-  }, []);
   const resetInteractionState = useCallback((): void => {
     wheelDeltaRef.current = 0;
     pageTurnLockedRef.current = false;
@@ -84,20 +64,26 @@ export function useReaderPageViewModel(novelId: number): ReaderPageViewModel {
   const closeSidebar = useCallback((): void => {
     sidebar.setIsSidebarOpen(false);
   }, [sidebar]);
-  const analysis = useReaderAnalysisBridge({
-    controller: readerAnalysisController,
+  const surfaceController = useReaderReadingSurfaceController({
+    analysisController: readerAnalysisController,
     novelId,
-    chapterIndex,
-    viewMode,
-  });
-
-  const chapterData = useReaderChapterData({
-    novelId,
-    sessionSnapshot,
-    sessionCommands,
-    onChapterContentResolved: handleChapterContentResolved,
+    preferences,
     resetInteractionState,
   });
+  const {
+    chapterData,
+    lifecycle,
+    navigation,
+    restore,
+    sessionSnapshot,
+    viewport,
+  } = surfaceController;
+  const {
+    chapterIndex,
+    isPagedMode,
+    mode,
+    viewMode,
+  } = sessionSnapshot;
 
   useEffect(() => {
     let active = true;
@@ -114,24 +100,6 @@ export function useReaderPageViewModel(novelId: number): ReaderPageViewModel {
       active = false;
     };
   }, [novelId]);
-
-  const restoreFlow = useReaderRestoreController({
-    sessionSnapshot,
-    sessionCommands,
-    currentChapter: chapterData.currentChapter,
-    summaryRestoreSignal: analysis.summaryRestoreSignal,
-    isChapterAnalysisLoading: analysis.isChapterAnalysisLoading,
-  });
-  const layoutController = useReaderLayoutController({
-    analysis,
-    chapterDataRevision,
-    chapterData,
-    novelId,
-    preferences,
-    restoreFlow,
-    session,
-  });
-  const { lifecycle, navigation, restore, viewport } = layoutController;
   const reparseRecoveryController = useReaderReparseRecoveryController({
     fileType: readerFileType,
     novelId,

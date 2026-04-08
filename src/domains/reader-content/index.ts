@@ -11,5 +11,6 @@ export type {
   ReaderHydrateDataResult,
   ReaderLoadActiveChapterParams,
   ReaderLoadActiveChapterResult,
+  ReaderLoadActiveChapterRuntime,
   UseReaderChapterDataResult,
 } from './hooks/useReaderChapterData';

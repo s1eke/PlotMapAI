@@ -24,6 +24,9 @@ const readerShellMocks = vi.hoisted(() => ({
   handleContentClick: vi.fn(),
   setIsChromeVisible: vi.fn(),
 }));
+const readerSurfaceMocks = vi.hoisted(() => ({
+  useReaderReadingSurfaceController: vi.fn(),
+}));
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
@@ -148,48 +151,76 @@ vi.mock('@domains/reader-interaction', () => ({
   }),
 }));
 
-vi.mock('@domains/reader-layout-engine', () => ({
-  useReaderLayoutController: ({
-    analysis,
-    chapterData,
-  }: {
-    analysis: { summaryPanel: ReactNode };
-    chapterData: { currentChapter: { id: number; title: string } };
-  }) => ({
-    lifecycle: {
-      isRestoringPosition: false,
-      loadingLabel: 'reader.loading',
-      readerError: null,
-      showLoadingOverlay: false,
-      lifecycleStatus: 'ready',
-    },
-    navigation: {
-      goToChapter: vi.fn(),
-      goToNextPage: vi.fn(),
-      goToPrevPage: vi.fn(),
-      handleNext: vi.fn(),
-      handlePrev: vi.fn(),
-      toolbarHasNext: false,
-      toolbarHasPrev: false,
-    },
-    restore: {
-      handleSetContentMode: readerShellMocks.handleSetContentMode,
-      handleSetViewMode: readerShellMocks.handleSetViewMode,
-    },
-    viewport: {
-      buildContentProps: () => ({
-        summaryContentProps: {
-          analysisPanel: analysis.summaryPanel,
-          chapter: chapterData.currentChapter,
-          headerBgClassName: 'bg-header',
-          readerTheme: 'paper',
-          textClassName: 'text-reader',
-        },
-      }),
-      handleViewportScroll: vi.fn(),
-      renderableChapter: chapterData.currentChapter,
-    },
-  }),
+vi.mock('../reader/useReaderReadingSurfaceController', () => ({
+  useReaderReadingSurfaceController:
+    readerSurfaceMocks.useReaderReadingSurfaceController.mockImplementation(({
+      analysisController,
+    }: {
+      analysisController: {
+        analyzeChapter: (nextNovelId: number, chapterIndex: number) => Promise<unknown>;
+        renderSummaryPanel: (input: {
+          analysis: null;
+          isAnalyzingChapter: boolean;
+          isLoading: boolean;
+          job: null;
+          novelId: number;
+          onAnalyzeChapter: () => void;
+        }) => ReactNode;
+      };
+    }) => ({
+      chapterData: {
+        chapters: [],
+        currentChapter: { id: 1, title: 'Chapter 1' },
+      },
+      lifecycle: {
+        isRestoringPosition: false,
+        loadingLabel: 'reader.loading',
+        readerError: null,
+        showLoadingOverlay: false,
+        lifecycleStatus: 'ready',
+      },
+      navigation: {
+        goToChapter: vi.fn(),
+        goToNextPage: vi.fn(),
+        goToPrevPage: vi.fn(),
+        handleNext: vi.fn(),
+        handlePrev: vi.fn(),
+        toolbarHasNext: false,
+        toolbarHasPrev: false,
+      },
+      restore: {
+        handleSetContentMode: readerShellMocks.handleSetContentMode,
+        handleSetViewMode: readerShellMocks.handleSetViewMode,
+      },
+      sessionSnapshot: {
+        chapterIndex: 0,
+        isPagedMode: false,
+        mode: 'scroll',
+        viewMode: 'summary',
+      },
+      viewport: {
+        buildContentProps: () => ({
+          summaryContentProps: {
+            analysisPanel: analysisController.renderSummaryPanel({
+              analysis: null,
+              isAnalyzingChapter: false,
+              isLoading: false,
+              job: null,
+              novelId: 1,
+              onAnalyzeChapter: () => {
+                analysisController.analyzeChapter(1, 0).catch(() => undefined);
+              },
+            }),
+            chapter: { id: 1, title: 'Chapter 1' },
+            headerBgClassName: 'bg-header',
+            readerTheme: 'paper',
+            textClassName: 'text-reader',
+          },
+        }),
+        handleViewportScroll: vi.fn(),
+        renderableChapter: { id: 1, title: 'Chapter 1' },
+      },
+    })),
 }));
 
 vi.mock('@domains/reader-media', () => ({
@@ -238,6 +269,7 @@ function renderPage() {
 describe('application ReaderPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(readerSurfaceMocks.useReaderReadingSurfaceController).mockClear();
     vi.mocked(analyzeChapter).mockResolvedValue({
       analysis: {
         chapterIndex: 0,

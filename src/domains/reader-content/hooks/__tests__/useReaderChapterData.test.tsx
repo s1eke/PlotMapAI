@@ -165,6 +165,9 @@ describe('useReaderChapterData', () => {
       loadResult = await result.current.loadActiveChapter({
         chapterIndex: 2,
         mode: 'scroll',
+      }, {
+        navigationSource: chapterChangeSource,
+        pendingPageTarget,
       });
     });
 
@@ -174,10 +177,12 @@ describe('useReaderChapterData', () => {
         locatorBoundary: 'start',
         mode: 'scroll',
       },
+      shouldClearNavigationSource: false,
+      shouldResetViewport: true,
     });
     expect(chapterChangeSource).toBe('navigation');
-    expect(suppressScrollSyncTemporarily).toHaveBeenCalledTimes(1);
-    expect(contentRef.current.scrollTop).toBe(0);
-    expect(contentRef.current.scrollLeft).toBe(0);
+    expect(suppressScrollSyncTemporarily).not.toHaveBeenCalled();
+    expect(contentRef.current.scrollTop).toBe(240);
+    expect(contentRef.current.scrollLeft).toBe(36);
   });
 });

@@ -3,8 +3,8 @@ import type {
   ReaderContentContextVariant,
   ReaderContentLeafVariant,
   ReaderContentMode,
-} from '@domains/reader-shell/constants/readerContentContract';
-import type { ReaderContentVisualToken } from '@shared/reader-content';
+  ReaderContentVisualToken,
+} from '@shared/reader-content';
 import type { ReaderBlock } from './readerLayoutTypes';
 
 import {
@@ -13,8 +13,8 @@ import {
   READER_CONTENT_LEAF_SPECS,
   READER_CONTENT_MODE_CLASSES,
   READER_CONTENT_THEME_CLASSES,
-} from '@domains/reader-shell/constants/readerContentContract';
-import { createReaderContentMeasuredTokenValues } from '@shared/reader-content';
+  createReaderContentMeasuredTokenValues,
+} from '@shared/reader-content';
 import { cn } from '@shared/utils/cn';
 
 const LEAF_CLASSES_BY_VARIANT = Object.fromEntries(

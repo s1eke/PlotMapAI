@@ -9,7 +9,7 @@ import type {
   ReaderImageGalleryEntry,
 } from '../../utils/readerImageGallery';
 
-import { READER_CONTENT_CLASS_NAMES } from '@domains/reader-shell/constants/readerContentContract';
+import { READER_CONTENT_CLASS_NAMES } from '@shared/reader-content';
 import { cn } from '@shared/utils/cn';
 
 import RichBlockRenderer from './RichBlockRenderer';

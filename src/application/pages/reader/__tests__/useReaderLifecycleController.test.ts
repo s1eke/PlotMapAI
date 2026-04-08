@@ -1,12 +1,13 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { createReaderContextWrapper } from '@test/readerRuntimeTestUtils';
 
 import type {
   ReaderHydrateDataResult,
   ReaderLoadActiveChapterResult,
-} from '../useReaderChapterData';
-import { useReaderLifecycleController } from '../useReaderLifecycleController';
-import type { ReaderRestoreTarget, StoredReaderState } from '../useReaderStatePersistence';
+} from '@domains/reader-content';
+import { useReaderLifecycleController } from '@application/pages/reader/useReaderLifecycleController';
+import type { ReaderRestoreTarget, StoredReaderState } from '@shared/contracts/reader';
 
 function createDeferred<T>() {
   let resolve!: (value: T | PromiseLike<T>) => void;
@@ -74,6 +75,8 @@ function createProps(
   }));
   const loadActiveChapter = vi.fn<() => Promise<ReaderLoadActiveChapterResult>>(async () => ({
     navigationRestoreTarget: null,
+    shouldClearNavigationSource: true,
+    shouldResetViewport: true,
   }));
   const resetReaderContent = vi.fn();
   const clearPendingRestoreTarget = vi.fn();
@@ -105,6 +108,8 @@ function createProps(
     ...overrides,
   };
 }
+
+const { Wrapper } = createReaderContextWrapper();
 
 describe('useReaderLifecycleController', () => {
   it('drives hydration into restore and returns to ready when restore settles', async () => {
@@ -139,6 +144,7 @@ describe('useReaderLifecycleController', () => {
           stopRestoreMask: vi.fn(),
         },
       }),
+      wrapper: Wrapper,
     });
 
     expect(result.current.lifecycleStatus).toBe('hydrating');
@@ -178,14 +184,24 @@ describe('useReaderLifecycleController', () => {
     }));
 
     await waitFor(() => {
-      expect(loadActiveChapter).toHaveBeenCalledWith({
-        chapterIndex: 2,
-        mode: 'scroll',
-      });
+      expect(loadActiveChapter).toHaveBeenCalledWith(
+        {
+          chapterIndex: 2,
+          mode: 'scroll',
+        },
+        expect.objectContaining({
+          navigationSource: null,
+          pendingPageTarget: null,
+        }),
+      );
     });
 
     await act(async () => {
-      loadDeferred.resolve({ navigationRestoreTarget: null });
+      loadDeferred.resolve({
+        navigationRestoreTarget: null,
+        shouldClearNavigationSource: true,
+        shouldResetViewport: true,
+      });
       await Promise.resolve();
     });
 
@@ -207,6 +223,8 @@ describe('useReaderLifecycleController', () => {
     const hydrateReaderData = vi.fn(() => hydrateDeferred.promise);
     const loadActiveChapter = vi.fn(async () => ({
       navigationRestoreTarget: null,
+      shouldClearNavigationSource: true,
+      shouldResetViewport: true,
     }));
 
     const { rerender } = renderHook(useReaderLifecycleController, {
@@ -223,6 +241,7 @@ describe('useReaderLifecycleController', () => {
           resetReaderContent: vi.fn(),
         },
       }),
+      wrapper: Wrapper,
     });
 
     await act(async () => {
@@ -259,10 +278,16 @@ describe('useReaderLifecycleController', () => {
     }));
 
     await waitFor(() => {
-      expect(loadActiveChapter).toHaveBeenCalledWith({
-        chapterIndex: 2,
-        mode: 'paged',
-      });
+      expect(loadActiveChapter).toHaveBeenCalledWith(
+        {
+          chapterIndex: 2,
+          mode: 'paged',
+        },
+        expect.objectContaining({
+          navigationSource: null,
+          pendingPageTarget: null,
+        }),
+      );
     });
   });
 
@@ -285,6 +310,7 @@ describe('useReaderLifecycleController', () => {
           resetReaderContent: vi.fn(),
         },
       }),
+      wrapper: Wrapper,
     });
 
     await waitFor(() => {
@@ -316,7 +342,11 @@ describe('useReaderLifecycleController', () => {
     }));
 
     await act(async () => {
-      loadDeferred.resolve({ navigationRestoreTarget: null });
+      loadDeferred.resolve({
+        navigationRestoreTarget: null,
+        shouldClearNavigationSource: true,
+        shouldResetViewport: true,
+      });
       await Promise.resolve();
     });
 
@@ -358,6 +388,7 @@ describe('useReaderLifecycleController', () => {
           stopRestoreMask: vi.fn(),
         },
       }),
+      wrapper: Wrapper,
     });
 
     await act(async () => {
@@ -403,6 +434,8 @@ describe('useReaderLifecycleController', () => {
     await act(async () => {
       loadDeferred.resolve({
         navigationRestoreTarget: restoreTarget,
+        shouldClearNavigationSource: false,
+        shouldResetViewport: true,
       });
       await Promise.resolve();
     });
@@ -473,6 +506,8 @@ describe('useReaderLifecycleController', () => {
     }));
     const loadActiveChapter = vi.fn(async () => ({
       navigationRestoreTarget: null,
+      shouldClearNavigationSource: true,
+      shouldResetViewport: false,
     }));
 
     const { result } = renderHook(useReaderLifecycleController, {
@@ -487,6 +522,7 @@ describe('useReaderLifecycleController', () => {
           resetReaderContent: vi.fn(),
         },
       }),
+      wrapper: Wrapper,
     });
 
     await waitFor(() => {
@@ -520,6 +556,7 @@ describe('useReaderLifecycleController', () => {
           resetReaderContent: vi.fn(),
         },
       }),
+      wrapper: Wrapper,
     });
 
     rerender(createProps({
