@@ -1,0 +1,1 @@
+import{d as e,t}from"./readerPreferenceStore-ClG0Bf28.js";async function n(){await t()}function r(t){return e(e=>t({readerTheme:e.readerTheme}))}export{r as n,n as t};

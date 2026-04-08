@@ -6,8 +6,8 @@ var e=`- externalId: 1
   isRegex: true
   isEnabled: true
   order: 0
-  scopeTitle: false
-  scopeContent: true
+  targetScope: all
+  executionStage: post-ast
   exclusiveGroup: indentation
   timeoutMs: 3000
 
@@ -19,8 +19,8 @@ var e=`- externalId: 1
   isRegex: true
   isEnabled: false
   order: 1
-  scopeTitle: false
-  scopeContent: true
+  targetScope: all
+  executionStage: post-ast
   exclusiveGroup: indentation
   timeoutMs: 3000
 
@@ -32,7 +32,7 @@ var e=`- externalId: 1
   isRegex: true
   isEnabled: true
   order: 10
-  scopeTitle: true
-  scopeContent: true
+  targetScope: all
+  executionStage: post-ast
   timeoutMs: 3000
 `;export{e as default};
