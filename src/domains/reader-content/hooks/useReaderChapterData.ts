@@ -9,6 +9,7 @@ import type {
   ReaderNavigationIntent,
   ReaderMode,
   ReaderRestoreTarget,
+  ReaderChapterCacheApi,
   StoredReaderState,
 } from '@shared/contracts/reader';
 import type { ReaderSessionCommands, ReaderSessionSnapshot } from '@domains/reader-session';
@@ -50,13 +51,6 @@ export interface ReaderLoadActiveChapterRuntime {
   pendingPageTarget?: PageTarget | null;
 }
 
-export interface ReaderChapterCacheApi {
-  clearCachedChapters: () => void;
-  getCachedChapter: (index: number) => ChapterContent | null;
-  hasCachedChapter: (index: number) => boolean;
-  setCachedChapter: (chapter: ChapterContent) => void;
-  snapshotCachedChapters: () => Map<number, ChapterContent>;
-}
 
 interface UseReaderChapterDataParams {
   novelId: number;

@@ -16,3 +16,11 @@ export interface ChapterContent extends Chapter {
   richBlocks: RichBlock[];
   totalChapters: number;
 }
+
+export interface ReaderChapterCacheApi {
+  clearCachedChapters: () => void;
+  getCachedChapter: (index: number) => ChapterContent | null;
+  hasCachedChapter: (index: number) => boolean;
+  setCachedChapter: (chapter: ChapterContent) => void;
+  snapshotCachedChapters: () => Map<number, ChapterContent>;
+}

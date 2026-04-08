@@ -2,7 +2,7 @@ import type {
   ReaderMode,
   ReaderRestoreTarget,
   RestoreStatus,
-  StoredReaderState,
+  ReaderSessionCommands,
 } from '@shared/contracts/reader';
 
 import { useCallback, useMemo } from 'react';
@@ -29,19 +29,6 @@ export interface ReaderSessionSnapshot {
   lastContentMode: 'scroll' | 'paged';
 }
 
-export interface ReaderSessionCommands {
-  setChapterIndex: React.Dispatch<React.SetStateAction<number>>;
-  setMode: React.Dispatch<React.SetStateAction<ReaderMode>>;
-  latestReaderStateRef: React.MutableRefObject<StoredReaderState>;
-  hasUserInteractedRef: React.MutableRefObject<boolean>;
-  markUserInteracted: () => void;
-  persistReaderState: (
-    nextState: StoredReaderState,
-    options?: { flush?: boolean },
-  ) => void;
-  flushReaderState: () => Promise<void>;
-  loadPersistedReaderState: () => Promise<StoredReaderState>;
-}
 
 export interface UseReaderSessionResult {
   snapshot: ReaderSessionSnapshot;

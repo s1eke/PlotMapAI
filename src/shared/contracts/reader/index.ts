@@ -1,4 +1,4 @@
-export type { Chapter, ChapterContent } from './content';
+export type { Chapter, ChapterContent, ReaderChapterCacheApi } from './content';
 export type { ReaderLocator, ScrollModeAnchor } from './layout';
 export type {
   ReaderImageActivationPayload,
@@ -17,6 +17,7 @@ export type {
   ReaderMode,
   ReaderNavigationIntent,
   ReaderRestoreTarget,
+  ReaderSessionCommands,
   ReaderSessionSnapshot,
   ReaderSessionState,
   RestoreStatus,

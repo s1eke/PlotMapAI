@@ -3,13 +3,13 @@ export type {
   ReaderMode,
   ReaderNavigationIntent,
   ReaderRestoreTarget,
+  ReaderSessionCommands,
   ReaderSessionSnapshot as ReaderSessionStoreSnapshot,
   ReaderSessionState,
   RestoreStatus,
   StoredReaderState,
 } from '@shared/contracts/reader';
 export type {
-  ReaderSessionCommands,
   ReaderSessionSnapshot,
   UseReaderSessionResult,
 } from './useReaderSession';

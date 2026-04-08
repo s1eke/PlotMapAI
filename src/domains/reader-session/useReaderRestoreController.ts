@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef } from 'react';
 
 import type { ChapterContent } from './readerContentService';
-import type { ReaderSessionCommands, ReaderSessionSnapshot } from './useReaderSession';
-import type { ReaderMode, ReaderRestoreTarget, StoredReaderState } from '@shared/contracts/reader';
+import type { ReaderSessionSnapshot } from './useReaderSession';
+import type { ReaderMode, ReaderRestoreTarget, ReaderSessionCommands, StoredReaderState } from '@shared/contracts/reader';
 
 import {
   useReaderLayoutQueries,

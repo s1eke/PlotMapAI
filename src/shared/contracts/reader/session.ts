@@ -1,3 +1,5 @@
+import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
+
 import type { ReaderLocator } from './layout';
 
 export type PageTarget = 'start' | 'end';
@@ -42,3 +44,17 @@ export interface ReaderSessionState {
 }
 
 export type ReaderSessionSnapshot = ReaderSessionState;
+
+export interface ReaderSessionCommands {
+  setChapterIndex: Dispatch<SetStateAction<number>>;
+  setMode: Dispatch<SetStateAction<ReaderMode>>;
+  latestReaderStateRef: MutableRefObject<StoredReaderState>;
+  hasUserInteractedRef: MutableRefObject<boolean>;
+  markUserInteracted: () => void;
+  persistReaderState: (
+    nextState: StoredReaderState,
+    options?: { flush?: boolean },
+  ) => void;
+  flushReaderState: () => Promise<void>;
+  loadPersistedReaderState: () => Promise<StoredReaderState>;
+}
