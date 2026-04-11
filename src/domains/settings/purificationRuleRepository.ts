@@ -16,6 +16,16 @@ interface PurificationRulesYamlV2 {
   rules: unknown[];
 }
 
+interface EnabledPurificationRulesSnapshot {
+  rules: PurifyRule[];
+  version: number;
+}
+
+let enabledPurificationRulesSnapshot: EnabledPurificationRulesSnapshot | null = null;
+let enabledPurificationRulesSnapshotPromise:
+  Promise<EnabledPurificationRulesSnapshot> | null = null;
+let enabledPurificationRulesVersion = 0;
+
 function isPurificationRulesYamlV2(value: unknown): value is PurificationRulesYamlV2 {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     return false;
@@ -66,6 +76,22 @@ function extractImportedRules(loaded: unknown): unknown[] {
   return [];
 }
 
+function invalidateEnabledPurificationRulesSnapshot(): void {
+  enabledPurificationRulesSnapshot = null;
+  enabledPurificationRulesSnapshotPromise = null;
+  enabledPurificationRulesVersion += 1;
+}
+
+export function notifyPurificationRulesChanged(): void {
+  invalidateEnabledPurificationRulesSnapshot();
+}
+
+export function resetPurificationRuleRepositorySnapshotsForTests(): void {
+  enabledPurificationRulesSnapshot = null;
+  enabledPurificationRulesSnapshotPromise = null;
+  enabledPurificationRulesVersion = 0;
+}
+
 export const purificationRuleRepository = {
   getPurificationRules: async (): Promise<PurificationRule[]> => {
     const rules = await db.purificationRules.orderBy('order').toArray();
@@ -73,8 +99,39 @@ export const purificationRuleRepository = {
   },
 
   getEnabledPurificationRules: async (): Promise<PurifyRule[]> => {
-    const rules = await db.purificationRules.filter((rule) => rule.isEnabled).sortBy('order');
-    return rules.map((rule) => toPersistedPurifyRule(mapPurificationRuleRecordToDomain(rule)));
+    const snapshot = await purificationRuleRepository.getEnabledPurificationRulesSnapshot();
+    return snapshot.rules;
+  },
+
+  getEnabledPurificationRulesSnapshot: async (): Promise<EnabledPurificationRulesSnapshot> => {
+    if (enabledPurificationRulesSnapshot) {
+      return enabledPurificationRulesSnapshot;
+    }
+    if (enabledPurificationRulesSnapshotPromise) {
+      return enabledPurificationRulesSnapshotPromise;
+    }
+
+    const snapshotVersion = enabledPurificationRulesVersion;
+    const snapshotPromise = db.purificationRules
+      .filter((rule) => rule.isEnabled)
+      .sortBy('order')
+      .then((rules) => {
+        const snapshot = {
+          rules: rules.map((rule) =>
+            toPersistedPurifyRule(mapPurificationRuleRecordToDomain(rule))),
+          version: snapshotVersion,
+        };
+        enabledPurificationRulesSnapshot = snapshot;
+        enabledPurificationRulesSnapshotPromise = null;
+        return snapshot;
+      })
+      .catch((error) => {
+        enabledPurificationRulesSnapshotPromise = null;
+        throw error;
+      });
+
+    enabledPurificationRulesSnapshotPromise = snapshotPromise;
+    return snapshotPromise;
   },
 
   createPurificationRule: async (data: Partial<PurificationRule>): Promise<PurificationRule> => {
@@ -110,6 +167,7 @@ export const purificationRuleRepository = {
     });
 
     const rule = await db.purificationRules.get(id);
+    invalidateEnabledPurificationRulesSnapshot();
     return mapPurificationRuleRecordToDomain(rule!);
   },
 
@@ -156,6 +214,7 @@ export const purificationRuleRepository = {
       });
     }
 
+    invalidateEnabledPurificationRulesSnapshot();
     return mapPurificationRuleRecordToDomain(rule);
   },
 
@@ -182,11 +241,13 @@ export const purificationRuleRepository = {
     }
 
     await db.purificationRules.delete(id);
+    invalidateEnabledPurificationRulesSnapshot();
     return { message: 'Rule deleted' };
   },
 
   clearAllPurificationRules: async (): Promise<{ message: string }> => {
     await db.purificationRules.clear();
+    invalidateEnabledPurificationRulesSnapshot();
     return { message: 'All rules cleared' };
   },
 
@@ -251,6 +312,7 @@ export const purificationRuleRepository = {
     }
 
     debugLog('Settings', `uploadPurificationRulesYaml: ${importedRules.length} parsed, ${added} added`);
+    invalidateEnabledPurificationRulesSnapshot();
     return purificationRuleRepository.getPurificationRules();
   },
 

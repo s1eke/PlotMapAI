@@ -7,6 +7,7 @@ import type {
   PurificationTargetScope,
 } from '@shared/text-processing';
 
+import { notifyPurificationRulesChanged } from '../purificationRuleRepository';
 import { loadYaml } from './yaml';
 
 interface DefaultPurificationRuleRecord {
@@ -71,19 +72,30 @@ export async function ensureDefaultPurificationRules(): Promise<void> {
   );
 
   const createdAt = new Date().toISOString();
+  let hasChanges = false;
   for (const rule of defaultRules) {
     if (existingExternalIds.has(rule.externalId)) {
       const existingRule = existingRules.find(
         (candidate) => candidate.externalId === rule.externalId,
       );
       if (existingRule) {
-        await db.purificationRules.update(existingRule.id, {
-          isDefault: true,
-          exclusiveGroup: rule.exclusiveGroup ?? '',
-          targetScope: rule.targetScope,
-          executionStage: rule.executionStage,
-          ruleVersion: CURRENT_PURIFICATION_RULE_VERSION,
-        });
+        const nextExclusiveGroup = rule.exclusiveGroup ?? '';
+        const hasRuleChanges = existingRule.isDefault !== true
+          || existingRule.exclusiveGroup !== nextExclusiveGroup
+          || existingRule.targetScope !== rule.targetScope
+          || existingRule.executionStage !== rule.executionStage
+          || existingRule.ruleVersion !== CURRENT_PURIFICATION_RULE_VERSION;
+
+        if (hasRuleChanges) {
+          await db.purificationRules.update(existingRule.id, {
+            isDefault: true,
+            exclusiveGroup: nextExclusiveGroup,
+            targetScope: rule.targetScope,
+            executionStage: rule.executionStage,
+            ruleVersion: CURRENT_PURIFICATION_RULE_VERSION,
+          });
+          hasChanges = true;
+        }
       }
       continue;
     }
@@ -91,5 +103,10 @@ export async function ensureDefaultPurificationRules(): Promise<void> {
     await db.purificationRules.add({
       ...mapDefaultPurificationRule(rule, createdAt),
     });
+    hasChanges = true;
+  }
+
+  if (hasChanges) {
+    notifyPurificationRulesChanged();
   }
 }

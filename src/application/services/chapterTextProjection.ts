@@ -87,6 +87,50 @@ export function buildPostAstPlainProjection(params: {
   };
 }
 
+export function buildProjectedBookChapter(params: {
+  bookTitle: string;
+  chapter: BookChapter;
+  chapterRichContent: StoredChapterRichContent | null;
+  rules: PurifyRule[];
+}): BookChapter {
+  const projection = buildPostAstPlainProjection(params);
+
+  return {
+    chapterIndex: params.chapter.chapterIndex,
+    title: params.chapter.title,
+    content: projection.plainText,
+    wordCount: params.chapter.wordCount,
+  };
+}
+
+export async function finalizeProjectedBookChapters(params: {
+  bookTitle: string;
+  onProgress?: (progress: TextProcessingProgress) => void;
+  projectedChapters: BookChapter[];
+  rules: PurifyRule[];
+  signal?: AbortSignal;
+}): Promise<BookChapter[]> {
+  if (!hasPurifyRulesForExecutionStage(params.rules, 'plain-text-only')) {
+    return params.projectedChapters;
+  }
+
+  const purified = await runPurifyChaptersTask({
+    chapters: params.projectedChapters,
+    rules: params.rules,
+    bookTitle: params.bookTitle,
+    executionStage: 'plain-text-only',
+  }, {
+    signal: params.signal,
+    onProgress: params.onProgress,
+  });
+
+  return params.projectedChapters.map((chapter, index) => ({
+    ...chapter,
+    title: purified[index]?.title ?? chapter.title,
+    content: purified[index]?.content ?? chapter.content,
+  }));
+}
+
 export async function buildProjectedBookChapters({
   bookTitle,
   onProgress,
@@ -96,39 +140,18 @@ export async function buildProjectedBookChapters({
   signal,
 }: BuildProjectedBookChaptersParams): Promise<BookChapter[]> {
   const richChapterMap = new Map(richChapters.map((chapter) => [chapter.chapterIndex, chapter]));
-  const projectedChapters = rawChapters.map((chapter) => {
-    const projection = buildPostAstPlainProjection({
-      chapter,
-      chapterRichContent: richChapterMap.get(chapter.chapterIndex) ?? null,
-      bookTitle,
-      rules,
-    });
-
-    return {
-      chapterIndex: chapter.chapterIndex,
-      title: chapter.title,
-      content: projection.plainText,
-      wordCount: chapter.wordCount,
-    } satisfies BookChapter;
-  });
-
-  if (!hasPurifyRulesForExecutionStage(rules, 'plain-text-only')) {
-    return projectedChapters;
-  }
-
-  const purified = await runPurifyChaptersTask({
-    chapters: projectedChapters,
-    rules,
+  const projectedChapters = rawChapters.map((chapter) => buildProjectedBookChapter({
+    chapter,
+    chapterRichContent: richChapterMap.get(chapter.chapterIndex) ?? null,
     bookTitle,
-    executionStage: 'plain-text-only',
-  }, {
-    signal,
-    onProgress,
-  });
-
-  return projectedChapters.map((chapter, index) => ({
-    ...chapter,
-    title: purified[index]?.title ?? chapter.title,
-    content: purified[index]?.content ?? chapter.content,
+    rules,
   }));
+
+  return finalizeProjectedBookChapters({
+    bookTitle,
+    onProgress,
+    projectedChapters,
+    rules,
+    signal,
+  });
 }

@@ -13,8 +13,8 @@ import {
 } from '@domains/settings';
 import { AppErrorCode, toAppError } from '@shared/errors';
 
-import { loadAnalysisBookChapters } from '@application/services/analysisTextProjectionService';
 import { bookLifecycleService } from '@application/services/bookLifecycleService';
+import { projectNovelText } from '@application/services/novelTextProjectionService';
 
 export interface BookDetailAnalysisData {
   analysisStatus: Awaited<ReturnType<typeof analysisService.getStatus>> | null;
@@ -168,7 +168,7 @@ export async function loadCharacterGraphPageData(
 ): Promise<CharacterGraphPageData> {
   const [novel, chapters] = await Promise.all([
     novelRepository.get(novelId),
-    loadAnalysisBookChapters(novelId),
+    projectNovelText(novelId),
   ]);
 
   return {
