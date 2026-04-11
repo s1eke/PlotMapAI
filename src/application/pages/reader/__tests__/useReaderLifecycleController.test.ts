@@ -357,6 +357,106 @@ describe('useReaderLifecycleController', () => {
     });
   });
 
+  it('keeps an existing mode-switch restore target when chapter load has no explicit target', async () => {
+    const hydrateDeferred = createDeferred<ReaderHydrateDataResult>();
+    const loadDeferred = createDeferred<ReaderLoadActiveChapterResult>();
+    const persistedRestoreTarget = createRestoreTarget({
+      chapterIndex: 2,
+      mode: 'paged',
+      locatorBoundary: 'start',
+      chapterProgress: undefined,
+    });
+    const hydrateReaderData = vi.fn(() => hydrateDeferred.promise);
+    const loadActiveChapter = vi.fn(() => loadDeferred.promise);
+    const clearPendingRestoreTarget = vi.fn();
+    const setPendingRestoreTarget = vi.fn();
+    const startRestoreMaskForTarget = vi.fn();
+
+    const { result, rerender } = renderHook(useReaderLifecycleController, {
+      initialProps: createProps({
+        chapterIndex: 0,
+        mode: 'scroll',
+        currentPagedLayoutChapterIndex: null,
+        chapterData: {
+          chapters: [],
+          currentChapter: null,
+          loadingMessage: 'loading',
+          readerError: null,
+          hydrateReaderData,
+          loadActiveChapter,
+          resetReaderContent: vi.fn(),
+        },
+        restoreFlow: {
+          pendingRestoreTarget: null,
+          clearPendingRestoreTarget,
+          setPendingRestoreTarget,
+          startRestoreMaskForTarget,
+          stopRestoreMask: vi.fn(),
+        },
+      }),
+      wrapper: Wrapper,
+    });
+
+    await act(async () => {
+      hydrateDeferred.resolve({
+        hasChapters: true,
+        initialRestoreTarget: null,
+        resolvedState: createStoredState({
+          chapterIndex: 2,
+          mode: 'paged',
+          lastContentMode: 'paged',
+        }),
+        storedState: createStoredState({
+          chapterIndex: 2,
+          mode: 'paged',
+          lastContentMode: 'paged',
+        }),
+      });
+      await Promise.resolve();
+    });
+
+    rerender(createProps({
+      chapterIndex: 2,
+      mode: 'paged',
+      currentPagedLayoutChapterIndex: null,
+      chapterData: {
+        chapters: [createChapter(2)],
+        currentChapter: createChapterContent(2),
+        loadingMessage: null,
+        readerError: null,
+        hydrateReaderData,
+        loadActiveChapter,
+        resetReaderContent: vi.fn(),
+      },
+      restoreFlow: {
+        pendingRestoreTarget: persistedRestoreTarget,
+        clearPendingRestoreTarget,
+        setPendingRestoreTarget,
+        startRestoreMaskForTarget,
+        stopRestoreMask: vi.fn(),
+      },
+    }));
+
+    await act(async () => {
+      loadDeferred.resolve({
+        navigationRestoreTarget: null,
+        shouldClearNavigationSource: true,
+        shouldResetViewport: true,
+      });
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(result.current.lifecycleStatus).toBe('restoring-position');
+    });
+    expect(setPendingRestoreTarget).toHaveBeenLastCalledWith(
+      persistedRestoreTarget,
+      { force: true },
+    );
+    expect(startRestoreMaskForTarget).toHaveBeenLastCalledWith(persistedRestoreTarget);
+    expect(clearPendingRestoreTarget).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps the loading overlay visible for paged restores until the layout consumes the restore target', async () => {
     const hydrateDeferred = createDeferred<ReaderHydrateDataResult>();
     const loadDeferred = createDeferred<ReaderLoadActiveChapterResult>();

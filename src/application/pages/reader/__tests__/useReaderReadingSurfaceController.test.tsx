@@ -102,8 +102,6 @@ const surfaceMocks = vi.hoisted(() => {
       getRestoreAttempt: vi.fn(() => 0),
       handleBeforeChapterChange: vi.fn(),
       handleContentScroll: vi.fn(),
-      handleSetContentMode: vi.fn(),
-      handleSetViewMode: vi.fn(),
       pendingRestoreTarget: null,
       pendingRestoreTargetRef: { current: null },
       recordRestoreResult: vi.fn(() => ({ scheduledRetry: false })),
@@ -111,6 +109,7 @@ const surfaceMocks = vi.hoisted(() => {
       setPendingRestoreTarget: vi.fn(),
       startRestoreMaskForTarget: vi.fn(),
       stopRestoreMask: vi.fn(),
+      switchMode: vi.fn(),
     },
     scrollController: {
       handleContentScroll: vi.fn(),
@@ -127,6 +126,7 @@ const surfaceMocks = vi.hoisted(() => {
     sessionSnapshot: {
       chapterIndex: 0,
       isPagedMode: false,
+      lastContentMode: 'scroll' as const,
       mode: 'summary' as const,
       viewMode: 'summary' as const,
     },

@@ -81,6 +81,7 @@ export function useReaderPageViewModel(novelId: number): ReaderPageViewModel {
   const {
     chapterIndex,
     isPagedMode,
+    lastContentMode,
     mode,
     viewMode,
   } = sessionSnapshot;
@@ -181,9 +182,13 @@ export function useReaderPageViewModel(novelId: number): ReaderPageViewModel {
 
     const nextContentMode = resolveContentModeFromPageTurnMode(nextMode);
     if (mode !== nextContentMode) {
-      restore.handleSetContentMode(nextContentMode);
+      restore.switchMode(nextContentMode);
     }
   }, [mode, preferences, restore]);
+
+  const handleSetViewMode = useCallback((nextViewMode: 'original' | 'summary'): void => {
+    restore.switchMode(nextViewMode === 'summary' ? 'summary' : lastContentMode);
+  }, [lastContentMode, restore]);
 
   const handleViewportClick = useCallback((event: MouseEvent<HTMLDivElement>): void => {
     if (sidebar.isSidebarOpen) {
@@ -254,7 +259,7 @@ export function useReaderPageViewModel(novelId: number): ReaderPageViewModel {
       viewMode,
       onMobileBack: handleMobileBack,
       onToggleSidebar: sidebar.toggleSidebar,
-      onSetViewMode: restore.handleSetViewMode,
+      onSetViewMode: handleSetViewMode,
     },
     viewportProps: {
       contentRef,

@@ -13,6 +13,7 @@ import {
   canSkipReaderRestore,
   resolvePagedTargetPage,
 } from '@shared/utils/readerPosition';
+import { debugLog, setDebugSnapshot } from '@shared/debug';
 import {
   restoreStepFailure,
   restoreStepPending,
@@ -238,6 +239,16 @@ export function usePagedReaderLayout({
       ));
 
       if (hasRestorableTarget && canSkipReaderRestore(pendingRestoreTarget)) {
+        const skippedSnapshot = {
+          source: 'usePagedReaderLayout',
+          mode: 'paged',
+          status: 'skipped',
+          chapterIndex,
+          reason: 'no_target',
+          target: pendingRestoreTarget,
+        };
+        setDebugSnapshot('reader-position-restore', skippedSnapshot);
+        debugLog('Reader', 'paged restore skipped because target is missing', skippedSnapshot);
         recordRestoreResult(
           buildSkippedNoTargetResult(
             chapterIndex,
@@ -366,6 +377,18 @@ export function usePagedReaderLayout({
             return;
           }
 
+          const failedSnapshot = {
+            source: 'usePagedReaderLayout',
+            mode: 'paged',
+            status: 'failed',
+            chapterIndex,
+            reason: solverOutcome.result.reason,
+            retryable: solverOutcome.result.retryable,
+            attempts: solverOutcome.result.attempts,
+            target: pendingRestoreTarget,
+          };
+          setDebugSnapshot('reader-position-restore', failedSnapshot);
+          debugLog('Reader', 'paged restore failed', failedSnapshot);
           clearPendingRestoreTarget();
           stopRestoreMask();
           notifyRestoreSettled('failed');
@@ -373,6 +396,14 @@ export function usePagedReaderLayout({
         }
 
         recordRestoreResult(solverOutcome.result, pendingRestoreTarget);
+        setDebugSnapshot('reader-position-restore', {
+          source: 'usePagedReaderLayout',
+          mode: 'paged',
+          status: solverOutcome.result.status,
+          chapterIndex,
+          resolvedPageIndex: solverOutcome.context?.pageIndex ?? null,
+          target: pendingRestoreTarget,
+        });
         clearPendingRestoreTarget();
         stopRestoreMask();
         notifyRestoreSettled(solverOutcome.result.status);

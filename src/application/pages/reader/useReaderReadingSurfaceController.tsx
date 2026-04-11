@@ -161,7 +161,7 @@ export function useReaderReadingSurfaceController({
   const persistence = useReaderPersistenceRuntime();
   const session = useReaderSession(novelId);
   const { snapshot: sessionSnapshot, commands: sessionCommands } = session;
-  const { chapterIndex, isPagedMode, mode, viewMode } = sessionSnapshot;
+  const { chapterIndex, isPagedMode, lastContentMode, mode, viewMode } = sessionSnapshot;
   const [chapterDataRevision, setChapterDataRevision] = useState(0);
 
   const chapterData = useReaderChapterData({
@@ -299,12 +299,12 @@ export function useReaderReadingSurfaceController({
     },
     navigation,
     restore: {
-      handleSetContentMode: restoreFlow.handleSetContentMode,
-      handleSetViewMode: restoreFlow.handleSetViewMode,
+      switchMode: restoreFlow.switchMode,
     },
     sessionSnapshot: {
       chapterIndex,
       isPagedMode,
+      lastContentMode,
       mode,
       viewMode,
     },

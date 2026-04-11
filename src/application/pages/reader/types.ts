@@ -59,13 +59,10 @@ export interface ReaderReadingSurfaceController {
   chapterData: Pick<UseReaderChapterDataResult, 'chapters' | 'currentChapter'>;
   lifecycle: ReaderLifecycleControllerResult;
   navigation: ReaderNavigationControllerResult;
-  restore: Pick<
-    UseReaderRestoreControllerResult,
-    'handleSetContentMode' | 'handleSetViewMode'
-  >;
+  restore: Pick<UseReaderRestoreControllerResult, 'switchMode'>;
   sessionSnapshot: Pick<
     UseReaderSessionResult['snapshot'],
-    'chapterIndex' | 'isPagedMode' | 'mode' | 'viewMode'
+    'chapterIndex' | 'isPagedMode' | 'lastContentMode' | 'mode' | 'viewMode'
   >;
   viewport: {
     buildContentProps: (options: {

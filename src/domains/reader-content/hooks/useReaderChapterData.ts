@@ -15,7 +15,7 @@ import type {
   StoredReaderState,
 } from '@shared/contracts/reader';
 
-import { reportAppError } from '@shared/debug';
+import { debugLog, reportAppError, setDebugSnapshot } from '@shared/debug';
 import { AppErrorCode, toAppError, type AppError } from '@shared/errors';
 import { useReaderContentRuntime } from '@shared/reader-runtime';
 import {
@@ -176,6 +176,27 @@ export function useReaderChapterData({
       };
       const nextMode = nextStoredState.hints?.contentMode ?? 'scroll';
       const nextStoredChapterIndex = getStoredChapterIndex(nextStoredState);
+      const modeResolutionSnapshot = {
+        source: 'useReaderChapterData.hydrateReaderData',
+        novelId: resolvedNovelId,
+        resolvedMode: nextMode,
+        persistedHintContentMode: nextStoredState.hints?.contentMode ?? null,
+        persistedPageIndex: nextStoredState.hints?.pageIndex ?? null,
+        persistedChapterIndex: nextStoredChapterIndex,
+        fallbackReason:
+          nextStoredState.hints?.contentMode == null
+            ? 'missing-hints.contentMode -> fallback-to-scroll'
+            : null,
+      };
+      setDebugSnapshot('reader-mode-resolution', modeResolutionSnapshot);
+      debugLog('Reader', 'hydrate reader data mode snapshot', modeResolutionSnapshot);
+      if (modeResolutionSnapshot.fallbackReason) {
+        debugLog(
+          'Reader',
+          'reader mode fallback to scroll because persisted hints.contentMode is missing',
+          modeResolutionSnapshot,
+        );
+      }
 
       latestReaderStateRef.current = nextStoredState;
       setMode(nextMode);

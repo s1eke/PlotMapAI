@@ -51,7 +51,19 @@ const CATEGORY_COLORS: Record<string, string> = {
   'character-graph': 'text-cyan-300',
 };
 
-const SNAPSHOT_ORDER = ['reader-layout', 'reader-restore', 'reader-lifecycle', 'book-import', 'storage'];
+const SNAPSHOT_ORDER = [
+  'reader-layout',
+  'reader-mode-hydration',
+  'reader-mode-resolution',
+  'reader-mode-switch',
+  'reader-position-hydration',
+  'reader-position-persist',
+  'reader-position-restore',
+  'reader-restore',
+  'reader-lifecycle',
+  'book-import',
+  'storage',
+];
 
 interface ReaderLayoutDiagnosticSnapshot {
   novelId: number | null;
@@ -516,37 +528,39 @@ export default function DebugPanel() {
             {orderedSnapshots.length}
           </span>
         </div>
-        <div className="space-y-2">
-          {orderedSnapshots.length === 0 && (
-            <div className="rounded-lg border border-white/5 bg-black/10 px-3 py-2 text-[11px] text-text-secondary">
-              {t('debug.diagnostics.empty')}
-            </div>
-          )}
-          {orderedSnapshots.map((snapshot) => (
-            <section
-              key={getDebugSnapshotKey(snapshot)}
-              className="rounded-lg border border-white/5 bg-black/10 px-3 py-2"
-            >
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-[11px] font-semibold text-text-primary">
-                  {getSnapshotLabel(snapshot.key, t)}
-                </span>
-                <span className="shrink-0 text-[10px] text-text-secondary/60">
-                  {formatDiagnosticTime(snapshot.time)}
-                </span>
+        <div className="max-h-48 overflow-y-auto pr-1 custom-scrollbar sm:max-h-64">
+          <div className="space-y-2">
+            {orderedSnapshots.length === 0 && (
+              <div className="rounded-lg border border-white/5 bg-black/10 px-3 py-2 text-[11px] text-text-secondary">
+                {t('debug.diagnostics.empty')}
               </div>
-              <div className="mt-2 space-y-1">
-                {buildSnapshotPreview(snapshot, t).map((line) => (
-                  <div key={line} className="text-[10px] text-text-secondary/90">
-                    {line}
-                  </div>
-                ))}
-              </div>
-              <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-all rounded bg-black/15 p-2 text-[10px] text-text-secondary/90">
-                {JSON.stringify(snapshot.value, null, 2)}
-              </pre>
-            </section>
-          ))}
+            )}
+            {orderedSnapshots.map((snapshot) => (
+              <section
+                key={getDebugSnapshotKey(snapshot)}
+                className="rounded-lg border border-white/5 bg-black/10 px-3 py-2"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-[11px] font-semibold text-text-primary">
+                    {getSnapshotLabel(snapshot.key, t)}
+                  </span>
+                  <span className="shrink-0 text-[10px] text-text-secondary/60">
+                    {formatDiagnosticTime(snapshot.time)}
+                  </span>
+                </div>
+                <div className="mt-2 space-y-1">
+                  {buildSnapshotPreview(snapshot, t).map((line) => (
+                    <div key={line} className="text-[10px] text-text-secondary/90">
+                      {line}
+                    </div>
+                  ))}
+                </div>
+                <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-all rounded bg-black/15 p-2 text-[10px] text-text-secondary/90">
+                  {JSON.stringify(snapshot.value, null, 2)}
+                </pre>
+              </section>
+            ))}
+          </div>
         </div>
       </div>
       <div ref={listRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-2 space-y-0.5 text-[11px] font-mono leading-relaxed custom-scrollbar">

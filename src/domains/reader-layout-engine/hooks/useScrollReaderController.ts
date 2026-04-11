@@ -6,6 +6,7 @@ import {
   useReaderPersistenceRuntime,
   useReaderViewportContext,
 } from '@shared/reader-runtime';
+import { debugLog, setDebugSnapshot } from '@shared/debug';
 import { toCanonicalPositionFromLocator } from '@shared/utils/readerStoredState';
 
 import type {
@@ -100,6 +101,16 @@ export function useScrollReaderController({
     }
 
     const locator = layoutQueries.getCurrentOriginalLocator();
+    if (!locator) {
+      const persistFallbackSnapshot = {
+        source: 'useScrollReaderController.handleReadingAnchorChange',
+        mode: 'scroll',
+        chapterIndex: anchor.chapterIndex,
+        fallbackReason: 'currentOriginalLocator-null -> persist-chapter-start-edge',
+      };
+      setDebugSnapshot('reader-position-persist', persistFallbackSnapshot);
+      debugLog('Reader', 'scroll persist fallback to chapter start', persistFallbackSnapshot);
+    }
     persistReaderState({
       canonical: toCanonicalPositionFromLocator(locator ?? undefined) ?? {
         chapterIndex: anchor.chapterIndex,

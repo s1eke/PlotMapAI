@@ -11,6 +11,7 @@ import type { ScrollReaderLayout } from './scrollReaderControllerTypes';
 import { useCallback, useEffect } from 'react';
 
 import { getChapterBoundaryLocator } from '../layout-core/internal';
+import { debugLog, setDebugSnapshot } from '@shared/debug';
 import {
   canSkipReaderRestore,
   SCROLL_READING_ANCHOR_RATIO,
@@ -202,6 +203,16 @@ export function useScrollReaderRestore(params: {
 
     const currentRetryAttempt = getRestoreAttempt(pendingTarget);
     if (canSkipReaderRestore(pendingTarget)) {
+      const skippedSnapshot = {
+        source: 'scrollReaderRestore',
+        mode: 'scroll',
+        status: 'skipped',
+        chapterIndex,
+        reason: 'no_target',
+        target: pendingTarget,
+      };
+      setDebugSnapshot('reader-position-restore', skippedSnapshot);
+      debugLog('Reader', 'scroll restore skipped because target is missing', skippedSnapshot);
       recordRestoreResult(
         buildSkippedNoTargetResult(chapterIndex, currentRetryAttempt + 1),
         pendingTarget,
@@ -305,6 +316,18 @@ export function useScrollReaderRestore(params: {
           return;
         }
 
+        const failedSnapshot = {
+          source: 'scrollReaderRestore',
+          mode: 'scroll',
+          status: 'failed',
+          chapterIndex,
+          reason: solverOutcome.result.reason,
+          retryable: solverOutcome.result.retryable,
+          attempts: solverOutcome.result.attempts,
+          target: activeTarget ?? null,
+        };
+        setDebugSnapshot('reader-position-restore', failedSnapshot);
+        debugLog('Reader', 'scroll restore failed', failedSnapshot);
         clearPendingRestoreTarget();
         stopRestoreMask();
         persistence.notifyRestoreSettled('failed');
@@ -312,6 +335,15 @@ export function useScrollReaderRestore(params: {
       }
 
       recordRestoreResult(solverOutcome.result, activeTarget);
+      const completedSnapshot = {
+        source: 'scrollReaderRestore',
+        mode: 'scroll',
+        status: solverOutcome.result.status,
+        chapterIndex,
+        resolvedLocator: solverOutcome.context?.locator ?? null,
+        target: activeTarget ?? null,
+      };
+      setDebugSnapshot('reader-position-restore', completedSnapshot);
       if (solverOutcome.context?.locator) {
         persistReaderState({
           canonical: toCanonicalPositionFromLocator(solverOutcome.context.locator),

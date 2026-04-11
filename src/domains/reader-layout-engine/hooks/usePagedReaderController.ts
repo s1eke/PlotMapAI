@@ -9,13 +9,13 @@ import type {
   ReaderSessionCommands,
   ReaderSessionSnapshot,
 } from '@shared/contracts/reader';
-
 import {
   useReaderLayoutQueries,
   useReaderNavigationRuntime,
   useReaderPersistenceRuntime,
   useReaderViewportContext,
 } from '@shared/reader-runtime';
+import { debugLog, setDebugSnapshot } from '@shared/debug';
 import { createCanonicalPositionFromNavigationIntent } from '@shared/utils/readerPosition';
 import { toCanonicalPositionFromLocator } from '@shared/utils/readerStoredState';
 import { resolveCurrentPagedLocator } from '../layout-core/internal';
@@ -25,7 +25,6 @@ import {
   usePagedReaderLayout,
 } from '../paged-runtime/internal';
 import { useReaderRenderCache } from '../render-cache/internal';
-
 type NavigationDirection = 'next' | 'prev';
 type DirectionalNavigationReplay = (
   direction: NavigationDirection,
@@ -435,6 +434,17 @@ export function usePagedReaderController({
     }
 
     const locator = layoutQueries.getCurrentPagedLocator();
+    if (!locator) {
+      const persistFallbackSnapshot = {
+        source: 'usePagedReaderController.persistCurrentPage',
+        mode: 'paged',
+        chapterIndex,
+        pageIndex,
+        fallbackReason: 'currentPagedLocator-null -> persist-chapter-start-edge',
+      };
+      setDebugSnapshot('reader-position-persist', persistFallbackSnapshot);
+      debugLog('Reader', 'paged persist fallback to chapter start', persistFallbackSnapshot);
+    }
     persistReaderState({
       canonical: toCanonicalPositionFromLocator(locator ?? undefined) ?? {
         chapterIndex,

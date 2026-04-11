@@ -61,6 +61,7 @@ interface ReaderSurfaceMockState {
   isSidebarOpen: boolean;
   lifecycleStatus: 'ready';
   loadingLabel: string;
+  lastContentMode: 'scroll' | 'paged';
   mode: 'summary' | 'scroll' | 'paged';
   pageTurnMode: 'cover' | 'scroll' | 'slide' | 'none';
   paragraphSpacing: number;
@@ -75,8 +76,6 @@ interface ReaderSurfaceMockState {
 const readerShellMocks = vi.hoisted(() => ({
   handleContentClick: vi.fn(),
   handleMobileBack: vi.fn(),
-  handleSetContentMode: vi.fn(),
-  handleSetViewMode: vi.fn(),
   setFontSize: vi.fn(),
   setIsChromeVisible: vi.fn(),
   setIsSidebarOpen: vi.fn(),
@@ -84,6 +83,7 @@ const readerShellMocks = vi.hoisted(() => ({
   setPageTurnMode: vi.fn(),
   setParagraphSpacing: vi.fn(),
   setReaderTheme: vi.fn(),
+  switchMode: vi.fn(),
   toggleSidebar: vi.fn(),
 }));
 
@@ -125,6 +125,7 @@ const readerSurfaceMocks: ReaderSurfaceMockState = vi.hoisted(() => ({
   isSidebarOpen: false,
   lifecycleStatus: 'ready',
   loadingLabel: 'reader.loading',
+  lastContentMode: 'scroll',
   mode: 'summary',
   pageTurnMode: 'cover',
   paragraphSpacing: 1.2,
@@ -230,6 +231,7 @@ function resetReaderSurfaceMocks(): void {
   readerSurfaceMocks.isSidebarOpen = false;
   readerSurfaceMocks.lifecycleStatus = 'ready';
   readerSurfaceMocks.loadingLabel = 'reader.loading';
+  readerSurfaceMocks.lastContentMode = 'scroll';
   readerSurfaceMocks.mode = 'summary';
   readerSurfaceMocks.pageTurnMode = 'cover';
   readerSurfaceMocks.paragraphSpacing = 1.2;
@@ -249,8 +251,6 @@ function resetReaderSurfaceMocks(): void {
   readerNavigationMocks.handlePrev.mockReset();
   readerShellMocks.handleContentClick.mockReset();
   readerShellMocks.handleMobileBack.mockReset();
-  readerShellMocks.handleSetContentMode.mockReset();
-  readerShellMocks.handleSetViewMode.mockReset();
   readerShellMocks.setFontSize.mockReset();
   readerShellMocks.setIsChromeVisible.mockReset();
   readerShellMocks.setIsSidebarOpen.mockReset();
@@ -258,6 +258,7 @@ function resetReaderSurfaceMocks(): void {
   readerShellMocks.setPageTurnMode.mockReset();
   readerShellMocks.setParagraphSpacing.mockReset();
   readerShellMocks.setReaderTheme.mockReset();
+  readerShellMocks.switchMode.mockReset();
   readerShellMocks.toggleSidebar.mockReset();
 }
 
@@ -380,12 +381,12 @@ vi.mock('../useReaderReadingSurfaceController', () => ({
       toolbarHasPrev: false,
     },
     restore: {
-      handleSetContentMode: readerShellMocks.handleSetContentMode,
-      handleSetViewMode: readerShellMocks.handleSetViewMode,
+      switchMode: readerShellMocks.switchMode,
     },
     sessionSnapshot: {
       chapterIndex: 0,
       isPagedMode: readerSurfaceMocks.isPagedMode,
+      lastContentMode: readerSurfaceMocks.lastContentMode,
       mode: readerSurfaceMocks.mode,
       viewMode: readerSurfaceMocks.viewMode,
     },
@@ -444,7 +445,7 @@ describe('useReaderPageViewModel', () => {
     });
 
     expect(readerShellMocks.setPageTurnMode).toHaveBeenCalledWith('scroll');
-    expect(readerShellMocks.handleSetContentMode).not.toHaveBeenCalled();
+    expect(readerShellMocks.switchMode).not.toHaveBeenCalled();
   });
 
   it('maps page turn mode changes back into content mode while in original reading mode', () => {
@@ -459,7 +460,25 @@ describe('useReaderPageViewModel', () => {
     });
 
     expect(readerShellMocks.setPageTurnMode).toHaveBeenCalledWith('scroll');
-    expect(readerShellMocks.handleSetContentMode).toHaveBeenCalledWith('scroll');
+    expect(readerShellMocks.switchMode).toHaveBeenCalledWith('scroll');
+  });
+
+  it('maps top bar view changes into switchMode targets', () => {
+    readerSurfaceMocks.mode = 'summary';
+    readerSurfaceMocks.viewMode = 'summary';
+    readerSurfaceMocks.lastContentMode = 'paged';
+
+    const { result } = renderHook(() => useReaderPageViewModel(1));
+
+    act(() => {
+      result.current.topBarProps.onSetViewMode('original');
+    });
+    act(() => {
+      result.current.topBarProps.onSetViewMode('summary');
+    });
+
+    expect(readerShellMocks.switchMode).toHaveBeenNthCalledWith(1, 'paged');
+    expect(readerShellMocks.switchMode).toHaveBeenNthCalledWith(2, 'summary');
   });
 
   it('dismisses blocked interactions before delegating viewport clicks', () => {

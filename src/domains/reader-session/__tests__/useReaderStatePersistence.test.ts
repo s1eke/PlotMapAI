@@ -188,7 +188,11 @@ describe('useReaderStatePersistence', () => {
         chapterIndex: 0,
         edge: 'start',
       },
-      hints: undefined,
+      hints: {
+        chapterProgress: undefined,
+        contentMode: 'scroll',
+        pageIndex: undefined,
+      },
     });
     await expect(db.readingProgress.where('novelId').equals(1).first()).resolves.toBeUndefined();
     expect(readReaderBootstrapSnapshot(1)).toBeNull();

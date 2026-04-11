@@ -1,7 +1,6 @@
 import { useStore } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { createStore, type StoreApi } from 'zustand/vanilla';
-
 import type { ReaderPageTurnMode } from '@shared/contracts/reader/preferences';
 import {
   createPersistedRuntime,
@@ -43,6 +42,7 @@ import {
 } from './repository';
 import { reduceReaderLifecycleState } from './lifecycleStateMachine';
 import { writeReaderLifecycleDebugSnapshot } from './readerLifecycleDebugSnapshot';
+import { debugLog, setDebugSnapshot } from '@shared/debug';
 import {
   createInitialReaderSessionState,
   getRemoteProgressSnapshot,
@@ -296,7 +296,36 @@ export async function hydrateSession(
     mode === 'paged' ? 'paged' : 'scroll',
   );
   const pendingRestoreTarget = createRestoreTargetFromPersistedState(baseState, mode);
-
+  const modeHydrationSnapshot = {
+    source: 'readerSessionStore.hydrateSession',
+    novelId,
+    hasConfiguredPageTurnMode: options.hasConfiguredPageTurnMode ?? false,
+    resolvedPageTurnMode,
+    modeFromPageTurnPreference: mode,
+    hasRemoteProgress: Boolean(remoteState),
+    persistedHintContentMode: baseState.hints?.contentMode ?? null,
+    pendingRestoreTargetMode: pendingRestoreTarget?.mode ?? null,
+  };
+  setDebugSnapshot('reader-mode-hydration', modeHydrationSnapshot);
+  debugLog('Reader', 'reader session hydration mode snapshot', modeHydrationSnapshot);
+  const positionHydrationSnapshot = {
+    source: 'readerSessionStore.hydrateSession',
+    novelId,
+    hasRemoteProgress: Boolean(remoteState),
+    canonical: baseState.canonical ?? null,
+    hints: baseState.hints ?? null,
+    pendingRestoreTarget: pendingRestoreTarget
+      ? {
+        mode: pendingRestoreTarget.mode,
+        chapterIndex: pendingRestoreTarget.chapterIndex,
+        hasLocator: Boolean(pendingRestoreTarget.locator),
+        locatorBoundary: pendingRestoreTarget.locatorBoundary ?? null,
+        chapterProgress: pendingRestoreTarget.chapterProgress ?? null,
+      }
+      : null,
+  };
+  setDebugSnapshot('reader-position-hydration', positionHydrationSnapshot);
+  debugLog('Reader', 'reader session hydration position snapshot', positionHydrationSnapshot);
   readerSessionRuntime.patch({
     novelId,
     canonical: baseState.canonical,

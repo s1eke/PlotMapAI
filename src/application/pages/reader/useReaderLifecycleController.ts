@@ -183,6 +183,7 @@ export function useReaderLifecycleController({
   const runChapterLoad = useCallback(async (
     params: ReaderLoadActiveChapterParams,
     initialRestoreTarget: ReaderRestoreTarget | null,
+    persistedRestoreTarget: ReaderRestoreTarget | null,
   ) => {
     const loadKey = createLifecycleLoadKey({
       chapterIndex: params.chapterIndex,
@@ -207,7 +208,12 @@ export function useReaderLifecycleController({
         shouldClearNavigationSource,
         shouldResetViewport,
       } = await loadActiveChapter(params, runtime);
-      const nextRestoreTarget = navigationRestoreTarget ?? initialRestoreTarget;
+      const shouldReusePersistedRestoreTarget =
+        persistedRestoreTarget?.chapterIndex === params.chapterIndex
+        && persistedRestoreTarget.mode === params.mode;
+      const nextRestoreTarget = navigationRestoreTarget
+        ?? initialRestoreTarget
+        ?? (shouldReusePersistedRestoreTarget ? persistedRestoreTarget : null);
 
       if (shouldResetViewport) {
         resetViewportPosition();
@@ -373,8 +379,9 @@ export function useReaderLifecycleController({
     const initialRestoreTarget = queuedInitialLoadParams
       ? queuedInitialRestoreTargetRef.current
       : null;
+    const persistedRestoreTarget = pendingRestoreTarget;
 
-    runChapterLoad(nextLoadParams, initialRestoreTarget);
+    runChapterLoad(nextLoadParams, initialRestoreTarget, persistedRestoreTarget);
     if (queuedInitialLoadParams && currentLoadKey === nextLoadKey) {
       queuedInitialLoadParamsRef.current = null;
       queuedInitialRestoreTargetRef.current = null;
@@ -386,6 +393,7 @@ export function useReaderLifecycleController({
     lifecycleStatus,
     mode,
     novelId,
+    pendingRestoreTarget,
     runChapterLoad,
   ]);
 
