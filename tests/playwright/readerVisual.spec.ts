@@ -47,7 +47,9 @@ test.describe('reader visual regression', () => {
   test('renders imported simple tables with stable spacing', async ({ page }) => {
     await importFixtureToDetailPage(page, 'simpleTable');
     await openReaderFromDetailPage(page);
-    await expect(page.getByTestId('reader-rich-table')).toHaveScreenshot('05-simple-table.png');
+    await expect(
+      page.locator('[data-testid="reader-rich-table"], [data-testid="reader-flow-table"]').first(),
+    ).toHaveScreenshot('05-simple-table.png');
   });
 
   test('renders sanitized dirty-style chapters consistently', async ({ page }) => {
@@ -129,11 +131,15 @@ test.describe('reader visual regression', () => {
     await openReaderFromDetailPage(page);
 
     const viewport = page.getByTestId('reader-viewport');
-    const targetTable = page.getByTestId('reader-rich-table');
+    const targetTable = page.locator(
+      '[data-testid="reader-rich-table"], [data-testid="reader-flow-table"]',
+    ).first();
 
     const scrollTop = await viewport.evaluate((element) => {
       const viewportElement = element;
-      const target = viewportElement.querySelector('[data-testid="reader-rich-table"]');
+      const target = viewportElement.querySelector(
+        '[data-testid="reader-rich-table"], [data-testid="reader-flow-table"]',
+      );
       if (!(target instanceof HTMLElement)) {
         return viewportElement.scrollTop;
       }
