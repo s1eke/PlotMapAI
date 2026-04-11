@@ -254,16 +254,14 @@ docker compose up -d
 - `docs/adr/0002-rich-content-reader-plan.md` — EPUB 富内容阅读计划 ADR
 - `docs/db-table-ownership.md` — Dexie 表 ownership 与跨域访问规则
 - `docs/epub-rich-content-support-matrix.md` — 富内容支持/降级矩阵
-- `AGENTS.md` — 面向 AI coding agents 与维护者的详细仓库操作手册
 
 ## 贡献说明
 
 如果你准备长期维护或让 AI agent 参与改动，建议先阅读：
 
 1. `README.md`
-2. `AGENTS.md`
-3. `docs/adr/0001-layer-responsibilities.md`
-4. `docs/db-table-ownership.md`
+2. `docs/adr/0001-layer-responsibilities.md`
+3. `docs/db-table-ownership.md`
 
 这几个文件已经基本定义了“代码该放哪、怎么依赖、改完要跑什么”。
 
