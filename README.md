@@ -11,23 +11,37 @@
 </p>
 
 <p align="center">
-  AI 驱动的小说阅读器 — 支持 EPUB / TXT，章节分析、人物关系图谱、文本净化，数据全部存储在浏览器本地。
+  AI 驱动的本地优先小说阅读器，支持 EPUB / TXT、结构化富内容阅读、章节分析、人物关系图谱与文本净化。
 </p>
 
 ---
 
-## 功能特性
+## 项目简介
+
+PlotMapAI 是一个运行在浏览器里的 local-first SPA，核心目标是把“导入小说、阅读、净化、分析、图谱可视化”这些能力放在一套纯前端工作流里完成。
+
+项目特点：
+
+- 没有后端数据库，书籍内容、章节、分析结果、阅读进度都落在浏览器本地
+- EPUB / TXT 在导入阶段统一落成结构化内容与 plain-text projection
+- 阅读器已经拆分成多个 `reader-*` 领域，滚动与分页共用受控富内容管线
+- AI 分析使用 OpenAI-compatible 接口，配置由浏览器本地保存，API Key 通过 AES-GCM 加密存储
+- 支持 PWA 安装、更新提示与 File Handling API 文件关联打开
+
+## 核心功能
 
 - **小说阅读** — 支持 EPUB / TXT 格式，滚动/分页双模式，动画翻页（cover/slide），拖拽手势翻页
-- **AI 章节分析** — 对接 OpenAI 兼容 API，生成章节摘要、角色提取、关键要点、关系分析，支持暂停/恢复
+- **结构化富内容** — 支持标题、段落、引用、列表、图片、表格、诗歌、分隔线等富内容阅读与投影
+- **AI 章节分析** — 对接 OpenAI-compatible API，生成章节摘要、角色提取、关键要点、关系分析，支持暂停/恢复/重跑
 - **人物关系图谱** — 可视化展示整部小说的人物关系网络和角色重要度，支持拖拽和缩放
 - **文本净化** — 可配置正则规则清除广告、译注等干扰内容，支持互斥组（如缩进/去缩进二选一）、默认规则保护、YAML 导入/导出
 - **章节检测** — 自动识别 TXT 章节标题，自定义规则跳过弱标题校验
-- **离线优先** — 所有数据存储在 IndexedDB（Dexie），API Key 使用 AES-256-GCM 加密存储
-- **PWA** — 支持安装到桌面，自动更新提醒，独立窗口模式
+- **离线优先** — 所有核心数据存储在 IndexedDB（Dexie），敏感设置通过 `@infra/storage` 加密保存
+- **PWA** — 支持安装到桌面、自动更新提醒、独立窗口模式与文件关联打开
 - **移动端适配** — 全宽底部工具栏、BottomSheet 面板、安全区域（刘海屏）适配、触摸手势
 - **跨平台字体** — 覆盖小米/华为/vivo/OPPO/鸿蒙/iOS/Windows/Linux 系统字体
 - **中英双语** — 支持中文和英文界面
+- **启动恢复** — 当本地数据库 schema 超出受支持迁移线时，提供显式恢复流程而不是静默失败
 
 ## 截图
 
@@ -51,14 +65,14 @@
 | 构建 | Vite 8 |
 | 语言 | TypeScript 5.9 |
 | 样式 | Tailwind CSS v4 |
-| 动画 | motion (Framer Motion) |
+| 动画 | motion |
 | 存储 | Dexie (IndexedDB) + AES-256-GCM 加密 |
 | 解析 | JSZip (EPUB)、原生 JS (TXT/编码检测) |
 | 路由 | React Router 7 |
 | 国际化 | i18next + react-i18next |
 | PWA | vite-plugin-pwa + Workbox |
-| 测试 | Vitest 4、Testing Library、MSW v2 |
-| 代码检查 | ESLint 9 + typescript-eslint |
+| 测试 | Vitest 4、Testing Library、MSW、Playwright |
+| 代码检查 | ESLint 9 + Reader 架构门禁脚本 |
 
 ## 快速开始
 
@@ -69,7 +83,19 @@ npm run dev
 
 打开 http://localhost:5173，应用完全在浏览器端运行，无需后端服务。
 
-如需使用 AI 分析功能，在设置页面配置 OpenAI 兼容的 API 地址和密钥。
+如需使用 AI 分析功能，在设置页面配置 OpenAI-compatible API 地址、模型名和密钥。
+
+建议环境：
+
+- Node.js 20+
+- 现代 Chromium / Safari / Firefox 浏览器
+
+### 本地优先与安全说明
+
+- 书籍、章节、图谱、分析结果、阅读进度保存在 IndexedDB
+- 普通应用设置通过 `@infra/storage` 的 `primary` / `cache` 层访问
+- AI API Key 通过 `storage.secure` 使用 AES-GCM 在浏览器本地加密保存
+- 这不是服务端密钥托管；本项目默认信任“当前浏览器 + 当前设备”的本地环境
 
 ### 调试模式
 
@@ -85,53 +111,114 @@ npm run dev:debug
 |------|------|
 | `npm run dev` | 启动开发服务器 |
 | `npm run dev:debug` | 启动开发服务器（含调试日志） |
-| `npm run build` | 类型检查 + 生产构建 |
+| `npm run build` | `tsc -b` + `vite build` + bundle budget 校验 |
+| `npm run analyze` | 输出 bundle 可视化分析报告 |
 | `npm run preview` | 预览生产构建 |
-| `npm run lint` | 运行 ESLint |
-| `npm test` | 运行测试 |
+| `npm run lint` | ESLint + Reader 架构门禁 |
+| `npm test` | 运行 Vitest（单次） |
 | `npm run test:watch` | 监听模式运行测试 |
 | `npm run coverage` | 测试覆盖率报告 |
+| `npm run test:visual` | 运行 Playwright 视觉回归 |
 | `npm run generate:pwa-icons` | 生成多尺寸 PWA 图标 |
 
 ### 运行单个测试
 
 ```bash
-npx vitest run src/domains/reader/hooks/__tests__/useReaderPreferences.test.ts  # 按文件
-npx vitest run -t "restores reading position"                                    # 按名称
+npx vitest run src/application/pages/reader/__tests__/useReaderPageViewModel.test.tsx
+npx vitest run src/shared/components/__tests__/Modal.test.tsx
+npx vitest run -t "calls onClose when close button is clicked"
+npx playwright test tests/playwright/readerVisual.spec.ts
 ```
 
-## Docker 部署
+如果你第一次运行 Playwright，可能需要先安装浏览器：
 
 ```bash
-docker compose up -d
+npx playwright install --with-deps chromium
 ```
 
-通过 nginx 在 80 端口提供前端静态文件服务。
+## 开发与验收
+
+默认改动验收命令：
+
+```bash
+npm run lint && npm test && npm run build
+```
+
+如果改动涉及阅读器布局、富文本渲染或样式基线，请额外执行：
+
+```bash
+npm run test:visual
+```
 
 ## 项目结构
 
-采用分层领域驱动设计（Layered Domain-Driven Design）：
+项目采用分层架构：`app / application / domains / shared / infra`。
 
-```
+```text
 src/
-├── app/                # 应用壳：路由、布局、Provider、调试面板、错误边界
-├── application/        # 编排层：跨领域页面、用例、hooks、组合组件
-├── domains/            # 业务领域（每个领域自包含）
-│   ├── analysis/       #   AI 章节分析（Provider 适配、运行时、Prompt）
-│   ├── book-import/    #   EPUB/TXT 导入与解析
-│   ├── character-graph/ #   人物关系图谱可视化
-│   ├── library/        #   书架与书籍管理
-│   ├── reader/         #   阅读器（分页/滚动、导航、偏好设置）
-│   └── settings/       #   设置（净化规则、目录规则、AI 配置）
-├── shared/             # 跨领域共享：UI 组件、契约、错误体系、状态、文本处理、工具函数
-├── infra/              # 基础设施：Dexie 数据库、localStorage 封装、Web Worker
-├── i18n/               # 国际化配置与语言文件（zh/en）
-└── test/               # 测试基础设施（MSW handlers、setup、mocks）
+├── app/                      # 应用壳：Router、Provider、Layout、错误边界、启动恢复、PWA 提示
+├── application/              # 编排层：页面、use-cases、跨域 services、读模型组合
+├── domains/                  # 业务域 owner
+│   ├── analysis/             # AI 分析、provider、运行时状态机、总览与人物关系输出
+│   ├── book-content/         # 章节、结构化内容、章节图片与图库索引
+│   ├── book-import/          # TXT/EPUB 解析、编码检测、章节检测、导入进度、EPUB Worker
+│   ├── character-graph/      # 图谱画布、视口控制、布局算法、布局 Worker
+│   ├── library/              # 书架、书籍元信息、封面资源
+│   ├── reader-content/       # 阅读器章节读取 hook，消费 application runtime
+│   ├── reader-interaction/   # 点击、拖拽、快捷交互
+│   ├── reader-layout-engine/ # 滚动/分页布局、summary shell、render cache
+│   ├── reader-media/         # 图片资源、图片查看器与手势
+│   ├── reader-session/       # 阅读进度、restore、session persistence
+│   ├── reader-shell/         # Reader Provider、Toolbar、主题、壳层 UI
+│   └── settings/             # AI 配置、净化规则、目录规则、YAML 导入导出
+├── shared/                   # 中立共享：contracts、组件、errors、debug、text-processing、utils
+├── infra/                    # Dexie、schema/migrations、storage、workers
+├── i18n/                     # 国际化配置与语言包
+└── test/                     # 测试基础设施与 mocks
 ```
 
-静态资源位于 `public/`，PWA 图标与截图也从该目录提供。
+### 关键架构规则
 
-### 路径别名
+- `app` 和 `application` 使用 domain 时只允许从 `@domains/<domain>` 进入
+- domain 不得依赖 `@app/*` 或 `@application/*`
+- `shared` 与 `infra` 不得依赖任何 domain
+- `book-import` 是 parse-only domain，不直接访问 Dexie
+- `reader-content` 不直接读 Dexie，只消费 application 注册的 runtime
+- 页面编排统一采用 `Route Page -> usePageViewModel -> Screen`
+
+### Reader 家族现状
+
+阅读器已经按职责拆分为：
+
+- `reader-content`
+- `reader-interaction`
+- `reader-layout-engine`
+- `reader-media`
+- `reader-session`
+- `reader-shell`
+
+仓库内有专门门禁脚本 `scripts/checkReaderArchitecture.mjs`，用于限制：
+
+- Reader 文件体量
+- deep import
+- 根 barrel 暴露面
+- 弱语义转发文件
+
+## 核心数据流
+
+### 导入
+
+`UploadModal` / PWA 文件打开 → `bookLifecycleService` → `bookImportService` → TXT / EPUB parser → 结构化 rich content + plain text projection → Dexie transaction 持久化。
+
+### 阅读
+
+Reader 页面通过 `ReaderProvider` 注入 `applicationReaderContentRuntime`，由 application 层组合原始章节、结构化章节内容和净化规则，再交给 Reader 各子域消费。
+
+### 分析
+
+分析功能读取章节 plain-text projection，经 `analysisService` 组织 chunk 执行并持久化结果，Book Detail、Character Graph 和 Reader Summary Shell 共同消费这些工件。
+
+## 路径别名
 
 | 别名 | 映射 |
 |------|------|
@@ -142,22 +229,43 @@ src/
 | `@infra/*` | `src/infra/*` |
 | `@test/*` | `src/test/*` |
 
-### 关键架构模式
+## PWA 与部署
 
-- **应用编排层** — `src/application/` 负责跨领域页面、用例与组合逻辑；领域代码不得反向依赖该层
-- **页面模板统一** — application 页面统一采用 `Route Page -> usePageViewModel -> Screen`：route page 只处理 params/provider/lazy boundary，Screen 只接收单一 `viewModel`
-- **领域隔离** — `@shared/` 和 `@infra/` 不得导入 `@domains/`，`@app/` 与 `@application/` 访问领域时通过 barrel export（`@domains/<domain>`）交互
-- **本地存储** — 使用 `@infra/storage`（三级封装：primary/cache/secure），禁止直接访问 `localStorage`
-- **Shim 治理** — 过渡性 re-export / shim 必须在同次重构中删除，或附带明确移除条件；不要长期保留“真实归属 + 兼容入口”双入口
-- **错误处理** — 统一 `AppError` 基类 + `as const` 错误码，UI 通过 i18n 翻译错误消息
-- **Web Worker** — EPUB 解析、文本净化、图谱布局在 Worker 中执行，不阻塞主线程
-- **PWA** — `registerType: 'prompt'`，用户确认后更新
+### PWA
 
-## 配置文件
+- 使用 `vite-plugin-pwa`
+- `registerType: 'prompt'`
+- 支持安装、更新提示和文件关联打开
+- `main.tsx` 对 iOS standalone overscroll 做了额外处理
+
+### Docker 部署
+
+```bash
+docker compose up -d
+```
+
+通过 nginx 在 80 端口提供前端静态文件服务。
+
+## 重要配置与文档
 
 - `src/domains/settings/services/defaultTocRules.yaml` — 默认章节检测规则（首次启动时自动填充）
 - `src/domains/settings/services/defaultPurificationRules.yaml` — 默认文本净化规则
-- 净化规则/目录规则 — 在设置页面通过 YAML 导入/导出
+- `docs/adr/0001-layer-responsibilities.md` — 分层职责 ADR
+- `docs/adr/0002-rich-content-reader-plan.md` — EPUB 富内容阅读计划 ADR
+- `docs/db-table-ownership.md` — Dexie 表 ownership 与跨域访问规则
+- `docs/epub-rich-content-support-matrix.md` — 富内容支持/降级矩阵
+- `AGENTS.md` — 面向 AI coding agents 与维护者的详细仓库操作手册
+
+## 贡献说明
+
+如果你准备长期维护或让 AI agent 参与改动，建议先阅读：
+
+1. `README.md`
+2. `AGENTS.md`
+3. `docs/adr/0001-layer-responsibilities.md`
+4. `docs/db-table-ownership.md`
+
+这几个文件已经基本定义了“代码该放哪、怎么依赖、改完要跑什么”。
 
 ## 许可证
 
