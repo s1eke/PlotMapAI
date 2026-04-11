@@ -161,11 +161,15 @@ function decodeHtmlEntities(input: string): string {
     .replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/giu, (match, entity: string) => {
       if (entity.startsWith('#x')) {
         const codePoint = Number.parseInt(entity.slice(2), 16);
-        return Number.isNaN(codePoint) || codePoint < 0 || codePoint > 0x10FFFF ? match : String.fromCodePoint(codePoint);
+        return Number.isNaN(codePoint) || codePoint < 0 || codePoint > 0x10FFFF
+          ? match
+          : String.fromCodePoint(codePoint);
       }
       if (entity.startsWith('#')) {
         const codePoint = Number.parseInt(entity.slice(1), 10);
-        return Number.isNaN(codePoint) || codePoint < 0 || codePoint > 0x10FFFF ? match : String.fromCodePoint(codePoint);
+        return Number.isNaN(codePoint) || codePoint < 0 || codePoint > 0x10FFFF
+          ? match
+          : String.fromCodePoint(codePoint);
       }
       return namedEntities[entity.toLowerCase()] ?? match;
     })
@@ -216,7 +220,7 @@ export function htmlToText(html: string): string {
     .replace(/[^\S\n]+/gu, ' ')
     .replace(/ *\n */gu, '\n');
   const lines = text.split('\n');
-  const filtered = lines.filter(line => {
+  const filtered = lines.filter((line) => {
     const trimmed = line.trim();
     return !trimmed || !NAV_LINE_PATTERN.test(trimmed);
   });

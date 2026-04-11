@@ -104,8 +104,8 @@ export const handlers = [
   })),
   http.get('/api/novels/:id/reading-progress', () => HttpResponse.json({
     chapterIndex: 0,
-    scrollPosition: 0,
-    viewMode: 'original',
+    mode: 'summary',
+    chapterProgress: 0,
   })),
   http.put('/api/novels/:id/reading-progress', () => HttpResponse.json({ message: 'ok' })),
   http.get('/api/settings/ai-provider', () => HttpResponse.json({

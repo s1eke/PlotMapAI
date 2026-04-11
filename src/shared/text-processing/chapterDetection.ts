@@ -4,6 +4,7 @@ import type {
   DetectedChapter,
   SplitChapter,
 } from './types';
+import { stripLeadingChapterTitle } from './chapterContent';
 
 const MIN_WEAK_CANDIDATE_COUNT = 3;
 const MIN_INCREMENTING_RATIO = 0.8;
@@ -44,37 +45,37 @@ const BRACKETED_NUMBER_PATTERN = /^\s*(?:\(|（|\[)\s*(\d{1,5})\s*(?:\)|）|\])\
 const NO_NUMBER_PATTERN = /^\s*[Nn][Oo]\.?\s*(\d{1,5})\s+\S.*$/;
 
 const CJK_DIGIT_VALUES: Record<string, number> = {
-  '零': 0,
-  '〇': 0,
-  '一': 1,
-  '二': 2,
-  '两': 2,
-  '三': 3,
-  '四': 4,
-  '五': 5,
-  '六': 6,
-  '七': 7,
-  '八': 8,
-  '九': 9,
-  '壹': 1,
-  '贰': 2,
-  '叁': 3,
-  '肆': 4,
-  '伍': 5,
-  '陆': 6,
-  '柒': 7,
-  '捌': 8,
-  '玖': 9,
+  零: 0,
+  〇: 0,
+  一: 1,
+  二: 2,
+  两: 2,
+  三: 3,
+  四: 4,
+  五: 5,
+  六: 6,
+  七: 7,
+  八: 8,
+  九: 9,
+  壹: 1,
+  贰: 2,
+  叁: 3,
+  肆: 4,
+  伍: 5,
+  陆: 6,
+  柒: 7,
+  捌: 8,
+  玖: 9,
 };
 
 const CJK_UNIT_VALUES: Record<string, number> = {
-  '十': 10,
-  '百': 100,
-  '千': 1000,
-  '万': 10000,
-  '拾': 10,
-  '佰': 100,
-  '仟': 1000,
+  十: 10,
+  百: 100,
+  千: 1000,
+  万: 10000,
+  拾: 10,
+  佰: 100,
+  仟: 1000,
 };
 
 function splitTextFixed(text: string, chunkSize: number): SplitChapter[] {
@@ -180,7 +181,11 @@ function buildNonEmptyLinePrefixCounts(lines: string[]): number[] {
   return prefixCounts;
 }
 
-function countNonEmptyLinesBetween(startLineIndex: number, endLineIndex: number, prefixCounts: number[]): number {
+function countNonEmptyLinesBetween(
+  startLineIndex: number,
+  endLineIndex: number,
+  prefixCounts: number[],
+): number {
   if (endLineIndex <= startLineIndex + 1) {
     return 0;
   }
@@ -294,7 +299,10 @@ function classifyWeakHeading(title: string): WeakHeadingMatch | null {
   return null;
 }
 
-function selectMatchingRule(lineText: string, compiledRules: CompiledChapterRule[]): CompiledChapterRule | null {
+function selectMatchingRule(
+  lineText: string,
+  compiledRules: CompiledChapterRule[],
+): CompiledChapterRule | null {
   let matchedDefaultRule: CompiledChapterRule | null = null;
 
   for (const compiledRule of compiledRules) {
@@ -353,7 +361,9 @@ function collectHeadingCandidates(
   return candidates;
 }
 
-function groupWeakCandidatesByKind(candidates: DetectedHeadingCandidate[]): Map<WeakHeadingKind, DetectedHeadingCandidate[]> {
+function groupWeakCandidatesByKind(
+  candidates: DetectedHeadingCandidate[],
+): Map<WeakHeadingKind, DetectedHeadingCandidate[]> {
   const groups = new Map<WeakHeadingKind, DetectedHeadingCandidate[]>();
 
   for (const candidate of candidates) {
@@ -449,7 +459,11 @@ function isSuppressedInsideStructuralChapter(
     ? nextCandidate.charStart - candidate.charStart
     : textLength - candidate.charStart;
   const nonEmptyLineSpan = nextCandidate
-    ? countNonEmptyLinesBetween(candidate.lineIndex, nextCandidate.lineIndex, nonEmptyLinePrefixCounts)
+    ? countNonEmptyLinesBetween(
+      candidate.lineIndex,
+      nextCandidate.lineIndex,
+      nonEmptyLinePrefixCounts,
+    )
     : 0;
 
   return charSpan < MIN_STRONG_SECTION_CHAR_SPAN
@@ -467,7 +481,9 @@ function selectAcceptedWeakCandidates(
   const groups = groupWeakCandidatesByKind(defaultCandidates);
 
   for (const groupCandidates of groups.values()) {
-    const sortedGroup = [...groupCandidates].sort((left, right) => left.lineIndex - right.lineIndex);
+    const sortedGroup = [...groupCandidates].sort(
+      (left, right) => left.lineIndex - right.lineIndex,
+    );
     if (!hasConsistentOrdinalProgression(sortedGroup)) {
       continue;
     }
@@ -489,7 +505,10 @@ function selectAcceptedWeakCandidates(
   return accepted;
 }
 
-function buildDetectedChapters(lines: string[], candidates: DetectedHeadingCandidate[]): DetectedChapter[] {
+function buildDetectedChapters(
+  lines: string[],
+  candidates: DetectedHeadingCandidate[],
+): DetectedChapter[] {
   if (candidates.length === 0) {
     return [];
   }
@@ -580,7 +599,7 @@ export function detectChapters(
 export function splitByChapters(
   text: string,
   chapters: DetectedChapter[],
-  maxChunkSize: number = 50000,
+  maxChunkSize = 50000,
 ): SplitChapter[] {
   const lines = text.split('\n');
 
@@ -590,7 +609,10 @@ export function splitByChapters(
 
   const result: SplitChapter[] = [];
   for (const chapter of chapters) {
-    const content = lines.slice(chapter.start, chapter.end).join('\n').trim();
+    const content = stripLeadingChapterTitle(
+      lines.slice(chapter.start, chapter.end).join('\n').trim(),
+      chapter.title,
+    );
     if (content.length <= maxChunkSize) {
       result.push({ title: chapter.title, content });
       continue;

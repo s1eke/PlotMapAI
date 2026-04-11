@@ -32,7 +32,7 @@ describe('analysis service provider adapter integration', () => {
   });
 
   it('uses the provider adapter for chunk analysis and preserves prompt-level settings', async () => {
-    const signal = new AbortController().signal;
+    const { signal } = new AbortController();
     mockGenerateText.mockResolvedValue('```json\n'
       + '{"chunkSummary":"chunk","chapterAnalyses":[{"chapterIndex":0,"title":"第一章","summary":"剧情推进","keyPoints":["开场"],"tags":["成长"],"characters":[],"relationships":[]}]}\n'
       + '```');
@@ -82,7 +82,7 @@ describe('analysis service provider adapter integration', () => {
   });
 
   it('uses the provider adapter for overview analysis and keeps overview normalization', async () => {
-    const signal = new AbortController().signal;
+    const { signal } = new AbortController();
     mockGenerateText.mockResolvedValue('{"bookIntro":"导读","globalSummary":"完整概览","themes":["成长"],"characterStats":[{"name":"主角","role":"核心主角","description":"推动主线","sharePercent":100}],"relationshipGraph":[{"source":"主角","target":"伙伴","relationTags":["同伴"],"description":"共同冒险"}]}');
 
     const result = await runOverviewAnalysis(

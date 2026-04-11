@@ -9,6 +9,9 @@ export type BookImportProgressStage =
   | 'finalizing';
 
 export interface BookImportProgress {
+  current?: number;
+  detail?: string;
   progress: number;
   stage: BookImportProgressStage;
+  total?: number;
 }

@@ -13,21 +13,21 @@ export interface WorkerTaskSpec<Payload, Result, Progress> {
 export type WorkerTaskSpecMap = Record<string, WorkerTaskSpec<unknown, unknown, unknown>>;
 
 export type WorkerTaskPayload<
-  TMap extends WorkerTaskSpecMap,
+  TMap extends object,
   TTask extends keyof TMap,
-> = TMap[TTask]['payload'];
+> = TMap[TTask] extends WorkerTaskSpec<infer Payload, unknown, unknown> ? Payload : never;
 
 export type WorkerTaskResult<
-  TMap extends WorkerTaskSpecMap,
+  TMap extends object,
   TTask extends keyof TMap,
-> = TMap[TTask]['result'];
+> = TMap[TTask] extends WorkerTaskSpec<unknown, infer Result, unknown> ? Result : never;
 
 export type WorkerTaskProgress<
-  TMap extends WorkerTaskSpecMap,
+  TMap extends object,
   TTask extends keyof TMap,
-> = TMap[TTask]['progress'];
+> = TMap[TTask] extends WorkerTaskSpec<unknown, unknown, infer Progress> ? Progress : never;
 
-export type WorkerTaskHandlerMap<TMap extends WorkerTaskSpecMap> = {
+export type WorkerTaskHandlerMap<TMap extends object> = {
   [TTask in keyof TMap]: WorkerTaskHandler<
     WorkerTaskPayload<TMap, TTask>,
     WorkerTaskResult<TMap, TTask>,

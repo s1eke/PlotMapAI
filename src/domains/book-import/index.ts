@@ -1,7 +1,5 @@
-export { bookImportApi } from './api/bookImportApi';
+export { bookImportService } from './bookImportService';
 export { parseBook, registerParser } from './services/bookParser';
+export type { ImportBookOptions, ImportedBookRecord, PreparedBookImport } from './bookImportService';
 export type { BookParser, ParsedBook, ParseContext } from './services/bookParser';
-
-export function loadUploadModal() {
-  return import('./components/UploadModal');
-}
+export type { BookImportProgress, BookImportProgressStage } from './services/progress';

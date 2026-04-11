@@ -9,6 +9,7 @@
     "types": ["vite/client"],
     "skipLibCheck": true,
     "paths": {
+      "@application/*": ["src/application/*"],
       "@app/*": ["src/app/*"],
       "@domains/*": ["src/domains/*"],
       "@shared/*": ["src/shared/*"],

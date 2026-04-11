@@ -1,46 +1,21 @@
-import { translateAppError } from '@shared/errors';
-import { DEFAULT_ANALYSIS_PROVIDER_ID } from '@domains/analysis';
-import { useCallback, useEffect, useState } from 'react';
-import { useTranslation } from 'react-i18next';
-import { aiConfigApi } from '../api/aiConfig';
+import type {
+  AiSettingsManager,
+  AiSettingsManagerActions,
+} from '../settingsManagers';
 import type {
   AiProviderSettings,
   AiProviderSettingsPayload,
-} from '../api/types';
+} from '../types';
 import type { SettingsFeedbackState } from '../utils/settingsPage';
-import {
-  downloadFile,
-} from '../utils/settingsPage';
 
-export interface AiSettingsManager {
-  settings: AiProviderSettings | null;
-  form: AiProviderSettingsPayload;
-  isLoading: boolean;
-  isSaving: boolean;
-  isTesting: boolean;
-  isExporting: boolean;
-  isImporting: boolean;
-  isExportModalOpen: boolean;
-  isImportModalOpen: boolean;
-  exportPassword: string;
-  importPassword: string;
-  pendingImportFile: File | null;
-  feedback: SettingsFeedbackState | null;
-  exportDialogFeedback: SettingsFeedbackState | null;
-  importDialogFeedback: SettingsFeedbackState | null;
-  clearFeedback: () => void;
-  updateField: <K extends keyof AiProviderSettingsPayload>(key: K, value: AiProviderSettingsPayload[K]) => void;
-  saveSettings: () => Promise<void>;
-  testSettings: () => Promise<void>;
-  openExportModal: () => void;
-  closeExportModal: () => void;
-  setExportPasswordValue: (password: string) => void;
-  exportConfig: () => Promise<void>;
-  queueImportFile: (file: File) => void;
-  closeImportModal: () => void;
-  setImportPasswordValue: (password: string) => void;
-  confirmImport: () => Promise<void>;
-}
+import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+
+import { DEFAULT_ANALYSIS_PROVIDER_ID } from '@shared/contracts';
+import { translateAppError } from '@shared/errors';
+
+import { getAiProviderSettings } from '../aiConfigRepository';
+import { downloadFile } from '../utils/settingsPage';
 
 const DEFAULT_AI_FORM: AiProviderSettingsPayload = {
   providerId: DEFAULT_ANALYSIS_PROVIDER_ID,
@@ -51,7 +26,9 @@ const DEFAULT_AI_FORM: AiProviderSettingsPayload = {
   keepExistingApiKey: true,
 };
 
-export function useAiSettingsManager(): AiSettingsManager {
+export function useAiSettingsManager(
+  actions: AiSettingsManagerActions,
+): AiSettingsManager {
   const { t } = useTranslation();
   const [settings, setSettings] = useState<AiProviderSettings | null>(null);
   const [form, setForm] = useState<AiProviderSettingsPayload>(DEFAULT_AI_FORM);
@@ -66,14 +43,16 @@ export function useAiSettingsManager(): AiSettingsManager {
   const [importPassword, setImportPassword] = useState('');
   const [pendingImportFile, setPendingImportFile] = useState<File | null>(null);
   const [feedback, setFeedback] = useState<SettingsFeedbackState | null>(null);
-  const [exportDialogFeedback, setExportDialogFeedback] = useState<SettingsFeedbackState | null>(null);
-  const [importDialogFeedback, setImportDialogFeedback] = useState<SettingsFeedbackState | null>(null);
+  const [exportDialogFeedback, setExportDialogFeedback] =
+    useState<SettingsFeedbackState | null>(null);
+  const [importDialogFeedback, setImportDialogFeedback] =
+    useState<SettingsFeedbackState | null>(null);
 
-  const clearFeedback = useCallback(() => {
+  const clearFeedback = useCallback((): void => {
     setFeedback(null);
   }, []);
 
-  const syncForm = useCallback((data: AiProviderSettings) => {
+  const syncForm = useCallback((data: AiProviderSettings): void => {
     setForm({
       providerId: data.providerId,
       apiBaseUrl: data.apiBaseUrl,
@@ -84,14 +63,14 @@ export function useAiSettingsManager(): AiSettingsManager {
     });
   }, []);
 
-  const loadSettings = useCallback(async () => {
+  const loadSettings = useCallback(async (): Promise<void> => {
     setIsLoading(true);
+
     try {
-      const data = await aiConfigApi.getAiProviderSettings();
+      const data = await getAiProviderSettings();
       setSettings(data);
       syncForm(data);
     } catch (error) {
-      console.error('Failed to load AI settings', error);
       setFeedback({
         type: 'error',
         message: translateAppError(error, t, 'settings.ai.loadFailed', {
@@ -105,7 +84,7 @@ export function useAiSettingsManager(): AiSettingsManager {
   }, [syncForm, t]);
 
   useEffect(() => {
-    void loadSettings();
+    loadSettings().catch(() => undefined);
   }, [loadSettings]);
 
   const buildPayload = useCallback((): AiProviderSettingsPayload => {
@@ -124,17 +103,17 @@ export function useAiSettingsManager(): AiSettingsManager {
   const updateField = useCallback(<K extends keyof AiProviderSettingsPayload>(
     key: K,
     value: AiProviderSettingsPayload[K],
-  ) => {
+  ): void => {
     setFeedback(null);
     setForm((previous) => ({ ...previous, [key]: value }));
   }, []);
 
-  const saveSettings = useCallback(async () => {
+  const saveSettings = useCallback(async (): Promise<void> => {
     setIsSaving(true);
     setFeedback(null);
 
     try {
-      const data = await aiConfigApi.updateAiProviderSettings(buildPayload());
+      const data = await actions.saveAiProviderSettings(buildPayload());
       setSettings(data);
       syncForm(data);
       setFeedback({
@@ -152,14 +131,14 @@ export function useAiSettingsManager(): AiSettingsManager {
     } finally {
       setIsSaving(false);
     }
-  }, [buildPayload, syncForm, t]);
+  }, [actions, buildPayload, syncForm, t]);
 
-  const testSettings = useCallback(async () => {
+  const testSettings = useCallback(async (): Promise<void> => {
     setIsTesting(true);
     setFeedback(null);
 
     try {
-      const result = await aiConfigApi.testAiProviderSettings(buildPayload());
+      const result = await actions.testAiProviderSettings(buildPayload());
       const preview = result.preview
         ? ` ${t('settings.ai.testPreviewPrefix', { preview: result.preview })}`
         : '';
@@ -179,26 +158,26 @@ export function useAiSettingsManager(): AiSettingsManager {
     } finally {
       setIsTesting(false);
     }
-  }, [buildPayload, t]);
+  }, [actions, buildPayload, t]);
 
-  const openExportModal = useCallback(() => {
+  const openExportModal = useCallback((): void => {
     setExportPassword('');
     setExportDialogFeedback(null);
     setIsExportModalOpen(true);
   }, []);
 
-  const closeExportModal = useCallback(() => {
+  const closeExportModal = useCallback((): void => {
     setIsExportModalOpen(false);
     setExportPassword('');
     setExportDialogFeedback(null);
   }, []);
 
-  const setExportPasswordValue = useCallback((password: string) => {
+  const setExportPasswordValue = useCallback((password: string): void => {
     setExportPassword(password);
     setExportDialogFeedback(null);
   }, []);
 
-  const exportConfig = useCallback(async () => {
+  const exportConfig = useCallback(async (): Promise<void> => {
     if (exportPassword.length < 4) {
       setExportDialogFeedback({
         type: 'error',
@@ -210,7 +189,7 @@ export function useAiSettingsManager(): AiSettingsManager {
     setIsExporting(true);
 
     try {
-      const content = await aiConfigApi.exportAiConfig(exportPassword);
+      const content = await actions.exportAiProviderSettings(exportPassword);
       downloadFile(content, 'plotmapai-ai-config.enc', 'application/octet-stream');
       closeExportModal();
       setFeedback({
@@ -220,7 +199,7 @@ export function useAiSettingsManager(): AiSettingsManager {
     } catch (error) {
       setExportDialogFeedback({
         type: 'error',
-        message: translateAppError(error, t, 'settings.ai.errorExport', {
+        message: translateAppError(error, t, 'settings.ai.exportFailed', {
           source: 'settings',
           kind: 'execution',
         }),
@@ -228,29 +207,31 @@ export function useAiSettingsManager(): AiSettingsManager {
     } finally {
       setIsExporting(false);
     }
-  }, [closeExportModal, exportPassword, t]);
+  }, [actions, closeExportModal, exportPassword, t]);
 
-  const queueImportFile = useCallback((file: File) => {
+  const queueImportFile = useCallback((file: File): void => {
     setPendingImportFile(file);
     setImportPassword('');
     setImportDialogFeedback(null);
     setIsImportModalOpen(true);
   }, []);
 
-  const closeImportModal = useCallback(() => {
-    setIsImportModalOpen(false);
+  const closeImportModal = useCallback((): void => {
+    setPendingImportFile(null);
     setImportPassword('');
     setImportDialogFeedback(null);
-    setPendingImportFile(null);
+    setIsImportModalOpen(false);
   }, []);
 
-  const setImportPasswordValue = useCallback((password: string) => {
+  const setImportPasswordValue = useCallback((password: string): void => {
     setImportPassword(password);
     setImportDialogFeedback(null);
   }, []);
 
-  const confirmImport = useCallback(async () => {
-    if (!pendingImportFile) return;
+  const confirmImport = useCallback(async (): Promise<void> => {
+    if (!pendingImportFile) {
+      return;
+    }
 
     if (importPassword.length < 4) {
       setImportDialogFeedback({
@@ -263,17 +244,19 @@ export function useAiSettingsManager(): AiSettingsManager {
     setIsImporting(true);
 
     try {
-      await aiConfigApi.importAiConfig(pendingImportFile, importPassword);
+      await actions.importAiProviderSettings(pendingImportFile, importPassword);
+      const data = await getAiProviderSettings();
+      setSettings(data);
+      syncForm(data);
       closeImportModal();
       setFeedback({
         type: 'success',
         message: t('settings.ai.importSuccess'),
       });
-      await loadSettings();
     } catch (error) {
       setImportDialogFeedback({
         type: 'error',
-        message: translateAppError(error, t, 'settings.ai.errorImport', {
+        message: translateAppError(error, t, 'settings.ai.importFailed', {
           source: 'settings',
           kind: 'execution',
         }),
@@ -281,7 +264,7 @@ export function useAiSettingsManager(): AiSettingsManager {
     } finally {
       setIsImporting(false);
     }
-  }, [closeImportModal, importPassword, loadSettings, pendingImportFile, t]);
+  }, [actions, closeImportModal, importPassword, pendingImportFile, syncForm, t]);
 
   return {
     settings,

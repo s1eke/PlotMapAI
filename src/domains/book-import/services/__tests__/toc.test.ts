@@ -3,7 +3,10 @@ import JSZip from 'jszip';
 import { loadOpfPackage } from '../epub/opf';
 import { buildTocMap } from '../epub/toc';
 
-async function createOpfPackage(opfXml: string, extraFiles: Record<string, string>): Promise<Awaited<ReturnType<typeof loadOpfPackage>>> {
+async function createOpfPackage(
+  opfXml: string,
+  extraFiles: Record<string, string>,
+): Promise<Awaited<ReturnType<typeof loadOpfPackage>>> {
   const zip = new JSZip();
   zip.file('META-INF/container.xml', `<?xml version="1.0"?>
 <container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">

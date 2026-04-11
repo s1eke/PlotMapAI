@@ -1,24 +1,22 @@
-export { analysisApi } from './api/analysisApi';
+export { analysisService } from './analysisService';
+export { default as ChapterAnalysisPanel } from './components/ChapterAnalysisPanel';
+export { useChapterAnalysis } from './hooks/useChapterAnalysis';
+export { DEFAULT_ANALYSIS_PROVIDER_ID } from './providers';
+export type { AnalysisProviderId } from './providers';
+export type { AnalysisExecutionContext } from './analysisService';
 export type {
-  AnalysisCharacter,
   AnalysisChunkStatus,
   AnalysisJobStatus,
   AnalysisOverview,
-  AnalysisRelationship,
   AnalysisStatusResponse,
   ChapterAnalysisResult,
   CharacterGraphEdge,
   CharacterGraphNode,
   CharacterGraphResponse,
-} from './api/analysisApi';
-export { default as ChapterAnalysisPanel } from './components/ChapterAnalysisPanel';
-export { useChapterAnalysis } from './hooks/useChapterAnalysis';
-export { DEFAULT_ANALYSIS_PROVIDER_ID } from './providers';
-export type { AnalysisProviderId } from './providers';
+} from '@shared/contracts';
 export {
   buildAnalysisChunks,
   buildRuntimeAnalysisConfig,
   maskApiKey,
   testAiProviderConnection,
 } from './services';
-export { initializeAnalysisRuntime } from './runtime/orchestrator';

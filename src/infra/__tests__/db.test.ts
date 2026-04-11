@@ -19,10 +19,13 @@ describe('db', () => {
       'appSettings',
       'chapterAnalyses',
       'chapterImages',
+      'chapterRichContents',
       'chapters',
       'coverImages',
+      'novelImageGalleryEntries',
       'novels',
       'purificationRules',
+      'readerRenderCache',
       'readingProgress',
       'tocRules',
     ]);
@@ -30,7 +33,6 @@ describe('db', () => {
 
   it('can add and retrieve a novel', async () => {
     const id = await db.novels.add({
-      id: undefined as unknown as number,
       title: 'Test Novel',
       author: 'Author',
       description: 'Desc',
@@ -41,6 +43,7 @@ describe('db', () => {
       originalFilename: 'test.txt',
       originalEncoding: 'utf-8',
       totalWords: 1000,
+      chapterCount: 0,
       createdAt: new Date().toISOString(),
     });
     const novel = await db.novels.get(id);
@@ -50,7 +53,6 @@ describe('db', () => {
 
   it('can add and retrieve chapters', async () => {
     const novelId = await db.novels.add({
-      id: undefined as unknown as number,
       title: 'Novel',
       author: '',
       description: '',
@@ -61,10 +63,10 @@ describe('db', () => {
       originalFilename: 'n.txt',
       originalEncoding: 'utf-8',
       totalWords: 100,
+      chapterCount: 0,
       createdAt: new Date().toISOString(),
     });
     await db.chapters.add({
-      id: undefined as unknown as number,
       novelId: novelId as number,
       title: 'Chapter 1',
       content: 'Content',
@@ -76,9 +78,46 @@ describe('db', () => {
     expect(chapters[0].title).toBe('Chapter 1');
   });
 
+  it('can add and retrieve chapter rich contents', async () => {
+    await db.chapterRichContents.add({
+      novelId: 1,
+      chapterIndex: 0,
+      contentRich: [
+        {
+          type: 'paragraph',
+          children: [{
+            type: 'text',
+            text: 'Rich content',
+          }],
+        },
+      ],
+      contentPlain: 'Rich content',
+      contentFormat: 'rich',
+      contentVersion: 1,
+      importFormatVersion: 1,
+      updatedAt: new Date().toISOString(),
+    });
+
+    const richContent = await db.chapterRichContents
+      .where('[novelId+chapterIndex]')
+      .equals([1, 0])
+      .first();
+
+    expect(richContent).toBeDefined();
+    expect(richContent?.contentFormat).toBe('rich');
+    expect(richContent?.contentRich).toEqual([
+      {
+        type: 'paragraph',
+        children: [{
+          type: 'text',
+          text: 'Rich content',
+        }],
+      },
+    ]);
+  });
+
   it('can add and retrieve purification rules', async () => {
     await db.purificationRules.add({
-      id: undefined as unknown as number,
       externalId: null,
       name: 'Test Rule',
       group: 'default',
@@ -87,8 +126,9 @@ describe('db', () => {
       isRegex: false,
       isEnabled: true,
       order: 10,
-      scopeTitle: true,
-      scopeContent: true,
+      targetScope: 'all',
+      executionStage: 'post-ast',
+      ruleVersion: 2,
       bookScope: '',
       excludeBookScope: '',
       exclusiveGroup: '',
@@ -101,23 +141,37 @@ describe('db', () => {
     expect(rules[0].pattern).toBe('foo');
   });
 
+  it('can add and retrieve novel image gallery entries', async () => {
+    await db.novelImageGalleryEntries.add({
+      novelId: 1,
+      chapterIndex: 0,
+      blockIndex: 2,
+      imageKey: 'cover',
+      order: 0,
+    });
+
+    const entries = await db.novelImageGalleryEntries.where('novelId').equals(1).toArray();
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0].imageKey).toBe('cover');
+  });
+
   it('can add and retrieve reading progress', async () => {
     await db.readingProgress.add({
-      id: undefined as unknown as number,
       novelId: 1,
       chapterIndex: 5,
-      scrollPosition: 100,
-      viewMode: 'original',
+      mode: 'summary',
+      chapterProgress: 0.5,
       updatedAt: new Date().toISOString(),
     });
     const progress = await db.readingProgress.where('novelId').equals(1).first();
     expect(progress).toBeDefined();
     expect(progress!.chapterIndex).toBe(5);
+    expect(progress!.mode).toBe('summary');
   });
 
   it('can add analysis jobs', async () => {
     await db.analysisJobs.add({
-      id: undefined as unknown as number,
       novelId: 1,
       status: 'idle',
       totalChapters: 10,

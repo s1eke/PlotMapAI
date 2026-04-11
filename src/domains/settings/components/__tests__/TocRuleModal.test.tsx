@@ -19,11 +19,11 @@ describe('TocRuleModal', () => {
     const user = userEvent.setup();
     render(
       <TocRuleModal
-        isOpen={true}
+        isOpen
         onClose={onClose}
         onSave={onSave}
         rule={{ id: 1, name: 'Old Rule', rule: '^old', example: 'old', priority: 5, isEnabled: true, isDefault: false }}
-      />
+      />,
     );
 
     const nameInput = screen.getByPlaceholderText('settings.toc.namePlaceholder');
@@ -55,7 +55,7 @@ describe('TocRuleModal', () => {
     const onClose = vi.fn();
     const onSave = vi.fn().mockRejectedValue(new Error('save failed'));
     const user = userEvent.setup();
-    render(<TocRuleModal isOpen={true} onClose={onClose} onSave={onSave} rule={null} />);
+    render(<TocRuleModal isOpen onClose={onClose} onSave={onSave} rule={null} />);
 
     await user.type(screen.getByPlaceholderText('settings.toc.namePlaceholder'), 'Rule');
     await user.type(screen.getByPlaceholderText('settings.toc.regexPlaceholder'), '^chapter');
@@ -68,17 +68,24 @@ describe('TocRuleModal', () => {
   it('resets the form to defaults when reopening for a new rule', () => {
     const { rerender } = render(
       <TocRuleModal
-        isOpen={true}
+        isOpen
         onClose={() => {}}
         onSave={() => Promise.resolve()}
         rule={{ id: 1, name: 'Existing', rule: '^existing', example: 'Existing', priority: 3, isEnabled: false, isDefault: false }}
-      />
+      />,
     );
 
     expect(screen.getByPlaceholderText('settings.toc.namePlaceholder')).toHaveValue('Existing');
     expect(screen.getByPlaceholderText('settings.toc.examplePlaceholder')).toHaveValue('Existing');
 
-    rerender(<TocRuleModal isOpen={true} onClose={() => {}} onSave={() => Promise.resolve()} rule={null} />);
+    rerender(
+      <TocRuleModal
+        isOpen
+        onClose={() => {}}
+        onSave={() => Promise.resolve()}
+        rule={null}
+      />,
+    );
 
     expect(screen.getByPlaceholderText('settings.toc.namePlaceholder')).toHaveValue('');
     expect(screen.getByRole('spinbutton')).toHaveValue(10);

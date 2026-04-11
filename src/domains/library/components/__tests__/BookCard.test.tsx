@@ -1,18 +1,17 @@
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
+
 import BookCard from '../BookCard';
-import type { NovelView } from '../../api/libraryApi';
-import { libraryApi } from '../../api/libraryApi';
+import { useNovelCoverResource } from '../../hooks/useNovelCoverResource';
+import type { NovelView } from '../../novelRepository';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 
-vi.mock('../../api/libraryApi', () => ({
-  libraryApi: {
-    getCoverUrl: vi.fn(),
-  },
+vi.mock('../../hooks/useNovelCoverResource', () => ({
+  useNovelCoverResource: vi.fn(),
 }));
 
 vi.mock('../TxtCover', () => ({
@@ -37,19 +36,19 @@ const mockNovel: NovelView = {
 describe('BookCard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(libraryApi.getCoverUrl).mockResolvedValue('blob:cover');
+    vi.mocked(useNovelCoverResource).mockReturnValue('blob:cover');
   });
 
   it('loads and renders a cover image when the novel has a stored cover', async () => {
     const novel = { ...mockNovel, hasCover: true };
     render(
       <MemoryRouter>
-        <BookCard novel={novel} />
-      </MemoryRouter>
+        <BookCard detailHref="/novel/1" novel={novel} />
+      </MemoryRouter>,
     );
 
     expect(await screen.findByRole('img', { name: 'Test Novel' })).toHaveAttribute('src', 'blob:cover');
-    expect(libraryApi.getCoverUrl).toHaveBeenCalledWith(1);
+    expect(useNovelCoverResource).toHaveBeenCalledWith(1, true);
     expect(screen.queryByTestId('txt-cover')).not.toBeInTheDocument();
   });
 
@@ -57,20 +56,20 @@ describe('BookCard', () => {
     const novel = { ...mockNovel, author: '' };
     render(
       <MemoryRouter>
-        <BookCard novel={novel} />
-      </MemoryRouter>
+        <BookCard detailHref="/novel/1" novel={novel} />
+      </MemoryRouter>,
     );
 
     expect(screen.getByTestId('txt-cover')).toHaveTextContent('Test Novel');
-    expect(libraryApi.getCoverUrl).not.toHaveBeenCalled();
+    expect(useNovelCoverResource).toHaveBeenCalledWith(1, false);
     expect(screen.queryByText('Test Author')).not.toBeInTheDocument();
   });
 
   it('links to the novel detail page', () => {
     render(
       <MemoryRouter>
-        <BookCard novel={mockNovel} />
-      </MemoryRouter>
+        <BookCard detailHref="/novel/1" novel={mockNovel} />
+      </MemoryRouter>,
     );
 
     expect(screen.getByRole('link')).toHaveAttribute('href', '/novel/1');
@@ -79,8 +78,8 @@ describe('BookCard', () => {
   it('uses touch-friendly mobile classes while keeping the desktop hover overlay available', () => {
     render(
       <MemoryRouter>
-        <BookCard novel={mockNovel} />
-      </MemoryRouter>
+        <BookCard detailHref="/novel/1" novel={mockNovel} />
+      </MemoryRouter>,
     );
 
     const link = screen.getByRole('link');

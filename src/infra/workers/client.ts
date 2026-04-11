@@ -3,11 +3,12 @@ import type {
   WorkerTaskPayload,
   WorkerTaskProgress,
   WorkerTaskResult,
-  WorkerTaskSpecMap,
 } from './types';
+import type { AppErrorInit } from '@shared/errors';
 
 import {
   AppErrorCode,
+  createAppError,
   deserializeAppError,
   isSerializedAppError,
   toAppError,
@@ -18,27 +19,42 @@ export interface WorkerTaskOptions<Progress> {
   onProgress?: (progress: Progress) => void;
 }
 
+interface WorkerAddEventListener {
+  (type: 'message', listener: (event: MessageEvent) => void): void;
+  (type: 'error', listener: (event: ErrorEvent) => void): void;
+}
+
+export interface WorkerLike {
+  addEventListener: WorkerAddEventListener;
+  postMessage: (message: unknown) => void;
+  terminate: () => void;
+}
+
 export interface CreateWorkerTaskRunnerOptions<Payload, Result, Progress> {
-  createWorker: () => Worker;
+  createWorker: () => WorkerLike;
   task: string;
-  fallback: (payload: Payload, options: WorkerTaskOptions<Progress>) => Promise<Result> | Result;
+  fallback?: (payload: Payload, options: WorkerTaskOptions<Progress>) => Promise<Result> | Result;
+  unavailableError?: AppErrorInit;
 }
 
 interface CreateMappedWorkerTaskRunnerOptions<
-  TMap extends WorkerTaskSpecMap,
+  TMap extends object,
   TTask extends keyof TMap & string,
 > {
-  createWorker: () => Worker;
+  createWorker: () => WorkerLike;
   task: TTask;
-  fallback: (
+  fallback?: (
     payload: WorkerTaskPayload<TMap, TTask>,
     options: WorkerTaskOptions<WorkerTaskProgress<TMap, TTask>>,
   ) => Promise<WorkerTaskResult<TMap, TTask>> | WorkerTaskResult<TMap, TTask>;
+  unavailableError?: AppErrorInit;
 }
 
-interface PendingWorkerRequest<Result, Progress> {
+interface PendingWorkerRequest<Payload, Result, Progress> {
   cleanup: () => void;
   onProgress?: (progress: Progress) => void;
+  options: WorkerTaskOptions<Progress>;
+  payload: Payload;
   reject: (reason?: unknown) => void;
   resolve: (value: Result) => void;
 }
@@ -63,8 +79,39 @@ function createRequestId(): string {
   return `worker-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+function toWorkerExecutionError(error: unknown) {
+  return toAppError(error, {
+    code: AppErrorCode.WORKER_EXECUTION_FAILED,
+    kind: 'execution',
+    source: 'worker',
+    userMessageKey: 'errors.WORKER_EXECUTION_FAILED',
+  });
+}
+
+function createWorkerUnavailableError(
+  task: string,
+  unavailableError: AppErrorInit | undefined,
+  cause?: unknown,
+) {
+  if (unavailableError) {
+    return createAppError({
+      ...unavailableError,
+      cause,
+    });
+  }
+
+  return createAppError({
+    code: AppErrorCode.WORKER_UNAVAILABLE,
+    kind: 'unsupported',
+    source: 'worker',
+    userMessageKey: 'errors.WORKER_UNAVAILABLE',
+    debugMessage: `Worker task "${task}" is unavailable.`,
+    cause,
+  });
+}
+
 export function createWorkerTaskRunner<
-  TMap extends WorkerTaskSpecMap,
+  TMap extends object,
   TTask extends keyof TMap & string,
 >(
   options: CreateMappedWorkerTaskRunnerOptions<TMap, TTask>,
@@ -82,16 +129,26 @@ export function createWorkerTaskRunner<Payload, Result, Progress>({
   createWorker,
   task,
   fallback,
+  unavailableError,
 }: CreateWorkerTaskRunnerOptions<Payload, Result, Progress>) {
-  const pending = new Map<string, PendingWorkerRequest<Result, Progress>>();
-  let worker: Worker | null = null;
+  if (!fallback && !unavailableError) {
+    throw new Error(
+      `Worker task "${task}" must configure either a fallback or an unavailableError.`,
+    );
+  }
+
+  const pending = new Map<string, PendingWorkerRequest<Payload, Result, Progress>>();
+  let worker: WorkerLike | null = null;
   let workerDisabled = false;
+  let workerInitialized = false;
+  let workerUnavailableCause: unknown = null;
 
   const tearDownWorker = () => {
     if (worker) {
       worker.terminate();
       worker = null;
     }
+    workerInitialized = false;
   };
 
   const rejectAllPending = (reason: unknown) => {
@@ -103,8 +160,38 @@ export function createWorkerTaskRunner<Payload, Result, Progress>({
     tearDownWorker();
   };
 
-  const ensureWorker = (): Worker | null => {
+  const settleUnavailableRequest = (
+    request: PendingWorkerRequest<Payload, Result, Progress>,
+    cause?: unknown,
+  ) => {
+    request.cleanup();
+    if (!fallback) {
+      request.reject(createWorkerUnavailableError(task, unavailableError, cause));
+      return;
+    }
+
+    Promise.resolve()
+      .then(() => fallback(request.payload, request.options))
+      .then(request.resolve)
+      .catch((fallbackError) => {
+        request.reject(toWorkerExecutionError(fallbackError));
+      });
+  };
+
+  const settleAllPendingAsUnavailable = (cause?: unknown) => {
+    const requests = [...pending.values()];
+    pending.clear();
+    tearDownWorker();
+    requests.forEach((request) => {
+      settleUnavailableRequest(request, cause);
+    });
+  };
+
+  const ensureWorker = (): WorkerLike | null => {
     if (workerDisabled || typeof Worker === 'undefined') {
+      if (typeof Worker === 'undefined' && workerUnavailableCause === null) {
+        workerUnavailableCause = new Error('Worker API is unavailable.');
+      }
       return null;
     }
 
@@ -114,8 +201,10 @@ export function createWorkerTaskRunner<Payload, Result, Progress>({
 
     try {
       worker = createWorker();
-    } catch {
+      workerUnavailableCause = null;
+    } catch (error) {
       workerDisabled = true;
+      workerUnavailableCause = error;
       tearDownWorker();
       return null;
     }
@@ -126,6 +215,7 @@ export function createWorkerTaskRunner<Payload, Result, Progress>({
       if (!current) {
         return;
       }
+      workerInitialized = true;
 
       if (message.kind === 'progress') {
         current.onProgress?.(message.progress);
@@ -148,31 +238,31 @@ export function createWorkerTaskRunner<Payload, Result, Progress>({
       current.reject(
         isSerializedAppError(message.error)
           ? deserializeAppError(message.error)
-          : toAppError(message.error, {
-            code: AppErrorCode.WORKER_EXECUTION_FAILED,
-            kind: 'execution',
-            source: 'worker',
-            userMessageKey: 'errors.WORKER_EXECUTION_FAILED',
-          }),
+          : toWorkerExecutionError(message.error),
       );
     });
 
     worker.addEventListener('error', (event) => {
+      const error = event.error instanceof Error
+        ? event.error
+        : new Error(event.message || 'Worker execution failed.');
+
       if (pending.size === 0) {
-        workerDisabled = true;
+        workerDisabled = !workerInitialized;
+        workerUnavailableCause = workerInitialized ? null : error;
         tearDownWorker();
         return;
       }
 
-      const error = event.error instanceof Error
-        ? event.error
-        : new Error(event.message || 'Worker execution failed.');
-      rejectAllPending(toAppError(error, {
-        code: AppErrorCode.WORKER_EXECUTION_FAILED,
-        kind: 'execution',
-        source: 'worker',
-        userMessageKey: 'errors.WORKER_EXECUTION_FAILED',
-      }));
+      if (!workerInitialized) {
+        workerDisabled = true;
+        workerUnavailableCause = error;
+        settleAllPendingAsUnavailable(error);
+        return;
+      }
+
+      workerUnavailableCause = null;
+      rejectAllPending(toWorkerExecutionError(error));
     });
 
     return worker;
@@ -185,9 +275,14 @@ export function createWorkerTaskRunner<Payload, Result, Progress>({
 
     const currentWorker = ensureWorker();
     if (!currentWorker) {
-      return fallback(payload, options);
+      if (fallback) {
+        return fallback(payload, options);
+      }
+
+      throw createWorkerUnavailableError(task, unavailableError, workerUnavailableCause);
     }
 
+    workerUnavailableCause = null;
     const requestId = createRequestId();
 
     return new Promise<Result>((resolve, reject) => {
@@ -211,6 +306,8 @@ export function createWorkerTaskRunner<Payload, Result, Progress>({
       pending.set(requestId, {
         cleanup,
         onProgress: options.onProgress,
+        options,
+        payload,
         reject,
         resolve,
       });
@@ -225,21 +322,25 @@ export function createWorkerTaskRunner<Payload, Result, Progress>({
           task,
         } satisfies WorkerTaskMessage<Payload>);
       } catch (error) {
+        const currentRequest = pending.get(requestId);
         pending.delete(requestId);
-        cleanup();
         workerDisabled = !isAbortError(error);
+        workerUnavailableCause = error;
         tearDownWorker();
-        Promise.resolve()
-          .then(() => fallback(payload, options))
-          .then(resolve)
-          .catch((error) => {
-            reject(toAppError(error, {
-              code: AppErrorCode.WORKER_EXECUTION_FAILED,
-              kind: 'execution',
-              source: 'worker',
-              userMessageKey: 'errors.WORKER_EXECUTION_FAILED',
-            }));
-          });
+        if (currentRequest) {
+          if (isAbortError(error)) {
+            currentRequest.cleanup();
+            currentRequest.reject(createAbortError());
+            return;
+          }
+          settleUnavailableRequest(currentRequest, error);
+          return;
+        }
+        reject(
+          isAbortError(error)
+            ? createAbortError()
+            : createWorkerUnavailableError(task, unavailableError, error),
+        );
       }
     });
   };

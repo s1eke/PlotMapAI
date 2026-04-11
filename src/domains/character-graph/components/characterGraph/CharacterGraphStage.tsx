@@ -8,14 +8,13 @@ import {
   RefreshCw,
   RotateCcw,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import type { PointerEvent as ReactPointerEvent, PointerEventHandler, ReactNode, RefObject } from 'react';
-import { appPaths } from '@app/router/paths';
-import type { CharacterGraphEdge } from '@domains/analysis';
+import type { ReactNode, RefObject } from 'react';
 import { cn } from '@shared/utils/cn';
-import type { LayoutEdge, LayoutNode, ZoomState } from '../../utils/characterGraphLayout';
+import type { CharacterGraphCanvasController } from '../../hooks/useCharacterGraphCanvasController';
+import type { LayoutNode } from '../../utils/characterGraphLayout';
 import BottomSheet from '@shared/components/BottomSheet';
 import CharacterGraphCanvas from './CharacterGraphCanvas';
 import CharacterGraphInspector from './CharacterGraphInspector';
@@ -23,98 +22,73 @@ import CharacterGraphProfileContent from './CharacterGraphProfileContent';
 import StatusPill from './StatusPill';
 
 interface CharacterGraphStageProps {
+  canvas: CharacterGraphCanvasController;
   fullscreenRef: RefObject<HTMLDivElement | null>;
   actionMessage: string | null;
-  canPanCanvas: boolean;
+  backHref: string;
   canRefreshOverview: boolean;
-  focusNodeId: string | null;
   graphGeneratedAt: string | null | undefined;
-  highlightedNodeIds: ReadonlySet<string>;
   isComplete: boolean;
   isFullscreen: boolean;
-  isGestureInteracting: boolean;
-  isLayoutComputing: boolean;
   isMobile: boolean;
-  isPanning: boolean;
   isRefreshingOverview: boolean;
-  layoutEdges: LayoutEdge[];
-  layoutMessage: string | null;
-  layoutNodes: LayoutNode[];
-  layoutProgress: number;
-  novelId: number;
   novelTitle: string;
-  relatedEdges: CharacterGraphEdge[];
-  selectedNode: LayoutNode | null;
-  selectedNodeId: string | null;
-  stageHeight: number;
-  stageMeta: string[];
-  zoomState: ZoomState;
-  svgRef: RefObject<SVGSVGElement | null>;
-  onCanvasPointerDown: PointerEventHandler<SVGSVGElement>;
-  onClearSelection: () => void;
-  onNodeMouseEnter: (nodeId: string) => void;
-  onNodeMouseLeave: (nodeId: string) => void;
-  onNodePointerDown: (event: ReactPointerEvent<SVGGElement>, node: LayoutNode) => void;
   onRefreshOverview: () => void;
-  onResetLayout: () => void;
-  onSelectNode: (nodeId: string) => void;
   onToggleFullscreen: () => void;
 }
 
+type MobileSheetMode = 'details' | 'help' | null;
+
+function resolveMobileSheetMode(
+  isMobile: boolean,
+  selectedNode: LayoutNode | null,
+  mobileSheetPreference: 'help' | null,
+): MobileSheetMode {
+  if (!isMobile) {
+    return null;
+  }
+  if (selectedNode) {
+    return 'details';
+  }
+  return mobileSheetPreference;
+}
+
 export default function CharacterGraphStage({
+  canvas,
   fullscreenRef,
   actionMessage,
-  canPanCanvas,
+  backHref,
   canRefreshOverview,
-  focusNodeId,
   graphGeneratedAt,
-  highlightedNodeIds,
   isComplete,
   isFullscreen,
-  isGestureInteracting,
-  isLayoutComputing,
   isMobile,
-  isPanning,
   isRefreshingOverview,
-  layoutEdges,
-  layoutMessage,
-  layoutNodes,
-  layoutProgress,
-  novelId,
   novelTitle,
-  relatedEdges,
-  selectedNode,
-  selectedNodeId,
-  stageHeight,
-  stageMeta,
-  zoomState,
-  svgRef,
-  onCanvasPointerDown,
-  onClearSelection,
-  onNodeMouseEnter,
-  onNodeMouseLeave,
-  onNodePointerDown,
   onRefreshOverview,
-  onResetLayout,
-  onSelectNode,
   onToggleFullscreen,
 }: CharacterGraphStageProps) {
   const { t } = useTranslation();
+  const { actions, gesture, layout } = canvas;
   const stageHeightClass = isFullscreen ? 'h-[100dvh]' : 'h-[calc(100dvh-4rem)] md:h-[calc(100vh-4rem)]';
   const generatedAtText = graphGeneratedAt
     ? t('characterGraph.metaGeneratedAt', { time: new Date(graphGeneratedAt).toLocaleString() })
     : null;
   const [mobileSheetPreference, setMobileSheetPreference] = useState<'help' | null>(null);
-  const mobileSheetMode = !isMobile ? null : (selectedNode ? 'details' : mobileSheetPreference);
-  const detailNode = mobileSheetMode === 'details' ? selectedNode : null;
+  const mobileSheetMode = resolveMobileSheetMode(
+    isMobile,
+    layout.selectedNode,
+    mobileSheetPreference,
+  );
+  const detailNode = mobileSheetMode === 'details' ? layout.selectedNode : null;
 
-  function handleCloseMobileSheet(): void {
-    const shouldClearSelection = mobileSheetMode === 'details' && selectedNode;
+  const handleCloseMobileSheet = useCallback((): void => {
+    const shouldClearSelection = mobileSheetMode === 'details' && layout.selectedNode;
     setMobileSheetPreference(null);
     if (shouldClearSelection) {
-      onClearSelection();
+      actions.clearSelection();
     }
-  }
+  }, [actions, layout.selectedNode, mobileSheetMode]);
 
   return (
     <div className={cn(stageHeightClass, 'overflow-hidden bg-[#f5f2eb] text-[#18202a]')}>
@@ -129,7 +103,7 @@ export default function CharacterGraphStage({
               <div className="shrink-0 space-y-2">
                 <div className="flex items-center justify-between gap-2">
                   <Link
-                    to={appPaths.novel(novelId)}
+                    to={backHref}
                     aria-label={t('characterGraph.backToBook')}
                     className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#ddd7cc] bg-[#fffdfa]/96 text-[#5f6b79] shadow-[0_10px_24px_rgba(28,35,45,0.05)] backdrop-blur transition hover:border-[#cfc7b9] hover:text-[#18202a]"
                   >
@@ -146,7 +120,7 @@ export default function CharacterGraphStage({
                         {isRefreshingOverview ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
                       </StageIconButton>
                     )}
-                    <StageIconButton label={t('characterGraph.resetLayout')} onClick={onResetLayout}>
+                    <StageIconButton label={t('characterGraph.resetLayout')} onClick={actions.resetLayout}>
                       <RotateCcw className="h-4 w-4" />
                     </StageIconButton>
                     <StageIconButton
@@ -164,7 +138,7 @@ export default function CharacterGraphStage({
                   </p>
                   <p className="mt-1 truncate text-sm font-medium text-[#18202a]">{novelTitle}</p>
                   <div className="mt-2 flex flex-wrap gap-1.5">
-                    {stageMeta.map((item) => (
+                    {layout.stageMeta.map((item) => (
                       <span
                         key={item}
                         className="max-w-full rounded-full border border-[#e2ddd3] bg-[#f7f5f0] px-3 py-1.5 text-[11px] leading-4 text-[#5f6b79]"
@@ -176,13 +150,19 @@ export default function CharacterGraphStage({
                       isComplete
                         ? 'border-[#d6dde5] bg-[#eef1f4] text-[#34527a]'
                         : 'border-[#ffd6a5] bg-[#fff5e8] text-[#a06528]'
-                    }`}>
+                    }`}
+                    >
                       {isComplete ? t('characterGraph.metaComplete') : t('characterGraph.metaPartial')}
                     </span>
                   </div>
                 </div>
 
-                {(generatedAtText || actionMessage || !isComplete || (isLayoutComputing && layoutMessage)) && (
+                {(
+                  generatedAtText ||
+                  actionMessage ||
+                  !isComplete ||
+                  (layout.isComputing && layout.message)
+                ) && (
                   <div className="flex flex-wrap gap-2">
                     {generatedAtText && (
                       <div className="min-w-0 flex-1 rounded-[18px] border border-[#ddd7cc] bg-[#fffdfa]/94 px-4 py-2 text-xs text-[#5f6b79] shadow-[0_10px_24px_rgba(28,35,45,0.04)] backdrop-blur">
@@ -200,16 +180,16 @@ export default function CharacterGraphStage({
                         <span>{t('characterGraph.partialHint')}</span>
                       </div>
                     )}
-                    {isLayoutComputing && layoutMessage && (
+                    {layout.isComputing && layout.message && (
                       <div className="min-w-0 basis-full rounded-[18px] border border-[#d7deea] bg-[#f8fafc]/96 px-4 py-2.5 text-sm text-[#34527a] shadow-[0_10px_24px_rgba(28,35,45,0.05)] backdrop-blur">
                         <div className="flex items-center gap-2">
                           <Loader2 className="h-4 w-4 animate-spin" />
-                          <span>{layoutMessage}</span>
+                          <span>{layout.message}</span>
                         </div>
                         <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#dce4ec]">
                           <div
                             className="h-full rounded-full bg-[#34527a] transition-[width] duration-200"
-                            style={{ width: `${layoutProgress}%` }}
+                            style={{ width: `${layout.progress}%` }}
                           />
                         </div>
                       </div>
@@ -221,31 +201,17 @@ export default function CharacterGraphStage({
 
               <div className="relative mt-2 min-h-0 flex-1 overflow-hidden rounded-[28px] border border-[#ddd7cc]/80 bg-[#fffdfa]/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)]">
                 <CharacterGraphCanvas
-                  svgRef={svgRef}
-                  canPanCanvas={canPanCanvas}
-                  focusNodeId={focusNodeId}
-                  highlightedNodeIds={highlightedNodeIds}
-                  isGestureInteracting={isGestureInteracting}
+                  canvas={canvas}
                   isMobile={isMobile}
-                  isPanning={isPanning}
-                  layoutEdges={layoutEdges}
-                  layoutNodes={layoutNodes}
-                  selectedNodeId={selectedNodeId}
-                  stageHeight={stageHeight}
-                  zoomState={zoomState}
-                  onCanvasPointerDown={onCanvasPointerDown}
-                  onNodeMouseEnter={onNodeMouseEnter}
-                  onNodeMouseLeave={onNodeMouseLeave}
-                  onNodePointerDown={onNodePointerDown}
                 />
 
-                {!selectedNode && mobileSheetMode !== 'help' && (
+                {!layout.selectedNode && mobileSheetMode !== 'help' && (
                   <button
                     type="button"
                     onClick={() => setMobileSheetPreference('help')}
                     className="absolute bottom-4 right-4 z-20 inline-flex items-center gap-2 rounded-full border border-[#ddd7cc] bg-[#fffdfa]/96 px-4 py-3 text-sm font-medium text-[#34527a] shadow-[0_18px_42px_rgba(28,35,45,0.1)] backdrop-blur transition-transform duration-150"
                     style={{
-                      transform: isGestureInteracting ? 'translateY(2px) scale(0.985)' : undefined,
+                      transform: gesture.isInteracting ? 'translateY(2px) scale(0.985)' : undefined,
                     }}
                   >
                     <CircleHelp className="h-4 w-4" />
@@ -272,13 +238,13 @@ export default function CharacterGraphStage({
               {detailNode ? (
                 <CharacterGraphProfileContent
                   selectedNode={detailNode}
-                  relatedEdges={relatedEdges}
-                  onSelectNode={onSelectNode}
+                  relatedEdges={layout.relatedEdges}
+                  onSelectNode={actions.selectNode}
                 />
               ) : (
                 <div className="space-y-4">
                   <div className="flex flex-wrap gap-2">
-                    {stageMeta.map((item) => (
+                    {layout.stageMeta.map((item) => (
                       <span
                         key={item}
                         className="rounded-full border border-[#ddd7cc] bg-[#f8f7f3] px-3 py-2 text-xs text-[#5f6b79]"
@@ -290,7 +256,8 @@ export default function CharacterGraphStage({
                       isComplete
                         ? 'border-[#d6dde5] bg-[#eef1f4] text-[#34527a]'
                         : 'border-[#ffd6a5] bg-[#fff5e8] text-[#a06528]'
-                    }`}>
+                    }`}
+                    >
                       {isComplete ? t('characterGraph.metaComplete') : t('characterGraph.metaPartial')}
                     </span>
                   </div>
@@ -325,7 +292,7 @@ export default function CharacterGraphStage({
           <>
             <div className="absolute left-4 top-4 z-20 flex max-w-[min(62rem,calc(100%-2rem))] flex-wrap items-center gap-3 md:left-6 md:top-6">
               <Link
-                to={appPaths.novel(novelId)}
+                to={backHref}
                 className="inline-flex items-center gap-2 rounded-full border border-[#ddd7cc] bg-[#fffdfa]/94 px-4 py-2 text-xs text-[#5f6b79] backdrop-blur transition hover:border-[#cfc7b9] hover:text-[#18202a]"
               >
                 <ArrowLeft className="h-4 w-4" />
@@ -341,12 +308,12 @@ export default function CharacterGraphStage({
             </div>
 
             <div className="absolute right-4 top-4 z-20 flex max-w-[min(36rem,calc(100%-2rem))] flex-wrap justify-end gap-2 md:right-6 md:top-6">
-              {stageMeta.map((item) => (
+              {layout.stageMeta.map((item) => (
                 <StatusPill key={item} text={item} />
               ))}
               <StatusPill text={isComplete ? t('characterGraph.metaComplete') : t('characterGraph.metaPartial')} accent />
               {generatedAtText && <StatusPill text={generatedAtText} />}
-              {isLayoutComputing && layoutMessage && <StatusPill text={layoutMessage} />}
+              {layout.isComputing && layout.message && <StatusPill text={layout.message} />}
               {canRefreshOverview && (
                 <button
                   type="button"
@@ -360,7 +327,7 @@ export default function CharacterGraphStage({
               )}
               <button
                 type="button"
-                onClick={onResetLayout}
+                onClick={actions.resetLayout}
                 className="inline-flex items-center gap-2 rounded-full border border-[#ddd7cc] bg-[#fffdfa]/94 px-4 py-2 text-xs text-[#5f6b79] backdrop-blur transition hover:border-[#cfc7b9] hover:text-[#18202a]"
               >
                 <RotateCcw className="h-4 w-4" />
@@ -387,16 +354,16 @@ export default function CharacterGraphStage({
                   {actionMessage}
                 </div>
               )}
-              {isLayoutComputing && layoutMessage && (
+              {layout.isComputing && layout.message && (
                 <div className="mt-3 rounded-2xl border border-[#d7deea] bg-[#f8fafc] px-3 py-3 text-[#34527a]">
                   <div className="flex items-center gap-2">
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>{layoutMessage}</span>
+                    <span>{layout.message}</span>
                   </div>
                   <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#dce4ec]">
                     <div
                       className="h-full rounded-full bg-[#34527a] transition-[width] duration-200"
-                      style={{ width: `${layoutProgress}%` }}
+                      style={{ width: `${layout.progress}%` }}
                     />
                   </div>
                 </div>
@@ -409,12 +376,12 @@ export default function CharacterGraphStage({
               )}
             </div>
 
-            {selectedNode && (
+            {layout.selectedNode && (
               <CharacterGraphInspector
-                selectedNode={selectedNode}
-                relatedEdges={relatedEdges}
-                onClose={onClearSelection}
-                onSelectNode={onSelectNode}
+                selectedNode={layout.selectedNode}
+                relatedEdges={layout.relatedEdges}
+                onClose={actions.clearSelection}
+                onSelectNode={actions.selectNode}
               />
             )}
           </>
@@ -422,22 +389,8 @@ export default function CharacterGraphStage({
 
         {!isMobile && (
           <CharacterGraphCanvas
-            svgRef={svgRef}
-            canPanCanvas={canPanCanvas}
-            focusNodeId={focusNodeId}
-            highlightedNodeIds={highlightedNodeIds}
-            isGestureInteracting={isGestureInteracting}
+            canvas={canvas}
             isMobile={isMobile}
-            isPanning={isPanning}
-            layoutEdges={layoutEdges}
-            layoutNodes={layoutNodes}
-            selectedNodeId={selectedNodeId}
-            stageHeight={stageHeight}
-            zoomState={zoomState}
-            onCanvasPointerDown={onCanvasPointerDown}
-            onNodeMouseEnter={onNodeMouseEnter}
-            onNodeMouseLeave={onNodeMouseLeave}
-            onNodePointerDown={onNodePointerDown}
           />
         )}
       </div>

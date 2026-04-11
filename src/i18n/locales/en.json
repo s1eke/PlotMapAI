@@ -112,7 +112,13 @@
     "pausingAnalysis": "Pausing...",
     "resumeAnalysis": "Resume Analysis",
     "restartAnalysis": "Restart Analysis",
-    "characterGraphEntry": "Character Graph"
+    "characterGraphEntry": "Character Graph",
+    "contentFormat": "Content Format",
+    "contentFormatPlain": "Plain",
+    "contentFormatRich": "Rich",
+    "contentVersion": "Content Version",
+    "importFormatVersion": "Import Format Version",
+    "lastParsedAt": "Last Parsed"
   },
   "characterGraph": {
     "title": "Character Graph",
@@ -243,13 +249,88 @@
     "processingContents": "Preparing contents {{percent}}%",
     "processingChapter": "Processing chapter {{percent}}%",
     "restoringPosition": "Restoring reading position",
+    "imageViewer": {
+      "title": "Image Viewer",
+      "loadingMore": "Loading more images"
+    },
+    "reparse": {
+      "required": "This book is missing enhanced layout data. Reparse the original source file to continue.",
+      "description": "Select the original source file. PlotMapAI will overwrite the parsed content, images, analysis artifacts, and reading progress for this book.",
+      "action": "Reparse Source File",
+      "succeeded": "The book has been reparsed. Reopening the reader now.",
+      "failed": "Failed to reparse the source file.",
+      "fileTypeMismatch": "Please select the same file type as the current book."
+    },
     "loadError": "Failed to load reader content.",
     "exit": "Exit Reader",
     "goBack": "Go Back"
   },
+  "debug": {
+    "panelTitle": "Debug Panel",
+    "titleWithCount": "Debug ({{count}})",
+    "clearLogs": "Clear logs",
+    "filters": {
+      "all": "All",
+      "errors": "Errors",
+      "logs": "Logs"
+    },
+    "features": {
+      "readerTelemetry": {
+        "label": "Reader Telemetry",
+        "description": "Verbose reader layout snapshots and preheat source logs"
+      }
+    },
+    "actions": {
+      "goBack": "Go Back",
+      "installPrompt": "Install Prompt",
+      "iosHint": "iOS Hint",
+      "updateToast": "Update Toast",
+      "resetPwa": "Reset PWA",
+      "retryReaderRestore": "Retry Reader Restore"
+    },
+    "diagnostics": {
+      "title": "Diagnostics",
+      "empty": "No diagnostics yet",
+      "labels": {
+        "bookImport": "Import Diagnostics",
+        "readerLayout": "Reader Diagnostics",
+        "readerRestore": "Restore Diagnostics",
+        "readerLifecycle": "Lifecycle Diagnostics",
+        "storage": "Storage Diagnostics"
+      },
+      "preview": {
+        "storageUsage": "Usage {{usage}} / {{quota}}",
+        "storageCounts": "Render cache {{renderCacheCount}} · rich {{richCount}} · images {{imageCount}}",
+        "storageNovelCache": "Current novel cache {{count}}",
+        "readerFormat": "Format {{format}}",
+        "readerLayout": "Layout {{layout}}",
+        "readerPendingPreheat": "Pending preheat {{count}}",
+        "restoreStatus": "Status {{status}}",
+        "restoreReason": "Reason {{reason}}",
+        "restoreError": "Error {{metric}} Δ{{delta}} (tol {{tolerance}})",
+        "restoreAttempts": "Attempts {{attempts}} · retryable {{retryable}}",
+        "lifecycleState": "State {{state}}",
+        "lifecycleEvent": "Event {{event}}",
+        "lifecyclePersistence": "Persistence {{status}} · load {{loadKey}}",
+        "importOperation": "Operation {{operation}}",
+        "importFile": "File {{file}}",
+        "importStage": "Stage {{stage}}"
+      }
+    },
+    "logsEmpty": "No logs yet",
+    "errorDetails": {
+      "retryable": "retryable={{value}}",
+      "source": "source: {{value}}",
+      "userVisible": "userVisible: {{value}}",
+      "debugVisible": "debugVisible: {{value}}",
+      "messageKey": "messageKey: {{value}}",
+      "cause": "cause: {{value}}"
+    }
+  },
   "settings": {
     "title": "Settings",
     "subtitle": "Manage chapter parsing, text purification, and AI analysis settings from one place.",
+    "versionLabel": "Version {{version}}",
     "tocRules": "Book Parsing Rules",
     "purificationRules": "Purification Rules",
     "language": "Language",
@@ -293,8 +374,27 @@
       "useRegex": "Use Regex",
       "isEnabled": "Enabled",
       "scope": "Scope",
+      "scopeText": "Body Text",
+      "scopeHeading": "Heading Text",
+      "scopeCaption": "Caption Text",
+      "scopeAll": "All Text Nodes",
+      "scopeLabel": {
+        "text": "Body Text",
+        "heading": "Heading Text",
+        "caption": "Caption Text",
+        "all": "All Text Nodes"
+      },
       "scopeTitle": "Title",
       "scopeContent": "Content",
+      "executionStage": "Execution Stage",
+      "stagePreAst": "Import-time pre-ast",
+      "stagePostAst": "Reader-time post-ast",
+      "stagePlainTextOnly": "Plain-text projection",
+      "stageLabel": {
+        "pre-ast": "pre-ast",
+        "post-ast": "post-ast",
+        "plain-text-only": "plain-text-only"
+      },
       "bookScope": "Book Whitelist",
       "excludeBookScope": "Book Blacklist",
       "order": "Execution Order",
@@ -409,6 +509,19 @@
     "updating": "Refreshing...",
     "later": "Later"
   },
+  "startup": {
+    "recovery": {
+      "title": "Local data needs attention",
+      "description": "PlotMapAI found an older local database that this version cannot migrate safely. You can keep the current data untouched, or explicitly delete and rebuild the local database to continue starting the app.",
+      "debugHint": "Detected database {{dbName}} targeting schema v{{version}}. A diagnostic entry was recorded in the debug log when debug mode is enabled.",
+      "retry": "Check Again",
+      "reset": "Delete And Rebuild",
+      "confirmTitle": "Delete incompatible local database?",
+      "confirmDescription": "This will permanently remove the incompatible IndexedDB data on this device and rebuild the current schema. This action cannot be undone.",
+      "cancel": "Not Now",
+      "confirmReset": "Delete And Rebuild"
+    }
+  },
   "errors": {
     "boundaryTitle": "Something went wrong",
     "INTERNAL_ERROR_GENERIC": "An unexpected error occurred. Please retry or return to the bookshelf.",
@@ -417,6 +530,7 @@
     "JOB_NOT_FOUND": "No analysis job found for this novel.",
     "JOB_CREATE_FAILED": "Failed to create analysis job.",
     "CHAPTER_NOT_FOUND": "Chapter not found.",
+    "CHAPTER_STRUCTURED_CONTENT_MISSING": "This book is missing enhanced layout data. Reparse the original source file to continue.",
     "CHAPTER_MISSING": "Chapter not found, unable to continue analysis.",
     "INTERNAL_ERROR": "Internal error: {{message}}",
     "CHUNK_COMPLETED": "Chunk analysis completed.",
@@ -457,6 +571,7 @@
     "STORAGE_SECURE_UNAVAILABLE": "Secure storage is currently unavailable.",
     "STORAGE_ENCRYPTED_PAYLOAD_INVALID": "The encrypted settings payload is invalid.",
     "STORAGE_OPERATION_FAILED": "A local storage operation failed. Please try again later.",
+    "DATABASE_RECOVERY_REQUIRED": "An incompatible local database version was detected. Review the recovery options before continuing.",
     "RULE_NOT_FOUND": "The requested rule was not found.",
     "CANNOT_DELETE_DEFAULT_RULE": "Default rules cannot be deleted.",
     "INVALID_YAML_FILE": "The YAML file is invalid.",
@@ -471,6 +586,7 @@
     "AI_CONFIG_JSON_INVALID": "The decrypted AI config is not valid JSON.",
     "AI_CONFIG_MISSING_FIELDS": "The imported AI config is missing required fields.",
     "BOOK_IMPORT_FAILED": "Failed to import the book. Please try again later.",
+    "WORKER_UNAVAILABLE": "Background tasks are unavailable in this browser environment.",
     "WORKER_EXECUTION_FAILED": "A background task failed. Please try again later.",
     "TEXT_PROCESSING_RULES_INVALID": "Text processing rules are invalid."
   }

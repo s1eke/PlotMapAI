@@ -12,7 +12,7 @@ export function normalizeChunkResult(
     throw new AnalysisExecutionError('AI 返回缺少 chapterAnalyses 数组。');
   }
 
-  const expectedIndices = new Set(chunk.chapters.map(chapter => chapter.chapterIndex));
+  const expectedIndices = new Set(chunk.chapters.map((chapter) => chapter.chapterIndex));
   const rawMap = new Map<number, Record<string, unknown>>();
   for (const item of rawItems) {
     if (typeof item !== 'object' || item === null) {
@@ -59,7 +59,10 @@ export function normalizeSingleChapterResult(
     throw new AnalysisExecutionError('AI 返回的 chapterAnalyses 项不是对象。');
   }
   const itemRecord = item as Record<string, unknown>;
-  const normalizedChapterIndex = normalizeSingleChapterIndex(itemRecord.chapterIndex, chapter.chapterIndex);
+  const normalizedChapterIndex = normalizeSingleChapterIndex(
+    itemRecord.chapterIndex,
+    chapter.chapterIndex,
+  );
   if (normalizedChapterIndex === null) {
     throw new AnalysisExecutionError(`AI 返回的 chapterIndex (${itemRecord.chapterIndex}) 与请求的 (${chapter.chapterIndex}) 不一致。`);
   }
@@ -82,20 +85,18 @@ export function normalizeOverviewResult(
   if (!Array.isArray(raw.characterStats)) throw new AnalysisExecutionError('AI 返回缺少有效的 characterStats 数组。');
   if (!Array.isArray(raw.relationshipGraph)) throw new AnalysisExecutionError('AI 返回缺少有效的 relationshipGraph 数组。');
 
-  const localCharacterMap = new Map<string, Record<string, unknown>>();
+  const localCharacterMap = new Map<string, AnalysisAggregates['allCharacterStats'][number]>();
   for (const item of aggregates.allCharacterStats) {
-    localCharacterMap.set(item.name, item as unknown as Record<string, unknown>);
+    localCharacterMap.set(item.name, item);
   }
 
-  const localRelationshipMap = buildOverviewRelationshipMap(
-    aggregates.allRelationshipGraph as unknown as Array<Record<string, unknown>>,
-  );
+  const localRelationshipMap = buildOverviewRelationshipMap(aggregates.allRelationshipGraph);
 
   const characterStats: OverviewAnalysisResult['characterStats'] = [];
   const seenNames = new Set<string>();
   const rawSharePercents: number[] = [];
 
-  for (const item of (raw.characterStats as Array<unknown>).slice(0, 8)) {
+  for (const item of (raw.characterStats as unknown[]).slice(0, 8)) {
     if (typeof item !== 'object' || item === null) {
       throw new AnalysisExecutionError('AI 返回的 characterStats 项不是对象。');
     }
@@ -131,12 +132,11 @@ export function normalizeOverviewResult(
   characterStats.sort((a, b) =>
     b.sharePercent - a.sharePercent ||
     b.weight - a.weight ||
-    a.name.localeCompare(b.name),
-  );
+    a.name.localeCompare(b.name));
 
   const relationshipGraph: OverviewRelationship[] = [];
   const seenPairs = new Set<string>();
-  for (const item of (raw.relationshipGraph as Array<unknown>).slice(0, 24)) {
+  for (const item of (raw.relationshipGraph as unknown[]).slice(0, 24)) {
     if (typeof item !== 'object' || item === null) {
       throw new AnalysisExecutionError('AI 返回的 relationshipGraph 项不是对象。');
     }
@@ -146,12 +146,12 @@ export function normalizeOverviewResult(
     const pairKey = `${pair[0]}::${pair[1]}`;
     if (seenPairs.has(pairKey)) continue;
     const [source, target] = pair;
-    const missingNames = [source, target].filter(name => !localCharacterMap.has(name));
+    const missingNames = [source, target].filter((name) => !localCharacterMap.has(name));
     if (missingNames.length > 0) continue;
-    const localEdge = localRelationshipMap.get(pairKey) || {};
+    const localEdge = localRelationshipMap.get(pairKey);
     let relationTags = normalizeRelationTags(obj.relationTags, obj.type);
     if (!relationTags) {
-      relationTags = normalizeRelationTags(localEdge.relationTags, localEdge.type);
+      relationTags = normalizeRelationTags(localEdge?.relationTags, localEdge?.type);
     }
     if (!relationTags) throw new AnalysisExecutionError(`AI 返回的关系 ${source} / ${target} 缺少有效的 relationTags。`);
     relationshipGraph.push({
@@ -159,7 +159,7 @@ export function normalizeOverviewResult(
       target,
       type: relationTags[0],
       relationTags: relationTags.slice(0, 6),
-      description: cleanText(obj.description, 280) || cleanText(localEdge.description, 280),
+      description: cleanText(obj.description, 280) || cleanText(localEdge?.description, 280),
     });
     seenPairs.add(pairKey);
   }
@@ -204,8 +204,8 @@ function normalizeCharacterList(value: unknown): AnalysisCharacter[] {
   if (!Array.isArray(value)) return [];
   return value
     .slice(0, 20)
-    .filter(item => typeof item === 'object' && item !== null)
-    .map(item => {
+    .filter((item) => typeof item === 'object' && item !== null)
+    .map((item) => {
       const obj = item as Record<string, unknown>;
       const name = cleanText(obj.name, 80);
       if (!name) return null;
@@ -223,8 +223,8 @@ function normalizeRelationshipList(value: unknown): AnalysisRelationship[] {
   if (!Array.isArray(value)) return [];
   return value
     .slice(0, 20)
-    .filter(item => typeof item === 'object' && item !== null)
-    .map(item => {
+    .filter((item) => typeof item === 'object' && item !== null)
+    .map((item) => {
       const obj = item as Record<string, unknown>;
       const source = cleanText(obj.source, 80);
       const target = cleanText(obj.target, 80);
@@ -252,12 +252,12 @@ function normalizeStringList(value: unknown, limit: number, maxLength: number): 
 
 function normalizeSharePercentValues(values: number[]): number[] {
   if (!values.length) return [];
-  const sanitized = values.map(value => Math.max(0, Math.min(value, 100)));
+  const sanitized = values.map((value) => Math.max(0, Math.min(value, 100)));
   const total = sanitized.reduce((sum, value) => sum + value, 0);
   if (total <= 0) return sanitized.map(() => 0);
-  if (total <= 100) return sanitized.map(value => Math.round(value * 100) / 100);
+  if (total <= 100) return sanitized.map((value) => Math.round(value * 100) / 100);
   const scale = 100 / total;
-  const normalized = sanitized.map(value => Math.round(value * scale * 100) / 100);
+  const normalized = sanitized.map((value) => Math.round(value * scale * 100) / 100);
   const diff = Math.round((100 - normalized.reduce((sum, value) => sum + value, 0)) * 100) / 100;
   if (normalized.length > 0 && diff !== 0) {
     normalized[0] = Math.round(Math.max(0, Math.min(100, normalized[0] + diff)) * 100) / 100;

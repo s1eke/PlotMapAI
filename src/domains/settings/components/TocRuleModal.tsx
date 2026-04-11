@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Loader2 } from 'lucide-react';
 import Modal from '@shared/components/Modal';
-import type { TocRule } from '../api/types';
+import type { TocRule } from '../types';
 
 interface TocRuleModalProps {
   isOpen: boolean;
@@ -18,9 +18,10 @@ export default function TocRuleModal({ isOpen, onClose, onSave, rule }: TocRuleM
     rule: '',
     example: '',
     priority: 10,
-    isEnabled: true
+    isEnabled: true,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
     if (rule) {
@@ -29,7 +30,7 @@ export default function TocRuleModal({ isOpen, onClose, onSave, rule }: TocRuleM
         rule: rule.rule,
         example: rule.example,
         priority: rule.priority,
-        isEnabled: rule.isEnabled
+        isEnabled: rule.isEnabled,
       });
     } else {
       setFormData({
@@ -37,23 +38,27 @@ export default function TocRuleModal({ isOpen, onClose, onSave, rule }: TocRuleM
         rule: '',
         example: '',
         priority: 10,
-        isEnabled: true
+        isEnabled: true,
       });
     }
+    setSubmitError(null);
   }, [rule, isOpen]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setSubmitError(null);
     try {
       await onSave(formData);
       onClose();
     } catch (err) {
-      console.error(err);
+      setSubmitError(err instanceof Error ? err.message : String(err));
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  const submitActionLabel = rule ? t('common.actions.save') : t('common.actions.add');
 
   return (
     <Modal
@@ -68,7 +73,7 @@ export default function TocRuleModal({ isOpen, onClose, onSave, rule }: TocRuleM
             type="text"
             required
             value={formData.name}
-            onChange={e => setFormData({ ...formData, name: e.target.value })}
+            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             className="w-full bg-muted-bg border border-white/10 rounded-xl px-4 py-2.5 text-text-primary focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-all"
             placeholder={t('settings.toc.namePlaceholder')}
           />
@@ -79,7 +84,7 @@ export default function TocRuleModal({ isOpen, onClose, onSave, rule }: TocRuleM
           <textarea
             required
             value={formData.rule}
-            onChange={e => setFormData({ ...formData, rule: e.target.value })}
+            onChange={(e) => setFormData({ ...formData, rule: e.target.value })}
             className="w-full bg-muted-bg border border-white/10 rounded-xl px-4 py-2.5 text-text-primary focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-all font-mono text-sm h-24 resize-none"
             placeholder={t('settings.toc.regexPlaceholder')}
           />
@@ -93,7 +98,12 @@ export default function TocRuleModal({ isOpen, onClose, onSave, rule }: TocRuleM
               min="0"
               max="100"
               value={formData.priority}
-              onChange={e => setFormData({ ...formData, priority: parseInt(e.target.value) || 0 })}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  priority: parseInt(e.target.value, 10) || 0,
+                })
+              }
               className="w-full bg-muted-bg border border-white/10 rounded-xl px-4 py-2.5 text-text-primary focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-all"
             />
           </div>
@@ -101,7 +111,7 @@ export default function TocRuleModal({ isOpen, onClose, onSave, rule }: TocRuleM
             <label className="text-sm font-medium text-text-primary px-1">{t('settings.toc.status')}</label>
             <select
               value={formData.isEnabled ? 'true' : 'false'}
-              onChange={e => setFormData({ ...formData, isEnabled: e.target.value === 'true' })}
+              onChange={(e) => setFormData({ ...formData, isEnabled: e.target.value === 'true' })}
               className="w-full bg-muted-bg border border-white/10 rounded-xl px-4 py-2.5 text-text-primary focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-all"
             >
               <option value="true">{t('settings.common.enabled')}</option>
@@ -115,12 +125,15 @@ export default function TocRuleModal({ isOpen, onClose, onSave, rule }: TocRuleM
           <input
             type="text"
             value={formData.example}
-            onChange={e => setFormData({ ...formData, example: e.target.value })}
+            onChange={(e) => setFormData({ ...formData, example: e.target.value })}
             className="w-full bg-muted-bg border border-white/10 rounded-xl px-4 py-2.5 text-text-primary focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-all"
             placeholder={t('settings.toc.examplePlaceholder')}
           />
         </div>
 
+        {submitError && (
+          <p className="text-sm text-red-400 px-1">{submitError}</p>
+        )}
         <div className="flex justify-end gap-3 pt-4 border-t border-white/5 mt-6">
           <button
             type="button"
@@ -134,7 +147,7 @@ export default function TocRuleModal({ isOpen, onClose, onSave, rule }: TocRuleM
             disabled={isSubmitting}
             className="px-6 py-2 bg-brand-700 hover:bg-brand-600 disabled:opacity-50 text-white rounded-xl transition-all shadow-lg shadow-brand-900/20 text-sm font-medium flex items-center gap-2"
           >
-            {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : rule ? t('common.actions.save') : t('common.actions.add')}
+            {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : submitActionLabel}
           </button>
         </div>
       </form>

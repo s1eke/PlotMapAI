@@ -1,10 +1,22 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { reportAppError } from '@app/debug/service';
-import { AppErrorCode, toAppError } from '@shared/errors';
-import { analysisApi } from '../api/analysisApi';
-import type { AnalysisStatusResponse, ChapterAnalysisResult } from '../api/analysisApi';
+import { reportAppError } from '@shared/debug';
+import type { AnalysisStatusResponse, ChapterAnalysisResult } from '@shared/contracts';
 
-export function useChapterAnalysis(novelId: number, chapterIndex: number) {
+import { AppErrorCode, toAppError } from '@shared/errors';
+import { analysisService } from '../analysisService';
+
+interface UseChapterAnalysisOptions {
+  analyzeChapter?: (
+    novelId: number,
+    chapterIndex: number,
+  ) => Promise<{ analysis: ChapterAnalysisResult | null }>;
+}
+
+export function useChapterAnalysis(
+  novelId: number,
+  chapterIndex: number,
+  options: UseChapterAnalysisOptions = {},
+) {
   const [analysisStatus, setAnalysisStatus] = useState<AnalysisStatusResponse | null>(null);
   const [chapterAnalysis, setChapterAnalysis] = useState<ChapterAnalysisResult | null>(null);
   const [isChapterAnalysisLoading, setIsChapterAnalysisLoading] = useState(false);
@@ -15,7 +27,7 @@ export function useChapterAnalysis(novelId: number, chapterIndex: number) {
     if (!novelId) return;
 
     try {
-      const data = await analysisApi.getStatus(novelId);
+      const data = await analysisService.getStatus(novelId);
       setAnalysisStatus(data);
     } catch (err) {
       reportAppError(toAppError(err, {
@@ -24,7 +36,6 @@ export function useChapterAnalysis(novelId: number, chapterIndex: number) {
         source: 'analysis',
         userMessageKey: 'errors.ANALYSIS_EXECUTION_FAILED',
       }));
-      console.error('Failed to load analysis status', err);
       setAnalysisStatus(null);
     }
   }, [novelId]);
@@ -48,7 +59,7 @@ export function useChapterAnalysis(novelId: number, chapterIndex: number) {
 
     if (!silent && !hasUsableCache) setIsChapterAnalysisLoading(true);
     try {
-      const data = await analysisApi.getChapterAnalysis(novelId, chapterIndex);
+      const data = await analysisService.getChapterAnalysis(novelId, chapterIndex);
       chapterAnalysisCacheRef.current.set(cacheKey, data.analysis);
       setChapterAnalysis(data.analysis);
     } catch (err) {
@@ -58,7 +69,6 @@ export function useChapterAnalysis(novelId: number, chapterIndex: number) {
         source: 'analysis',
         userMessageKey: 'errors.ANALYSIS_EXECUTION_FAILED',
       }));
-      console.error('Failed to load chapter analysis', err);
       if (!hasCachedAnalysis) {
         setChapterAnalysis(null);
       }
@@ -68,10 +78,10 @@ export function useChapterAnalysis(novelId: number, chapterIndex: number) {
   }, [analysisStatus?.job.status, chapterIndex, novelId]);
 
   const handleAnalyzeChapter = useCallback(async () => {
-    if (!novelId || chapterIndex < 0) return;
+    if (!novelId || chapterIndex < 0 || !options.analyzeChapter) return;
     setIsAnalyzingChapter(true);
     try {
-      const result = await analysisApi.analyzeChapter(novelId, chapterIndex);
+      const result = await options.analyzeChapter(novelId, chapterIndex);
       chapterAnalysisCacheRef.current.set(`${novelId}:${chapterIndex}`, result.analysis);
       setChapterAnalysis(result.analysis);
     } catch (err) {
@@ -81,11 +91,10 @@ export function useChapterAnalysis(novelId: number, chapterIndex: number) {
         source: 'analysis',
         userMessageKey: 'errors.ANALYSIS_EXECUTION_FAILED',
       }));
-      console.error('Failed to analyze chapter', err);
     } finally {
       setIsAnalyzingChapter(false);
     }
-  }, [chapterIndex, novelId]);
+  }, [chapterIndex, novelId, options]);
 
   useEffect(() => {
     if (!novelId) return;

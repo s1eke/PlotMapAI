@@ -1,20 +1,57 @@
 import { AlertTriangle, Bot, GitBranch, Loader2, PauseCircle, Sparkles, Tags, Users } from 'lucide-react';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { appPaths } from '@app/router/paths';
-import type { AnalysisJobStatus, ChapterAnalysisResult } from '../api/analysisApi';
+
+import type { AnalysisJobStatus, ChapterAnalysisResult } from '@shared/contracts';
 
 interface ChapterAnalysisPanelProps {
-  novelId: number;
   analysis: ChapterAnalysisResult | null;
   job: AnalysisJobStatus | null;
   isLoading: boolean;
   onAnalyzeChapter?: () => void;
   isAnalyzingChapter?: boolean;
+  progressHref: string;
+  settingsHref: string;
 }
 
-export default function ChapterAnalysisPanel({ novelId, analysis, job, isLoading, onAnalyzeChapter, isAnalyzingChapter }: ChapterAnalysisPanelProps) {
+export default function ChapterAnalysisPanel({
+  analysis,
+  job,
+  isLoading,
+  onAnalyzeChapter,
+  isAnalyzingChapter,
+  progressHref,
+  settingsHref,
+}: ChapterAnalysisPanelProps) {
   const { t } = useTranslation();
+  const keyedKeyPoints = useMemo(() => {
+    const pointCounts = new Map<string, number>();
+    return analysis?.keyPoints.map((point) => {
+      const occurrence = pointCounts.get(point) ?? 0;
+      pointCounts.set(point, occurrence + 1);
+      return {
+        key: `${point}:${occurrence}`,
+        point,
+      };
+    }) ?? [];
+  }, [analysis?.keyPoints]);
+  const keyedRelationships = useMemo(() => {
+    const relationCounts = new Map<string, number>();
+    return analysis?.relationships.map((relationship) => {
+      const relationId = [
+        relationship.source,
+        relationship.target,
+        relationship.type,
+      ].join(':');
+      const occurrence = relationCounts.get(relationId) ?? 0;
+      relationCounts.set(relationId, occurrence + 1);
+      return {
+        key: `${relationId}:${occurrence}`,
+        relationship,
+      };
+    }) ?? [];
+  }, [analysis?.relationships]);
 
   if (isLoading) {
     return (
@@ -45,8 +82,8 @@ export default function ChapterAnalysisPanel({ novelId, analysis, job, isLoading
             <h4 className="text-lg font-semibold text-text-primary mb-4">{t('reader.analysisPanel.keyPointsTitle')}</h4>
             {analysis.keyPoints.length > 0 ? (
               <ul className="space-y-3 text-text-primary">
-                {analysis.keyPoints.map((point, index) => (
-                  <li key={`${point}-${index}`} className="flex gap-3 leading-7">
+                {keyedKeyPoints.map(({ key, point }) => (
+                  <li key={key} className="flex gap-3 leading-7">
                     <span className="mt-2 h-2 w-2 rounded-full bg-accent shrink-0" />
                     <span>{point}</span>
                   </li>
@@ -108,8 +145,11 @@ export default function ChapterAnalysisPanel({ novelId, analysis, job, isLoading
           </div>
           {analysis.relationships.length > 0 ? (
             <div className="space-y-3">
-              {analysis.relationships.map((relationship, index) => (
-                <div key={`${relationship.source}-${relationship.target}-${relationship.type}-${index}`} className="rounded-xl border border-border-color/20 bg-muted-bg/50 p-4">
+              {keyedRelationships.map(({ key, relationship }) => (
+                <div
+                  key={key}
+                  className="rounded-xl border border-border-color/20 bg-muted-bg/50 p-4"
+                >
                   <div className="flex flex-wrap items-center gap-2 mb-2">
                     <span className="font-semibold text-text-primary">{relationship.source}</span>
                     <span className="text-text-secondary">→</span>
@@ -135,47 +175,84 @@ export default function ChapterAnalysisPanel({ novelId, analysis, job, isLoading
   const isFailed = job?.status === 'failed';
   const isOverviewStage = job?.currentStage === 'overview';
   const hasIncompleteOutputs = Boolean(job && !job.analysisComplete);
+  const statusIcon = (() => {
+    if (isRunning) {
+      return <Loader2 className="w-8 h-8 text-accent animate-spin" />;
+    }
+    if (isPaused) {
+      return <PauseCircle className="w-8 h-8 text-yellow-400" />;
+    }
+    if (isFailed) {
+      return <AlertTriangle className="w-8 h-8 text-red-400" />;
+    }
+    return <Bot className="w-8 h-8 text-accent opacity-80" />;
+  })();
+  const statusTitle = (() => {
+    if (isRunning) {
+      if (isOverviewStage) {
+        return t('reader.analysisPanel.statusGeneratingOverview');
+      }
+      return t('reader.analysisPanel.statusQueued');
+    }
+    if (isPaused) {
+      return t('reader.analysisPanel.statusPaused');
+    }
+    if (isFailed) {
+      return t('reader.analysisPanel.statusFailed');
+    }
+    if (hasIncompleteOutputs) {
+      return t('reader.analysisPanel.statusIncomplete');
+    }
+    return t('reader.analysisPanel.statusEmpty');
+  })();
+  const statusHint = (() => {
+    if (isRunning) {
+      if (isOverviewStage) {
+        return t('reader.analysisPanel.hintGeneratingOverview');
+      }
+      return t('reader.analysisPanel.hintRunning');
+    }
+    if (isPaused) {
+      return t('reader.analysisPanel.hintPaused');
+    }
+    if (isFailed) {
+      return t(`errors.${job?.lastError}`, { defaultValue: job?.lastError })
+        || t('reader.analysisPanel.hintFailed');
+    }
+    if (hasIncompleteOutputs) {
+      return t('reader.analysisPanel.hintIncomplete');
+    }
+    return t('reader.analysisPanel.hintEmpty');
+  })();
+  const progressStage = (() => {
+    if (isOverviewStage) {
+      return <span>{t('reader.analysisPanel.progressOverviewStage')}</span>;
+    }
+    if (job?.currentChunk) {
+      return (
+        <span>
+          {t('reader.analysisPanel.progressCurrentChunk', {
+            start: job.currentChunk.startChapterIndex + 1,
+            end: job.currentChunk.endChapterIndex + 1,
+          })}
+        </span>
+      );
+    }
+    return null;
+  })();
 
   return (
     <div className="max-w-3xl mx-auto bg-card-bg rounded-2xl p-8 border border-border-color/20 text-center animate-fade-in shadow-xl">
       <div className="w-16 h-16 bg-muted-bg rounded-full flex items-center justify-center mx-auto mb-6">
-        {isRunning ? (
-          <Loader2 className="w-8 h-8 text-accent animate-spin" />
-        ) : isPaused ? (
-          <PauseCircle className="w-8 h-8 text-yellow-400" />
-        ) : isFailed ? (
-          <AlertTriangle className="w-8 h-8 text-red-400" />
-        ) : (
-          <Bot className="w-8 h-8 text-accent opacity-80" />
-        )}
+        {statusIcon}
       </div>
 
       <h3 className="text-xl font-medium mb-4 text-text-primary">
-        {isRunning
-          ? isOverviewStage
-            ? t('reader.analysisPanel.statusGeneratingOverview')
-            : t('reader.analysisPanel.statusQueued')
-          : isPaused
-            ? t('reader.analysisPanel.statusPaused')
-            : isFailed
-              ? t('reader.analysisPanel.statusFailed')
-              : hasIncompleteOutputs
-                ? t('reader.analysisPanel.statusIncomplete')
-                : t('reader.analysisPanel.statusEmpty')}
+        {statusTitle}
       </h3>
 
       <p className="text-text-secondary leading-relaxed max-w-xl mx-auto mb-6">
-        {isRunning
-          ? isOverviewStage
-            ? t('reader.analysisPanel.hintGeneratingOverview')
-            : t('reader.analysisPanel.hintRunning')
-          : isPaused
-            ? t('reader.analysisPanel.hintPaused')
-            : isFailed
-              ? t(`errors.${job?.lastError}`, { defaultValue: job?.lastError }) || t('reader.analysisPanel.hintFailed')
-              : hasIncompleteOutputs
-                ? t('reader.analysisPanel.hintIncomplete')
-                : t('reader.analysisPanel.hintEmpty')}
+        {statusHint}
       </p>
 
       {isRunning && job && job.totalChunks > 0 && (
@@ -189,11 +266,7 @@ export default function ChapterAnalysisPanel({ novelId, analysis, job, isLoading
           </div>
           <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-text-secondary">
             <span>{t('reader.analysisPanel.progressChapters', { done: job.analyzedChapters, total: job.totalChapters })}</span>
-            {isOverviewStage
-              ? <span>{t('reader.analysisPanel.progressOverviewStage')}</span>
-              : job.currentChunk
-                ? <span>{t('reader.analysisPanel.progressCurrentChunk', { start: job.currentChunk.startChapterIndex + 1, end: job.currentChunk.endChapterIndex + 1 })}</span>
-                : null}
+            {progressStage}
           </div>
         </div>
       )}
@@ -217,13 +290,13 @@ export default function ChapterAnalysisPanel({ novelId, analysis, job, isLoading
           </button>
         )}
         <Link
-          to={appPaths.novel(novelId)}
+          to={progressHref}
           className="px-4 py-2 rounded-lg bg-accent hover:bg-accent-hover text-white transition-colors"
         >
           {t('reader.analysisPanel.viewProgress')}
         </Link>
         <Link
-          to={appPaths.settings()}
+          to={settingsHref}
           className="px-4 py-2 rounded-lg border border-border-color/30 hover:bg-white/5 text-text-primary transition-colors"
         >
           {t('reader.analysisPanel.openAiSettings')}

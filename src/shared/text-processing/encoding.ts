@@ -25,7 +25,10 @@ export function detectAndConvert(rawBytes: ArrayBuffer): { text: string; encodin
 
       if (encoding.startsWith('utf-16')) {
         const asciiCountBytes = bytes.reduce((count, byte) => count + (byte < 128 ? 1 : 0), 0);
-        const asciiCountText = [...text].reduce((count, char) => count + (char.charCodeAt(0) < 128 ? 1 : 0), 0);
+        const asciiCountText = [...text].reduce(
+          (count, char) => count + (char.charCodeAt(0) < 128 ? 1 : 0),
+          0,
+        );
 
         if (bytes.length > 0 && asciiCountBytes / bytes.length > 0.2) {
           if (text.length > 0 && asciiCountText / text.length < 0.05) {

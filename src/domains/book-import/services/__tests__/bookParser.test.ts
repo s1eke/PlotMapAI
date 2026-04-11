@@ -6,7 +6,12 @@ const { mockParseTxt, mockParseEpub } = vi.hoisted(() => ({
     author: '',
     description: '',
     coverBlob: null,
-    chapters: [{ title: 'Ch1', content: 'content' }],
+    chapters: [{
+      title: 'Ch1',
+      content: 'content',
+      contentFormat: 'plain',
+      richBlocks: [],
+    }],
     rawText: 'content',
     encoding: 'utf-8',
     totalWords: 7,
@@ -19,7 +24,18 @@ const { mockParseTxt, mockParseEpub } = vi.hoisted(() => ({
     author: 'Author',
     description: 'Desc',
     coverBlob: null,
-    chapters: [{ title: 'Ch1', content: 'epub content' }],
+    chapters: [{
+      title: 'Ch1',
+      content: 'epub content',
+      contentFormat: 'rich',
+      richBlocks: [{
+        type: 'paragraph',
+        children: [{
+          type: 'text',
+          text: 'epub content',
+        }],
+      }],
+    }],
     rawText: '',
     encoding: 'utf-8',
     totalWords: 11,
@@ -53,7 +69,32 @@ describe('parseBook', () => {
     const result = await parseBook(file, []);
     expect(result.title).toBe('MockEpub');
     expect(result.author).toBe('Author');
-    expect(mockParseEpub).toHaveBeenCalledWith(file);
+    expect(mockParseEpub).toHaveBeenCalledWith(file, { purificationRules: undefined });
+  });
+
+  it('passes signal, progress, and purification options to the EPUB parser', async () => {
+    const file = new File(['epub'], 'book.epub', { type: 'application/epub+zip' });
+    const controller = new AbortController();
+    const onProgress = vi.fn();
+    const purificationRules = [{
+      pattern: 'foo',
+      replacement: 'bar',
+      is_regex: false,
+      target_scope: 'text' as const,
+      execution_stage: 'pre-ast' as const,
+    }];
+
+    await parseBook(file, [], {
+      signal: controller.signal,
+      onProgress,
+      purificationRules,
+    });
+
+    expect(mockParseEpub).toHaveBeenCalledWith(file, {
+      signal: controller.signal,
+      onProgress,
+      purificationRules,
+    });
   });
 
   it('throws for unsupported file types', async () => {
@@ -79,7 +120,12 @@ describe('registerParser', () => {
     author: '',
     description: '',
     coverBlob: null,
-    chapters: [{ title: 'C1', content: 'custom' }],
+    chapters: [{
+      title: 'C1',
+      content: 'custom',
+      contentFormat: 'plain',
+      richBlocks: [],
+    }],
     rawText: '',
     encoding: 'utf-8',
     totalWords: 6,

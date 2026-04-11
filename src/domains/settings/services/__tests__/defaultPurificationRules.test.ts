@@ -27,7 +27,6 @@ describe('ensureDefaultPurificationRules', () => {
 
   it('adds only missing defaults without duplicating existing ones', async () => {
     await db.purificationRules.add({
-      id: undefined as unknown as number,
       externalId: 1,
       name: '首行缩进(两格)',
       group: '段落排版',
@@ -36,8 +35,9 @@ describe('ensureDefaultPurificationRules', () => {
       isRegex: true,
       isEnabled: true,
       order: 0,
-      scopeTitle: false,
-      scopeContent: true,
+      targetScope: 'all',
+      executionStage: 'post-ast',
+      ruleVersion: 2,
       bookScope: '',
       excludeBookScope: '',
       exclusiveGroup: 'indentation',

@@ -48,14 +48,14 @@ function expectStateError(action: () => void, code: string): void {
 
 describe('analysis runtime state machine', () => {
   it('models idle -> running -> pausing -> paused -> running -> completed', () => {
-    const started = {
+    const started: RuntimeSnapshot = {
       ...createSnapshot(),
       ...deriveJobPatchForStart(3, 2, 0),
       totalChapters: 3,
       totalChunks: 2,
       hasReusableChunks: true,
       status: 'running' as const,
-    } as RuntimeSnapshot;
+    };
     expect(deriveCurrentStage(started)).toBe('chapters');
 
     const pausing = {
@@ -74,7 +74,7 @@ describe('analysis runtime state machine', () => {
     };
     expect(deriveCapabilities(paused).canResume).toBe(true);
 
-    const resumed = {
+    const resumed: RuntimeSnapshot = {
       ...paused,
       ...deriveJobPatchForResume({
         totalChapters: 3,
@@ -87,11 +87,11 @@ describe('analysis runtime state machine', () => {
       analyzedChapters: 2,
       currentChunkIndex: 1,
       status: 'running' as const,
-    } as RuntimeSnapshot;
+    };
     expect(deriveCurrentStage(resumed)).toBe('chapters');
     expect(deriveProgress(resumed)).toBe(33.33);
 
-    const completed = {
+    const completed: RuntimeSnapshot = {
       ...resumed,
       ...deriveJobPatchForOverviewSuccess(),
       status: 'completed' as const,
@@ -99,7 +99,7 @@ describe('analysis runtime state machine', () => {
       analyzedChapters: 3,
       overviewComplete: true,
       analysisComplete: true,
-    } as RuntimeSnapshot;
+    };
     expect(deriveCurrentStage(completed)).toBe('completed');
     expect(deriveProgress(completed)).toBe(100);
     expect(deriveCapabilities(completed).canResume).toBe(false);

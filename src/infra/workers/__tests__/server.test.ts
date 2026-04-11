@@ -3,17 +3,16 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { AppErrorCode } from '@shared/errors';
 
-import type { WorkerTaskHandler } from '../server';
 import { registerWorkerTaskHandlers } from '../server';
 
 interface FakeWorkerContext {
   onmessage: ((event: MessageEvent<WorkerTaskMessage<unknown>>) => void) | null;
-  postedMessages: WorkerTaskResponse<unknown, unknown>[];
+  postedMessages: Array<WorkerTaskResponse<unknown, unknown>>;
   postMessage: (message: WorkerTaskResponse<unknown, unknown>) => void;
 }
 
 function createWorkerContext(): FakeWorkerContext {
-  const postedMessages: WorkerTaskResponse<unknown, unknown>[] = [];
+  const postedMessages: Array<WorkerTaskResponse<unknown, unknown>> = [];
 
   return {
     onmessage: null,
@@ -28,9 +27,10 @@ function dispatchMessage(
   context: FakeWorkerContext,
   message: WorkerTaskMessage<unknown>,
 ): void {
-  context.onmessage?.({
+  const event = new MessageEvent<WorkerTaskMessage<unknown>>('message', {
     data: message,
-  } as MessageEvent<WorkerTaskMessage<unknown>>);
+  });
+  context.onmessage?.(event);
 }
 
 describe('registerWorkerTaskHandlers', () => {
@@ -45,7 +45,7 @@ describe('registerWorkerTaskHandlers', () => {
     const inheritedHandler = vi.fn();
     const handlers = Object.create({
       inheritedTask: inheritedHandler,
-    }) as Record<string, WorkerTaskHandler<unknown, unknown, unknown>>;
+    });
 
     registerWorkerTaskHandlers(handlers);
     dispatchMessage(context, {
@@ -72,7 +72,7 @@ describe('registerWorkerTaskHandlers', () => {
     vi.stubGlobal('self', context);
     const handlers = {
       invalidTask: 'not-a-function',
-    } as unknown as Record<string, WorkerTaskHandler<unknown, unknown, unknown>>;
+    };
 
     registerWorkerTaskHandlers(handlers);
 

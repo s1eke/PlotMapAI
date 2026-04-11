@@ -1,9 +1,10 @@
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import './index.css'
-import './i18n/config'
-import App from '@app/App'
-import { initializeAppSafely } from '@app/bootstrap/startup'
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import './index.css';
+import './domains/reader-shell/styles/readerContent.css';
+import './i18n/config';
+import App from '@app/App';
+import { initializeAppSafely } from '@app/bootstrap/startup';
 
 function findNearestScrollableAncestor(target: EventTarget | null): HTMLElement | null {
   if (!(target instanceof HTMLElement)) {
@@ -11,7 +12,10 @@ function findNearestScrollableAncestor(target: EventTarget | null): HTMLElement 
   }
 
   const declaredScrollContainer = target.closest<HTMLElement>('[data-scroll-container="true"]');
-  if (declaredScrollContainer && declaredScrollContainer.scrollHeight > declaredScrollContainer.clientHeight) {
+  if (
+    declaredScrollContainer
+    && declaredScrollContainer.scrollHeight > declaredScrollContainer.clientHeight
+  ) {
     return declaredScrollContainer;
   }
 
@@ -58,12 +62,11 @@ if (window.matchMedia('(display-mode: standalone)').matches) {
   }, { passive: false });
 }
 
-console.log(`PlotMapAI v${__APP_VERSION__}`)
 
-const startupError = await initializeAppSafely()
+const startupState = await initializeAppSafely();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App startupError={startupError} />
+    <App startupState={startupState} />
   </StrictMode>,
-)
+);

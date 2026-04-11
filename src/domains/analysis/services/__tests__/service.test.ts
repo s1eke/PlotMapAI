@@ -1,4 +1,7 @@
 import { describe, it, expect } from 'vitest';
+
+import type { BookChapter } from '@shared/contracts';
+
 import { DEFAULT_ANALYSIS_PROVIDER_ID } from '../../providers';
 import {
   buildRuntimeAnalysisConfig,
@@ -15,8 +18,12 @@ import {
   AnalysisConfigError,
   ChunkingError,
   type RuntimeAnalysisConfig,
+  type RuntimeAnalysisConfigInput,
 } from '..';
-import type { Chapter, ChapterAnalysis, AnalysisOverview } from '@infra/db';
+import type {
+  StoredAnalysisOverview,
+  StoredChapterAnalysis,
+} from '../../runtime/types';
 
 describe('maskApiKey', () => {
   it('returns empty string for empty input', () => {
@@ -96,7 +103,10 @@ describe('validateAnalysisConfig', () => {
   });
 
   it('throws for missing config', () => {
-    expect(() => validateAnalysisConfig(null as unknown as RuntimeAnalysisConfig)).toThrow(AnalysisConfigError);
+    expect(() => {
+      // @ts-expect-error intentionally validating runtime guard behavior with invalid input
+      validateAnalysisConfig(null);
+    }).toThrow(AnalysisConfigError);
   });
 
   it('throws for empty apiBaseUrl', () => {
@@ -121,35 +131,22 @@ describe('validateAnalysisConfig', () => {
   });
 
   it('throws for small contextSize', () => {
-    expect(() => validateAnalysisConfig({ ...validConfig, contextSize: 1000 })).toThrow(AnalysisConfigError);
+    expect(() => (
+      validateAnalysisConfig({ ...validConfig, contextSize: 1000 })
+    )).toThrow(AnalysisConfigError);
   });
 });
 
 describe('buildRuntimeAnalysisConfig', () => {
-  it('defaults providerId for legacy flat config input', () => {
-    expect(buildRuntimeAnalysisConfig({
-      apiBaseUrl: 'http://localhost:5000',
-      apiKey: 'token',
-      modelName: 'gpt-test',
-      contextSize: 32000,
-    })).toEqual({
-      providerId: DEFAULT_ANALYSIS_PROVIDER_ID,
+  it('throws for invalid providerId', () => {
+    expect(() => buildRuntimeAnalysisConfig({
+      providerId: 'invalid-provider',
       contextSize: 32000,
       providerConfig: {
         apiBaseUrl: 'http://localhost:5000',
         apiKey: 'token',
         modelName: 'gpt-test',
       },
-    });
-  });
-
-  it('throws for invalid providerId', () => {
-    expect(() => buildRuntimeAnalysisConfig({
-      providerId: 'invalid-provider',
-      apiBaseUrl: 'http://localhost:5000',
-      apiKey: 'token',
-      modelName: 'gpt-test',
-      contextSize: 32000,
     })).toThrow(AnalysisConfigError);
   });
 
@@ -163,6 +160,22 @@ describe('buildRuntimeAnalysisConfig', () => {
         modelName: 'gpt-test',
       },
     }).providerConfig.modelName).toBe('gpt-test');
+  });
+
+  it('throws for legacy flat config input', () => {
+    const legacyInput: RuntimeAnalysisConfigInput & {
+      apiBaseUrl: string;
+      apiKey: string;
+      modelName: string;
+    } = {
+      providerId: DEFAULT_ANALYSIS_PROVIDER_ID,
+      apiBaseUrl: 'http://localhost:5000',
+      apiKey: 'token',
+      modelName: 'gpt-test',
+      contextSize: 32000,
+    };
+
+    expect(() => buildRuntimeAnalysisConfig(legacyInput)).toThrow(AnalysisConfigError);
   });
 });
 
@@ -208,37 +221,53 @@ describe('isChapterAnalysisComplete', () => {
   });
 
   it('returns false for empty summary', () => {
-    const row = {
-      id: 1, novelId: 1, chapterIndex: 0, chapterTitle: 'Ch1',
-      summary: '', keyPoints: [], characters: [], relationships: [],
-      tags: [], chunkIndex: 0, updatedAt: '',
-    } as ChapterAnalysis;
+    const row: StoredChapterAnalysis = {
+      id: 1,
+      novelId: 1,
+      chapterIndex: 0,
+      chapterTitle: 'Ch1',
+      summary: '',
+      keyPoints: [],
+      characters: [],
+      relationships: [],
+      tags: [],
+      chunkIndex: 0,
+      updatedAt: '',
+    };
     expect(isChapterAnalysisComplete(row)).toBe(false);
   });
 
   it('returns true for valid complete analysis', () => {
-    const row = {
-      id: 1, novelId: 1, chapterIndex: 0, chapterTitle: 'Ch1',
+    const row: StoredChapterAnalysis = {
+      id: 1,
+      novelId: 1,
+      chapterIndex: 0,
+      chapterTitle: 'Ch1',
       summary: 'A valid summary',
       keyPoints: ['point1'],
       characters: [{ name: 'Hero', role: '', description: '', weight: 80 }],
       relationships: [],
       tags: ['action'],
-      chunkIndex: 0, updatedAt: '',
-    } as ChapterAnalysis;
+      chunkIndex: 0,
+      updatedAt: '',
+    };
     expect(isChapterAnalysisComplete(row)).toBe(true);
   });
 
   it('returns true for analysis with all arrays present (even empty)', () => {
-    const row = {
-      id: 1, novelId: 1, chapterIndex: 0, chapterTitle: 'Ch1',
+    const row: StoredChapterAnalysis = {
+      id: 1,
+      novelId: 1,
+      chapterIndex: 0,
+      chapterTitle: 'Ch1',
       summary: 'Valid',
       keyPoints: [],
       characters: [],
       relationships: [],
       tags: [],
-      chunkIndex: 0, updatedAt: '',
-    } as ChapterAnalysis;
+      chunkIndex: 0,
+      updatedAt: '',
+    };
     expect(isChapterAnalysisComplete(row)).toBe(true);
   });
 });
@@ -249,30 +278,50 @@ describe('isOverviewComplete', () => {
   });
 
   it('returns false when totalChapters <= 0', () => {
-    const overview = {} as AnalysisOverview;
+    const overview: StoredAnalysisOverview = {
+      id: 0,
+      novelId: 0,
+      bookIntro: '',
+      globalSummary: '',
+      themes: [],
+      characterStats: [],
+      relationshipGraph: [],
+      totalChapters: 0,
+      analyzedChapters: 0,
+      updatedAt: '',
+    };
     expect(isOverviewComplete(overview, 0)).toBe(false);
   });
 
   it('returns false for empty bookIntro', () => {
-    const overview = {
-      id: 1, novelId: 1, bookIntro: '', globalSummary: 'Summary',
-      themes: [], characterStats: [], relationshipGraph: [],
-      totalChapters: 10, analyzedChapters: 10, updatedAt: '',
-    } as AnalysisOverview;
+    const overview: StoredAnalysisOverview = {
+      id: 1,
+      novelId: 1,
+      bookIntro: '',
+      globalSummary: 'Summary',
+      themes: [],
+      characterStats: [],
+      relationshipGraph: [],
+      totalChapters: 10,
+      analyzedChapters: 10,
+      updatedAt: '',
+    };
     expect(isOverviewComplete(overview, 10)).toBe(false);
   });
 
   it('returns true for valid complete overview', () => {
-    const overview = {
-      id: 1, novelId: 1,
+    const overview: StoredAnalysisOverview = {
+      id: 1,
+      novelId: 1,
       bookIntro: 'A book about adventure and mystery in a faraway land.',
       globalSummary: 'The story follows multiple characters through a series of events that test their resolve and bring them together.',
       themes: ['adventure', 'mystery'],
       characterStats: [{ name: 'Hero', role: 'protagonist', description: 'The hero', weight: 80, sharePercent: 100, chapters: [0], chapterCount: 1 }],
       relationshipGraph: [],
-      totalChapters: 10, analyzedChapters: 10,
+      totalChapters: 10,
+      analyzedChapters: 10,
       updatedAt: '',
-    } as AnalysisOverview;
+    };
     expect(isOverviewComplete(overview, 10)).toBe(true);
   });
 });
@@ -283,15 +332,18 @@ describe('serializeOverview', () => {
   });
 
   it('serializes with native array fields', () => {
-    const overview = {
-      id: 1, novelId: 1,
-      bookIntro: 'Intro', globalSummary: 'Summary',
+    const overview: StoredAnalysisOverview = {
+      id: 1,
+      novelId: 1,
+      bookIntro: 'Intro',
+      globalSummary: 'Summary',
       themes: ['theme1'],
       characterStats: [{ name: 'A', role: 'supporting', description: 'desc', weight: 80, sharePercent: 100, chapters: [0], chapterCount: 1 }],
       relationshipGraph: [],
-      totalChapters: 5, analyzedChapters: 5,
+      totalChapters: 5,
+      analyzedChapters: 5,
       updatedAt: '2024-01-01',
-    } as AnalysisOverview;
+    };
     const result = serializeOverview(overview);
     expect(result).not.toBeNull();
     expect(result!.bookIntro).toBe('Intro');
@@ -306,11 +358,19 @@ describe('serializeChapterAnalysis', () => {
   });
 
   it('serializes with native array fields', () => {
-    const row = {
-      id: 1, novelId: 1, chapterIndex: 0, chapterTitle: 'Ch1',
-      summary: 'Summary', keyPoints: ['p1'], characters: [],
-      relationships: [], tags: ['t1'], chunkIndex: 0, updatedAt: '',
-    } as ChapterAnalysis;
+    const row: StoredChapterAnalysis = {
+      id: 1,
+      novelId: 1,
+      chapterIndex: 0,
+      chapterTitle: 'Ch1',
+      summary: 'Summary',
+      keyPoints: ['p1'],
+      characters: [],
+      relationships: [],
+      tags: ['t1'],
+      chunkIndex: 0,
+      updatedAt: '',
+    };
     const result = serializeChapterAnalysis(row);
     expect(result).not.toBeNull();
     expect(result!.chapterTitle).toBe('Ch1');
@@ -328,11 +388,14 @@ describe('buildCharacterGraphPayload', () => {
   });
 
   it('builds graph from chapter analyses', () => {
-    const chapters: Chapter[] = [
-      { id: 1, novelId: 1, title: 'Ch1', content: 'content', chapterIndex: 0, wordCount: 100 },
+    const chapters: BookChapter[] = [
+      { title: 'Ch1', content: 'content', chapterIndex: 0, wordCount: 100 },
     ];
-    const analyses: ChapterAnalysis[] = [{
-      id: 1, novelId: 1, chapterIndex: 0, chapterTitle: 'Ch1',
+    const analyses: StoredChapterAnalysis[] = [{
+      id: 1,
+      novelId: 1,
+      chapterIndex: 0,
+      chapterTitle: 'Ch1',
       summary: 'Summary',
       keyPoints: ['point'],
       characters: [{ name: 'Alice', role: 'protagonist', description: 'Hero', weight: 80 }],

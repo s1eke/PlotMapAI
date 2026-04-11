@@ -1,13 +1,19 @@
-import { loadAndPurifyChapters } from '@domains/reader';
-import { getAiConfig } from '@domains/settings';
-import { debugLog } from '@app/debug/service';
-import { buildRuntimeAnalysisConfig, buildAnalysisChunks, runSingleChapterAnalysis } from '../services';
+import type {
+  AnalysisOverview,
+  AnalysisStatusResponse,
+  BookChapter,
+  ChapterAnalysisResult,
+  CharacterGraphResponse,
+} from '@shared/contracts';
+import type { Transaction } from 'dexie';
+
+import { debugLog } from '@shared/debug';
+
+import { buildAnalysisChunks, runSingleChapterAnalysis } from '../services';
 import { AnalysisErrorCode, AnalysisJobStateError } from '../services/errors';
 import type { RuntimeAnalysisConfig } from '../services/types';
 import { runAnalysisExecution } from './executor';
-import {
-  createDexieAnalysisRuntimeRepository,
-} from './repository';
+import { createDexieAnalysisRuntimeRepository } from './repository';
 import {
   assertCanPause,
   assertCanRefreshOverview,
@@ -19,34 +25,31 @@ import {
   deriveJobPatchForResume,
 } from './stateMachine';
 
-import type {
-  AnalysisOverview as ApiAnalysisOverview,
-  AnalysisStatusResponse,
-  ChapterAnalysisResult,
-  CharacterGraphResponse,
-} from '../api/analysisApi';
+interface AnalysisExecutionContext {
+  chapters: BookChapter[];
+  novelId: number;
+  novelTitle: string;
+  runtimeConfig: RuntimeAnalysisConfig;
+}
+
+interface AnalyzeSingleChapterInput extends AnalysisExecutionContext {
+  chapterIndex: number;
+}
 
 const ACTIVE_RUNNERS = new Map<number, AbortController>();
 const repository = createDexieAnalysisRuntimeRepository();
 
 let initialized = false;
 
-function nowISO(): string {
-  return new Date().toISOString();
-}
-
-async function loadRuntimeConfig(): Promise<RuntimeAnalysisConfig> {
-  return buildRuntimeAnalysisConfig(await getAiConfig());
-}
-
-function spawnRunner(
-  novelId: number,
-  novelTitle: string,
-  runtimeConfig: RuntimeAnalysisConfig,
-  chapters: Awaited<ReturnType<typeof loadAndPurifyChapters>>,
-): AbortController {
+function spawnRunner({
+  chapters,
+  novelId,
+  novelTitle,
+  runtimeConfig,
+}: AnalysisExecutionContext): AbortController {
   const existing = ACTIVE_RUNNERS.get(novelId);
   if (existing && !existing.signal.aborted) return existing;
+
   const controller = new AbortController();
   ACTIVE_RUNNERS.set(novelId, controller);
   runAnalysisExecution({
@@ -76,17 +79,17 @@ export async function getAnalysisStatus(novelId: number): Promise<AnalysisStatus
   return repository.buildStatusResponse(novelId);
 }
 
-export async function startAnalysis(novelId: number): Promise<AnalysisStatusResponse> {
-  const [novel, runtimeConfig, chapters] = await Promise.all([
-    repository.loadNovel(novelId),
-    loadRuntimeConfig(),
-    loadAndPurifyChapters(novelId),
-  ]);
+export async function startAnalysis({
+  chapters,
+  novelId,
+  novelTitle,
+  runtimeConfig,
+}: AnalysisExecutionContext): Promise<AnalysisStatusResponse> {
   const chunks = buildAnalysisChunks(chapters, runtimeConfig.contextSize);
   assertCanStart(await repository.getSnapshot(novelId));
   await repository.resetAnalysisPlan(novelId, chapters.length, chunks);
   debugLog('Analysis', `job started: novelId=${novelId} chunks=${chunks.length} chapters=${chapters.length}`);
-  spawnRunner(novelId, novel.title, runtimeConfig, chapters);
+  spawnRunner({ chapters, novelId, novelTitle, runtimeConfig });
   return repository.buildStatusResponse(novelId);
 }
 
@@ -98,18 +101,18 @@ export async function pauseAnalysis(novelId: number): Promise<AnalysisStatusResp
   return repository.buildStatusResponse(novelId);
 }
 
-export async function resumeAnalysis(novelId: number): Promise<AnalysisStatusResponse> {
-  const [novel, runtimeConfig, chapters] = await Promise.all([
-    repository.loadNovel(novelId),
-    loadRuntimeConfig(),
-    loadAndPurifyChapters(novelId),
-  ]);
+export async function resumeAnalysis({
+  chapters,
+  novelId,
+  novelTitle,
+  runtimeConfig,
+}: AnalysisExecutionContext): Promise<AnalysisStatusResponse> {
   await repository.ensureJob(novelId);
   assertCanResume(await repository.getSnapshot(novelId));
   await repository.resetChunksForResume(novelId);
   const chunks = await repository.loadChunks(novelId);
   const snapshot = await repository.getSnapshot(novelId);
-  const nextPending = chunks.find(chunk => chunk.status !== 'completed');
+  const nextPending = chunks.find((chunk) => chunk.status !== 'completed');
   await repository.saveJobPatch(
     novelId,
     deriveJobPatchForResume({
@@ -117,33 +120,35 @@ export async function resumeAnalysis(novelId: number): Promise<AnalysisStatusRes
       totalChunks: chunks.length,
       completedChunks: snapshot.completedChunks,
       analyzedChapters: snapshot.analyzedChapters,
-      currentChunkIndex: nextPending ? nextPending.chunkIndex : chunks[chunks.length - 1].chunkIndex,
+      currentChunkIndex: nextPending
+        ? nextPending.chunkIndex
+        : chunks[chunks.length - 1].chunkIndex,
     }),
-    { lastHeartbeat: nowISO() },
+    { lastHeartbeat: new Date().toISOString() },
   );
-  spawnRunner(novelId, novel.title, runtimeConfig, chapters);
+  spawnRunner({ chapters, novelId, novelTitle, runtimeConfig });
   return repository.buildStatusResponse(novelId);
 }
 
-export async function restartAnalysis(novelId: number): Promise<AnalysisStatusResponse> {
-  const [novel, runtimeConfig, chapters] = await Promise.all([
-    repository.loadNovel(novelId),
-    loadRuntimeConfig(),
-    loadAndPurifyChapters(novelId),
-  ]);
+export async function restartAnalysis({
+  chapters,
+  novelId,
+  novelTitle,
+  runtimeConfig,
+}: AnalysisExecutionContext): Promise<AnalysisStatusResponse> {
   assertCanRestart(await repository.getSnapshot(novelId));
   const chunks = buildAnalysisChunks(chapters, runtimeConfig.contextSize);
   await repository.resetAnalysisPlan(novelId, chapters.length, chunks);
-  spawnRunner(novelId, novel.title, runtimeConfig, chapters);
+  spawnRunner({ chapters, novelId, novelTitle, runtimeConfig });
   return repository.buildStatusResponse(novelId);
 }
 
-export async function refreshOverview(novelId: number): Promise<AnalysisStatusResponse> {
-  const [novel, runtimeConfig, chapters] = await Promise.all([
-    repository.loadNovel(novelId),
-    loadRuntimeConfig(),
-    loadAndPurifyChapters(novelId),
-  ]);
+export async function refreshOverview({
+  chapters,
+  novelId,
+  novelTitle,
+  runtimeConfig,
+}: AnalysisExecutionContext): Promise<AnalysisStatusResponse> {
   const snapshot = await repository.getSnapshot(novelId);
   assertCanRefreshOverview(snapshot);
   await repository.clearOverview(novelId);
@@ -158,24 +163,22 @@ export async function refreshOverview(novelId: number): Promise<AnalysisStatusRe
       totalChapters: chapters.length,
       analyzedChapters: snapshot.analyzedChapters,
     },
-    { lastHeartbeat: nowISO() },
+    { lastHeartbeat: new Date().toISOString() },
   );
-  spawnRunner(novelId, novel.title, runtimeConfig, chapters);
+  spawnRunner({ chapters, novelId, novelTitle, runtimeConfig });
   return repository.buildStatusResponse(novelId);
 }
 
-export async function analyzeSingleChapter(
-  novelId: number,
-  chapterIndex: number,
-): Promise<ChapterAnalysisResult | null> {
-  const [runtimeConfig, novel, chapters] = await Promise.all([
-    loadRuntimeConfig(),
-    repository.loadNovel(novelId),
-    loadAndPurifyChapters(novelId),
-  ]);
-  const chapter = chapters.find(item => item.chapterIndex === chapterIndex);
+export async function analyzeSingleChapter({
+  chapterIndex,
+  chapters,
+  novelId,
+  novelTitle,
+  runtimeConfig,
+}: AnalyzeSingleChapterInput): Promise<ChapterAnalysisResult | null> {
+  const chapter = chapters.find((item) => item.chapterIndex === chapterIndex);
   if (!chapter) throw new AnalysisJobStateError(AnalysisErrorCode.CHAPTER_NOT_FOUND);
-  const result = await runSingleChapterAnalysis(runtimeConfig, novel.title, chapter);
+  const result = await runSingleChapterAnalysis(runtimeConfig, novelTitle, chapter);
   return repository.saveSingleChapterAnalysis(
     novelId,
     chapterIndex,
@@ -184,8 +187,10 @@ export async function analyzeSingleChapter(
   );
 }
 
-export async function getCharacterGraph(novelId: number): Promise<CharacterGraphResponse> {
-  const chapters = await loadAndPurifyChapters(novelId);
+export async function getCharacterGraph(
+  novelId: number,
+  chapters: BookChapter[],
+): Promise<CharacterGraphResponse> {
   return repository.getCharacterGraph(novelId, chapters);
 }
 
@@ -198,6 +203,13 @@ export async function getChapterAnalysis(
 
 export async function getOverview(
   novelId: number,
-): Promise<{ overview: ApiAnalysisOverview | null }> {
+): Promise<{ overview: AnalysisOverview | null }> {
   return repository.getOverview(novelId);
+}
+
+export async function deleteAnalysisArtifacts(
+  novelId: number,
+  transaction?: Transaction,
+): Promise<void> {
+  await repository.deleteAnalysisArtifacts(novelId, transaction);
 }

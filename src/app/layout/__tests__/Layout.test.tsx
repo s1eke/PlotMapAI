@@ -1,10 +1,10 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { CACHE_KEYS, storage } from '@infra/storage';
-import { resetReaderSessionStoreForTests } from '@domains/reader';
 import Layout from '../Layout';
 import { MemoryRouter } from 'react-router-dom';
 import { ThemeProvider } from '@app/providers/ThemeContext';
+import { resetReaderStoresForTests } from '@test/readerTestUtils';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
@@ -20,8 +20,8 @@ vi.mock('../../components/LanguageSwitcher', () => ({
 
 describe('Layout component', () => {
   beforeEach(() => {
-    resetReaderSessionStoreForTests();
     localStorage.clear();
+    resetReaderStoresForTests();
     document.head.querySelector('meta[name="theme-color"]')?.remove();
   });
 
@@ -33,7 +33,7 @@ describe('Layout component', () => {
             <div>Page Content</div>
           </Layout>
         </ThemeProvider>
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     expect(screen.getByRole('link', { name: 'common.appName' })).toHaveAttribute('href', '/');
@@ -62,7 +62,7 @@ describe('Layout component', () => {
             <div>Reader Content</div>
           </Layout>
         </ThemeProvider>
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     expect(screen.queryByRole('link', { name: 'common.appName' })).not.toBeInTheDocument();
@@ -81,7 +81,15 @@ describe('Layout component', () => {
   });
 
   it('syncs theme-color to the active reader background in reader mode', async () => {
-    storage.cache.set(CACHE_KEYS.readerTheme, 'night');
+    storage.cache.set(CACHE_KEYS.readerPreferences, {
+      version: 1,
+      appTheme: 'light',
+      readerTheme: 'night',
+      pageTurnMode: 'scroll',
+      fontSize: 18,
+      lineSpacing: 1.8,
+      paragraphSpacing: 16,
+    });
 
     render(
       <MemoryRouter initialEntries={['/novel/1/read']}>
@@ -90,7 +98,7 @@ describe('Layout component', () => {
             <div>Reader Content</div>
           </Layout>
         </ThemeProvider>
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     await waitFor(() => {

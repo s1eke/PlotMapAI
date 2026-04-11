@@ -1,6 +1,6 @@
 import { translateAppError } from '@shared/errors';
 import type { TFunction } from 'i18next';
-import type { PurificationRule } from '../api/types';
+import type { PurificationRule } from '../types';
 
 export type SettingsTabId = 'toc' | 'purification' | 'ai';
 
@@ -24,7 +24,11 @@ export function downloadFile(content: string, filename: string, mimeType: string
   URL.revokeObjectURL(url);
 }
 
-export function getTranslatedErrorMessage(error: unknown, t: TFunction, fallbackKey: string): string {
+export function getTranslatedErrorMessage(
+  error: unknown,
+  t: TFunction,
+  fallbackKey: string,
+): string {
   return translateAppError(error, t, fallbackKey, {
     kind: 'execution',
     source: 'settings',

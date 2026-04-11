@@ -1,18 +1,18 @@
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useChapterAnalysis } from '../useChapterAnalysis';
-import { analysisApi } from '../../api/analysisApi';
-import type { AnalysisStatusResponse, ChapterAnalysisResult } from '../../api/analysisApi';
+import { analysisService } from '../../analysisService';
+import type { AnalysisStatusResponse, ChapterAnalysisResult } from '../../analysisService';
 
-vi.mock('../../api/analysisApi', () => ({
-  analysisApi: {
+vi.mock('../../analysisService', () => ({
+  analysisService: {
     getStatus: vi.fn(),
     getChapterAnalysis: vi.fn(),
     analyzeChapter: vi.fn(),
   },
 }));
 
-const mockedApi = vi.mocked(analysisApi);
+const mockedApi = vi.mocked(analysisService);
 
 const idleStatus: AnalysisStatusResponse = {
   job: {
@@ -99,7 +99,9 @@ describe('useChapterAnalysis', () => {
 
   it('calls analyzeChapter on handleAnalyzeChapter', async () => {
     mockedApi.analyzeChapter.mockResolvedValue({ analysis: chapterAnalysisResult });
-    const { result } = renderHook(() => useChapterAnalysis(1, 0));
+    const { result } = renderHook(() => useChapterAnalysis(1, 0, {
+      analyzeChapter: mockedApi.analyzeChapter,
+    }));
 
     await waitFor(() => {
       expect(result.current.isChapterAnalysisLoading).toBe(false);
@@ -117,10 +119,12 @@ describe('useChapterAnalysis', () => {
   it('sets isAnalyzingChapter during analyzeChapter call', async () => {
     let resolveAnalyze: (value: { analysis: ChapterAnalysisResult | null }) => void;
     mockedApi.analyzeChapter.mockImplementation(
-      () => new Promise(resolve => { resolveAnalyze = resolve; })
+      () => new Promise((resolve) => { resolveAnalyze = resolve; }),
     );
 
-    const { result } = renderHook(() => useChapterAnalysis(1, 0));
+    const { result } = renderHook(() => useChapterAnalysis(1, 0, {
+      analyzeChapter: mockedApi.analyzeChapter,
+    }));
 
     await waitFor(() => {
       expect(result.current.isChapterAnalysisLoading).toBe(false);
@@ -136,7 +140,9 @@ describe('useChapterAnalysis', () => {
   });
 
   it('does not call handleAnalyzeChapter when novelId is 0', async () => {
-    const { result } = renderHook(() => useChapterAnalysis(0, 0));
+    const { result } = renderHook(() => useChapterAnalysis(0, 0, {
+      analyzeChapter: mockedApi.analyzeChapter,
+    }));
     await act(async () => {
       await result.current.handleAnalyzeChapter();
     });
@@ -200,7 +206,7 @@ describe('useChapterAnalysis', () => {
   it('re-fetches when chapterIndex changes', async () => {
     const { rerender } = renderHook(
       ({ idx }) => useChapterAnalysis(1, idx),
-      { initialProps: { idx: 0 } }
+      { initialProps: { idx: 0 } },
     );
 
     await waitFor(() => {

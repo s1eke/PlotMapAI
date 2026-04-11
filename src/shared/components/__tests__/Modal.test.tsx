@@ -11,14 +11,14 @@ describe('Modal component', () => {
   });
 
   it('renders content and title when isOpen is true', () => {
-    render(<Modal isOpen={true} onClose={() => {}} title="Test Title">Test Content</Modal>);
+    render(<Modal isOpen onClose={() => {}} title="Test Title">Test Content</Modal>);
     expect(screen.getByText('Test Title')).toBeInTheDocument();
     expect(screen.getByText('Test Content')).toBeInTheDocument();
   });
 
   it('calls onClose when close button is clicked', async () => {
     const handleClose = vi.fn();
-    render(<Modal isOpen={true} onClose={handleClose} title="Test">Content</Modal>);
+    render(<Modal isOpen onClose={handleClose} title="Test">Content</Modal>);
     const user = userEvent.setup();
     const buttons = screen.getAllByRole('button');
 
@@ -29,7 +29,7 @@ describe('Modal component', () => {
 
   it('calls onClose when the backdrop is clicked', async () => {
     const handleClose = vi.fn();
-    render(<Modal isOpen={true} onClose={handleClose} title="Test">Content</Modal>);
+    render(<Modal isOpen onClose={handleClose} title="Test">Content</Modal>);
 
     fireEvent.click(document.body.querySelector('[data-slot="modal-backdrop"]') as HTMLDivElement);
 
@@ -37,7 +37,7 @@ describe('Modal component', () => {
   });
 
   it('keeps content mounted until the exit animation completes', async () => {
-    const { rerender } = render(<Modal isOpen={true} onClose={() => {}} title="Test">Content</Modal>);
+    const { rerender } = render(<Modal isOpen onClose={() => {}} title="Test">Content</Modal>);
 
     expect(screen.getByText('Content')).toBeInTheDocument();
 
@@ -50,7 +50,7 @@ describe('Modal component', () => {
   });
 
   it('modifies document body overflow on open', async () => {
-    const { rerender } = render(<Modal isOpen={true} onClose={() => {}} title="Test">Content</Modal>);
+    const { rerender } = render(<Modal isOpen onClose={() => {}} title="Test">Content</Modal>);
 
     expect(document.body.style.overflow).toBe('hidden');
 

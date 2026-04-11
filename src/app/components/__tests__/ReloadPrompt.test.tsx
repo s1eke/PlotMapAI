@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 
 import ReloadPrompt from '../ReloadPrompt';
 import { __resetRegisterSwState, __setRegisterSwState } from '@test/mocks/pwaRegisterReact';
-import { DEBUG_SHOW_UPDATE_TOAST_EVENT } from '@app/debug/service';
+import { DEBUG_SHOW_UPDATE_TOAST_EVENT } from '@app/debug/pwaDebugTools';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -47,7 +47,7 @@ describe('ReloadPrompt', () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'pwa.reload' }));
 
-    expect(updateServiceWorker).toHaveBeenCalledWith(true);
+    expect(updateServiceWorker).toHaveBeenCalledWith();
     await waitFor(() => {
       expect(setNeedRefresh).toHaveBeenCalledWith(false);
       expect(screen.queryByText('pwa.updateAvailable')).not.toBeInTheDocument();
@@ -88,7 +88,7 @@ describe('ReloadPrompt', () => {
 
   it('switches to the updating label while refreshing', async () => {
     const updateServiceWorker = vi.fn().mockImplementation(async () => {
-      await new Promise(resolve => setTimeout(resolve, 20));
+      await new Promise((resolve) => setTimeout(resolve, 20));
     });
 
     __setRegisterSwState({

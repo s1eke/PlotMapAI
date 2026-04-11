@@ -2,7 +2,11 @@ import { useEffect, type CSSProperties, type ReactNode } from 'react';
 import { BookOpen, Settings } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { type AppTheme, useReaderSessionSelector } from '@domains/reader';
+import {
+  ensureReaderAppearanceHydrated,
+  useReaderAppearanceSelector,
+} from '@shared/stores/readerAppearanceStore';
+import { type AppTheme, useAppThemeSelector } from '@shared/stores/appThemeStore';
 import { cn } from '@shared/utils/cn';
 
 import { appPaths } from '../router/paths';
@@ -58,16 +62,18 @@ export default function Layout({ children }: LayoutProps) {
   const { t } = useTranslation();
   const location = useLocation();
   const isReader = location.pathname.includes('/read');
-  const { appTheme, readerTheme } = useReaderSessionSelector(state => ({
-    appTheme: state.appTheme,
-    readerTheme: state.readerTheme,
-  }));
+  const appTheme = useAppThemeSelector((state) => state.theme);
+  const readerTheme = useReaderAppearanceSelector((state) => state.readerTheme);
   const shellSurfaceColor = resolveShellSurfaceColor(isReader, readerTheme, appTheme);
-  const layoutStyle = {
+  const layoutStyle: CSSProperties & Record<'--app-header-height' | '--app-header-offset', string> = {
     '--app-header-height': isReader ? '0px' : 'calc(4rem + env(safe-area-inset-top, 0px))',
     '--app-header-offset': '0px',
     backgroundColor: shellSurfaceColor,
-  } as CSSProperties;
+  };
+
+  useEffect(() => {
+    ensureReaderAppearanceHydrated().catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     const themeColorMeta = ensureMetaTag('theme-color');
@@ -102,7 +108,7 @@ export default function Layout({ children }: LayoutProps) {
             <nav className="flex items-center gap-2 sm:gap-4">
               <ThemeToggle />
               <LanguageSwitcher />
-              <Link 
+              <Link
                 to={appPaths.settings()}
                 className="p-2 rounded-full hover:bg-white/10 transition-colors text-text-secondary hover:text-text-primary"
                 title={t('common.nav.settings')}

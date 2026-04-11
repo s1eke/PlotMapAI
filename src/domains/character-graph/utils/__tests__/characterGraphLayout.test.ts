@@ -107,15 +107,15 @@ describe('buildSpaciousLayout', () => {
 
   it('computes degree from edges', () => {
     const layout = buildSpaciousLayout(nodes, edges);
-    const heroNode = layout.find(n => n.id === 'hero');
+    const heroNode = layout.find((n) => n.id === 'hero');
     expect(heroNode?.degree).toBe(2);
-    const friendNode = layout.find(n => n.id === 'friend');
+    const friendNode = layout.find((n) => n.id === 'friend');
     expect(friendNode?.degree).toBe(1);
   });
 
   it('computes score from sharePercent when positive', () => {
     const layout = buildSpaciousLayout(nodes, edges);
-    const heroNode = layout.find(n => n.id === 'hero');
+    const heroNode = layout.find((n) => n.id === 'hero');
     expect(heroNode?.score).toBe(70);
   });
 
@@ -339,7 +339,7 @@ describe('getNodeLabelLayout', () => {
 
   it('trims whitespace from name', () => {
     const labelLayout = getNodeLabelLayout('  Alice  ', 50);
-    expect(labelLayout.lines.some(l => l.includes('Alice'))).toBe(true);
+    expect(labelLayout.lines.some((l) => l.includes('Alice'))).toBe(true);
   });
 
   it('returns finite values', () => {
@@ -409,9 +409,15 @@ describe('clampZoomOffset', () => {
     const epsilon = 0.01;
 
     expect(zoomedIn.offsetX).toBeLessThanOrEqual(CANVAS_PADDING * 0.6 + epsilon);
-    expect(zoomedIn.offsetY).toBeGreaterThanOrEqual(STAGE_HEIGHT - STAGE_HEIGHT * 1.8 - CANVAS_PADDING * 0.6 - epsilon);
-    expect(zoomedOut.offsetX).toBeGreaterThanOrEqual((STAGE_WIDTH - STAGE_WIDTH * 0.8) / 2 - CANVAS_PADDING * 0.6 - epsilon);
-    expect(zoomedOut.offsetY).toBeLessThanOrEqual((STAGE_HEIGHT - STAGE_HEIGHT * 0.8) / 2 + CANVAS_PADDING * 0.6 + epsilon);
+    expect(zoomedIn.offsetY).toBeGreaterThanOrEqual(
+      STAGE_HEIGHT - STAGE_HEIGHT * 1.8 - CANVAS_PADDING * 0.6 - epsilon,
+    );
+    expect(zoomedOut.offsetX).toBeGreaterThanOrEqual(
+      (STAGE_WIDTH - STAGE_WIDTH * 0.8) / 2 - CANVAS_PADDING * 0.6 - epsilon,
+    );
+    expect(zoomedOut.offsetY).toBeLessThanOrEqual(
+      (STAGE_HEIGHT - STAGE_HEIGHT * 0.8) / 2 + CANVAS_PADDING * 0.6 + epsilon,
+    );
   });
 
   it('returns finite numbers for various inputs', () => {

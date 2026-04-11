@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import ChapterAnalysisPanel from '../ChapterAnalysisPanel';
 import { MemoryRouter } from 'react-router-dom';
-import type { AnalysisJobStatus, ChapterAnalysisResult } from '../../api/analysisApi';
+import type { AnalysisJobStatus, ChapterAnalysisResult } from '../../analysisService';
 
 const changeLanguage = vi.fn();
 const t = (key: string) => key;
@@ -15,8 +15,14 @@ describe('ChapterAnalysisPanel', () => {
   it('shows loading state when isLoading is true', () => {
     const { container } = render(
       <MemoryRouter>
-        <ChapterAnalysisPanel novelId={1} analysis={null} job={null} isLoading={true} />
-      </MemoryRouter>
+        <ChapterAnalysisPanel
+          analysis={null}
+          job={null}
+          isLoading
+          progressHref="/novel/1"
+          settingsHref="/settings"
+        />
+      </MemoryRouter>,
     );
     expect(container.querySelector('.animate-spin')).toBeInTheDocument();
   });
@@ -36,8 +42,14 @@ describe('ChapterAnalysisPanel', () => {
 
     render(
       <MemoryRouter>
-        <ChapterAnalysisPanel novelId={1} analysis={analysis} job={null} isLoading={false} />
-      </MemoryRouter>
+        <ChapterAnalysisPanel
+          analysis={analysis}
+          job={null}
+          isLoading={false}
+          progressHref="/novel/1"
+          settingsHref="/settings"
+        />
+      </MemoryRouter>,
     );
 
     expect(screen.getByText('Test Chapter')).toBeInTheDocument();
@@ -82,8 +94,14 @@ describe('ChapterAnalysisPanel', () => {
 
     render(
       <MemoryRouter>
-        <ChapterAnalysisPanel novelId={1} analysis={null} job={job} isLoading={false} />
-      </MemoryRouter>
+        <ChapterAnalysisPanel
+          analysis={null}
+          job={job}
+          isLoading={false}
+          progressHref="/novel/1"
+          settingsHref="/settings"
+        />
+      </MemoryRouter>,
     );
 
     expect(screen.getByText('reader.analysisPanel.statusQueued')).toBeInTheDocument();

@@ -13,11 +13,11 @@ describe('PurificationRuleModal', () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
   });
 
-  it('submits changed rule values, toggles, and scopes on success', async () => {
+  it('submits changed rule values, toggles, and stage/scope selections on success', async () => {
     const onClose = vi.fn();
     const onSave = vi.fn().mockResolvedValue(undefined);
     const user = userEvent.setup();
-    render(<PurificationRuleModal isOpen={true} onClose={onClose} onSave={onSave} rule={null} />);
+    render(<PurificationRuleModal isOpen onClose={onClose} onSave={onSave} rule={null} />);
 
     await user.type(screen.getByPlaceholderText('settings.purification.namePlaceholder'), 'Rule A');
     await user.clear(screen.getByPlaceholderText('settings.purification.groupPlaceholder'));
@@ -25,7 +25,8 @@ describe('PurificationRuleModal', () => {
     await user.type(screen.getByPlaceholderText('settings.purification.patternPlaceholder'), 'foo');
     await user.type(screen.getByPlaceholderText('settings.purification.replacementPlaceholder'), 'bar');
     await user.click(screen.getAllByRole('switch')[0]);
-    await user.click(screen.getByRole('checkbox', { name: 'settings.purification.scopeTitle' }));
+    await user.selectOptions(screen.getAllByRole('combobox')[0], 'heading');
+    await user.selectOptions(screen.getAllByRole('combobox')[1], 'plain-text-only');
 
     await user.click(screen.getByRole('button', { name: 'common.actions.add' }));
 
@@ -35,8 +36,9 @@ describe('PurificationRuleModal', () => {
       pattern: 'foo',
       replacement: 'bar',
       isRegex: false,
-      scopeTitle: false,
-      scopeContent: true,
+      targetScope: 'heading',
+      executionStage: 'plain-text-only',
+      ruleVersion: 2,
     }));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
@@ -45,7 +47,7 @@ describe('PurificationRuleModal', () => {
     const onClose = vi.fn();
     const onSave = vi.fn().mockRejectedValue(new Error('save failed'));
     const user = userEvent.setup();
-    render(<PurificationRuleModal isOpen={true} onClose={onClose} onSave={onSave} rule={null} />);
+    render(<PurificationRuleModal isOpen onClose={onClose} onSave={onSave} rule={null} />);
 
     await user.type(screen.getByPlaceholderText('settings.purification.namePlaceholder'), 'Rule');
     await user.type(screen.getByPlaceholderText('settings.purification.patternPlaceholder'), 'foo');
@@ -56,7 +58,14 @@ describe('PurificationRuleModal', () => {
   });
 
   it('shows a security notice for whitelisted @js replacements', async () => {
-    render(<PurificationRuleModal isOpen={true} onClose={() => {}} onSave={() => Promise.resolve()} rule={null} />);
+    render(
+      <PurificationRuleModal
+        isOpen
+        onClose={() => {}}
+        onSave={() => Promise.resolve()}
+        rule={null}
+      />,
+    );
     const user = userEvent.setup();
 
     await user.type(screen.getByPlaceholderText('settings.purification.replacementPlaceholder'), '@js:fullwidth');
@@ -67,7 +76,7 @@ describe('PurificationRuleModal', () => {
   it('keeps optional inputs controlled when editing a sparse rule', () => {
     render(
       <PurificationRuleModal
-        isOpen={true}
+        isOpen
         onClose={() => {}}
         onSave={() => Promise.resolve()}
         rule={{
@@ -79,8 +88,9 @@ describe('PurificationRuleModal', () => {
           isRegex: true,
           isEnabled: true,
           order: 3,
-          scopeTitle: true,
-          scopeContent: true,
+          targetScope: 'all',
+          executionStage: 'post-ast',
+          ruleVersion: 2,
           isDefault: false,
           timeoutMs: 3000,
         }}

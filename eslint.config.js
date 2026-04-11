@@ -1,23 +1,30 @@
-import js from '@eslint/js'
-import globals from 'globals'
-import reactHooks from 'eslint-plugin-react-hooks'
-import reactRefresh from 'eslint-plugin-react-refresh'
-import tseslint from 'typescript-eslint'
-import { defineConfig, globalIgnores } from 'eslint/config'
+import { react as aliReact } from 'eslint-config-ali';
+import reactRefresh from 'eslint-plugin-react-refresh';
+import { defineConfig, globalIgnores } from 'eslint/config';
 
 export default defineConfig([
-  globalIgnores(['dist','coverage']),
+  globalIgnores(['dist', 'coverage']),
+  ...aliReact,
+  reactRefresh.configs.vite,
   {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      js.configs.recommended,
-      tseslint.configs.recommended,
-      reactHooks.configs.flat.recommended,
-      reactRefresh.configs.vite,
+    files: [
+      'scripts/**/*.test.ts',
+      'src/**/__tests__/**/*.{ts,tsx}',
+      'src/test/**/*.{ts,tsx}',
+      'vitest.config.ts',
     ],
     languageOptions: {
-      ecmaVersion: 2020,
-      globals: globals.browser,
+      parserOptions: {
+        project: ['./tsconfig.eslint.json'],
+        projectService: false,
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+  },
+  {
+    files: ['scripts/**/*.{mjs,js}'],
+    rules: {
+      'no-console': 'off',
     },
   },
   {
@@ -47,7 +54,7 @@ export default defineConfig([
     },
   },
   {
-    files: ['src/app/**/*.{ts,tsx}', 'src/domains/**/*.{ts,tsx}'],
+    files: ['src/app/**/*.{ts,tsx}', 'src/application/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-imports': [
         'error',
@@ -55,7 +62,102 @@ export default defineConfig([
           patterns: [
             {
               group: ['@domains/*/*'],
-              message: 'Import other domains only via @domains/<domain>.',
+              message: 'Import domains only via @domains/<domain>.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['src/domains/book-import/**/*.{ts,tsx}'],
+    ignores: ['src/domains/book-import/**/__tests__/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['@infra/db', '@infra/db/*'],
+              message: 'book-import is parse-only and must not access Dexie directly.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['src/domains/reader-content/**/*.{ts,tsx}'],
+    ignores: ['src/domains/reader-content/**/__tests__/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['@infra/db', '@infra/db/*'],
+              message: 'reader-content must consume application-registered read models instead of Dexie directly.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['src/domains/reader-*/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['@app/*', '@app/*/*'],
+              message: 'domain code must not depend on app code.',
+            },
+            {
+              group: ['@application/*', '@application/*/*'],
+              message: 'domain code must not depend on application code.',
+            },
+            {
+              group: ['@domains/*', '!@domains/reader-*', '!@domains/reader-*/*'],
+              message: 'reader-family domain code must not depend on unrelated domains.',
+            },
+            {
+              group: ['@domains/reader-*/*'],
+              message: 'reader-family code must import sibling reader domains via barrels and same-domain modules via relative paths.',
+            },
+            {
+              group: ['@domains/*/*', '!@domains/reader-*/*'],
+              message: 'reader-family domain code must not depend on unrelated domain internals.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['src/domains/**/*.{ts,tsx}'],
+    ignores: ['src/domains/reader-*/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['@app/*', '@app/*/*'],
+              message: 'domain code must not depend on app code.',
+            },
+            {
+              group: ['@application/*', '@application/*/*'],
+              message: 'domain code must not depend on application code.',
+            },
+            {
+              group: ['@domains/*'],
+              message: 'domain code must not depend on other domains.',
+            },
+            {
+              group: ['@domains/*/*'],
+              message: 'domain code must not depend on other domain internals.',
             },
           ],
         },
@@ -87,4 +189,4 @@ export default defineConfig([
       ],
     },
   },
-])
+]);

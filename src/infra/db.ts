@@ -1,219 +1,154 @@
-import Dexie, { type EntityTable } from 'dexie';
+import type { AnalysisTables } from './db/analysis';
+import type { LibraryTables } from './db/library';
+import type { ReaderTables } from './db/reader';
+import type { SettingsTables } from './db/settings';
 
-export interface AnalysisCharacter {
-  name: string;
-  role: string;
-  description: string;
-  weight: number;
+import Dexie from 'dexie';
+
+import { AppErrorCode, createAppError } from '@shared/errors';
+import { debugLog, reportAppError } from '@shared/debug';
+
+import {
+  DB_SCHEMA_MIGRATIONS,
+  CURRENT_DB_SCHEMA_VERSION,
+  registerDbSchemaMigrations,
+  toNativeDatabaseVersion,
+} from './migrations/dbSchema';
+
+export const PLOTMAPAI_DB_NAME = 'PlotMapAI';
+
+interface PlotMapAIDatabase
+  extends Dexie, LibraryTables, SettingsTables, AnalysisTables, ReaderTables {}
+
+const db = new Dexie(PLOTMAPAI_DB_NAME) as PlotMapAIDatabase;
+
+registerDbSchemaMigrations(db);
+
+const KNOWN_NATIVE_DATABASE_VERSIONS = new Set(
+  DB_SCHEMA_MIGRATIONS.map((migration) => toNativeDatabaseVersion(migration.version)),
+);
+const KNOWN_STORE_SIGNATURES = new Set(
+  DB_SCHEMA_MIGRATIONS.map((migration) => Object.keys(migration.stores).sort().join('|')),
+);
+
+function isLegacyDatabaseVersionError(error: unknown): boolean {
+  return error instanceof Dexie.DexieError && error.name === Dexie.errnames.Version;
 }
 
-export interface AnalysisRelationship {
-  source: string;
-  target: string;
-  type: string;
-  description: string;
-  weight: number;
+interface ExistingDatabaseInspection {
+  nativeVersion: number;
+  storeNames: string[];
 }
 
-export interface OverviewCharacterStat {
-  name: string;
-  role: string;
-  description: string;
-  weight: number;
-  sharePercent: number;
-  chapters: number[];
-  chapterCount: number;
+function buildStoreSignature(storeNames: readonly string[]): string {
+  return [...storeNames].sort().join('|');
 }
 
-export interface OverviewRelationship {
-  source: string;
-  target: string;
-  type: string;
-  relationTags: string[];
-  description: string;
-  weight?: number;
-  mentionCount?: number;
-  chapterCount?: number;
-  chapters?: number[];
+async function inspectExistingDatabase(): Promise<ExistingDatabaseInspection | null> {
+  if (!(await Dexie.exists(PLOTMAPAI_DB_NAME))) {
+    return null;
+  }
+
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(PLOTMAPAI_DB_NAME);
+
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const { result } = request;
+      const inspection: ExistingDatabaseInspection = {
+        nativeVersion: result.version,
+        storeNames: Array.from(result.objectStoreNames),
+      };
+      result.close();
+      resolve(inspection);
+    };
+  });
 }
 
-export interface Novel {
-  id: number;
-  title: string;
-  author: string;
-  description: string;
-  tags: string[];
-  fileType: string;
-  fileHash: string;
-  coverPath: string;
-  originalFilename: string;
-  originalEncoding: string;
-  totalWords: number;
-  createdAt: string;
+function createDatabaseRecoveryRequiredError(error: unknown) {
+  return createAppError({
+    code: AppErrorCode.DATABASE_RECOVERY_REQUIRED,
+    kind: 'storage',
+    source: 'storage',
+    retryable: true,
+    userMessageKey: 'errors.DATABASE_RECOVERY_REQUIRED',
+    debugMessage: 'Detected an incompatible local database version that requires explicit recovery.',
+    details: {
+      databaseName: PLOTMAPAI_DB_NAME,
+      errorName: error instanceof Dexie.DexieError ? error.name : 'unknown',
+      legacyVersionError: isLegacyDatabaseVersionError(error),
+      targetVersion: CURRENT_DB_SCHEMA_VERSION,
+    },
+    cause: error,
+  });
 }
 
-export interface Chapter {
-  id: number;
-  novelId: number;
-  title: string;
-  content: string;
-  chapterIndex: number;
-  wordCount: number;
+function createDatabaseRecoveryRequiredErrorFromInspection(
+  inspection: ExistingDatabaseInspection,
+) {
+  const installedSignature = buildStoreSignature(inspection.storeNames);
+  const installedNativeVersion = inspection.nativeVersion;
+
+  return createAppError({
+    code: AppErrorCode.DATABASE_RECOVERY_REQUIRED,
+    kind: 'storage',
+    source: 'storage',
+    retryable: true,
+    userMessageKey: 'errors.DATABASE_RECOVERY_REQUIRED',
+    debugMessage: 'Detected an incompatible local database layout that is outside the managed migration lineage.',
+    details: {
+      databaseName: PLOTMAPAI_DB_NAME,
+      expectedNativeVersion: toNativeDatabaseVersion(CURRENT_DB_SCHEMA_VERSION),
+      installedNativeVersion,
+      installedStoreNames: inspection.storeNames,
+      recognizedNativeVersion: KNOWN_NATIVE_DATABASE_VERSIONS.has(installedNativeVersion),
+      recognizedStoreSignature: KNOWN_STORE_SIGNATURES.has(installedSignature),
+      targetVersion: CURRENT_DB_SCHEMA_VERSION,
+    },
+  });
 }
 
-export interface TocRule {
-  id: number;
-  name: string;
-  rule: string;
-  example: string;
-  serialNumber: number;
-  enable: boolean;
-  isDefault: boolean;
-  createdAt: string;
+async function requireCompatibleDatabase(): Promise<void> {
+  const inspection = await inspectExistingDatabase();
+  if (!inspection) {
+    return;
+  }
+
+  if (
+    !KNOWN_NATIVE_DATABASE_VERSIONS.has(inspection.nativeVersion)
+    || !KNOWN_STORE_SIGNATURES.has(buildStoreSignature(inspection.storeNames))
+  ) {
+    const recoveryError = createDatabaseRecoveryRequiredErrorFromInspection(inspection);
+    debugLog('Storage', 'Database recovery required', recoveryError.details ?? {});
+    reportAppError(recoveryError);
+    throw recoveryError;
+  }
 }
 
-export interface PurificationRule {
-  id: number;
-  externalId: number | null;
-  name: string;
-  group: string;
-  pattern: string;
-  replacement: string;
-  isRegex: boolean;
-  isEnabled: boolean;
-  order: number;
-  scopeTitle: boolean;
-  scopeContent: boolean;
-  bookScope: string;
-  excludeBookScope: string;
-  exclusiveGroup: string;
-  isDefault: boolean;
-  timeoutMs: number;
-  createdAt: string;
+export async function resetDatabaseForRecovery(): Promise<void> {
+  db.close();
+  await Dexie.delete(PLOTMAPAI_DB_NAME);
 }
 
-export interface ReadingProgress {
-  id: number;
-  novelId: number;
-  chapterIndex: number;
-  scrollPosition: number;
-  viewMode: string;
-  chapterProgress?: number;
-  isTwoColumn?: boolean;
-  updatedAt: string;
+export async function prepareDatabase(): Promise<void> {
+  if (db.isOpen()) {
+    return;
+  }
+
+  await requireCompatibleDatabase();
+
+  try {
+    await db.open();
+  } catch (error) {
+    if (!isLegacyDatabaseVersionError(error)) {
+      throw error;
+    }
+
+    const recoveryError = createDatabaseRecoveryRequiredError(error);
+    debugLog('Storage', 'Database recovery required', recoveryError.details ?? {});
+    reportAppError(recoveryError);
+    throw recoveryError;
+  }
 }
-
-export interface AppSettingRecord {
-  key: string;
-  value: unknown;
-  updatedAt: string;
-}
-
-export interface AnalysisJob {
-  id: number;
-  novelId: number;
-  status: string;
-  totalChapters: number;
-  analyzedChapters: number;
-  totalChunks: number;
-  completedChunks: number;
-  currentChunkIndex: number;
-  pauseRequested: boolean;
-  lastError: string;
-  startedAt: string | null;
-  completedAt: string | null;
-  lastHeartbeat: string | null;
-  updatedAt: string;
-}
-
-export interface AnalysisChunk {
-  id: number;
-  novelId: number;
-  chunkIndex: number;
-  startChapterIndex: number;
-  endChapterIndex: number;
-  chapterIndices: number[];
-  status: string;
-  chunkSummary: string;
-  errorMessage: string;
-  updatedAt: string;
-}
-
-export interface ChapterAnalysis {
-  id: number;
-  novelId: number;
-  chapterIndex: number;
-  chapterTitle: string;
-  summary: string;
-  keyPoints: string[];
-  characters: AnalysisCharacter[];
-  relationships: AnalysisRelationship[];
-  tags: string[];
-  chunkIndex: number;
-  updatedAt: string;
-}
-
-export interface AnalysisOverview {
-  id: number;
-  novelId: number;
-  bookIntro: string;
-  globalSummary: string;
-  themes: string[];
-  characterStats: OverviewCharacterStat[];
-  relationshipGraph: OverviewRelationship[];
-  totalChapters: number;
-  analyzedChapters: number;
-  updatedAt: string;
-}
-
-export interface CoverImage {
-  id: number;
-  novelId: number;
-  blob: Blob;
-}
-
-export interface ChapterImage {
-  id: number;
-  novelId: number;
-  imageKey: string;
-  blob: Blob;
-}
-
-const CURRENT_DB_VERSION = 6;
-
-const CURRENT_SCHEMA = {
-  novels: '++id, createdAt',
-  chapters: '++id, novelId, [novelId+chapterIndex]',
-  tocRules: '++id, serialNumber, enable',
-  purificationRules: '++id, order, isEnabled',
-  readingProgress: '++id, novelId',
-  appSettings: 'key, updatedAt',
-  analysisJobs: '++id, novelId',
-  analysisChunks: '++id, novelId, [novelId+chunkIndex]',
-  chapterAnalyses: '++id, novelId, [novelId+chapterIndex]',
-  analysisOverviews: '++id, novelId',
-  coverImages: '++id, novelId',
-  chapterImages: '++id, novelId, [novelId+imageKey]',
-} as const;
-
-const db = new Dexie('PlotMapAI') as Dexie & {
-  novels: EntityTable<Novel, 'id'>;
-  chapters: EntityTable<Chapter, 'id'>;
-  tocRules: EntityTable<TocRule, 'id'>;
-  purificationRules: EntityTable<PurificationRule, 'id'>;
-  readingProgress: EntityTable<ReadingProgress, 'id'>;
-  appSettings: EntityTable<AppSettingRecord, 'key'>;
-  analysisJobs: EntityTable<AnalysisJob, 'id'>;
-  analysisChunks: EntityTable<AnalysisChunk, 'id'>;
-  chapterAnalyses: EntityTable<ChapterAnalysis, 'id'>;
-  analysisOverviews: EntityTable<AnalysisOverview, 'id'>;
-  coverImages: EntityTable<CoverImage, 'id'>;
-  chapterImages: EntityTable<ChapterImage, 'id'>;
-};
-
-// Development phase: keep a single declaration for the latest schema instead of
-// preserving every intermediate migration step. If we later need production-grade
-// upgrade compatibility, reintroduce explicit version history and upgrades here.
-db.version(CURRENT_DB_VERSION).stores(CURRENT_SCHEMA);
 
 export { db };

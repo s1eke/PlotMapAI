@@ -1,12 +1,6 @@
 import { createWorkerTaskRunner } from '@infra/workers';
-import type {
-  WorkerTaskOptions,
-  WorkerTaskPayload,
-  WorkerTaskProgress,
-  WorkerTaskResult,
-} from '@infra/workers';
-import { parseTxtDocument } from './txt';
-import { purifyChapter, purifyChapters, purifyTitles } from './purify';
+import type { WorkerTaskOptions } from '@infra/workers';
+import { AppErrorCode } from '@shared/errors';
 import type {
   ParseTxtPayload,
   PurifyChapterPayload,
@@ -21,36 +15,39 @@ type TextProcessingTaskName = keyof TextProcessingTaskMap & string;
 
 function createTextProcessingTaskRunner<TTask extends TextProcessingTaskName>(
   task: TTask,
-  fallback: (
-    payload: WorkerTaskPayload<TextProcessingTaskMap, TTask>,
-    options: WorkerTaskOptions<WorkerTaskProgress<TextProcessingTaskMap, TTask>>,
-  ) => Promise<WorkerTaskResult<TextProcessingTaskMap, TTask>> | WorkerTaskResult<TextProcessingTaskMap, TTask>,
+  debugMessage: string,
 ) {
   return createWorkerTaskRunner<TextProcessingTaskMap, TTask>({
     createWorker: () => new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' }),
     task,
-    fallback,
+    unavailableError: {
+      code: AppErrorCode.WORKER_UNAVAILABLE,
+      kind: 'unsupported',
+      source: 'worker',
+      userMessageKey: 'errors.WORKER_UNAVAILABLE',
+      debugMessage,
+    },
   });
 }
 
 const runParseTxtWorkerTask = createTextProcessingTaskRunner(
   'parse-txt',
-  ({ file, tocRules }, options) => parseTxtDocument(file, tocRules, options),
+  'TXT parsing worker is unavailable.',
 );
 
 const runPurifyTitlesWorkerTask = createTextProcessingTaskRunner(
   'purify-titles',
-  ({ titles, rules, bookTitle }) => purifyTitles(titles, rules, bookTitle),
+  'Title purification worker is unavailable.',
 );
 
 const runPurifyChapterWorkerTask = createTextProcessingTaskRunner(
   'purify-chapter',
-  ({ chapter, rules, bookTitle }) => purifyChapter(chapter, rules, bookTitle),
+  'Chapter purification worker is unavailable.',
 );
 
 const runPurifyChaptersWorkerTask = createTextProcessingTaskRunner(
   'purify-chapters',
-  ({ chapters, rules, bookTitle }) => purifyChapters(chapters, rules, bookTitle),
+  'Batch chapter purification worker is unavailable.',
 );
 
 export function runParseTxtTask(

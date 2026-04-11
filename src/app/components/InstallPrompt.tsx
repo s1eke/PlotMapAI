@@ -1,13 +1,13 @@
 import { Download, Share2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CACHE_KEYS, storage } from '@infra/storage';
+import { debugLog } from '@shared/debug';
 import {
   DEBUG_RESET_PWA_PROMPTS_EVENT,
   DEBUG_SHOW_INSTALL_PROMPT_EVENT,
   DEBUG_SHOW_IOS_INSTALL_HINT_EVENT,
-  debugLog,
-} from '../debug/service';
+} from '../debug/pwaDebugTools';
 
 const INSTALL_PROMPT_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -32,7 +32,7 @@ function isStandaloneMode(): boolean {
 }
 
 function isIosLikeDevice(): boolean {
-  const userAgent = navigator.userAgent;
+  const { userAgent } = navigator;
 
   return /iPad|iPhone|iPod/.test(userAgent) || (userAgent.includes('Mac') && 'ontouchend' in document);
 }
@@ -68,21 +68,24 @@ function clearInstallPromptDismissal(): void {
 }
 
 function createDebugInstallPromptEvent(): BeforeInstallPromptEvent {
-  return {
-    prompt: async () => {
-      debugLog('PWA', 'debug install prompt action invoked');
-    },
-    userChoice: Promise.resolve({
-      outcome: 'accepted',
-      platform: 'debug',
-    }),
-  } as BeforeInstallPromptEvent;
+  const debugEvent = new Event('beforeinstallprompt') as BeforeInstallPromptEvent;
+  debugEvent.prompt = async () => {
+    debugLog('PWA', 'debug install prompt action invoked');
+  };
+  debugEvent.userChoice = Promise.resolve({
+    outcome: 'accepted',
+    platform: 'debug',
+  });
+
+  return debugEvent;
 }
 
 export default function InstallPrompt() {
   const { t } = useTranslation();
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
-  const [showIosHint, setShowIosHint] = useState(() => !isStandaloneMode() && isIosLikeDevice() && !isInstallPromptDismissed());
+  const [showIosHint, setShowIosHint] = useState(
+    () => !isStandaloneMode() && isIosLikeDevice() && !isInstallPromptDismissed(),
+  );
   const [dismissed, setDismissed] = useState(() => isInstallPromptDismissed());
 
   useEffect(() => {
@@ -144,11 +147,7 @@ export default function InstallPrompt() {
     };
   }, []);
 
-  if (dismissed || (!deferredPrompt && !showIosHint)) {
-    return null;
-  }
-
-  async function handleInstall(): Promise<void> {
+  const handleInstall = useCallback(async (): Promise<void> => {
     if (!deferredPrompt) {
       return;
     }
@@ -164,11 +163,15 @@ export default function InstallPrompt() {
 
     setDeferredPrompt(null);
     setDismissed(true);
-  }
+  }, [deferredPrompt]);
 
-  function handleDismiss(): void {
+  const handleDismiss = useCallback((): void => {
     rememberInstallPromptDismissal();
     setDismissed(true);
+  }, []);
+
+  if (dismissed || (!deferredPrompt && !showIosHint)) {
+    return null;
   }
 
   return (

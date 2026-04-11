@@ -1,5 +1,26 @@
 import { cleanText } from './text';
 
+export interface RelationshipGraphNodePairLike {
+  source: string;
+  target: string;
+}
+
+export interface RelationshipGraphMapEntry extends RelationshipGraphNodePairLike {
+  chapterCount?: number;
+  chapters?: number[];
+  description?: string;
+  mentionCount?: number;
+  relationTags?: string[];
+  type?: string;
+  weight?: number;
+}
+
+export interface MergedRelationshipGraphRecord extends RelationshipGraphNodePairLike {
+  description: string;
+  relationTags: string[];
+  type?: string;
+}
+
 const RELATION_TAG_CANONICAL_PATTERNS: Array<[string, string[]]> = [
   ['父女', ['父女']],
   ['父子', ['父子']],
@@ -37,7 +58,7 @@ export function normalizeRelationTags(...values: unknown[]): string[] | null {
     for (const item of candidates) {
       const rawTag = cleanText(item, 80);
       if (!rawTag) continue;
-      const fragments = rawTag.split(/[\\/|｜；;，,、]+/).map(fragment => cleanText(fragment, 80)).filter(Boolean);
+      const fragments = rawTag.split(/[\\/|｜；;，,、]+/).map((fragment) => cleanText(fragment, 80)).filter(Boolean);
       for (const candidate of fragments) {
         const tag = canonicalizeRelationTag(candidate);
         if (tag && !results.includes(tag)) results.push(tag);
@@ -47,10 +68,10 @@ export function normalizeRelationTags(...values: unknown[]): string[] | null {
   return results.length > 0 ? results : null;
 }
 
-export function buildLocalRelationshipGraphMap(
-  raw: Array<Record<string, unknown>>,
-): Map<string, Record<string, unknown>> {
-  const results = new Map<string, Record<string, unknown>>();
+export function buildLocalRelationshipGraphMap<T extends RelationshipGraphNodePairLike>(
+  raw: readonly T[],
+): Map<string, T> {
+  const results = new Map<string, T>();
   for (const item of raw) {
     const pair = normalizeCharacterPair(item.source, item.target);
     if (!pair) continue;
@@ -60,27 +81,29 @@ export function buildLocalRelationshipGraphMap(
 }
 
 export function buildOverviewRelationshipMap(
-  raw: Array<Record<string, unknown>>,
-): Map<string, Record<string, unknown>> {
-  const results = new Map<string, Record<string, unknown>>();
+  raw: readonly RelationshipGraphMapEntry[],
+): Map<string, MergedRelationshipGraphRecord> {
+  const results = new Map<string, MergedRelationshipGraphRecord>();
   for (const item of raw) {
     const pair = normalizeCharacterPair(item.source, item.target);
     if (!pair) continue;
     const key = `${pair[0]}::${pair[1]}`;
     let target = results.get(key);
     if (!target) {
-      target = { source: pair[0], target: pair[1], relationTags: [] as string[], description: '' };
+      target = { source: pair[0], target: pair[1], relationTags: [], description: '' };
       results.set(key, target);
     }
     for (const tag of normalizeRelationTags(item.relationTags, item.type) || []) {
-      const relationTags = target.relationTags as string[];
-      if (!relationTags.includes(tag) && relationTags.length < 6) {
-        relationTags.push(tag);
+      if (!target.relationTags.includes(tag) && target.relationTags.length < 6) {
+        target.relationTags.push(tag);
       }
     }
     const description = cleanText(item.description, 280);
     if (description && description.length > String(target.description ?? '').length) {
       target.description = description;
+    }
+    if (!target.type) {
+      target.type = cleanText(item.type, 80) || undefined;
     }
   }
   return results;
@@ -92,7 +115,7 @@ function canonicalizeRelationTag(tag: string): string {
   const compact = cleaned.replace(/\s+/g, '');
   if (!compact) return '';
   for (const [canonical, patterns] of RELATION_TAG_CANONICAL_PATTERNS) {
-    if (patterns.some(pattern => compact.includes(pattern))) return canonical;
+    if (patterns.some((pattern) => compact.includes(pattern))) return canonical;
   }
   return compact;
 }

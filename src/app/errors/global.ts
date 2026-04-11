@@ -1,4 +1,4 @@
-import { reportAppError } from '@app/debug/service';
+import { reportAppError } from '@shared/debug';
 import { AppErrorCode } from '@shared/errors';
 
 export function registerGlobalErrorHandlers(): () => void {

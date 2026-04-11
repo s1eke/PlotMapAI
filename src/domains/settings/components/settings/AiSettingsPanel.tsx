@@ -2,8 +2,10 @@ import { useRef } from 'react';
 import type { ChangeEvent } from 'react';
 import { Download, Loader2, Save, Upload, Wifi } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+
 import Modal from '@shared/components/Modal';
-import type { AiSettingsManager } from '../../hooks/useAiSettingsManager';
+
+import type { AiSettingsManager } from '../../settingsManagers';
 import SettingsActionMenu from './SettingsActionMenu';
 import SettingsFeedbackBanner from './SettingsFeedbackBanner';
 import SettingsSectionHeader from './SettingsSectionHeader';
@@ -17,11 +19,12 @@ export default function AiSettingsPanel({ manager }: AiSettingsPanelProps) {
   const importFileRef = useRef<HTMLInputElement>(null);
 
   const handleImportFileSelected = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
+    const input = event.target;
+    const file = input.files?.[0];
     if (!file) return;
 
     manager.queueImportFile(file);
-    event.target.value = '';
+    input.value = '';
   };
 
   return (
@@ -124,7 +127,7 @@ export default function AiSettingsPanel({ manager }: AiSettingsPanelProps) {
           <div className="flex flex-wrap gap-3">
             <button
               type="button"
-              onClick={() => void manager.saveSettings()}
+              onClick={() => manager.saveSettings()}
               disabled={manager.isSaving}
               className="px-4 py-2.5 rounded-xl bg-accent hover:bg-accent-hover text-white transition-colors flex items-center gap-2 disabled:opacity-60"
             >
@@ -133,7 +136,7 @@ export default function AiSettingsPanel({ manager }: AiSettingsPanelProps) {
             </button>
             <button
               type="button"
-              onClick={() => void manager.testSettings()}
+              onClick={() => manager.testSettings()}
               disabled={manager.isTesting}
               className="px-4 py-2.5 rounded-xl border border-border-color/20 hover:bg-white/5 text-text-primary transition-colors flex items-center gap-2 disabled:opacity-60"
             >
@@ -161,7 +164,7 @@ export default function AiSettingsPanel({ manager }: AiSettingsPanelProps) {
               className="w-full rounded-xl border border-border-color/20 bg-muted-bg/50 px-4 py-3 text-text-primary outline-none focus:border-accent"
               onKeyDown={(event) => {
                 if (event.key === 'Enter' && manager.exportPassword.length >= 4) {
-                  void manager.exportConfig();
+                  manager.exportConfig();
                 }
               }}
             />
@@ -177,7 +180,7 @@ export default function AiSettingsPanel({ manager }: AiSettingsPanelProps) {
             </button>
             <button
               type="button"
-              onClick={() => void manager.exportConfig()}
+              onClick={() => manager.exportConfig()}
               disabled={manager.exportPassword.length < 4 || manager.isExporting}
               className="px-4 py-2 rounded-lg font-medium bg-accent hover:bg-accent-hover text-white transition-colors disabled:opacity-50 flex items-center gap-2"
             >
@@ -210,7 +213,7 @@ export default function AiSettingsPanel({ manager }: AiSettingsPanelProps) {
               className="w-full rounded-xl border border-border-color/20 bg-muted-bg/50 px-4 py-3 text-text-primary outline-none focus:border-accent"
               onKeyDown={(event) => {
                 if (event.key === 'Enter' && manager.importPassword.length >= 4) {
-                  void manager.confirmImport();
+                  manager.confirmImport();
                 }
               }}
             />
@@ -226,8 +229,12 @@ export default function AiSettingsPanel({ manager }: AiSettingsPanelProps) {
             </button>
             <button
               type="button"
-              onClick={() => void manager.confirmImport()}
-              disabled={!manager.pendingImportFile || manager.importPassword.length < 4 || manager.isImporting}
+              onClick={() => manager.confirmImport()}
+              disabled={
+                !manager.pendingImportFile ||
+                manager.importPassword.length < 4 ||
+                manager.isImporting
+              }
               className="px-4 py-2 rounded-lg font-medium bg-accent hover:bg-accent-hover text-white transition-colors disabled:opacity-50 flex items-center gap-2"
             >
               {manager.isImporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}

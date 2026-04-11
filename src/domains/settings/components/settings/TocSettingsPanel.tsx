@@ -20,11 +20,12 @@ export default function TocSettingsPanel({ manager }: TocSettingsPanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
+    const input = event.target;
+    const file = input.files?.[0];
     if (!file) return;
 
-    void manager.importYaml(file);
-    event.target.value = '';
+    manager.importYaml(file);
+    input.value = '';
   };
 
   const renderActions = () => (
@@ -53,12 +54,56 @@ export default function TocSettingsPanel({ manager }: TocSettingsPanelProps) {
           {
             label: t('settings.common.export'),
             icon: <Download className="w-4 h-4" />,
-            onClick: () => void manager.exportYaml(),
+            onClick: () => manager.exportYaml(),
           },
         ]}
       />
     </>
   );
+  const content = (() => {
+    if (manager.isLoading) {
+      return (
+        <div className="py-12 flex justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-accent" />
+        </div>
+      );
+    }
+    if (manager.rules.length === 0) {
+      return (
+        <SettingsEmptyState
+          title={t('settings.toc.emptyTitle')}
+          description={t('settings.toc.emptyDescription')}
+        />
+      );
+    }
+
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-2 text-lg font-semibold text-text-primary border-l-4 border-accent pl-3">
+          {t('settings.tocRules')}
+          <span className="text-xs font-normal text-text-secondary bg-white/5 px-2 py-0.5 rounded-full">
+            {manager.rules.length}
+          </span>
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {manager.rules.map((rule) => (
+            <RuleCard
+              key={rule.id}
+              name={rule.name}
+              pattern={rule.rule}
+              isEnabled={rule.isEnabled}
+              priority={rule.priority}
+              isDefault={rule.isDefault}
+              isCustom={!rule.isDefault}
+              onToggle={(checked) => manager.toggleRule(rule.id, checked)}
+              onEdit={() => manager.openEditRule(rule)}
+              onDelete={() => manager.requestDeleteRule(rule)}
+            />
+          ))}
+        </div>
+      </div>
+    );
+  })();
 
   return (
     <div className="space-y-6">
@@ -70,41 +115,7 @@ export default function TocSettingsPanel({ manager }: TocSettingsPanelProps) {
 
       <SettingsFeedbackBanner feedback={manager.feedback} onDismiss={manager.clearFeedback} />
 
-      {manager.isLoading ? (
-        <div className="py-12 flex justify-center">
-          <Loader2 className="w-8 h-8 animate-spin text-accent" />
-        </div>
-      ) : manager.rules.length === 0 ? (
-        <SettingsEmptyState
-          title={t('settings.toc.emptyTitle')}
-          description={t('settings.toc.emptyDescription')}
-        />
-      ) : (
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 text-lg font-semibold text-text-primary border-l-4 border-accent pl-3">
-            {t('settings.tocRules')}
-            <span className="text-xs font-normal text-text-secondary bg-white/5 px-2 py-0.5 rounded-full">
-              {manager.rules.length}
-            </span>
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {manager.rules.map((rule) => (
-              <RuleCard
-                key={rule.id}
-                name={rule.name}
-                pattern={rule.rule}
-                isEnabled={rule.isEnabled}
-                priority={rule.priority}
-                isDefault={rule.isDefault}
-                isCustom={!rule.isDefault}
-                onToggle={(checked) => void manager.toggleRule(rule.id, checked)}
-                onEdit={() => manager.openEditRule(rule)}
-                onDelete={() => manager.requestDeleteRule(rule)}
-              />
-            ))}
-          </div>
-        </div>
-      )}
+      {content}
 
       <TocRuleModal
         isOpen={manager.isRuleModalOpen}
@@ -116,7 +127,7 @@ export default function TocSettingsPanel({ manager }: TocSettingsPanelProps) {
       <SettingsConfirmModal
         isOpen={Boolean(manager.pendingDeleteRule)}
         onClose={manager.cancelDeleteRule}
-        onConfirm={() => void manager.confirmDeleteRule()}
+        onConfirm={() => manager.confirmDeleteRule()}
         title={t('settings.toc.deleteTitle')}
         description={t('settings.toc.deleteConfirm')}
         cancelLabel={t('common.actions.cancel')}

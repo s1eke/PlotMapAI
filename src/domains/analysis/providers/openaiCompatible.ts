@@ -1,4 +1,4 @@
-import { debugLog } from '@app/debug/service';
+import { debugLog } from '@shared/debug';
 import { AppErrorCode } from '@shared/errors';
 import { LLM_TIMEOUT_MS } from '../services/constants';
 import { AnalysisExecutionError } from '../services/errors';
@@ -164,7 +164,7 @@ async function requestChatCompletion(
     });
   }
 
-  const choices = data.choices;
+  const { choices } = data;
   if (!Array.isArray(choices) || choices.length === 0) {
     throw new AnalysisExecutionError('AI 接口返回内容为空。', {
       code: AppErrorCode.AI_RESPONSE_EMPTY,
@@ -180,7 +180,7 @@ async function requestChatCompletion(
     });
   }
 
-  const message = (firstChoice as Record<string, unknown>).message;
+  const { message } = (firstChoice as Record<string, unknown>);
   if (typeof message !== 'object' || message === null) {
     throw new AnalysisExecutionError('AI 接口返回内容格式无效。', {
       code: AppErrorCode.AI_RESPONSE_INVALID,

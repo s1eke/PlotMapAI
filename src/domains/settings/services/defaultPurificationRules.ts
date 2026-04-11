@@ -1,6 +1,11 @@
-import type { PurificationRule } from '@infra/db';
-
 import { db } from '@infra/db';
+import { CURRENT_PURIFICATION_RULE_VERSION } from '@shared/text-processing';
+
+import type { PurificationRuleRecord } from '@infra/db/settings';
+import type {
+  PurificationExecutionStage,
+  PurificationTargetScope,
+} from '@shared/text-processing';
 
 import { loadYaml } from './yaml';
 
@@ -13,8 +18,8 @@ interface DefaultPurificationRuleRecord {
   isRegex: boolean;
   isEnabled: boolean;
   order: number;
-  scopeTitle: boolean;
-  scopeContent: boolean;
+  targetScope: PurificationTargetScope;
+  executionStage: PurificationExecutionStage;
   exclusiveGroup?: string;
   timeoutMs?: number;
 }
@@ -30,7 +35,7 @@ async function loadDefaultPurificationRules(): Promise<DefaultPurificationRuleRe
 function mapDefaultPurificationRule(
   rule: DefaultPurificationRuleRecord,
   createdAt: string,
-): Omit<PurificationRule, 'id'> {
+): Omit<PurificationRuleRecord, 'id'> {
   return {
     externalId: rule.externalId,
     name: rule.name,
@@ -40,8 +45,9 @@ function mapDefaultPurificationRule(
     isRegex: rule.isRegex,
     isEnabled: rule.isEnabled,
     order: rule.order,
-    scopeTitle: rule.scopeTitle,
-    scopeContent: rule.scopeContent,
+    targetScope: rule.targetScope,
+    executionStage: rule.executionStage,
+    ruleVersion: CURRENT_PURIFICATION_RULE_VERSION,
     bookScope: '',
     excludeBookScope: '',
     exclusiveGroup: rule.exclusiveGroup ?? '',
@@ -67,18 +73,22 @@ export async function ensureDefaultPurificationRules(): Promise<void> {
   const createdAt = new Date().toISOString();
   for (const rule of defaultRules) {
     if (existingExternalIds.has(rule.externalId)) {
-      const existingRule = existingRules.find((candidate) => candidate.externalId === rule.externalId);
+      const existingRule = existingRules.find(
+        (candidate) => candidate.externalId === rule.externalId,
+      );
       if (existingRule) {
         await db.purificationRules.update(existingRule.id, {
           isDefault: true,
           exclusiveGroup: rule.exclusiveGroup ?? '',
+          targetScope: rule.targetScope,
+          executionStage: rule.executionStage,
+          ruleVersion: CURRENT_PURIFICATION_RULE_VERSION,
         });
       }
       continue;
     }
 
     await db.purificationRules.add({
-      id: undefined as unknown as number,
       ...mapDefaultPurificationRule(rule, createdAt),
     });
   }

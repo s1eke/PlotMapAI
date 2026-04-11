@@ -3,6 +3,7 @@ import { DEVICE_KEY_STORAGE_KEY } from './keys';
 
 let deviceCryptoKey: CryptoKey | null = null;
 let deviceKeyPromise: Promise<CryptoKey> | null = null;
+const sessionValues = new Map<string, string>();
 
 function isBrowser(): boolean {
   return typeof window !== 'undefined';
@@ -95,12 +96,21 @@ async function decrypt(payload: string): Promise<string> {
 async function get(key: string): Promise<string | null> {
   if (!isBrowser()) return null;
   const payload = localStorage.getItem(key);
-  if (!payload) return null;
+  if (!payload) {
+    sessionValues.delete(key);
+    return null;
+  }
+
+  const cached = sessionValues.get(key);
+  if (cached !== undefined) {
+    return cached;
+  }
 
   try {
-    return await decrypt(payload);
+    const value = await decrypt(payload);
+    sessionValues.set(key, value);
+    return value;
   } catch {
-    localStorage.removeItem(key);
     return null;
   }
 }
@@ -109,16 +119,19 @@ async function set(key: string, value: string): Promise<void> {
   if (!isBrowser()) return;
   const payload = await encrypt(value);
   localStorage.setItem(key, payload);
+  sessionValues.set(key, value);
 }
 
 async function remove(key: string): Promise<void> {
   if (!isBrowser()) return;
   localStorage.removeItem(key);
+  sessionValues.delete(key);
 }
 
 function resetForTesting(): void {
   deviceCryptoKey = null;
   deviceKeyPromise = null;
+  sessionValues.clear();
 }
 
 export const secureStorage = {

@@ -1,5 +1,7 @@
-import type { TocRule } from '@infra/db';
 import { db } from '@infra/db';
+
+import type { TocRuleRecord } from '@infra/db/settings';
+
 import { loadYaml } from './yaml';
 
 interface DefaultTocRuleRecord {
@@ -18,7 +20,7 @@ async function loadDefaultTocRules(): Promise<DefaultTocRuleRecord[]> {
   return loadYaml<DefaultTocRuleRecord[]>(defaultTocRulesRaw);
 }
 
-function mapDefaultRule(rule: DefaultTocRuleRecord, createdAt: string): Omit<TocRule, 'id'> {
+function mapDefaultRule(rule: DefaultTocRuleRecord, createdAt: string): Omit<TocRuleRecord, 'id'> {
   return {
     name: rule.name,
     rule: rule.rule,
@@ -40,7 +42,6 @@ export async function ensureDefaultTocRules(): Promise<void> {
   const defaultRules = await loadDefaultTocRules();
   for (const rule of defaultRules) {
     await db.tocRules.add({
-      id: undefined as unknown as number,
       ...mapDefaultRule(rule, createdAt),
     });
   }

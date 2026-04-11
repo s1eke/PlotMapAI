@@ -3,7 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { Loader2 } from 'lucide-react';
 import Modal from '@shared/components/Modal';
 import Toggle from '@shared/components/Toggle';
-import type { PurificationRule } from '../api/types';
+import { CURRENT_PURIFICATION_RULE_VERSION } from '@shared/text-processing';
+import type { PurificationRule } from '../types';
 
 interface PurificationRuleModalProps {
   isOpen: boolean;
@@ -12,7 +13,10 @@ interface PurificationRuleModalProps {
   rule: PurificationRule | null;
 }
 
-function createInitialFormData(defaultGroup: string, rule?: PurificationRule | null): Partial<PurificationRule> {
+function createInitialFormData(
+  defaultGroup: string,
+  rule?: PurificationRule | null,
+): Partial<PurificationRule> {
   return {
     id: rule?.id,
     externalId: rule?.externalId,
@@ -23,8 +27,9 @@ function createInitialFormData(defaultGroup: string, rule?: PurificationRule | n
     isRegex: rule?.isRegex ?? true,
     isEnabled: rule?.isEnabled ?? true,
     order: rule?.order ?? 10,
-    scopeTitle: rule?.scopeTitle ?? true,
-    scopeContent: rule?.scopeContent ?? true,
+    targetScope: rule?.targetScope ?? 'all',
+    executionStage: rule?.executionStage ?? 'post-ast',
+    ruleVersion: rule?.ruleVersion ?? CURRENT_PURIFICATION_RULE_VERSION,
     bookScope: rule?.bookScope ?? '',
     excludeBookScope: rule?.excludeBookScope ?? '',
     exclusiveGroup: rule?.exclusiveGroup ?? '',
@@ -34,7 +39,12 @@ function createInitialFormData(defaultGroup: string, rule?: PurificationRule | n
   };
 }
 
-export default function PurificationRuleModal({ isOpen, onClose, onSave, rule }: PurificationRuleModalProps) {
+export default function PurificationRuleModal({
+  isOpen,
+  onClose,
+  onSave,
+  rule,
+}: PurificationRuleModalProps) {
   const { t } = useTranslation();
   const defaultGroup = t('settings.purification.defaultGroup');
   const [formData, setFormData] = useState<Partial<PurificationRule>>(
@@ -42,19 +52,22 @@ export default function PurificationRuleModal({ isOpen, onClose, onSave, rule }:
   );
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
     setFormData(createInitialFormData(defaultGroup, rule));
+    setSubmitError(null);
   }, [defaultGroup, isOpen, rule]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setSubmitError(null);
     try {
       await onSave(formData);
       onClose();
     } catch (err) {
-      console.error(err);
+      setSubmitError(err instanceof Error ? err.message : String(err));
     } finally {
       setIsSubmitting(false);
     }
@@ -75,7 +88,7 @@ export default function PurificationRuleModal({ isOpen, onClose, onSave, rule }:
               type="text"
               required
               value={formData.name ?? ''}
-              onChange={e => setFormData({ ...formData, name: e.target.value })}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               className="w-full bg-muted-bg border border-white/10 rounded-xl px-4 py-2.5 text-text-primary focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-all"
               placeholder={t('settings.purification.namePlaceholder')}
             />
@@ -86,7 +99,7 @@ export default function PurificationRuleModal({ isOpen, onClose, onSave, rule }:
               type="text"
               required
               value={formData.group ?? ''}
-              onChange={e => setFormData({ ...formData, group: e.target.value })}
+              onChange={(e) => setFormData({ ...formData, group: e.target.value })}
               className="w-full bg-muted-bg border border-white/10 rounded-xl px-4 py-2.5 text-text-primary focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-all"
               placeholder={t('settings.purification.groupPlaceholder')}
             />
@@ -99,7 +112,7 @@ export default function PurificationRuleModal({ isOpen, onClose, onSave, rule }:
           <textarea
             required
             value={formData.pattern ?? ''}
-            onChange={e => setFormData({ ...formData, pattern: e.target.value })}
+            onChange={(e) => setFormData({ ...formData, pattern: e.target.value })}
             className="w-full bg-muted-bg border border-white/10 rounded-xl px-4 py-2.5 text-text-primary focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-all font-mono text-sm h-24 resize-none"
             placeholder={t('settings.purification.patternPlaceholder')}
           />
@@ -117,7 +130,7 @@ export default function PurificationRuleModal({ isOpen, onClose, onSave, rule }:
           </div>
           <textarea
             value={formData.replacement ?? ''}
-            onChange={e => setFormData({ ...formData, replacement: e.target.value })}
+            onChange={(e) => setFormData({ ...formData, replacement: e.target.value })}
             className="w-full bg-muted-bg border border-white/10 rounded-xl px-4 py-2.5 text-text-primary focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-all font-mono text-sm h-24 resize-none"
             placeholder={t('settings.purification.replacementPlaceholder')}
           />
@@ -130,36 +143,54 @@ export default function PurificationRuleModal({ isOpen, onClose, onSave, rule }:
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-muted-bg/50 p-4 rounded-xl border border-white/5">
           <div className="flex items-center justify-between">
             <span className="text-sm text-text-primary">{t('settings.purification.useRegex')}</span>
-            <Toggle checked={formData.isRegex ?? false} onChange={checked => setFormData({ ...formData, isRegex: checked })} />
+            <Toggle
+              checked={formData.isRegex ?? false}
+              onChange={(checked) => setFormData({ ...formData, isRegex: checked })}
+            />
           </div>
           <div className="flex items-center justify-between">
             <span className="text-sm text-text-primary">{t('settings.purification.isEnabled')}</span>
-            <Toggle checked={formData.isEnabled ?? false} onChange={checked => setFormData({ ...formData, isEnabled: checked })} />
+            <Toggle
+              checked={formData.isEnabled ?? false}
+              onChange={(checked) => setFormData({ ...formData, isEnabled: checked })}
+            />
           </div>
         </div>
 
-        {/* Scopes */}
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-text-primary px-1">{t('settings.purification.scope')}</label>
-          <div className="flex gap-4">
-            <label className="flex items-center gap-2 cursor-pointer group">
-              <input
-                type="checkbox"
-                checked={formData.scopeTitle ?? true}
-                onChange={e => setFormData({ ...formData, scopeTitle: e.target.checked })}
-                className="w-4 h-4 rounded border-white/20 bg-white/5 text-accent focus:ring-accent focus:ring-offset-0"
-              />
-              <span className="text-sm text-text-secondary group-hover:text-text-primary transition-colors">{t('settings.purification.scopeTitle')}</span>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer group">
-              <input
-                type="checkbox"
-                checked={formData.scopeContent ?? true}
-                onChange={e => setFormData({ ...formData, scopeContent: e.target.checked })}
-                className="w-4 h-4 rounded border-white/20 bg-white/5 text-accent focus:ring-accent focus:ring-offset-0"
-              />
-              <span className="text-sm text-text-secondary group-hover:text-text-primary transition-colors">{t('settings.purification.scopeContent')}</span>
-            </label>
+        {/* Scope & Stage */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-text-primary px-1">{t('settings.purification.scope')}</label>
+            <select
+              value={formData.targetScope ?? 'all'}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  targetScope: e.target.value as PurificationRule['targetScope'],
+                })}
+              className="w-full bg-muted-bg border border-white/10 rounded-xl px-4 py-2.5 text-text-primary focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-all"
+            >
+              <option value="text">{t('settings.purification.scopeText')}</option>
+              <option value="heading">{t('settings.purification.scopeHeading')}</option>
+              <option value="caption">{t('settings.purification.scopeCaption')}</option>
+              <option value="all">{t('settings.purification.scopeAll')}</option>
+            </select>
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-text-primary px-1">{t('settings.purification.executionStage')}</label>
+            <select
+              value={formData.executionStage ?? 'post-ast'}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  executionStage: e.target.value as PurificationRule['executionStage'],
+                })}
+              className="w-full bg-muted-bg border border-white/10 rounded-xl px-4 py-2.5 text-text-primary focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-all"
+            >
+              <option value="pre-ast">{t('settings.purification.stagePreAst')}</option>
+              <option value="post-ast">{t('settings.purification.stagePostAst')}</option>
+              <option value="plain-text-only">{t('settings.purification.stagePlainTextOnly')}</option>
+            </select>
           </div>
         </div>
 
@@ -170,7 +201,7 @@ export default function PurificationRuleModal({ isOpen, onClose, onSave, rule }:
             <input
               type="text"
               value={formData.bookScope ?? ''}
-              onChange={e => setFormData({ ...formData, bookScope: e.target.value })}
+              onChange={(e) => setFormData({ ...formData, bookScope: e.target.value })}
               className="w-full bg-muted-bg border border-white/10 rounded-xl px-4 py-2.5 text-text-primary focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-all"
               placeholder={t('settings.purification.bookScopePlaceholder')}
             />
@@ -180,7 +211,7 @@ export default function PurificationRuleModal({ isOpen, onClose, onSave, rule }:
             <input
               type="text"
               value={formData.excludeBookScope ?? ''}
-              onChange={e => setFormData({ ...formData, excludeBookScope: e.target.value })}
+              onChange={(e) => setFormData({ ...formData, excludeBookScope: e.target.value })}
               className="w-full bg-muted-bg border border-white/10 rounded-xl px-4 py-2.5 text-text-primary focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-all"
               placeholder={t('settings.purification.excludeBookScopePlaceholder')}
             />
@@ -196,7 +227,12 @@ export default function PurificationRuleModal({ isOpen, onClose, onSave, rule }:
               min="1"
               max="20"
               value={formData.order ?? 10}
-              onChange={e => setFormData({ ...formData, order: Number.parseInt(e.target.value, 10) || 0 })}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  order: Number.parseInt(e.target.value, 10) || 0,
+                })
+              }
               className="w-full bg-muted-bg border border-white/10 rounded-xl px-4 py-2.5 text-text-primary focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-all"
             />
           </div>
@@ -205,13 +241,21 @@ export default function PurificationRuleModal({ isOpen, onClose, onSave, rule }:
             <input
               type="number"
               value={formData.timeoutMs ?? 3000}
-              onChange={e => setFormData({ ...formData, timeoutMs: Number.parseInt(e.target.value, 10) || 0 })}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  timeoutMs: Number.parseInt(e.target.value, 10) || 0,
+                })
+              }
               className="w-full bg-muted-bg border border-white/10 rounded-xl px-4 py-2.5 text-text-primary focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-all"
             />
           </div>
         </div>
 
         {/* Footer */}
+        {submitError && (
+          <p className="text-sm text-red-400 px-1">{submitError}</p>
+        )}
         <div className="flex justify-end gap-3 pt-4 border-t border-white/5 mt-6">
           <button
             type="button"

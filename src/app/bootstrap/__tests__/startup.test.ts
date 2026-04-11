@@ -1,16 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockInitializeApp, mockReportAppError } = vi.hoisted(() => ({
+import { AppErrorCode, createAppError } from '@shared/errors';
+
+const { mockInitializeApp, mockReportAppError, mockResetDatabaseForRecovery } = vi.hoisted(() => ({
   mockInitializeApp: vi.fn(),
   mockReportAppError: vi.fn(),
+  mockResetDatabaseForRecovery: vi.fn(),
 }));
 
 vi.mock('../initializeApp', () => ({
   initializeApp: mockInitializeApp,
 }));
 
-vi.mock('@app/debug/service', () => ({
+vi.mock('@shared/debug', () => ({
   reportAppError: mockReportAppError,
+}));
+
+vi.mock('@infra/db', () => ({
+  resetDatabaseForRecovery: mockResetDatabaseForRecovery,
 }));
 
 describe('initializeAppSafely', () => {
@@ -23,7 +30,26 @@ describe('initializeAppSafely', () => {
 
     const { initializeAppSafely } = await import('../startup');
 
-    await expect(initializeAppSafely()).resolves.toBeNull();
+    await expect(initializeAppSafely()).resolves.toEqual({ kind: 'ready' });
+    expect(mockReportAppError).not.toHaveBeenCalled();
+  });
+
+  it('returns a recovery state for incompatible legacy databases without double-reporting', async () => {
+    const recoveryError = createAppError({
+      code: AppErrorCode.DATABASE_RECOVERY_REQUIRED,
+      kind: 'storage',
+      source: 'storage',
+      userMessageKey: 'errors.DATABASE_RECOVERY_REQUIRED',
+      debugMessage: 'legacy database needs recovery',
+    });
+    mockInitializeApp.mockRejectedValue(recoveryError);
+
+    const { initializeAppSafely } = await import('../startup');
+
+    await expect(initializeAppSafely()).resolves.toEqual({
+      kind: 'recovery-required',
+      error: recoveryError,
+    });
     expect(mockReportAppError).not.toHaveBeenCalled();
   });
 
@@ -35,7 +61,10 @@ describe('initializeAppSafely', () => {
 
     const { initializeAppSafely } = await import('../startup');
 
-    await expect(initializeAppSafely()).resolves.toBe(normalized);
+    await expect(initializeAppSafely()).resolves.toEqual({
+      kind: 'error',
+      error: normalized,
+    });
     expect(mockReportAppError).toHaveBeenCalledWith(startupError, {
       code: 'INTERNAL_ERROR',
       kind: 'internal',
@@ -45,5 +74,16 @@ describe('initializeAppSafely', () => {
         phase: 'bootstrap',
       },
     });
+  });
+
+  it('resets the database and re-runs startup when recovery is confirmed', async () => {
+    mockResetDatabaseForRecovery.mockResolvedValue(undefined);
+    mockInitializeApp.mockResolvedValue(undefined);
+
+    const { resetDatabaseAndReinitialize } = await import('../startup');
+
+    await expect(resetDatabaseAndReinitialize()).resolves.toEqual({ kind: 'ready' });
+    expect(mockResetDatabaseForRecovery).toHaveBeenCalledTimes(1);
+    expect(mockInitializeApp).toHaveBeenCalledTimes(1);
   });
 });

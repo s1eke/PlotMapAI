@@ -1,3 +1,2 @@
-export function loadCharacterGraphPage() {
-  return import('./pages/CharacterGraphPage');
-}
+export { default as CharacterGraphStage } from './components/characterGraph/CharacterGraphStage';
+export { useCharacterGraphCanvasController } from './hooks/useCharacterGraphCanvasController';

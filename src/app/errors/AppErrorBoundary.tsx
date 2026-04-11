@@ -2,8 +2,8 @@ import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { AlertTriangle, ArrowLeft, Home, RefreshCw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { appPaths } from '@app/router/paths';
+import { reportAppError } from '@shared/debug';
 import { AppErrorCode, getErrorPresentation, toAppError, type AppError } from '@shared/errors';
-import { reportAppError } from '@app/debug/service';
 
 interface AppErrorBoundaryProps {
   children: ReactNode;
@@ -69,11 +69,10 @@ function AppErrorFallback({ error }: AppErrorFallbackProps) {
   );
 }
 
-export default class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorBoundaryState> {
-  override state: AppErrorBoundaryState = {
-    error: null,
-  };
-
+export default class AppErrorBoundary extends Component<
+  AppErrorBoundaryProps,
+  AppErrorBoundaryState
+> {
   static getDerivedStateFromError(error: Error): AppErrorBoundaryState {
     return {
       error: toAppError(error, {
@@ -84,6 +83,10 @@ export default class AppErrorBoundary extends Component<AppErrorBoundaryProps, A
       }),
     };
   }
+
+  override state: AppErrorBoundaryState = {
+    error: null,
+  };
 
   override componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
     const normalized = toAppError(error, {

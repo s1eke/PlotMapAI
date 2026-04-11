@@ -25,10 +25,18 @@ describe('secureStorage', () => {
     expect(await secureStorage.get('second-key')).toBe('two');
   });
 
-  it('returns null and removes corrupted ciphertext', async () => {
+  it('keeps same-session secrets readable even if the device key disappears temporarily', async () => {
+    await secureStorage.set('session-key', 'live-secret');
+
+    localStorage.removeItem(DEVICE_KEY_STORAGE_KEY);
+
+    await expect(secureStorage.get('session-key')).resolves.toBe('live-secret');
+  });
+
+  it('returns null without deleting corrupted ciphertext', async () => {
     localStorage.setItem('broken-secure-key', 'bad-payload');
 
     await expect(secureStorage.get('broken-secure-key')).resolves.toBeNull();
-    expect(localStorage.getItem('broken-secure-key')).toBeNull();
+    expect(localStorage.getItem('broken-secure-key')).toBe('bad-payload');
   });
 });

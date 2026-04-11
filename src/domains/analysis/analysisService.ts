@@ -1,0 +1,94 @@
+import type {
+  AnalysisOverview,
+  AnalysisStatusResponse,
+  BookChapter,
+  ChapterAnalysisResult,
+  CharacterGraphResponse,
+} from '@shared/contracts';
+import type { Transaction } from 'dexie';
+
+import type { RuntimeAnalysisConfig } from './services/types';
+import {
+  analyzeSingleChapter,
+  getAnalysisStatus,
+  getChapterAnalysis as getChapterAnalysisRecord,
+  getCharacterGraph as getCharacterGraphRecord,
+  getOverview as getOverviewRecord,
+  initializeAnalysisRuntime,
+  pauseAnalysis,
+  refreshOverview,
+  restartAnalysis,
+  resumeAnalysis,
+  startAnalysis,
+  deleteAnalysisArtifacts as deletePersistedAnalysisArtifacts,
+} from './runtime/orchestrator';
+
+export interface AnalysisExecutionContext {
+  chapters: BookChapter[];
+  novelId: number;
+  novelTitle: string;
+  runtimeConfig: RuntimeAnalysisConfig;
+}
+
+export interface AnalyzeSingleChapterInput extends AnalysisExecutionContext {
+  chapterIndex: number;
+}
+
+export const analysisService = {
+  analyzeChapter: async (
+    input: AnalyzeSingleChapterInput,
+  ): Promise<{ analysis: ChapterAnalysisResult | null }> => {
+    const analysis = await analyzeSingleChapter(input);
+    return { analysis };
+  },
+
+  getChapterAnalysis: async (
+    novelId: number,
+    chapterIndex: number,
+  ): Promise<{ analysis: ChapterAnalysisResult | null }> => {
+    return getChapterAnalysisRecord(novelId, chapterIndex);
+  },
+
+  getCharacterGraph: (
+    novelId: number,
+    chapters: BookChapter[],
+  ): Promise<CharacterGraphResponse> => {
+    return getCharacterGraphRecord(novelId, chapters);
+  },
+
+  getOverview: async (novelId: number): Promise<{ overview: AnalysisOverview | null }> => {
+    return getOverviewRecord(novelId);
+  },
+
+  getStatus: (novelId: number): Promise<AnalysisStatusResponse> => {
+    return getAnalysisStatus(novelId);
+  },
+
+  initialize: (): Promise<void> => {
+    return initializeAnalysisRuntime();
+  },
+
+  pause: (novelId: number): Promise<AnalysisStatusResponse> => {
+    return pauseAnalysis(novelId);
+  },
+
+  refreshOverview: (input: AnalysisExecutionContext): Promise<AnalysisStatusResponse> => {
+    return refreshOverview(input);
+  },
+
+  restart: (input: AnalysisExecutionContext): Promise<AnalysisStatusResponse> => {
+    return restartAnalysis(input);
+  },
+
+  resume: (input: AnalysisExecutionContext): Promise<AnalysisStatusResponse> => {
+    return resumeAnalysis(input);
+  },
+
+  start: (input: AnalysisExecutionContext): Promise<AnalysisStatusResponse> => {
+    return startAnalysis(input);
+  },
+
+  deleteArtifacts: async (novelId: number, transaction?: Transaction): Promise<void> => {
+    return deletePersistedAnalysisArtifacts(novelId, transaction);
+  },
+};

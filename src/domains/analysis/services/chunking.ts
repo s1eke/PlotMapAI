@@ -73,11 +73,11 @@ function buildChunkPayload(
 ): AnalysisChunkPayload {
   return {
     chunkIndex,
-    chapterIndices: chapters.map(chapter => chapter.chapterIndex),
+    chapterIndices: chapters.map((chapter) => chapter.chapterIndex),
     startChapterIndex: chapters[0].chapterIndex,
     endChapterIndex: chapters[chapters.length - 1].chapterIndex,
     contentLength,
     chapters,
-    text: chapters.map(chapter => chapter.text).join('\n\n'),
+    text: chapters.map((chapter) => chapter.text).join('\n\n'),
   };
 }

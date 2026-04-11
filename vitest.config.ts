@@ -6,6 +6,7 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
+      '@application': resolve(__dirname, './src/application'),
       '@app': resolve(__dirname, './src/app'),
       '@domains': resolve(__dirname, './src/domains'),
       '@shared': resolve(__dirname, './src/shared'),
@@ -17,7 +18,10 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
-    include: ['src/{app,domains,shared,infra}/**/__tests__/**/*.{test,spec}.{ts,tsx}'],
+    include: [
+      'src/{app,application,domains,shared,infra}/**/__tests__/**/*.{test,spec}.{ts,tsx}',
+      'scripts/**/*.test.ts',
+    ],
     alias: {
       'virtual:pwa-register/react': resolve(__dirname, './src/test/mocks/pwaRegisterReact.ts'),
     },

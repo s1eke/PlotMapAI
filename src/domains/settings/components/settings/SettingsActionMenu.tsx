@@ -85,9 +85,9 @@ export default function SettingsActionMenu({
 
   return (
     <div className="flex items-center gap-2 min-w-max">
-      {inlineActions.map((action, index) => (
+      {inlineActions.map((action) => (
         <button
-          key={`${action.label}-${index}`}
+          key={action.label}
           type="button"
           onClick={action.onClick}
           disabled={action.disabled}
@@ -116,9 +116,9 @@ export default function SettingsActionMenu({
 
           {isOverflowOpen && (
             <div role="menu" className="absolute right-0 top-full mt-2 z-30 min-w-40 rounded-xl border border-white/10 bg-bg-secondary/95 p-1.5 shadow-2xl backdrop-blur-md">
-              {overflow.map((action, index) => (
+              {overflow.map((action) => (
                 <button
-                  key={`${action.label}-overflow-${index}`}
+                  key={`overflow:${action.label}`}
                   type="button"
                   role="menuitem"
                   onClick={() => {

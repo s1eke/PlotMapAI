@@ -1,9 +1,13 @@
 import type { ParsedBook } from './bookParser';
-import { debugLog } from '@app/debug/service';
 import type { WorkerTaskOptions } from '@infra/workers';
-import { runParseTxtTask } from '@shared/text-processing';
 import type { ChapterDetectionRule, ParsedTextDocument } from '@shared/text-processing';
 import type { BookImportProgress } from './progress';
+
+import { debugLog } from '@shared/debug';
+import {
+  projectTxtPlainTextToRichBlocks,
+  runParseTxtTask,
+} from '@shared/text-processing';
 
 function mapParsedDocument(document: ParsedTextDocument): ParsedBook {
   return {
@@ -11,7 +15,12 @@ function mapParsedDocument(document: ParsedTextDocument): ParsedBook {
     author: '',
     description: '',
     coverBlob: null,
-    chapters: document.chapters,
+    chapters: document.chapters.map((chapter) => ({
+      title: chapter.title,
+      content: chapter.content,
+      contentFormat: 'rich',
+      richBlocks: projectTxtPlainTextToRichBlocks(chapter.content),
+    })),
     rawText: document.rawText,
     encoding: document.encoding,
     totalWords: document.totalWords,
@@ -32,8 +41,11 @@ export async function parseTxt(
       signal: options.signal,
       onProgress: (progress) => {
         options.onProgress?.({
+          current: progress.current,
+          detail: progress.detail,
           progress: progress.progress,
           stage: progress.stage as BookImportProgress['stage'],
+          total: progress.total,
         });
       },
     },

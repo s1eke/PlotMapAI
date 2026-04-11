@@ -14,7 +14,9 @@ export default function LanguageSwitcher() {
     { code: 'en', name: 'English' },
   ];
 
-  const currentLanguage = languages.find(lang => i18n.language.startsWith(lang.code)) || languages[1];
+  const currentLanguage = languages.find((lang) => (
+    i18n.language.startsWith(lang.code)
+  )) || languages[1];
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -51,8 +53,8 @@ export default function LanguageSwitcher() {
               key={lang.code}
               onClick={() => toggleLanguage(lang.code)}
               className={cn(
-                "w-full text-left px-4 py-2 text-sm transition-colors hover:bg-muted-bg",
-                i18n.language.startsWith(lang.code) ? "text-accent font-medium" : "text-text-primary"
+                'w-full text-left px-4 py-2 text-sm transition-colors hover:bg-muted-bg',
+                i18n.language.startsWith(lang.code) ? 'text-accent font-medium' : 'text-text-primary',
               )}
             >
               {lang.name}

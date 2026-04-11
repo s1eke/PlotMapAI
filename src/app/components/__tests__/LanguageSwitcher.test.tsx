@@ -50,7 +50,7 @@ describe('LanguageSwitcher', () => {
       <div>
         <LanguageSwitcher />
         <div data-testid="outside">Outside</div>
-      </div>
+      </div>,
     );
     const user = userEvent.setup();
     await user.click(screen.getByRole('button'));

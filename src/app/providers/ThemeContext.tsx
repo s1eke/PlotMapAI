@@ -1,6 +1,12 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useEffect, useMemo, type ReactNode } from 'react';
-import { ensureSessionPreferencesHydrated, setAppTheme, useReaderSessionSelector, type AppTheme } from '@domains/reader';
+
+import {
+  ensureAppThemeHydrated,
+  toggleAppTheme,
+  type AppTheme,
+  useAppThemeSelector,
+} from '@shared/stores/appThemeStore';
 
 interface ThemeContextType {
   theme: AppTheme;
@@ -10,17 +16,15 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const theme = useReaderSessionSelector(state => state.appTheme);
+  const theme = useAppThemeSelector((state) => state.theme);
 
   useEffect(() => {
-    void ensureSessionPreferencesHydrated();
+    ensureAppThemeHydrated();
   }, []);
 
   const value = useMemo<ThemeContextType>(() => ({
     theme,
-    toggleTheme: () => {
-      setAppTheme(theme === 'light' ? 'dark' : 'light');
-    },
+    toggleTheme: toggleAppTheme,
   }), [theme]);
 
   return (

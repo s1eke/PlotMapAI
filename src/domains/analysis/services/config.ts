@@ -1,20 +1,23 @@
+import type { RuntimeAnalysisConfig } from './types';
+
 import { AppErrorCode } from '@shared/errors';
 import { MIN_CONTEXT_SIZE } from './constants';
 import { AnalysisConfigError } from './errors';
-import type { RuntimeAnalysisConfig } from './types';
 import {
-  DEFAULT_ANALYSIS_PROVIDER_ID,
   isAnalysisProviderId,
 } from '../providers';
 import { cleanText, coerceContextSize } from './text';
 
-export interface RuntimeAnalysisConfigInput {
-  providerId?: unknown;
+export interface RuntimeAnalysisProviderConfigInput {
   apiBaseUrl?: unknown;
   apiKey?: unknown;
   modelName?: unknown;
+}
+
+export interface RuntimeAnalysisConfigInput {
+  providerId?: unknown;
   contextSize?: unknown;
-  providerConfig?: unknown;
+  providerConfig?: RuntimeAnalysisProviderConfigInput | null;
 }
 
 export function maskApiKey(apiKey: string): string {
@@ -76,11 +79,7 @@ export function validateAnalysisConfig(config: RuntimeAnalysisConfig): void {
   }
 }
 
-function resolveProviderId(value: unknown): typeof DEFAULT_ANALYSIS_PROVIDER_ID {
-  if (value == null || value === '') {
-    return DEFAULT_ANALYSIS_PROVIDER_ID;
-  }
-
+function resolveProviderId(value: unknown) {
   if (!isAnalysisProviderId(value)) {
     throw new AnalysisConfigError('不支持的 AI Provider。', {
       code: AppErrorCode.AI_PROVIDER_UNSUPPORTED,
@@ -96,13 +95,15 @@ function getProviderField(
   field: 'apiBaseUrl' | 'apiKey' | 'modelName',
 ): unknown {
   const nested = input.providerConfig;
-  if (typeof nested === 'object' && nested !== null && field in nested) {
-    return (nested as Record<string, unknown>)[field];
+  if (nested && typeof nested === 'object') {
+    return nested[field];
   }
-  return input[field];
+  return undefined;
 }
 
-export function buildRuntimeAnalysisConfig(input: RuntimeAnalysisConfigInput | null | undefined): RuntimeAnalysisConfig {
+export function buildRuntimeAnalysisConfig(
+  input: RuntimeAnalysisConfigInput | null | undefined,
+): RuntimeAnalysisConfig {
   if (!input) {
     throw new AnalysisConfigError('请先在设置中完成 AI 接口配置。', {
       code: AppErrorCode.ANALYSIS_CONFIG_INVALID,

@@ -5,16 +5,22 @@ import { extractChapterImages, extractCoverBlob } from '../epub/imageExtractor';
 import { loadOpfPackage } from '../epub/opf';
 
 describe('extractChapterImages', () => {
-  it('extracts data-uri images and replaces them with markers', async () => {
+  it('extracts data-uri images and rewrites them as keyed img tags', async () => {
     const zip = new JSZip();
     const extracted = await extractChapterImages(
-      '<html><body><img src="data:image/png;base64,aGVsbG8=" /></body></html>',
+      '<html><body><img src="data:image/png;base64,aGVsbG8=" alt="Cover" width="640" style="width: 640px" /></body></html>',
       zip,
       '',
     );
 
     expect(extracted.images).toHaveLength(1);
-    expect(extracted.html).toContain('[IMG:img_');
+    const document = new DOMParser().parseFromString(extracted.html, 'text/html');
+    const image = document.querySelector('img');
+    expect(image?.getAttribute('data-plotmapai-image-key')).toMatch(/^img_/u);
+    expect(image?.getAttribute('alt')).toBe('Cover');
+    expect(image?.getAttribute('width')).toBe('640');
+    expect(image?.getAttribute('style')).toBe('width: 640px');
+    expect(image?.getAttribute('src')).toBeNull();
   });
 
   it('extracts url-encoded inline svg images without requiring base64', async () => {
@@ -28,7 +34,7 @@ describe('extractChapterImages', () => {
     expect(extracted.images).toHaveLength(1);
     expect(extracted.images[0].blob.type).toBe('image/svg+xml');
     await expect(extracted.images[0].blob.text()).resolves.toContain('<svg');
-    expect(extracted.html).toContain('[IMG:img_');
+    expect(extracted.html).toContain('data-plotmapai-image-key="img_');
   });
 
   it('skips malformed inline data-uri images without aborting extraction', async () => {
@@ -53,7 +59,7 @@ describe('extractChapterImages', () => {
 
     expect(extracted.images).toHaveLength(1);
     expect(extracted.images[0].blob.type).toBe('image/png');
-    expect(extracted.html).toContain('[IMG:img_');
+    expect(extracted.html).toContain('data-plotmapai-image-key="img_');
   });
 });
 

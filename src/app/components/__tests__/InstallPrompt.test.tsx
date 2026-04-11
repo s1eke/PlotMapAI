@@ -2,7 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import InstallPrompt from '../InstallPrompt';
-import { DEBUG_SHOW_INSTALL_PROMPT_EVENT } from '@app/debug/service';
+import { DEBUG_SHOW_INSTALL_PROMPT_EVENT } from '@app/debug/pwaDebugTools';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;

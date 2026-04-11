@@ -1,75 +1,64 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// Mock crypto.subtle.digest
-const mockDigest = vi.fn().mockResolvedValue(
-  new ArrayBuffer(32) // SHA-256 produces 32 bytes
-);
-
-Object.defineProperty(globalThis, 'crypto', {
-  value: {
-    subtle: {
-      digest: mockDigest,
-    },
-  },
-  writable: true,
-});
+import {
+  projectTxtPlainTextToRichBlocks,
+  runParseTxtTask,
+} from '@shared/text-processing';
 
 import { parseTxt } from '../txtParser';
+
+vi.mock('@shared/text-processing', () => ({
+  projectTxtPlainTextToRichBlocks: vi.fn((plainText: string) => [{
+    type: 'paragraph' as const,
+    children: [{
+      type: 'text' as const,
+      text: plainText,
+    }],
+  }]),
+  runParseTxtTask: vi.fn(),
+}));
 
 describe('parseTxt', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockDigest.mockResolvedValue(new ArrayBuffer(32));
+    vi.mocked(runParseTxtTask).mockImplementation(async (_payload, options) => {
+      options?.onProgress?.({
+        progress: 60,
+        stage: 'chapters',
+        current: 12,
+        total: 12,
+        detail: '12 chapters',
+      });
+
+      return {
+        title: 'TXT Novel',
+        chapters: [
+          { title: 'Chapter 1', content: 'Body' },
+        ],
+        encoding: 'utf-8',
+        fileHash: 'hash',
+        rawText: 'Body',
+        totalWords: 4,
+      };
+    });
   });
 
-  it('parses a simple txt file', async () => {
-    const content = 'Hello World\nThis is a test.';
-    const file = new File([content], 'MyNovel.txt', { type: 'text/plain' });
-    const result = await parseTxt(file, []);
+  it('maps shared text-processing progress details into book import progress updates', async () => {
+    const onProgress = vi.fn();
 
-    expect(result.title).toBe('MyNovel');
-    expect(result.author).toBe('');
-    expect(result.chapters.length).toBeGreaterThanOrEqual(1);
-    expect(result.totalWords).toBeGreaterThan(0);
-    expect(result.fileHash).toBeDefined();
-    expect(result.encoding).toBeDefined();
-  });
+    await parseTxt(
+      new File(['Body'], 'novel.txt', { type: 'text/plain' }),
+      [{ rule: '^Chapter', source: 'default' }],
+      { onProgress },
+    );
 
-  it('strips .txt extension from title', async () => {
-    const file = new File(['content'], 'TestBook.TXT', { type: 'text/plain' });
-    const result = await parseTxt(file, []);
-    expect(result.title).toBe('TestBook');
-  });
-
-  it('detects chapters when TOC rules match', async () => {
-    const lines = [
-      '第1章 Start',
-      'Content of chapter 1',
-      '',
-      '第2章 Middle',
-      'Content of chapter 2',
-    ];
-    const file = new File([lines.join('\n')], 'book.txt', { type: 'text/plain' });
-    const result = await parseTxt(file, [{ rule: '^第\\d+章' }]);
-    expect(result.chapters.length).toBeGreaterThanOrEqual(2);
-  });
-
-  it('computes file hash', async () => {
-    const file = new File(['test content'], 'hash.txt', { type: 'text/plain' });
-    const result = await parseTxt(file, []);
-    expect(mockDigest).toHaveBeenCalled();
-    expect(result.fileHash).toMatch(/^[0-9a-f]{64}$/);
-  });
-
-  it('returns empty tags array', async () => {
-    const file = new File(['content'], 'book.txt', { type: 'text/plain' });
-    const result = await parseTxt(file, []);
-    expect(result.tags).toEqual([]);
-  });
-
-  it('returns empty images array', async () => {
-    const file = new File(['content'], 'book.txt', { type: 'text/plain' });
-    const result = await parseTxt(file, []);
-    expect(result.images).toEqual([]);
+    expect(onProgress).toHaveBeenCalledWith({
+      progress: 60,
+      stage: 'chapters',
+      current: 12,
+      total: 12,
+      detail: '12 chapters',
+    });
+    expect(projectTxtPlainTextToRichBlocks).toHaveBeenCalledWith('Body');
   });
 });

@@ -36,6 +36,41 @@ function decodeDataUriText(data: string): ArrayBuffer {
   return buffer;
 }
 
+function escapeHtmlAttribute(value: string): string {
+  return value
+    .replace(/&/gu, '&amp;')
+    .replace(/"/gu, '&quot;')
+    .replace(/</gu, '&lt;')
+    .replace(/>/gu, '&gt;');
+}
+
+function buildExtractedImageTag(
+  attributes: Record<string, string>,
+  imageKey: string,
+): string {
+  const allowedAttributeNames = [
+    'alt',
+    'width',
+    'height',
+    'align',
+    'style',
+  ] as const;
+
+  const renderedAttributes = allowedAttributeNames
+    .map((name) => {
+      const value = attributes[name];
+      if (!value || value.trim().length === 0) {
+        return '';
+      }
+
+      return `${name}="${escapeHtmlAttribute(value)}"`;
+    })
+    .filter(Boolean);
+
+  renderedAttributes.unshift(`data-plotmapai-image-key="${escapeHtmlAttribute(imageKey)}"`);
+  return `<img ${renderedAttributes.join(' ')} />`;
+}
+
 function extractInlineImageBlob(src: string): Blob | null {
   const separatorIndex = src.indexOf(',');
   if (separatorIndex === -1) {
@@ -103,7 +138,7 @@ export async function extractChapterImages(
 
       const key = generateImageKey();
       images.push({ imageKey: key, blob });
-      transformedHtml += `[IMG:${key}]`;
+      transformedHtml += buildExtractedImageTag(parsedTag.attributes, key);
       index = tagEnd + 1;
       continue;
     }
@@ -119,8 +154,11 @@ export async function extractChapterImages(
     try {
       const buffer = await file.async('arraybuffer');
       const key = generateImageKey();
-      images.push({ imageKey: key, blob: new Blob([buffer], { type: getImageMimeType(fullPath) }) });
-      transformedHtml += `[IMG:${key}]`;
+      images.push({
+        imageKey: key,
+        blob: new Blob([buffer], { type: getImageMimeType(fullPath) }),
+      });
+      transformedHtml += buildExtractedImageTag(parsedTag.attributes, key);
     } catch {
       transformedHtml += originalTag;
     }
@@ -133,13 +171,13 @@ export async function extractChapterImages(
 
 export async function extractCoverBlob(opfPackage: OpfPackage): Promise<Blob | null> {
   const { manifest, metadata, opfDir, zip } = opfPackage;
-  const imageItems = Array.from(manifest.values()).filter(item => item.mediaType.startsWith('image/'));
+  const imageItems = Array.from(manifest.values()).filter((item) => item.mediaType.startsWith('image/'));
   let coverItem = undefined as (typeof imageItems)[number] | undefined;
 
   if (metadata.coverId) coverItem = manifest.get(metadata.coverId);
 
   if (!coverItem) {
-    coverItem = imageItems.find(item => {
+    coverItem = imageItems.find((item) => {
       const href = item.href.toLowerCase();
       const id = item.id.toLowerCase();
       return href.includes('cover') || id.includes('cover');

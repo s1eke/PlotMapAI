@@ -15,6 +15,7 @@ interface DebugPwaTools {
   showIosInstallHint: () => void;
   showUpdateToast: () => void;
   resetPwaPrompts: () => void;
+  retryReaderRestore: () => void;
 }
 
 interface Window {
