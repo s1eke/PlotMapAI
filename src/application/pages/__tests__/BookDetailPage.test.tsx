@@ -171,6 +171,10 @@ describe('application BookDetailPage', () => {
     renderPage();
 
     expect(await screen.findByRole('heading', { name: 'Mock Novel', level: 1 })).toBeInTheDocument();
+    expect(screen.queryByText('bookDetail.contentFormat')).not.toBeInTheDocument();
+    expect(screen.queryByText('bookDetail.contentVersion')).not.toBeInTheDocument();
+    expect(screen.queryByText('bookDetail.importFormatVersion')).not.toBeInTheDocument();
+    expect(screen.queryByText('bookDetail.lastParsedAt')).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'bookDetail.startAnalysis' }));
 
