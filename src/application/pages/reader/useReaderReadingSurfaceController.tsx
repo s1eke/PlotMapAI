@@ -241,10 +241,17 @@ export function useReaderReadingSurfaceController({
     novelId,
     restoreFlow,
   });
+  const handleLifecycleRestoreSettled = lifecycle.handleRestoreSettled;
+  const handleRestoreFlowSettled = restoreFlow.handleRestoreSettled;
 
   useEffect(() => {
-    return persistence.registerRestoreSettledHandler(lifecycle.handleRestoreSettled);
-  }, [lifecycle.handleRestoreSettled, persistence]);
+    return persistence.registerRestoreSettledHandler((result) => {
+      if (handleRestoreFlowSettled(result)) {
+        return;
+      }
+      handleLifecycleRestoreSettled(result);
+    });
+  }, [handleLifecycleRestoreSettled, handleRestoreFlowSettled, persistence]);
 
   useEffect(() => {
     const handleDebugRetryReaderRestore = () => {
@@ -299,6 +306,7 @@ export function useReaderReadingSurfaceController({
     },
     navigation,
     restore: {
+      setLastContentMode: sessionCommands.setLastContentMode,
       switchMode: restoreFlow.switchMode,
     },
     sessionSnapshot: {

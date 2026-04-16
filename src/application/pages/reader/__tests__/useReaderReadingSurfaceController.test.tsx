@@ -102,6 +102,7 @@ const surfaceMocks = vi.hoisted(() => {
       getRestoreAttempt: vi.fn(() => 0),
       handleBeforeChapterChange: vi.fn(),
       handleContentScroll: vi.fn(),
+      handleRestoreSettled: vi.fn(() => false),
       pendingRestoreTarget: null,
       pendingRestoreTargetRef: { current: null },
       recordRestoreResult: vi.fn(() => ({ scheduledRetry: false })),
@@ -185,6 +186,7 @@ vi.mock('@domains/reader-session', () => ({
       markUserInteracted: vi.fn(),
       persistReaderState: vi.fn(),
       setChapterIndex: vi.fn(),
+      setLastContentMode: vi.fn(),
       setMode: vi.fn(),
     },
     snapshot: surfaceMocks.sessionSnapshot,
@@ -208,7 +210,7 @@ describe('useReaderReadingSurfaceController', () => {
     surfaceMocks.scrollController.renderableScrollLayouts = [];
   });
 
-  it('builds summary content props and registers restore-settled handling', () => {
+  it('builds summary content props and registers wrapped restore-settled handling', () => {
     const { Wrapper } = createReaderContextWrapper({
       registerRestoreSettledHandler: surfaceMocks.registerRestoreSettledHandler,
     });
@@ -241,8 +243,20 @@ describe('useReaderReadingSurfaceController', () => {
       headerBgClassName: 'bg-header',
     });
     expect(contentProps.scrollContentProps).toBeUndefined();
-    expect(surfaceMocks.registerRestoreSettledHandler)
-      .toHaveBeenCalledWith(surfaceMocks.lifecycle.handleRestoreSettled);
+    expect(surfaceMocks.registerRestoreSettledHandler).toHaveBeenCalledTimes(1);
+
+    const registeredHandler = surfaceMocks.registerRestoreSettledHandler.mock.calls[0]?.[0];
+    expect(registeredHandler).toBeTypeOf('function');
+
+    surfaceMocks.restoreFlow.handleRestoreSettled.mockReturnValueOnce(true);
+    registeredHandler('failed');
+    expect(surfaceMocks.restoreFlow.handleRestoreSettled).toHaveBeenCalledWith('failed');
+    expect(surfaceMocks.lifecycle.handleRestoreSettled).not.toHaveBeenCalled();
+
+    surfaceMocks.restoreFlow.handleRestoreSettled.mockReturnValueOnce(false);
+    registeredHandler('completed');
+    expect(surfaceMocks.restoreFlow.handleRestoreSettled).toHaveBeenCalledWith('completed');
+    expect(surfaceMocks.lifecycle.handleRestoreSettled).toHaveBeenCalledWith('completed');
 
     result.current.viewport.handleViewportScroll();
     expect(surfaceMocks.restoreFlow.handleContentScroll).toHaveBeenCalledTimes(1);

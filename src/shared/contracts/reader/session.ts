@@ -154,6 +154,7 @@ export type ReaderSessionSnapshot = ReaderSessionState;
 
 export interface ReaderSessionCommands {
   setChapterIndex: Dispatch<SetStateAction<number>>;
+  setLastContentMode: (mode: 'scroll' | 'paged') => void;
   setMode: Dispatch<SetStateAction<ReaderMode>>;
   latestReaderStateRef: MutableRefObject<StoredReaderState>;
   hasUserInteractedRef: MutableRefObject<boolean>;

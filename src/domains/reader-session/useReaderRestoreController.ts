@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef } from 'react';
-
 import type { ChapterContent } from '@shared/contracts/reader';
 import type { ReaderSessionSnapshot } from './useReaderSession';
 import type {
@@ -7,20 +6,16 @@ import type {
   ReaderRestoreResult,
   ReaderRestoreTarget,
   ReaderSessionCommands,
+  RestoreSettledResult,
   StoredReaderState,
 } from '@shared/contracts/reader';
-
 import {
   useReaderLayoutQueries,
   useReaderNavigationRuntime,
   useReaderPersistenceRuntime,
   useReaderViewportContext,
 } from '@shared/reader-runtime';
-import {
-  clampProgress,
-  getContainerProgress,
-  shouldKeepReaderRestoreMask,
-} from '@shared/utils/readerPosition';
+import { clampProgress, getContainerProgress, shouldKeepReaderRestoreMask } from '@shared/utils/readerPosition';
 import { createReaderStateModeHints } from '@shared/utils/readerMode';
 import {
   buildStoredReaderState,
@@ -29,13 +24,9 @@ import {
   toCanonicalPositionFromLocator,
   toReaderLocatorFromCanonical,
 } from './state';
-import {
-  beginRestore,
-  completeRestore,
-  getStoredReaderStateSnapshot,
-  setPendingRestoreTarget as setStorePendingRestoreTarget,
-} from './readerSessionStore';
+import { beginRestore, completeRestore, getStoredReaderStateSnapshot, setPendingRestoreTarget as setStorePendingRestoreTarget } from './readerSessionStore';
 import { useReaderRestoreResultTracker } from './readerRestoreResultTracker';
+import { useReaderModeSwitchRollback } from './useReaderModeSwitchRollback';
 import { useSummaryRestoreRunner } from './useSummaryRestoreRunner';
 import { debugLog, setDebugSnapshot } from '@shared/debug';
 
@@ -64,6 +55,7 @@ export interface UseReaderRestoreControllerResult {
   clearPendingRestoreTarget: () => void;
   handleBeforeChapterChange: () => void;
   handleContentScroll: () => void;
+  handleRestoreSettled: (result: RestoreSettledResult) => boolean;
   switchMode: (targetMode: ReaderMode) => void;
   getRestoreAttempt: (target: ReaderRestoreTarget | null | undefined) => number;
   recordRestoreResult: (
@@ -91,11 +83,7 @@ export function useReaderRestoreController({
   const navigation = useReaderNavigationRuntime();
   const layoutQueries = useReaderLayoutQueries();
   const persistence = useReaderPersistenceRuntime();
-  const {
-    chapterIndex,
-    mode,
-    pendingRestoreTarget,
-  } = sessionSnapshot;
+  const { chapterIndex, mode, pendingRestoreTarget } = sessionSnapshot;
   const {
     latestReaderStateRef,
     markUserInteracted,
@@ -170,12 +158,10 @@ export function useReaderRestoreController({
     },
     [],
   );
-
   const clearPendingRestoreTarget = useCallback(() => {
     pendingRestoreTargetRef.current = null;
     setStorePendingRestoreTarget(null);
   }, []);
-
   const startRestoreMaskForTarget = useCallback(
     (target: ReaderRestoreTarget | null | undefined) => {
       if (shouldKeepReaderRestoreMask(target)) {
@@ -187,10 +173,7 @@ export function useReaderRestoreController({
     },
     [],
   );
-
-  const stopRestoreMask = useCallback(() => {
-    completeRestore();
-  }, []);
+  const stopRestoreMask = useCallback(() => { completeRestore(); }, []);
 
   const suppressScrollSyncTemporarily = useCallback(() => {
     persistence.suppressScrollSyncTemporarily();
@@ -203,10 +186,19 @@ export function useReaderRestoreController({
     setPendingRestoreTarget,
     startRestoreMaskForTarget,
   });
-
   const rememberModeState = useCallback((target: ReaderRestoreTarget) => {
     modeSnapshotRef.current[target.mode] = target;
   }, []);
+  const {
+    handleRestoreSettled: handleModeSwitchRestoreSettled,
+    rememberModeSwitchSource,
+  } = useReaderModeSwitchRollback({
+    persistReaderState,
+    rememberModeState,
+    setMode,
+    setPendingRestoreTarget,
+    suppressScrollSyncTemporarily,
+  });
 
   const captureCurrentReaderPosition = useCallback(
     (options?: { flush?: boolean }): StoredReaderState => {
@@ -355,6 +347,7 @@ export function useReaderRestoreController({
     if (targetMode === mode) return;
 
     const currentReaderState = captureCurrentReaderPosition();
+    const sourceRestoreTarget = buildModeRestoreTarget(currentReaderState, mode);
     const baseTarget = buildModeRestoreTarget(currentReaderState, targetMode);
     const targetRestoreTarget = solveModeRestoreTarget(
       targetMode,
@@ -373,6 +366,11 @@ export function useReaderRestoreController({
       },
     });
 
+    rememberModeSwitchSource({
+      previousMode: mode,
+      previousRestoreTarget: sourceRestoreTarget,
+      previousState: currentReaderState,
+    });
     markUserInteracted();
     setChapterIndex(targetRestoreTarget.chapterIndex);
     rememberModeState(targetRestoreTarget);
@@ -398,12 +396,18 @@ export function useReaderRestoreController({
     markUserInteracted,
     mode,
     persistReaderState,
+    rememberModeSwitchSource,
     rememberModeState,
     setChapterIndex,
     setMode,
     setPendingRestoreTarget,
     solveModeRestoreTarget,
   ]);
+
+  const handleRestoreSettled = useCallback(
+    (result: RestoreSettledResult): boolean => handleModeSwitchRestoreSettled(result, mode),
+    [handleModeSwitchRestoreSettled, mode],
+  );
 
   useSummaryRestoreRunner({
     chapterIndex,
@@ -479,6 +483,7 @@ export function useReaderRestoreController({
     clearPendingRestoreTarget,
     handleBeforeChapterChange,
     handleContentScroll,
+    handleRestoreSettled,
     getRestoreAttempt,
     recordRestoreResult,
     retryLastFailedRestore,

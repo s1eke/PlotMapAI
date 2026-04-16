@@ -12,6 +12,7 @@ import { useCallback, useMemo } from 'react';
 import {
   getReaderSessionSnapshot,
   setChapterIndex as setSessionChapterIndex,
+  setLastContentMode as setSessionLastContentMode,
   setMode as setSessionMode,
   useReaderSessionSelector,
 } from './readerSessionStore';
@@ -66,6 +67,9 @@ export function useReaderSession(novelId: number): UseReaderSessionResult {
       : nextState;
     setSessionMode(nextValue, { persistRemote: false });
   }, []);
+  const setLastContentMode = useCallback((nextMode: 'scroll' | 'paged') => {
+    setSessionLastContentMode(nextMode);
+  }, []);
 
   const snapshot = useMemo<ReaderSessionSnapshot>(() => ({
     novelId: storeNovelId || novelId,
@@ -94,6 +98,7 @@ export function useReaderSession(novelId: number): UseReaderSessionResult {
 
   const commands = useMemo<ReaderSessionCommands>(() => ({
     setChapterIndex,
+    setLastContentMode,
     setMode,
     latestReaderStateRef: readerStatePersistence.latestReaderStateRef,
     hasUserInteractedRef: readerStatePersistence.hasUserInteractedRef,
@@ -109,6 +114,7 @@ export function useReaderSession(novelId: number): UseReaderSessionResult {
     readerStatePersistence.markUserInteracted,
     readerStatePersistence.persistReaderState,
     setChapterIndex,
+    setLastContentMode,
     setMode,
   ]);
 

@@ -2,19 +2,10 @@ import { useStore } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { createStore, type StoreApi } from 'zustand/vanilla';
 import type { ReaderPageTurnMode } from '@shared/contracts/reader/preferences';
-import {
-  createPersistedRuntime,
-} from '@shared/stores/persistence/createPersistedRuntime';
-import {
-  resetReaderPreferenceStoreForTests,
-} from '@shared/stores/readerPreferenceStore';
-import {
-  createRestoreTargetFromPersistedState,
-} from '@shared/utils/readerPosition';
-import {
-  resolvePersistedReaderMode,
-  resolveLastContentMode,
-} from '@shared/utils/readerMode';
+import { createPersistedRuntime } from '@shared/stores/persistence/createPersistedRuntime';
+import { resetReaderPreferenceStoreForTests } from '@shared/stores/readerPreferenceStore';
+import { createRestoreTargetFromPersistedState } from '@shared/utils/readerPosition';
+import { resolvePersistedReaderMode, resolveLastContentMode } from '@shared/utils/readerMode';
 import type {
   PersistedReadingProgress,
   ReaderLifecycleEvent,
@@ -25,9 +16,7 @@ import type {
   ReaderSessionState,
   StoredReaderState,
 } from '@shared/contracts/reader';
-import {
-  clearReaderBootstrapSnapshot,
-} from '@infra/storage/readerStateCache';
+import { clearReaderBootstrapSnapshot } from '@infra/storage/readerStateCache';
 import {
   buildStoredReaderState,
   clampChapterProgress,
@@ -36,20 +25,13 @@ import {
   mergeStoredReaderState,
   toReaderLocatorFromCanonical,
 } from './state';
-import {
-  readPersistedReadingProgress,
-  replaceReadingProgress,
-} from './repository';
+import { readPersistedReadingProgress, replaceReadingProgress } from './repository';
 import { reduceReaderLifecycleState } from './lifecycleStateMachine';
 import { writeReaderLifecycleDebugSnapshot } from './readerLifecycleDebugSnapshot';
 import { debugLog, setDebugSnapshot } from '@shared/debug';
 import {
-  createInitialReaderSessionState,
-  getReaderSessionProgressFingerprint,
-  readLocalSessionState,
-  shouldMaskRestore,
-  toPersistenceFailure,
-  toStoredReaderState,
+  createInitialReaderSessionState, getReaderSessionProgressFingerprint, readLocalSessionState,
+  shouldMaskRestore, toPersistenceFailure, toStoredReaderState,
 } from './sessionPersistenceHelpers';
 
 interface ReaderSessionInternalState extends ReaderSessionState {}
@@ -60,6 +42,7 @@ export interface ReaderSessionActions {
     novelId: number,
     options?: ReaderSessionHydrationOptions,
   ) => Promise<StoredReaderState>;
+  setLastContentMode: (mode: 'scroll' | 'paged', options?: SessionUpdateOptions) => void;
   setMode: (mode: ReaderMode, options?: SessionUpdateOptions) => void;
   setChapterIndex: (chapterIndex: number, options?: SessionUpdateOptions) => void;
   setReadingPosition: (state: StoredReaderState, options?: SessionUpdateOptions) => void;
@@ -87,10 +70,6 @@ const READER_STATE_SYNC_DELAY_MS = 400;
 
 let lastSyncedRemoteSnapshot = '';
 let sessionHydrationEpoch = 0;
-
-function isBrowser(): boolean {
-  return typeof window !== 'undefined';
-}
 
 function setLastSyncedRemoteSnapshot(snapshot: string): void {
   lastSyncedRemoteSnapshot = snapshot;
@@ -150,13 +129,15 @@ async function persistRemoteReaderSession(state: ReaderSessionInternalState): Pr
 
   const persistedProgress = await replaceReadingProgress(novelId, toStoredReaderState(state));
   setLastSyncedRemoteSnapshot(
-    persistedProgress ? getReaderSessionProgressFingerprint(persistedProgress.state) : 'null',
+    persistedProgress
+      ? getReaderSessionProgressFingerprint(persistedProgress.state)
+      : 'null',
   );
 }
 
 const readerSessionRuntime = createPersistedRuntime<ReaderSessionInternalState>({
   createInitialState: createInitialReaderSessionState,
-  isEnabled: isBrowser,
+  isEnabled: () => typeof window !== 'undefined',
   onPersistError: (error) => {
     patchReaderSessionState({
       persistenceStatus: 'degraded',
@@ -353,6 +334,23 @@ export function setMode(mode: ReaderMode, options: SessionUpdateOptions = {}): v
   });
 }
 
+export function setLastContentMode(
+  lastContentMode: 'scroll' | 'paged',
+  options: SessionUpdateOptions = {},
+): void {
+  const currentState = readerSessionStore.getState();
+  const shouldPersistRemote = options.persistRemote ?? true;
+
+  readerSessionRuntime.patch({
+    lastContentMode,
+    hasUserInteracted: options.markUserInteracted ?? currentState.hasUserInteracted,
+  }, {
+    bumpRevision: shouldPersistRemote,
+    flush: options.flush,
+    persist: shouldPersistRemote,
+  });
+}
+
 export function setChapterIndex(chapterIndex: number, options: SessionUpdateOptions = {}): void {
   const currentState = readerSessionStore.getState();
   const shouldPersistRemote = options.persistRemote ?? false;
@@ -481,6 +479,7 @@ export function useReaderSessionActions(): ReaderSessionActions {
   return {
     dispatchLifecycleEvent: dispatchReaderLifecycleEvent,
     hydrateSession,
+    setLastContentMode,
     setMode,
     setChapterIndex,
     setReadingPosition,

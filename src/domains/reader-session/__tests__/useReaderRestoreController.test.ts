@@ -389,6 +389,102 @@ describe('useReaderRestoreFlow', () => {
     expect(setMode).toHaveBeenCalledWith('paged');
   });
 
+  it('clears mode-switch rollback state after a successful restore settle', () => {
+    const { hookProps, runtime } = createHookHarness({
+      sessionSnapshot: {
+        chapterIndex: 7,
+        mode: 'scroll',
+        pendingRestoreTarget: null,
+      },
+      runtime: {
+        getCurrentOriginalLocatorRef: {
+          current: () => createLocator({
+            chapterIndex: 7,
+          }),
+        },
+      },
+    });
+    const { result } = renderHook(() => useReaderRestoreFlow(hookProps), {
+      wrapper: runtime.Wrapper,
+    });
+
+    act(() => {
+      result.current.switchMode('paged');
+    });
+
+    expect(result.current.handleRestoreSettled('completed')).toBe(false);
+    expect(result.current.handleRestoreSettled('failed')).toBe(false);
+  });
+
+  it('rolls back mode-switch state when restore fails', () => {
+    const persistReaderState = vi.fn();
+    const setMode = vi.fn();
+    const setChapterIndex = vi.fn();
+    const locator = createLocator({
+      chapterIndex: 7,
+    });
+    const { hookProps, runtime } = createHookHarness({
+      sessionCommands: {
+        latestReaderStateRef: {
+          current: createStoredState({
+            canonical: locator,
+            hints: {
+              chapterProgress: 0.4,
+              contentMode: 'scroll',
+              viewMode: 'original',
+            },
+          }),
+        },
+        markUserInteracted: vi.fn(),
+        persistReaderState,
+        setChapterIndex,
+        setMode,
+      },
+      sessionSnapshot: {
+        chapterIndex: 7,
+        mode: 'scroll',
+        pendingRestoreTarget: null,
+      },
+      runtime: {
+        getCurrentOriginalLocatorRef: {
+          current: () => locator,
+        },
+      },
+    });
+    const { result } = renderHook(() => useReaderRestoreFlow(hookProps), {
+      wrapper: runtime.Wrapper,
+    });
+
+    act(() => {
+      result.current.switchMode('paged');
+    });
+
+    persistReaderState.mockClear();
+    setMode.mockClear();
+    setChapterIndex.mockClear();
+
+    expect(result.current.handleRestoreSettled('failed')).toBe(true);
+    expect(setMode).toHaveBeenCalledWith('scroll');
+    expect(result.current.pendingRestoreTargetRef.current).toMatchObject({
+      chapterIndex: 7,
+      mode: 'scroll',
+    });
+    expect(persistReaderState).toHaveBeenCalledWith(expect.objectContaining({
+      canonical: {
+        chapterIndex: 7,
+        blockIndex: 2,
+        kind: 'text',
+        lineIndex: 0,
+      },
+      hints: expect.objectContaining({
+        contentMode: 'scroll',
+        viewMode: 'original',
+      }),
+    }), {
+      flush: true,
+    });
+  });
+
   it('restores the last content reading position when switching back from summary', () => {
     const persistReaderState = vi.fn();
     const markUserInteracted = vi.fn();

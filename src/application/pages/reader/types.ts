@@ -59,7 +59,8 @@ export interface ReaderReadingSurfaceController {
   chapterData: Pick<UseReaderChapterDataResult, 'chapters' | 'currentChapter'>;
   lifecycle: ReaderLifecycleControllerResult;
   navigation: ReaderNavigationControllerResult;
-  restore: Pick<UseReaderRestoreControllerResult, 'switchMode'>;
+  restore: Pick<UseReaderRestoreControllerResult, 'switchMode'>
+    & Pick<UseReaderSessionResult['commands'], 'setLastContentMode'>;
   sessionSnapshot: Pick<
     UseReaderSessionResult['snapshot'],
     'chapterIndex' | 'isPagedMode' | 'lastContentMode' | 'mode' | 'viewMode'

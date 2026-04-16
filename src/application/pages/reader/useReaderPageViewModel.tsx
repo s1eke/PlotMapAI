@@ -175,16 +175,19 @@ export function useReaderPageViewModel(novelId: number): ReaderPageViewModel {
     }
 
     preferences.setPageTurnMode(nextMode);
+    const nextContentMode = resolveContentModeFromPageTurnMode(nextMode);
 
     if (mode === 'summary') {
+      if (lastContentMode !== nextContentMode) {
+        restore.setLastContentMode(nextContentMode);
+      }
       return;
     }
 
-    const nextContentMode = resolveContentModeFromPageTurnMode(nextMode);
     if (mode !== nextContentMode) {
       restore.switchMode(nextContentMode);
     }
-  }, [mode, preferences, restore]);
+  }, [lastContentMode, mode, preferences, restore]);
 
   const handleSetViewMode = useCallback((nextViewMode: 'original' | 'summary'): void => {
     restore.switchMode(nextViewMode === 'summary' ? 'summary' : lastContentMode);

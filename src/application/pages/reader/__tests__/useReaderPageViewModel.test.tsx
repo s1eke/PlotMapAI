@@ -79,6 +79,7 @@ const readerShellMocks = vi.hoisted(() => ({
   setFontSize: vi.fn(),
   setIsChromeVisible: vi.fn(),
   setIsSidebarOpen: vi.fn(),
+  setLastContentMode: vi.fn(),
   setLineSpacing: vi.fn(),
   setPageTurnMode: vi.fn(),
   setParagraphSpacing: vi.fn(),
@@ -254,6 +255,7 @@ function resetReaderSurfaceMocks(): void {
   readerShellMocks.setFontSize.mockReset();
   readerShellMocks.setIsChromeVisible.mockReset();
   readerShellMocks.setIsSidebarOpen.mockReset();
+  readerShellMocks.setLastContentMode.mockReset();
   readerShellMocks.setLineSpacing.mockReset();
   readerShellMocks.setPageTurnMode.mockReset();
   readerShellMocks.setParagraphSpacing.mockReset();
@@ -381,6 +383,7 @@ vi.mock('../useReaderReadingSurfaceController', () => ({
       toolbarHasPrev: false,
     },
     restore: {
+      setLastContentMode: readerShellMocks.setLastContentMode,
       switchMode: readerShellMocks.switchMode,
     },
     sessionSnapshot: {
@@ -434,9 +437,10 @@ describe('useReaderPageViewModel', () => {
     expect(analysisService.getStatus).toBeTypeOf('function');
   });
 
-  it('updates page turn preferences without changing content mode in summary mode', () => {
+  it('updates page turn preferences and last content mode without changing content mode in summary mode', () => {
     readerSurfaceMocks.mode = 'summary';
     readerSurfaceMocks.viewMode = 'summary';
+    readerSurfaceMocks.lastContentMode = 'paged';
 
     const { result } = renderHook(() => useReaderPageViewModel(1));
 
@@ -445,7 +449,31 @@ describe('useReaderPageViewModel', () => {
     });
 
     expect(readerShellMocks.setPageTurnMode).toHaveBeenCalledWith('scroll');
+    expect(readerShellMocks.setLastContentMode).toHaveBeenCalledWith('scroll');
     expect(readerShellMocks.switchMode).not.toHaveBeenCalled();
+  });
+
+  it('returns to the updated content mode after leaving summary mode', () => {
+    readerSurfaceMocks.mode = 'summary';
+    readerSurfaceMocks.viewMode = 'summary';
+    readerSurfaceMocks.lastContentMode = 'paged';
+
+    const { result, rerender } = renderHook(() => useReaderPageViewModel(1));
+
+    act(() => {
+      result.current.toolbarProps?.setPageTurnMode('scroll');
+    });
+
+    expect(readerShellMocks.setLastContentMode).toHaveBeenCalledWith('scroll');
+
+    readerSurfaceMocks.lastContentMode = 'scroll';
+    rerender();
+
+    act(() => {
+      result.current.topBarProps.onSetViewMode('original');
+    });
+
+    expect(readerShellMocks.switchMode).toHaveBeenCalledWith('scroll');
   });
 
   it('maps page turn mode changes back into content mode while in original reading mode', () => {
