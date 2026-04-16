@@ -465,6 +465,19 @@ export default function DebugPanel() {
       <div className="grid grid-cols-2 gap-2 border-b border-border-color/50 p-2">
         <div className="col-span-2 flex items-center justify-between rounded-lg border border-border-color/50 px-3 py-2">
           <div className="min-w-0">
+            <div className="text-xs font-medium text-text-primary">{t('debug.features.readerStrictModeSwitch.label')}</div>
+            <div className="text-[10px] text-text-secondary">{t('debug.features.readerStrictModeSwitch.description')}</div>
+          </div>
+          <Toggle
+            checked={featureFlags.readerStrictModeSwitch}
+            onChange={(checked) => {
+              setDebugFeatureEnabled('readerStrictModeSwitch', checked);
+            }}
+            className="ml-3"
+          />
+        </div>
+        <div className="col-span-2 flex items-center justify-between rounded-lg border border-border-color/50 px-3 py-2">
+          <div className="min-w-0">
             <div className="text-xs font-medium text-text-primary">{t('debug.features.readerTelemetry.label')}</div>
             <div className="text-[10px] text-text-secondary">{t('debug.features.readerTelemetry.description')}</div>
           </div>

@@ -103,6 +103,7 @@ const surfaceMocks = vi.hoisted(() => {
       handleBeforeChapterChange: vi.fn(),
       handleContentScroll: vi.fn(),
       handleRestoreSettled: vi.fn(() => false),
+      modeSwitchError: null as { code: string } | null,
       pendingRestoreTarget: null,
       pendingRestoreTargetRef: { current: null },
       recordRestoreResult: vi.fn(() => ({ scheduledRetry: false })),
@@ -207,6 +208,7 @@ describe('useReaderReadingSurfaceController', () => {
     surfaceMocks.sessionSnapshot.mode = 'summary';
     surfaceMocks.sessionSnapshot.viewMode = 'summary';
     surfaceMocks.sessionSnapshot.isPagedMode = false;
+    surfaceMocks.restoreFlow.modeSwitchError = null;
     surfaceMocks.scrollController.renderableScrollLayouts = [];
   });
 
@@ -242,6 +244,7 @@ describe('useReaderReadingSurfaceController', () => {
       chapter: surfaceMocks.chapter,
       headerBgClassName: 'bg-header',
     });
+    expect(result.current.modeSwitchError).toBeNull();
     expect(contentProps.scrollContentProps).toBeUndefined();
     expect(surfaceMocks.registerRestoreSettledHandler).toHaveBeenCalledTimes(1);
 
@@ -300,6 +303,7 @@ describe('useReaderReadingSurfaceController', () => {
       novelId: 1,
       readerTheme: 'paper',
     });
+    expect(result.current.modeSwitchError).toBeNull();
     expect(contentProps.summaryContentProps).toBeUndefined();
 
     result.current.viewport.handleViewportScroll();
@@ -326,5 +330,29 @@ describe('useReaderReadingSurfaceController', () => {
     window.dispatchEvent(new CustomEvent(DEBUG_RETRY_READER_RESTORE_EVENT));
 
     expect(surfaceMocks.restoreFlow.retryLastFailedRestore).toHaveBeenCalledTimes(1);
+  });
+
+  it('exposes the strict mode-switch error from the restore flow', () => {
+    surfaceMocks.restoreFlow.modeSwitchError = {
+      code: 'READER_MODE_SWITCH_FAILED',
+    };
+    const { Wrapper } = createReaderContextWrapper();
+
+    const { result } = renderHook(() => useReaderReadingSurfaceController({
+      analysisController: {
+        analyzeChapter: vi.fn(),
+        getChapterAnalysis: vi.fn(),
+        getStatus: vi.fn(),
+        renderSummaryPanel: vi.fn(() => 'summary-panel'),
+      },
+      novelId: 1,
+      preferences: surfaceMocks.preferences,
+    }), {
+      wrapper: Wrapper,
+    });
+
+    expect(result.current.modeSwitchError).toEqual({
+      code: 'READER_MODE_SWITCH_FAILED',
+    });
   });
 });

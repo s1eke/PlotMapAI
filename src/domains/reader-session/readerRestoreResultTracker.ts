@@ -52,6 +52,10 @@ export interface RestoreResultRecordOutcome {
 }
 
 export interface UseReaderRestoreResultTrackerParams {
+  shouldScheduleRetry?: (
+    target: ReaderRestoreTarget | null | undefined,
+    result: ReaderRestoreResult,
+  ) => boolean;
   setPendingRestoreTarget: (
     nextTarget: ReaderRestoreTarget | null,
     options?: { force?: boolean },
@@ -73,7 +77,11 @@ export interface UseReaderRestoreResultTrackerResult {
 export function useReaderRestoreResultTracker(
   params: UseReaderRestoreResultTrackerParams,
 ): UseReaderRestoreResultTrackerResult {
-  const { setPendingRestoreTarget, startRestoreMaskForTarget } = params;
+  const {
+    setPendingRestoreTarget,
+    shouldScheduleRetry,
+    startRestoreMaskForTarget,
+  } = params;
   const restoreAttemptByTargetKeyRef = useRef<Map<string, number>>(new Map());
   const lastFailedRestoreTargetRef = useRef<ReaderRestoreTarget | null>(null);
 
@@ -112,7 +120,10 @@ export function useReaderRestoreResultTracker(
     }
 
     const attemptIndex = Math.max(result.attempts - 1, 0);
-    if (result.retryable && attemptIndex < MAX_AUTO_RESTORE_RETRIES) {
+    const canScheduleRetry = shouldScheduleRetry
+      ? shouldScheduleRetry(target, result)
+      : true;
+    if (result.retryable && canScheduleRetry && attemptIndex < MAX_AUTO_RESTORE_RETRIES) {
       const nextAttempt = attemptIndex + 1;
       restoreAttemptByTargetKeyRef.current.set(key, nextAttempt);
       const retryTarget = cloneRestoreTarget(target);
@@ -124,7 +135,7 @@ export function useReaderRestoreResultTracker(
     restoreAttemptByTargetKeyRef.current.delete(key);
     lastFailedRestoreTargetRef.current = cloneRestoreTarget(target);
     return { scheduledRetry: false };
-  }, [setPendingRestoreTarget, startRestoreMaskForTarget]);
+  }, [setPendingRestoreTarget, shouldScheduleRetry, startRestoreMaskForTarget]);
 
   const retryLastFailedRestore = useCallback((): boolean => {
     const failedTarget = lastFailedRestoreTargetRef.current;

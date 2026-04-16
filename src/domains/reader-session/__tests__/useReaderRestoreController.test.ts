@@ -12,7 +12,9 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createReaderContextWrapper } from '@test/readerRuntimeTestUtils';
+import { setDebugFeatureEnabled } from '@shared/debug';
 import { getReaderSessionSnapshot, resetReaderSessionStoreForTests } from '../readerSessionStore';
+import * as readerSessionStore from '../readerSessionStore';
 import { useReaderRestoreFlow } from '../useReaderRestoreFlow';
 
 function makeContainer({
@@ -90,6 +92,15 @@ function createLocator(overrides: Partial<ReaderLocator> = {}): ReaderLocator {
     blockIndex: 2,
     kind: 'text' as const,
     lineIndex: 0,
+    ...overrides,
+  };
+}
+
+function createSessionStoreSnapshotMock(
+  overrides: Partial<ReturnType<typeof getReaderSessionSnapshot>>,
+): ReturnType<typeof getReaderSessionSnapshot> {
+  return {
+    ...readerSessionStore.readerSessionStore.getState(),
     ...overrides,
   };
 }
@@ -203,7 +214,9 @@ function createHookHarness(overrides: CreateHookPropsOptions = {}) {
 
 describe('useReaderRestoreFlow', () => {
   beforeEach(() => {
+    vi.restoreAllMocks();
     resetReaderSessionStoreForTests();
+    setDebugFeatureEnabled('readerStrictModeSwitch', false);
   });
 
   it('keeps summary progress restore targets but clears original-mode progress-only ones', () => {
@@ -483,6 +496,244 @@ describe('useReaderRestoreFlow', () => {
     }), {
       flush: true,
     });
+  });
+
+  it('does not enter the target mode when strict mode-switch source capture persistence fails', async () => {
+    setDebugFeatureEnabled('readerStrictModeSwitch', true);
+    vi.spyOn(readerSessionStore, 'flushPersistence').mockResolvedValue(undefined);
+    vi.spyOn(readerSessionStore, 'getReaderSessionSnapshot')
+      .mockReturnValueOnce(createSessionStoreSnapshotMock({
+        lastPersistenceFailure: null,
+        persistenceStatus: 'healthy',
+      }))
+      .mockReturnValueOnce(createSessionStoreSnapshotMock({
+        lastPersistenceFailure: {
+          code: 'STORAGE_OPERATION_FAILED',
+          message: 'db write failed',
+          retryable: true,
+          time: 1,
+        },
+        persistenceStatus: 'degraded',
+      }));
+
+    const persistReaderState = vi.fn();
+    const setMode = vi.fn();
+    const setChapterIndex = vi.fn();
+    const { hookProps, runtime } = createHookHarness({
+      sessionCommands: {
+        latestReaderStateRef: { current: createStoredState() },
+        markUserInteracted: vi.fn(),
+        persistReaderState,
+        setChapterIndex,
+        setMode,
+      },
+      runtime: {
+        getCurrentOriginalLocatorRef: {
+          current: () => createLocator({
+            chapterIndex: 7,
+          }),
+        },
+      },
+    });
+    const { result } = renderHook(() => useReaderRestoreFlow(hookProps), {
+      wrapper: runtime.Wrapper,
+    });
+
+    await act(async () => {
+      await result.current.switchMode('paged');
+    });
+
+    expect(setMode).not.toHaveBeenCalled();
+    expect(result.current.modeSwitchError?.code).toBe('READER_MODE_SWITCH_FAILED');
+    expect(result.current.modeSwitchError?.message).toContain('stage=capture_source');
+    expect(result.current.modeSwitchError?.message).toContain('switch=scroll->paged');
+  });
+
+  it('clears the pending restore target and surfaces an error when strict mode target persistence fails', async () => {
+    setDebugFeatureEnabled('readerStrictModeSwitch', true);
+    vi.spyOn(readerSessionStore, 'flushPersistence').mockResolvedValue(undefined);
+    vi.spyOn(readerSessionStore, 'getReaderSessionSnapshot')
+      .mockReturnValueOnce(createSessionStoreSnapshotMock({
+        lastPersistenceFailure: null,
+        persistenceStatus: 'healthy',
+      }))
+      .mockReturnValueOnce(createSessionStoreSnapshotMock({
+        lastPersistenceFailure: null,
+        persistenceStatus: 'healthy',
+      }))
+      .mockReturnValueOnce(createSessionStoreSnapshotMock({
+        lastPersistenceFailure: null,
+        persistenceStatus: 'healthy',
+      }))
+      .mockReturnValueOnce(createSessionStoreSnapshotMock({
+        lastPersistenceFailure: {
+          code: 'STORAGE_OPERATION_FAILED',
+          message: 'persist target hints failed',
+          retryable: true,
+          time: 2,
+        },
+        persistenceStatus: 'degraded',
+      }));
+
+    const persistReaderState = vi.fn();
+    const setMode = vi.fn();
+    const { hookProps, runtime } = createHookHarness({
+      sessionCommands: {
+        latestReaderStateRef: { current: createStoredState() },
+        markUserInteracted: vi.fn(),
+        persistReaderState,
+        setChapterIndex: vi.fn(),
+        setMode,
+      },
+      runtime: {
+        getCurrentOriginalLocatorRef: {
+          current: () => createLocator({
+            chapterIndex: 7,
+          }),
+        },
+      },
+    });
+    const { result } = renderHook(() => useReaderRestoreFlow(hookProps), {
+      wrapper: runtime.Wrapper,
+    });
+
+    await act(async () => {
+      await result.current.switchMode('paged');
+    });
+
+    expect(setMode).toHaveBeenCalledWith('paged');
+    expect(result.current.pendingRestoreTargetRef.current).toBeNull();
+    expect(result.current.modeSwitchError?.code).toBe('READER_MODE_SWITCH_FAILED');
+    expect(result.current.modeSwitchError?.message).toContain('stage=persist_target_state');
+  });
+
+  it('disables rollback and automatic retry when strict mode restore fails', async () => {
+    setDebugFeatureEnabled('readerStrictModeSwitch', true);
+    vi.spyOn(readerSessionStore, 'flushPersistence').mockResolvedValue(undefined);
+    vi.spyOn(readerSessionStore, 'getReaderSessionSnapshot')
+      .mockReturnValueOnce(createSessionStoreSnapshotMock({
+        lastPersistenceFailure: null,
+        persistenceStatus: 'healthy',
+      }))
+      .mockReturnValueOnce(createSessionStoreSnapshotMock({
+        lastPersistenceFailure: null,
+        persistenceStatus: 'healthy',
+      }))
+      .mockReturnValueOnce(createSessionStoreSnapshotMock({
+        lastPersistenceFailure: null,
+        persistenceStatus: 'healthy',
+      }))
+      .mockReturnValueOnce(createSessionStoreSnapshotMock({
+        lastPersistenceFailure: null,
+        persistenceStatus: 'healthy',
+      }))
+      .mockReturnValueOnce(createSessionStoreSnapshotMock({
+        lastRestoreResult: {
+          attempts: 1,
+          chapterIndex: 7,
+          measuredError: {
+            actual: 14,
+            delta: 4,
+            expected: 10,
+            metric: 'page_delta',
+            tolerance: 0,
+          },
+          mode: 'paged',
+          reason: 'validation_exceeded_tolerance',
+          retryable: true,
+          status: 'failed',
+        },
+      }))
+      .mockReturnValueOnce(createSessionStoreSnapshotMock({
+        lastRestoreResult: {
+          attempts: 1,
+          chapterIndex: 7,
+          measuredError: {
+            actual: 14,
+            delta: 4,
+            expected: 10,
+            metric: 'page_delta',
+            tolerance: 0,
+          },
+          mode: 'paged',
+          reason: 'validation_exceeded_tolerance',
+          retryable: true,
+          status: 'failed',
+        },
+      }));
+
+    const persistReaderState = vi.fn();
+    const setMode = vi.fn();
+    const locator = createLocator({
+      chapterIndex: 7,
+    });
+    const { hookProps, runtime } = createHookHarness({
+      sessionCommands: {
+        latestReaderStateRef: {
+          current: createStoredState({
+            canonical: locator,
+            hints: {
+              chapterProgress: 0.4,
+              contentMode: 'scroll',
+              viewMode: 'original',
+            },
+          }),
+        },
+        markUserInteracted: vi.fn(),
+        persistReaderState,
+        setChapterIndex: vi.fn(),
+        setMode,
+      },
+      sessionSnapshot: {
+        chapterIndex: 7,
+        mode: 'scroll',
+        pendingRestoreTarget: null,
+      },
+      runtime: {
+        getCurrentOriginalLocatorRef: {
+          current: () => locator,
+        },
+      },
+    });
+    const { result } = renderHook(() => useReaderRestoreFlow(hookProps), {
+      wrapper: runtime.Wrapper,
+    });
+
+    await act(async () => {
+      await result.current.switchMode('paged');
+    });
+
+    const retryOutcome = result.current.recordRestoreResult({
+      attempts: 1,
+      chapterIndex: 7,
+      measuredError: {
+        actual: 14,
+        delta: 4,
+        expected: 10,
+        metric: 'page_delta',
+        tolerance: 0,
+      },
+      mode: 'paged',
+      reason: 'validation_exceeded_tolerance',
+      retryable: true,
+      status: 'failed',
+    }, result.current.pendingRestoreTargetRef.current);
+
+    expect(retryOutcome.scheduledRetry).toBe(false);
+
+    persistReaderState.mockClear();
+    setMode.mockClear();
+
+    act(() => {
+      expect(result.current.handleRestoreSettled('failed')).toBe(false);
+    });
+    expect(setMode).not.toHaveBeenCalled();
+    expect(persistReaderState).not.toHaveBeenCalledWith(expect.anything(), {
+      flush: true,
+    });
+    expect(result.current.modeSwitchError?.code).toBe('READER_MODE_SWITCH_FAILED');
+    expect(result.current.modeSwitchError?.message).toContain('stage=restore_target');
+    expect(result.current.modeSwitchError?.message).toContain('reason=validation_exceeded_tolerance');
   });
 
   it('restores the last content reading position when switching back from summary', () => {

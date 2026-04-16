@@ -275,6 +275,10 @@
       "logs": "Logs"
     },
     "features": {
+      "readerStrictModeSwitch": {
+        "label": "Strict Mode Switch",
+        "description": "Disable paged/scroll mode-switch fallbacks and stop immediately on failure"
+      },
       "readerTelemetry": {
         "label": "Reader Telemetry",
         "description": "Verbose reader layout snapshots and preheat source logs"
@@ -532,6 +536,7 @@
     "CHAPTER_NOT_FOUND": "Chapter not found.",
     "CHAPTER_STRUCTURED_CONTENT_MISSING": "This book is missing enhanced layout data. Reparse the original source file to continue.",
     "CHAPTER_MISSING": "Chapter not found, unable to continue analysis.",
+    "READER_MODE_SWITCH_FAILED": "Failed to switch reader mode: {{message}}",
     "INTERNAL_ERROR": "Internal error: {{message}}",
     "CHUNK_COMPLETED": "Chunk analysis completed.",
     "CHUNKS_NOT_FOUND": "Analysis chunks not found, please restart analysis.",

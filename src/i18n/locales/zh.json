@@ -275,6 +275,10 @@
       "logs": "日志"
     },
     "features": {
+      "readerStrictModeSwitch": {
+        "label": "严格模式切换",
+        "description": "禁用翻页/滚动模式切换兜底，失败后立即中止并报错"
+      },
       "readerTelemetry": {
         "label": "Reader 遥测",
         "description": "输出更详细的阅读布局快照和预热来源日志"
@@ -532,6 +536,7 @@
     "CHAPTER_NOT_FOUND": "章节不存在。",
     "CHAPTER_STRUCTURED_CONTENT_MISSING": "当前书籍缺少增强排版数据，请重新解析源文件。",
     "CHAPTER_MISSING": "找不到指定章节，无法继续分析。",
+    "READER_MODE_SWITCH_FAILED": "切换阅读模式失败：{{message}}",
     "INTERNAL_ERROR": "系统内部错误：{{message}}",
     "CHUNK_COMPLETED": "该章节块分析已完成。",
     "CHUNKS_NOT_FOUND": "分析分块不存在，请重新开始分析。",

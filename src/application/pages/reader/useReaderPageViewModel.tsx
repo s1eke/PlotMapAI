@@ -73,6 +73,7 @@ export function useReaderPageViewModel(novelId: number): ReaderPageViewModel {
   const {
     chapterData,
     lifecycle,
+    modeSwitchError,
     navigation,
     restore,
     sessionSnapshot,
@@ -168,6 +169,7 @@ export function useReaderPageViewModel(novelId: number): ReaderPageViewModel {
     wheelDeltaRef,
     pageTurnLockedRef,
   );
+  const readerError = modeSwitchError ?? lifecycle.readerError;
 
   const handleSetPageTurnMode = useCallback((nextMode: ReaderPageTurnMode): void => {
     if (nextMode === preferences.pageTurnMode) {
@@ -185,12 +187,13 @@ export function useReaderPageViewModel(novelId: number): ReaderPageViewModel {
     }
 
     if (mode !== nextContentMode) {
-      restore.switchMode(nextContentMode);
+      restore.switchMode(nextContentMode).catch(() => undefined);
     }
   }, [lastContentMode, mode, preferences, restore]);
 
   const handleSetViewMode = useCallback((nextViewMode: 'original' | 'summary'): void => {
-    restore.switchMode(nextViewMode === 'summary' ? 'summary' : lastContentMode);
+    restore.switchMode(nextViewMode === 'summary' ? 'summary' : lastContentMode)
+      .catch(() => undefined);
   }, [lastContentMode, restore]);
 
   const handleViewportClick = useCallback((event: MouseEvent<HTMLDivElement>): void => {
@@ -237,10 +240,10 @@ export function useReaderPageViewModel(novelId: number): ReaderPageViewModel {
     backHref: novelDetailHref,
     imageViewerProps: imageOverlay.imageViewerProps,
     pageBgClassName: preferences.currentTheme.bg,
-    readerError: lifecycle.readerError,
+    readerError,
     reparseRecovery: {
       ...reparseRecoveryController,
-      visible: lifecycle.readerError?.code === AppErrorCode.CHAPTER_STRUCTURED_CONTENT_MISSING,
+      visible: readerError?.code === AppErrorCode.CHAPTER_STRUCTURED_CONTENT_MISSING,
     },
     sidebarProps: {
       chapters: chapterData.chapters,

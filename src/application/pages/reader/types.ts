@@ -58,6 +58,7 @@ export interface ReaderReadingSurfaceViewportContentProps {
 export interface ReaderReadingSurfaceController {
   chapterData: Pick<UseReaderChapterDataResult, 'chapters' | 'currentChapter'>;
   lifecycle: ReaderLifecycleControllerResult;
+  modeSwitchError: AppError | null;
   navigation: ReaderNavigationControllerResult;
   restore: Pick<UseReaderRestoreControllerResult, 'switchMode'>
     & Pick<UseReaderSessionResult['commands'], 'setLastContentMode'>;

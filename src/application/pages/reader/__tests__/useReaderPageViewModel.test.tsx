@@ -63,6 +63,7 @@ interface ReaderSurfaceMockState {
   loadingLabel: string;
   lastContentMode: 'scroll' | 'paged';
   mode: 'summary' | 'scroll' | 'paged';
+  modeSwitchError: TestReaderError | null;
   pageTurnMode: 'cover' | 'scroll' | 'slide' | 'none';
   paragraphSpacing: number;
   readerError: TestReaderError | null;
@@ -84,7 +85,7 @@ const readerShellMocks = vi.hoisted(() => ({
   setPageTurnMode: vi.fn(),
   setParagraphSpacing: vi.fn(),
   setReaderTheme: vi.fn(),
-  switchMode: vi.fn(),
+  switchMode: vi.fn(() => Promise.resolve()),
   toggleSidebar: vi.fn(),
 }));
 
@@ -128,6 +129,7 @@ const readerSurfaceMocks: ReaderSurfaceMockState = vi.hoisted(() => ({
   loadingLabel: 'reader.loading',
   lastContentMode: 'scroll',
   mode: 'summary',
+  modeSwitchError: null,
   pageTurnMode: 'cover',
   paragraphSpacing: 1.2,
   readerError: null,
@@ -234,6 +236,7 @@ function resetReaderSurfaceMocks(): void {
   readerSurfaceMocks.loadingLabel = 'reader.loading';
   readerSurfaceMocks.lastContentMode = 'scroll';
   readerSurfaceMocks.mode = 'summary';
+  readerSurfaceMocks.modeSwitchError = null;
   readerSurfaceMocks.pageTurnMode = 'cover';
   readerSurfaceMocks.paragraphSpacing = 1.2;
   readerSurfaceMocks.readerError = null;
@@ -373,6 +376,7 @@ vi.mock('../useReaderReadingSurfaceController', () => ({
       showLoadingOverlay: readerSurfaceMocks.showLoadingOverlay,
       lifecycleStatus: readerSurfaceMocks.lifecycleStatus,
     },
+    modeSwitchError: readerSurfaceMocks.modeSwitchError,
     navigation: {
       goToChapter: readerNavigationMocks.goToChapter,
       goToNextPage: readerNavigationMocks.goToNextPage,
@@ -573,6 +577,22 @@ describe('useReaderPageViewModel', () => {
     await waitFor(() => {
       expect(result.current.reparseRecovery.accept).toBe('.txt');
     });
+  });
+
+  it('prefers the strict mode-switch error over the lifecycle reader error', () => {
+    readerSurfaceMocks.readerError = {
+      code: AppErrorCode.CHAPTER_NOT_FOUND,
+    };
+    readerSurfaceMocks.modeSwitchError = {
+      code: AppErrorCode.READER_MODE_SWITCH_FAILED,
+    };
+
+    const { result } = renderHook(() => useReaderPageViewModel(1));
+
+    expect(result.current.readerError).toEqual({
+      code: AppErrorCode.READER_MODE_SWITCH_FAILED,
+    });
+    expect(result.current.reparseRecovery.visible).toBe(false);
   });
 
   it('omits toolbar props while loading overlays are visible or no current chapter is available', () => {

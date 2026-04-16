@@ -304,6 +304,7 @@ export function useReaderReadingSurfaceController({
       ...lifecycle,
       renderableChapter,
     },
+    modeSwitchError: restoreFlow.modeSwitchError,
     navigation,
     restore: {
       setLastContentMode: sessionCommands.setLastContentMode,
