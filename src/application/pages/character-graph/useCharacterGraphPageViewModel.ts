@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { refreshAnalysisOverview } from '@application/use-cases/analysis';
-import { loadCharacterGraphPageData } from '@application/use-cases/library';
+import { loadCharacterGraphPageData } from '@application/use-cases/character-graph';
 import { appPaths } from '@app/router/paths';
 import { useCharacterGraphCanvasController } from '@domains/character-graph';
 import { reportAppError } from '@shared/debug';

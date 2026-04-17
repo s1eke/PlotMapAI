@@ -10,14 +10,12 @@ import {
   purificationRuleRepository,
   tocRuleRepository,
 } from '@domains/settings';
-import { db } from '@infra/db';
 
 import {
   deleteNovelAndCleanupArtifacts,
-  importBookAndRefreshLibrary,
   loadBookDetailPageData,
   reparseBookAndRefreshDetail,
-} from '../library';
+} from '../book-detail';
 
 vi.mock('@domains/analysis', () => ({
   analysisService: {
@@ -28,14 +26,12 @@ vi.mock('@domains/analysis', () => ({
 vi.mock('@application/services/bookLifecycleService', () => ({
   bookLifecycleService: {
     deleteNovel: vi.fn(),
-    importBook: vi.fn(),
     reparseBook: vi.fn(),
   },
 }));
 
 vi.mock('@domains/library', () => ({
   novelRepository: {
-    delete: vi.fn(),
     get: vi.fn(),
   },
 }));
@@ -101,47 +97,12 @@ function createStatusResponse() {
   };
 }
 
-describe('application library use-cases', () => {
-  beforeEach(async () => {
+describe('book-detail use-cases', () => {
+  beforeEach(() => {
     vi.clearAllMocks();
-    localStorage.clear();
-    await db.delete();
-    await db.open();
     vi.mocked(analysisService.getStatus).mockResolvedValue(createStatusResponse());
     vi.mocked(chapterRichContentRepository.listNovelChapterRichContents).mockResolvedValue([]);
     vi.mocked(bookLifecycleService.deleteNovel).mockResolvedValue({ message: 'Novel deleted' });
-  });
-
-  it('importBookAndRefreshLibrary resolves toc rules before importing and then reloads the created novel', async () => {
-    const file = new File(['book'], 'book.txt', { type: 'text/plain' });
-    vi.mocked(ensureDefaultTocRules).mockResolvedValue(undefined);
-    vi.mocked(ensureDefaultPurificationRules).mockResolvedValue(undefined);
-    vi.mocked(tocRuleRepository.getEnabledChapterDetectionRules).mockResolvedValue([
-      { rule: '^Chapter', source: 'default' },
-    ]);
-    vi.mocked(purificationRuleRepository.getEnabledPurificationRules).mockResolvedValue([]);
-    vi.mocked(bookLifecycleService.importBook).mockResolvedValue(baseNovel);
-
-    const novel = await importBookAndRefreshLibrary(file, {
-      onProgress: vi.fn(),
-    });
-
-    expect(ensureDefaultTocRules).toHaveBeenCalledTimes(1);
-    expect(ensureDefaultPurificationRules).toHaveBeenCalledTimes(1);
-    expect(tocRuleRepository.getEnabledChapterDetectionRules).toHaveBeenCalledTimes(1);
-    expect(purificationRuleRepository.getEnabledPurificationRules).toHaveBeenCalledTimes(1);
-    expect(bookLifecycleService.importBook).toHaveBeenCalledWith(
-      file,
-      [{ rule: '^Chapter', source: 'default' }],
-      {
-        onProgress: expect.any(Function),
-        purificationRules: [],
-      },
-    );
-    expect(novel).toMatchObject({
-      id: 7,
-      title: 'Imported Novel',
-    });
   });
 
   it('loadBookDetailPageData keeps novel data when analysis status loading fails', async () => {

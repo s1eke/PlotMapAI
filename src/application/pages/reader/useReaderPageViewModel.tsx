@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { analyzeChapter } from '@application/use-cases/analysis';
-import { loadReaderSession } from '@application/use-cases/library';
+import { loadReaderSession } from '@application/use-cases/reader';
 import { appPaths } from '@app/router/paths';
 import { ChapterAnalysisPanel, analysisService } from '@domains/analysis';
 import {

@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
 import { analyzeChapter } from '@application/use-cases/analysis';
-import { loadReaderSession } from '@application/use-cases/library';
+import { loadReaderSession } from '@application/use-cases/reader';
 import { CACHE_KEYS, storage } from '@infra/storage';
 
 import ReaderPage from '../reader';
@@ -36,7 +36,7 @@ vi.mock('@application/use-cases/analysis', () => ({
   analyzeChapter: vi.fn(),
 }));
 
-vi.mock('@application/use-cases/library', () => ({
+vi.mock('@application/use-cases/reader', () => ({
   loadReaderSession: vi.fn(),
 }));
 

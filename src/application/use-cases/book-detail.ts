@@ -1,4 +1,4 @@
-import type { CharacterGraphResponse } from '@shared/contracts';
+import type { ImportBookOptions } from '@domains/book-import';
 import type { NovelView } from '@domains/library';
 import type { AppError } from '@shared/errors';
 
@@ -14,21 +14,10 @@ import {
 import { AppErrorCode, toAppError } from '@shared/errors';
 
 import { bookLifecycleService } from '@application/services/bookLifecycleService';
-import { projectNovelText } from '@application/services/novelTextProjectionService';
 
 export interface BookDetailAnalysisData {
   analysisStatus: Awaited<ReturnType<typeof analysisService.getStatus>> | null;
   analysisStatusError: AppError | null;
-}
-
-export interface BookDetailPageData extends BookDetailAnalysisData {
-  contentSummary: BookDetailContentSummary;
-  novel: NovelView;
-}
-
-export interface CharacterGraphPageData {
-  graph: CharacterGraphResponse;
-  novel: NovelView;
 }
 
 export interface BookDetailContentSummary {
@@ -36,6 +25,11 @@ export interface BookDetailContentSummary {
   contentVersion: number | null;
   importFormatVersion: number | null;
   lastParsedAt: string | null;
+}
+
+export interface BookDetailPageData extends BookDetailAnalysisData {
+  contentSummary: BookDetailContentSummary;
+  novel: NovelView;
 }
 
 type NovelRichContentList = Awaited<
@@ -53,6 +47,7 @@ function buildBookDetailContentSummary(
       lastParsedAt: null,
     };
   }
+
   const contentVersion = richContents.reduce<number | null>((latest, chapter) => {
     if (latest == null) {
       return chapter.contentVersion;
@@ -89,28 +84,10 @@ export async function deleteNovelAndCleanupArtifacts(
   return bookLifecycleService.deleteNovel(novelId);
 }
 
-export async function importBookAndRefreshLibrary(
-  file: File,
-  options: import('@domains/book-import').ImportBookOptions = {},
-): Promise<NovelView> {
-  await Promise.all([
-    ensureDefaultTocRules(),
-    ensureDefaultPurificationRules(),
-  ]);
-  const [tocRules, purificationRules] = await Promise.all([
-    tocRuleRepository.getEnabledChapterDetectionRules(),
-    purificationRuleRepository.getEnabledPurificationRules(),
-  ]);
-  return bookLifecycleService.importBook(file, tocRules, {
-    ...options,
-    purificationRules,
-  });
-}
-
 export async function reparseBookAndRefreshDetail(
   novelId: number,
   file: File,
-  options: import('@domains/book-import').ImportBookOptions = {},
+  options: ImportBookOptions = {},
 ): Promise<NovelView> {
   await Promise.all([
     ensureDefaultTocRules(),
@@ -149,7 +126,9 @@ export async function loadBookDetailAnalysisStatus(
   }
 }
 
-export async function loadBookDetailPageData(novelId: number): Promise<BookDetailPageData> {
+export async function loadBookDetailPageData(
+  novelId: number,
+): Promise<BookDetailPageData> {
   const [novel, analysisData, richContents] = await Promise.all([
     novelRepository.get(novelId),
     loadBookDetailAnalysisStatus(novelId),
@@ -160,25 +139,5 @@ export async function loadBookDetailPageData(novelId: number): Promise<BookDetai
     contentSummary: buildBookDetailContentSummary(richContents),
     novel,
     ...analysisData,
-  };
-}
-
-export async function loadCharacterGraphPageData(
-  novelId: number,
-): Promise<CharacterGraphPageData> {
-  const [novel, chapters] = await Promise.all([
-    novelRepository.get(novelId),
-    projectNovelText(novelId),
-  ]);
-
-  return {
-    graph: await analysisService.getCharacterGraph(novelId, chapters),
-    novel,
-  };
-}
-
-export async function loadReaderSession(novelId: number): Promise<{ novel: NovelView }> {
-  return {
-    novel: await novelRepository.get(novelId),
   };
 }

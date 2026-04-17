@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { analyzeChapter } from '@application/use-cases/analysis';
-import { loadReaderSession } from '@application/use-cases/library';
+import { loadReaderSession } from '@application/use-cases/reader';
 import { analysisService } from '@domains/analysis';
 import { useReaderInput } from '@domains/reader-interaction';
 import { AppErrorCode } from '@shared/errors';
@@ -281,7 +281,7 @@ vi.mock('@application/use-cases/analysis', () => ({
   analyzeChapter: vi.fn(),
 }));
 
-vi.mock('@application/use-cases/library', () => ({
+vi.mock('@application/use-cases/reader', () => ({
   loadReaderSession: vi.fn(),
 }));
 

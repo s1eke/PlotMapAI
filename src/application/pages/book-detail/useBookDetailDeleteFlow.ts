@@ -2,7 +2,7 @@ import type { AppError } from '@shared/errors';
 
 import { useCallback, useState } from 'react';
 
-import { deleteNovelAndCleanupArtifacts } from '@application/use-cases/library';
+import { deleteNovelAndCleanupArtifacts } from '@application/use-cases/book-detail';
 import { reportAppError } from '@shared/debug';
 import { AppErrorCode, toAppError } from '@shared/errors';
 

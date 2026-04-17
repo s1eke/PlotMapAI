@@ -2,7 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { refreshAnalysisOverview } from '@application/use-cases/analysis';
-import { loadCharacterGraphPageData } from '@application/use-cases/library';
+import { loadCharacterGraphPageData } from '@application/use-cases/character-graph';
 import { useCharacterGraphCanvasController } from '@domains/character-graph';
 import { AppErrorCode, createAppError } from '@shared/errors';
 
@@ -16,7 +16,7 @@ vi.mock('@shared/debug', () => ({
   reportAppError: vi.fn(),
 }));
 
-vi.mock('@application/use-cases/library', () => ({
+vi.mock('@application/use-cases/character-graph', () => ({
   loadCharacterGraphPageData: vi.fn(),
 }));
 

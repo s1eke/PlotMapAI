@@ -7,7 +7,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
-import { loadBookDetailAnalysisStatus, loadBookDetailPageData } from '@application/use-cases/library';
+import {
+  loadBookDetailAnalysisStatus,
+  loadBookDetailPageData,
+} from '@application/use-cases/book-detail';
 import { appPaths } from '@app/router/paths';
 import { useNovelCoverResource } from '@domains/library';
 import { reportAppError } from '@shared/debug';

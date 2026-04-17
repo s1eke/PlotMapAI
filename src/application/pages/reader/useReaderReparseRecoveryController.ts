@@ -4,7 +4,7 @@ import type { AppError } from '@shared/errors';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { reparseBookAndRefreshDetail } from '@application/use-cases/library';
+import { reparseBookAndRefreshDetail } from '@application/use-cases/book-detail';
 import { reportAppError, setDebugSnapshot } from '@shared/debug';
 import { AppErrorCode, serializeAppError, toAppError } from '@shared/errors';
 

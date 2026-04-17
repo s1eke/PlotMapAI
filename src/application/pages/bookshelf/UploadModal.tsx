@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { UploadCloud, FileText, Loader2 } from 'lucide-react';
 
-import { importBookAndRefreshLibrary } from '@application/use-cases/library';
+import { importBookAndRefreshLibrary } from '@application/use-cases/bookshelf';
 import type { BookImportProgress } from '@domains/book-import';
 import { reportAppError, setDebugSnapshot } from '@shared/debug';
 import {
