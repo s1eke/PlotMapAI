@@ -14,6 +14,7 @@ import { getChapterBoundaryLocator } from '../layout-core/internal';
 import { debugLog, setDebugSnapshot } from '@shared/debug';
 import {
   canSkipReaderRestore,
+  clampContainerScrollTop,
   SCROLL_READING_ANCHOR_RATIO,
 } from '@shared/utils/readerPosition';
 import {
@@ -152,7 +153,7 @@ export function useScrollReaderRestore(params: {
       if (target.locatorBoundary === 'start' && targetElement) {
         return restoreStepSuccess({
           locator: resolvedLocator,
-          scrollTop: Math.max(0, Math.round(targetElement.offsetTop)),
+          scrollTop: clampContainerScrollTop(container, targetElement.offsetTop),
         });
       }
 
@@ -160,9 +161,9 @@ export function useScrollReaderRestore(params: {
       if (nextScrollTop !== null) {
         return restoreStepSuccess({
           locator: resolvedLocator,
-          scrollTop: Math.max(
-            0,
-            Math.round(nextScrollTop - container.clientHeight * SCROLL_READING_ANCHOR_RATIO),
+          scrollTop: clampContainerScrollTop(
+            container,
+            nextScrollTop - container.clientHeight * SCROLL_READING_ANCHOR_RATIO,
           ),
         });
       }

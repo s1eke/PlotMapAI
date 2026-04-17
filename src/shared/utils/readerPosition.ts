@@ -21,6 +21,23 @@ export interface ChapterRenderData {
 
 export const SCROLL_READING_ANCHOR_RATIO = 0.3;
 
+export function getContainerMaxScrollTop(element: HTMLDivElement | null): number {
+  if (!element) return 0;
+  return Math.max(0, element.scrollHeight - element.clientHeight);
+}
+
+export function clampContainerScrollTop(
+  element: HTMLDivElement | null,
+  scrollTop: number,
+): number {
+  const nextScrollTop = Math.round(scrollTop);
+  if (!element) {
+    return Math.max(0, nextScrollTop);
+  }
+
+  return Math.max(0, Math.min(getContainerMaxScrollTop(element), nextScrollTop));
+}
+
 export function clampProgress(value: number | undefined): number {
   if (typeof value !== 'number' || Number.isNaN(value)) return 0;
   return Math.max(0, Math.min(1, value));
@@ -29,7 +46,7 @@ export function clampProgress(value: number | undefined): number {
 export function getContainerProgress(element: HTMLDivElement | null): number {
   if (!element) return 0;
 
-  const maxScroll = element.scrollHeight - element.clientHeight;
+  const maxScroll = getContainerMaxScrollTop(element);
   if (maxScroll <= 0) return 0;
 
   return clampProgress(element.scrollTop / maxScroll);

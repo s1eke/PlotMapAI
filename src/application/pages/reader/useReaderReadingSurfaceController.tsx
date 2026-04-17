@@ -3,7 +3,7 @@ import type { ChapterContent } from '@shared/contracts/reader';
 import type { ReaderAnalysisBridgeController, UseReaderPreferencesResult } from '@domains/reader-shell';
 import type { UseReaderSessionResult } from '@domains/reader-session';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import {
   PagedReaderContent,
@@ -241,17 +241,25 @@ export function useReaderReadingSurfaceController({
     novelId,
     restoreFlow,
   });
-  const handleLifecycleRestoreSettled = lifecycle.handleRestoreSettled;
-  const handleRestoreFlowSettled = restoreFlow.handleRestoreSettled;
+  const handleLifecycleRestoreSettledRef = useRef(lifecycle.handleRestoreSettled);
+  const handleRestoreFlowSettledRef = useRef(restoreFlow.handleRestoreSettled);
+
+  useEffect(() => {
+    handleLifecycleRestoreSettledRef.current = lifecycle.handleRestoreSettled;
+  }, [lifecycle.handleRestoreSettled]);
+
+  useEffect(() => {
+    handleRestoreFlowSettledRef.current = restoreFlow.handleRestoreSettled;
+  }, [restoreFlow.handleRestoreSettled]);
 
   useEffect(() => {
     return persistence.registerRestoreSettledHandler((result) => {
-      if (handleRestoreFlowSettled(result)) {
+      if (handleRestoreFlowSettledRef.current(result)) {
         return;
       }
-      handleLifecycleRestoreSettled(result);
+      handleLifecycleRestoreSettledRef.current(result);
     });
-  }, [handleLifecycleRestoreSettled, handleRestoreFlowSettled, persistence]);
+  }, [persistence]);
 
   useEffect(() => {
     const handleDebugRetryReaderRestore = () => {

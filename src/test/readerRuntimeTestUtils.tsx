@@ -54,6 +54,7 @@ export function createReaderContextValue(
   let currentAnchorResolver: () => ScrollModeAnchor | null = () => null;
   let currentOriginalLocatorResolver: () => ReaderLocator | null = () => null;
   let currentPagedLocatorResolver: () => ReaderLocator | null = () => null;
+  let pagedLocatorPageIndexResolver: (locator: ReaderLocator) => number | null = () => null;
   let scrollLocatorOffsetResolver: (locator: ReaderLocator) => number | null = () => null;
   let restoreSettledHandler: (result: RestoreSettledResult) => void = () => {};
   let scrollSyncSuppressed = false;
@@ -110,6 +111,11 @@ export function createReaderContextValue(
         currentPagedLocatorResolver = resolver;
         return createNoopCleanup();
       }),
+    registerPagedLocatorPageIndexResolver:
+      overrides.registerPagedLocatorPageIndexResolver ?? ((resolver) => {
+        pagedLocatorPageIndexResolver = resolver;
+        return createNoopCleanup();
+      }),
     registerScrollChapterBodyElement:
       overrides.registerScrollChapterBodyElement ?? ((index, element) => {
         if (element) {
@@ -132,6 +138,8 @@ export function createReaderContextValue(
         scrollLocatorOffsetResolver = resolver;
         return createNoopCleanup();
       }),
+    resolvePagedLocatorPageIndex: overrides.resolvePagedLocatorPageIndex
+      ?? ((locator) => pagedLocatorPageIndexResolver(locator)),
     resolveScrollLocatorOffset: overrides.resolveScrollLocatorOffset
       ?? ((locator) => scrollLocatorOffsetResolver(locator)),
     isScrollSyncSuppressed: overrides.isScrollSyncSuppressed ?? (() => scrollSyncSuppressed),

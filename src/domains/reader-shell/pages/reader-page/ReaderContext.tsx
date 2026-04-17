@@ -136,9 +136,11 @@ export function ReaderContextProvider({
     registerCurrentAnchorResolver: value.registerCurrentAnchorResolver,
     registerCurrentOriginalLocatorResolver: value.registerCurrentOriginalLocatorResolver,
     registerCurrentPagedLocatorResolver: value.registerCurrentPagedLocatorResolver,
+    registerPagedLocatorPageIndexResolver: value.registerPagedLocatorPageIndexResolver,
     registerScrollChapterBodyElement: value.registerScrollChapterBodyElement,
     registerScrollChapterElement: value.registerScrollChapterElement,
     registerScrollLocatorOffsetResolver: value.registerScrollLocatorOffsetResolver,
+    resolvePagedLocatorPageIndex: value.resolvePagedLocatorPageIndex,
     resolveScrollLocatorOffset: value.resolveScrollLocatorOffset,
   }), [
     value.clearScrollChapterBodyElements,
@@ -152,9 +154,11 @@ export function ReaderContextProvider({
     value.registerCurrentAnchorResolver,
     value.registerCurrentOriginalLocatorResolver,
     value.registerCurrentPagedLocatorResolver,
+    value.registerPagedLocatorPageIndexResolver,
     value.registerScrollChapterBodyElement,
     value.registerScrollChapterElement,
     value.registerScrollLocatorOffsetResolver,
+    value.resolvePagedLocatorPageIndex,
     value.resolveScrollLocatorOffset,
   ]);
 

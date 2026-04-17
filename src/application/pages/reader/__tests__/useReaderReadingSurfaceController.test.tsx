@@ -266,6 +266,43 @@ describe('useReaderReadingSurfaceController', () => {
     expect(surfaceMocks.scrollController.handleContentScroll).not.toHaveBeenCalled();
   });
 
+  it('keeps a stable restore-settled subscription while dispatching to the latest callbacks', () => {
+    const { Wrapper } = createReaderContextWrapper({
+      registerRestoreSettledHandler: surfaceMocks.registerRestoreSettledHandler,
+    });
+    const analysisController = {
+      analyzeChapter: vi.fn(),
+      getChapterAnalysis: vi.fn(),
+      getStatus: vi.fn(),
+      renderSummaryPanel: vi.fn(() => 'summary-panel'),
+    };
+
+    const { rerender } = renderHook(() => useReaderReadingSurfaceController({
+      analysisController,
+      novelId: 1,
+      preferences: surfaceMocks.preferences,
+    }), {
+      wrapper: Wrapper,
+    });
+
+    const registeredHandler = surfaceMocks.registerRestoreSettledHandler.mock.calls[0]?.[0];
+    expect(registeredHandler).toBeTypeOf('function');
+
+    const nextRestoreFlowHandler = vi.fn(() => false);
+    const nextLifecycleHandler = vi.fn();
+    surfaceMocks.restoreFlow.handleRestoreSettled = nextRestoreFlowHandler;
+    surfaceMocks.lifecycle.handleRestoreSettled = nextLifecycleHandler;
+
+    rerender();
+
+    expect(surfaceMocks.registerRestoreSettledHandler).toHaveBeenCalledTimes(1);
+
+    registeredHandler('completed');
+
+    expect(nextRestoreFlowHandler).toHaveBeenCalledWith('completed');
+    expect(nextLifecycleHandler).toHaveBeenCalledWith('completed');
+  });
+
   it('builds scroll content props and dispatches viewport scroll to the scroll controller', () => {
     surfaceMocks.sessionSnapshot.mode = 'scroll';
     surfaceMocks.sessionSnapshot.viewMode = 'original';

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { MutableRefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { ChapterContent, ReaderMode, ReaderRestoreTarget } from '@shared/contracts/reader';
@@ -41,6 +42,7 @@ interface ReaderLifecycleControllerChapterData {
 interface ReaderLifecycleControllerRestoreFlow {
   clearPendingRestoreTarget: UseReaderRestoreControllerResult['clearPendingRestoreTarget'];
   pendingRestoreTarget: UseReaderRestoreControllerResult['pendingRestoreTarget'];
+  pendingRestoreTargetRef: MutableRefObject<ReaderRestoreTarget | null>;
   setPendingRestoreTarget: UseReaderRestoreControllerResult['setPendingRestoreTarget'];
   startRestoreMaskForTarget: UseReaderRestoreControllerResult['startRestoreMaskForTarget'];
   stopRestoreMask: UseReaderRestoreControllerResult['stopRestoreMask'];
@@ -115,6 +117,7 @@ export function useReaderLifecycleController({
   const {
     clearPendingRestoreTarget,
     pendingRestoreTarget,
+    pendingRestoreTargetRef,
     setPendingRestoreTarget,
     startRestoreMaskForTarget,
     stopRestoreMask,
@@ -139,6 +142,8 @@ export function useReaderLifecycleController({
     lifecycleStatus === 'hydrating'
     || lifecycleStatus === 'loading-chapters'
     || lifecycleStatus === 'loading-chapter';
+  const activePendingRestoreTarget =
+    pendingRestoreTarget ?? pendingRestoreTargetRef.current;
   const isActiveChapterResolved = currentChapter?.index === chapterIndex;
   const renderableChapter = useMemo<ChapterContent | null>(() => {
     if (lifecycleStatus === 'hydrating' || lifecycleStatus === 'loading-chapters') {
@@ -148,7 +153,7 @@ export function useReaderLifecycleController({
     return isActiveChapterResolved ? currentChapter : null;
   }, [currentChapter, isActiveChapterResolved, lifecycleStatus]);
   const isAwaitingPagedLayout = lifecycleStatus === 'awaiting-paged-layout';
-  const shouldKeepRestoreMask = shouldKeepReaderRestoreMask(pendingRestoreTarget);
+  const shouldKeepRestoreMask = shouldKeepReaderRestoreMask(activePendingRestoreTarget);
   const isRestoringPosition = lifecycleStatus === 'restoring-position' && shouldKeepRestoreMask;
   const showLoadingOverlay =
     isLoadingLifecyclePhase
@@ -211,8 +216,14 @@ export function useReaderLifecycleController({
       const nextRestoreTarget = navigationRestoreTarget
         ?? initialRestoreTarget
         ?? (shouldReusePersistedRestoreTarget ? persistedRestoreTarget : null);
+      const shouldResetViewportForLoad =
+        shouldResetViewport
+        && (
+          !nextRestoreTarget
+          || runtime.navigationSource === 'navigation'
+        );
 
-      if (shouldResetViewport) {
+      if (shouldResetViewportForLoad) {
         resetViewportPosition();
       }
       if (shouldClearNavigationSource) {
@@ -376,7 +387,8 @@ export function useReaderLifecycleController({
     const initialRestoreTarget = queuedInitialLoadParams
       ? queuedInitialRestoreTargetRef.current
       : null;
-    const persistedRestoreTarget = pendingRestoreTarget;
+    const persistedRestoreTarget =
+      pendingRestoreTargetRef.current ?? pendingRestoreTarget;
 
     runChapterLoad(nextLoadParams, initialRestoreTarget, persistedRestoreTarget);
     if (queuedInitialLoadParams && currentLoadKey === nextLoadKey) {
@@ -391,6 +403,7 @@ export function useReaderLifecycleController({
     mode,
     novelId,
     pendingRestoreTarget,
+    pendingRestoreTargetRef,
     runChapterLoad,
   ]);
 
@@ -398,7 +411,7 @@ export function useReaderLifecycleController({
     if (
       lifecycleStatus !== 'restoring-position'
       || awaitingRestoreLoadKeyRef.current !== currentLoadKey
-      || pendingRestoreTarget !== null
+      || (pendingRestoreTargetRef.current ?? pendingRestoreTarget) !== null
     ) {
       return;
     }
@@ -417,6 +430,7 @@ export function useReaderLifecycleController({
     isPagedMode,
     lifecycleStatus,
     pendingRestoreTarget,
+    pendingRestoreTargetRef,
   ]);
 
   useEffect(() => {

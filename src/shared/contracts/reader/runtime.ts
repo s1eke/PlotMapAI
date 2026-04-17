@@ -64,6 +64,9 @@ export interface ReaderLayoutQueriesValue {
   registerCurrentPagedLocatorResolver: (
     resolver: () => ReaderLocator | null,
   ) => () => void;
+  registerPagedLocatorPageIndexResolver: (
+    resolver: (locator: ReaderLocator) => number | null,
+  ) => () => void;
   registerScrollChapterBodyElement: (
     index: number,
     element: HTMLDivElement | null,
@@ -75,6 +78,7 @@ export interface ReaderLayoutQueriesValue {
   registerScrollLocatorOffsetResolver: (
     resolver: (locator: ReaderLocator) => number | null,
   ) => () => void;
+  resolvePagedLocatorPageIndex: (locator: ReaderLocator) => number | null;
   resolveScrollLocatorOffset: (locator: ReaderLocator) => number | null;
 }
 

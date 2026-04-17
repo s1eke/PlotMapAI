@@ -128,6 +128,7 @@ function createHookProps(
 
 function setupHook(
   overrides: Partial<Parameters<typeof usePagedReaderController>[0]> = {},
+  contextOverrides: Parameters<typeof createReaderContextWrapper>[0] = {},
 ) {
   const sessionCommands = overrides.sessionCommands ?? createSessionCommands();
   const cache = overrides.cache ?? {
@@ -143,7 +144,7 @@ function setupHook(
   const clearPendingRestoreTarget = overrides.clearPendingRestoreTarget ?? vi.fn();
   const stopRestoreMask = overrides.stopRestoreMask ?? vi.fn();
   const beforeChapterChange = overrides.beforeChapterChange ?? vi.fn();
-  const { value, Wrapper } = createReaderContextWrapper();
+  const { value, Wrapper } = createReaderContextWrapper(contextOverrides);
 
   const buildProps = (
     nextOverrides: Partial<Parameters<typeof usePagedReaderController>[0]> = {},
@@ -265,6 +266,32 @@ describe('usePagedReaderController', () => {
         }),
       }));
     });
+  });
+
+  it('synchronizes the runtime paged state immediately when layout-driven restores update the page index', async () => {
+    pagedControllerTestState.pagedLayoutsByIndex = new Map([
+      [0, createPagedLayout(3)],
+    ]);
+    pagedControllerTestState.readyChapterIndex = 0;
+
+    const setPagedState = vi.fn();
+    const { result } = setupHook({}, {
+      setPagedState,
+    });
+    const pagedLayoutArgs = vi.mocked(usePagedReaderLayout).mock.calls.at(-1)?.[0];
+    expect(pagedLayoutArgs).toBeTruthy();
+
+    setPagedState.mockClear();
+
+    act(() => {
+      pagedLayoutArgs?.setPageIndex(2);
+      expect(setPagedState).toHaveBeenLastCalledWith({
+        pageCount: 3,
+        pageIndex: 2,
+      });
+    });
+
+    expect(result.current.pageIndex).toBe(2);
   });
 
   it('commits chapter navigation at page boundaries and tracks the pending page target', () => {

@@ -18,7 +18,10 @@ import {
 import { debugLog, setDebugSnapshot } from '@shared/debug';
 import { createCanonicalPositionFromNavigationIntent } from '@shared/utils/readerPosition';
 import { toCanonicalPositionFromLocator } from '@shared/utils/readerStoredState';
-import { resolveCurrentPagedLocator } from '../layout-core/internal';
+import {
+  findPageIndexForLocator,
+  resolveCurrentPagedLocator,
+} from '../layout-core/internal';
 import {
   usePagedChapterPreviews,
   usePagedChapterTransition,
@@ -35,15 +38,12 @@ type PagedReaderLayout =
   PagedReaderRenderCache['pagedLayouts'] extends Map<number, infer Layout>
     ? Layout
     : never;
-
 const EMPTY_SCROLL_CHAPTERS: Array<{ chapter: ChapterContent; index: number }> = [];
-
 interface PagedReaderControllerPreferences {
   fontSize: number;
   lineSpacing: number;
   paragraphSpacing: number;
 }
-
 interface UsePagedReaderControllerParams {
   enabled: boolean;
   novelId: number;
@@ -75,7 +75,6 @@ interface UsePagedReaderControllerParams {
   stopRestoreMask: () => void;
   beforeChapterChange?: () => void;
 }
-
 export interface UsePagedReaderControllerResult {
   currentPagedLayout: PagedReaderLayout | null;
   currentPagedLayoutChapterIndex: number | null;
@@ -100,7 +99,6 @@ export interface UsePagedReaderControllerResult {
   toolbarHasNext: boolean;
   toolbarHasPrev: boolean;
 }
-
 export function usePagedReaderController({
   enabled,
   novelId,
@@ -145,12 +143,10 @@ export function usePagedReaderController({
   const [pagedContentElement, setPagedContentElement] = useState<HTMLDivElement | null>(null);
   const [pagedViewportElement, setPagedViewportElement] = useState<HTMLDivElement | null>(null);
   const replayDirectionalNavigationRef = useRef<DirectionalNavigationReplay>(() => {});
-
   useEffect(() => {
     if (enabled) {
       return;
     }
-
     setPageIndex(0);
     setPageCount(1);
     setPendingPageTarget(null);
@@ -161,7 +157,6 @@ export function usePagedReaderController({
     setPagedContentElement(null);
     setPagedViewportElement(null);
   }, [enabled, navigation, viewport.pagedViewportRef]);
-
   const {
     nextChapterPreview,
     pagedChapters,
@@ -174,7 +169,6 @@ export function usePagedReaderController({
     enabled,
     novelId,
   });
-
   const handlePagedViewportRef = useCallback((element: HTMLDivElement | null) => {
     viewport.pagedViewportRef.current = element;
     setPagedViewportElement((previousElement) => (
@@ -187,7 +181,6 @@ export function usePagedReaderController({
       previousElement === element ? previousElement : element
     ));
   }, []);
-
   const renderCache = useReaderRenderCache({
     chapters,
     currentChapter: enabled ? currentChapter : null,
@@ -203,7 +196,6 @@ export function usePagedReaderController({
     scrollChapters: EMPTY_SCROLL_CHAPTERS,
     viewMode: 'original',
   });
-
   const currentPagedLayout = enabled && currentChapter
     ? renderCache.pagedLayouts.get(currentChapter.index) ?? null
     : null;
@@ -216,9 +208,22 @@ export function usePagedReaderController({
   const effectivePageCount = currentPagedLayout
     ? Math.max(1, currentPagedLayout.pageSlices.length)
     : pageCount;
-
+  const effectivePageCountRef = useRef(effectivePageCount);
+  effectivePageCountRef.current = effectivePageCount;
+  const setPageIndexAndSyncRuntime = useCallback((nextPageIndex: React.SetStateAction<number>) => {
+    setPageIndex((previousPageIndex) => {
+      const resolvedPageIndex = typeof nextPageIndex === 'function'
+        ? nextPageIndex(previousPageIndex)
+        : nextPageIndex;
+      navigation.setPagedState({
+        pageCount: effectivePageCountRef.current,
+        pageIndex: resolvedPageIndex,
+      });
+      return resolvedPageIndex;
+    });
+  }, [navigation]);
   useEffect(() => {
-    return layoutQueries.registerCurrentPagedLocatorResolver(() => {
+    const unregisterCurrentLocator = layoutQueries.registerCurrentPagedLocatorResolver(() => {
       return resolveCurrentPagedLocator({
         currentPagedLayout,
         isPagedMode: enabled,
@@ -226,13 +231,18 @@ export function usePagedReaderController({
         viewMode: 'original',
       });
     });
+    const unregisterPageIndexResolver = layoutQueries.registerPagedLocatorPageIndexResolver(
+      (locator) => findPageIndexForLocator(currentPagedLayout, locator),
+    );
+    return () => {
+      unregisterCurrentLocator();
+      unregisterPageIndexResolver();
+    };
   }, [currentPagedLayout, enabled, layoutQueries, pageIndex]);
-
   const clearPendingPageTarget = useCallback(() => {
     navigation.setPendingPageTarget(null);
     setPendingPageTarget(null);
   }, [navigation]);
-
   const pagedLayout = usePagedReaderLayout({
     chapterIndex,
     currentChapter,
@@ -252,7 +262,7 @@ export function usePagedReaderController({
     notifyRestoreSettled: persistence.notifyRestoreSettled,
     stopRestoreMask,
     setPageCount,
-    setPageIndex,
+    setPageIndex: setPageIndexAndSyncRuntime,
     fontSize: preferences.fontSize,
     lineSpacing: preferences.lineSpacing,
     paragraphSpacing: preferences.paragraphSpacing,
@@ -321,7 +331,7 @@ export function usePagedReaderController({
     }
 
     if (pageIndex < effectivePageCount - 1) {
-      setPageIndex((previousPageIndex) => previousPageIndex + 1);
+      setPageIndexAndSyncRuntime((previousPageIndex) => previousPageIndex + 1);
       return true;
     }
 
@@ -340,6 +350,7 @@ export function usePagedReaderController({
     isPageNavigationReady,
     pageIndex,
     requestChapterNavigation,
+    setPageIndexAndSyncRuntime,
   ]);
 
   const stepPrevPage = useCallback((allowChapterTransition: boolean) => {
@@ -352,7 +363,7 @@ export function usePagedReaderController({
     }
 
     if (pageIndex > 0) {
-      setPageIndex((previousPageIndex) => previousPageIndex - 1);
+      setPageIndexAndSyncRuntime((previousPageIndex) => previousPageIndex - 1);
       return true;
     }
 
@@ -369,6 +380,7 @@ export function usePagedReaderController({
     isPageNavigationReady,
     pageIndex,
     requestChapterNavigation,
+    setPageIndexAndSyncRuntime,
   ]);
 
   useLayoutEffect(() => {

@@ -88,6 +88,21 @@ function createContent(getScrollWidth: () => number): HTMLDivElement {
   return content;
 }
 
+function createPagedLayout(pageCount: number): PaginatedChapterLayout {
+  return {
+    columnCount: 1,
+    columnGap: 0,
+    columnWidth: 320,
+    pageHeight: 640,
+    pageSlices: Array.from({ length: pageCount }, (_, index) => ({
+      columns: [{
+        items: [],
+      }],
+      id: `page-${index}`,
+    })),
+  };
+}
+
 function createHookProps(overrides?: {
   currentPagedLayout?: PaginatedChapterLayout | null;
   enabled?: boolean;
@@ -377,6 +392,52 @@ describe('usePagedReaderLayout', () => {
     expect(stopRestoreMask).toHaveBeenCalled();
 
     animationFrames.restore();
+  });
+
+  it('restores the target page from layout before paged viewport measurement is ready', async () => {
+    const setPageCount = vi.fn();
+    const setPageIndex = vi.fn();
+    const notifyRestoreSettled = vi.fn();
+    const stopRestoreMask = vi.fn();
+    const pendingRestoreTarget = {
+      chapterIndex: 0,
+      mode: 'paged' as const,
+      locator: {
+        blockIndex: 6,
+        chapterIndex: 0,
+        kind: 'text' as const,
+        pageIndex: 2,
+      },
+    };
+    const pendingRestoreTargetRef = { current: pendingRestoreTarget as ReaderRestoreTarget | null };
+    const clearPendingRestoreTarget = vi.fn(() => {
+      pendingRestoreTargetRef.current = null;
+    });
+
+    renderHook(() => usePagedReaderLayout({
+      ...createHookProps({
+        currentPagedLayout: createPagedLayout(3),
+        pagedViewportElement: null,
+        pagedContentElement: null,
+        pendingRestoreTarget: null,
+        setPageCount,
+        setPageIndex,
+        notifyRestoreSettled,
+      }),
+      pendingRestoreTargetRef,
+      clearPendingRestoreTarget,
+      stopRestoreMask,
+    }));
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(setPageCount).toHaveBeenLastCalledWith(3);
+    expect(setPageIndex).toHaveBeenLastCalledWith(2);
+    expect(clearPendingRestoreTarget).toHaveBeenCalledTimes(1);
+    expect(stopRestoreMask).toHaveBeenCalledTimes(1);
+    expect(notifyRestoreSettled).toHaveBeenCalledWith('completed');
   });
 
   it('does not reapply the current page index during ordinary paged turns', async () => {

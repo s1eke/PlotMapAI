@@ -12,6 +12,7 @@ import type { AppError } from '@shared/errors';
 import { AppErrorCode, createAppError } from '@shared/errors';
 import {
   debugFeatureSubscribe,
+  getDebugSnapshot,
   debugLog,
   getDebugFeatureFlags,
   setDebugSnapshot,
@@ -21,6 +22,15 @@ import * as readerSessionStore from './readerSessionStore';
 
 export type StrictModeSwitchContentMode = Exclude<ReaderMode, 'summary'>;
 export type ModeSwitchTransactionStage = 'capture_source' | 'persist_target_state' | 'restore_target';
+const STRICT_MODE_SWITCH_RESTORE_TIMEOUT_MS_BY_TARGET: Record<
+  StrictModeSwitchContentMode,
+  number
+> = {
+  // Paged restores can legitimately spend extra time warming chapter images
+  // and preparing a fresh paginated layout before emitting restore-settled.
+  paged: 10000,
+  scroll: 2000,
+};
 
 export interface ModeSwitchTransaction {
   chapterIndex: number;
@@ -107,11 +117,22 @@ function buildModeSwitchFailureMessage(params: StrictModeSwitchFailureParams): s
     + measuredErrorLabel;
 }
 
+function getStrictModeSwitchRestoreTimeoutMs(
+  targetMode: StrictModeSwitchContentMode,
+): number {
+  return STRICT_MODE_SWITCH_RESTORE_TIMEOUT_MS_BY_TARGET[targetMode];
+}
+
 export interface UseReaderStrictModeSwitchResult {
+  bufferStrictModeRestoreSettled: (result: RestoreSettledResult) => boolean;
+  beginStrictModeSwitchTransaction: (transaction: ModeSwitchTransaction) => Promise<void>;
   clearModeSwitchError: () => void;
   clearStrictModeSwitchTransaction: () => void;
+  completeStrictModeSwitchTransaction: () => boolean;
+  consumeBufferedStrictModeRestoreSettled: () => RestoreSettledResult | null;
   finalizeStrictModeSwitchFailure: (params: StrictModeSwitchFailureParams) => AppError;
   flushPersistenceForStrictMode: () => Promise<ReaderPersistenceFailure | null>;
+  getStrictModeSwitchTransaction: () => ModeSwitchTransaction | null;
   handleStrictModeRestoreSettled: (result: RestoreSettledResult) => boolean;
   modeSwitchError: AppError | null;
   setStrictModeSwitchTransaction: (transaction: ModeSwitchTransaction) => void;
@@ -125,6 +146,13 @@ export function useReaderStrictModeSwitch(): UseReaderStrictModeSwitchResult {
     () => getDebugFeatureFlags().readerStrictModeSwitch,
   );
   const modeSwitchTransactionRef = useRef<ModeSwitchTransaction | null>(null);
+  const pendingBufferedRestoreSettledResultRef = useRef<RestoreSettledResult | null>(null);
+  const pendingTransactionPromiseRef = useRef<{
+    promise: Promise<void>;
+    reject: (error: AppError) => void;
+    resolve: () => void;
+  } | null>(null);
+  const restoreTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     return debugFeatureSubscribe((featureFlags) => {
@@ -137,14 +165,85 @@ export function useReaderStrictModeSwitch(): UseReaderStrictModeSwitchResult {
   }, []);
 
   const clearStrictModeSwitchTransaction = useCallback(() => {
+    if (restoreTimeoutRef.current) {
+      clearTimeout(restoreTimeoutRef.current);
+      restoreTimeoutRef.current = null;
+    }
+    pendingBufferedRestoreSettledResultRef.current = null;
     modeSwitchTransactionRef.current = null;
   }, []);
 
-  const setStrictModeSwitchTransaction = useCallback((transaction: ModeSwitchTransaction) => {
+  const completeStrictModeSwitchTransaction = useCallback(() => {
+    if (!modeSwitchTransactionRef.current) {
+      return false;
+    }
+
+    pendingTransactionPromiseRef.current?.resolve();
+    pendingTransactionPromiseRef.current = null;
+    clearStrictModeSwitchTransaction();
+    return true;
+  }, [clearStrictModeSwitchTransaction]);
+
+  const beginStrictModeSwitchTransaction = useCallback((transaction: ModeSwitchTransaction) => {
+    pendingBufferedRestoreSettledResultRef.current = null;
     modeSwitchTransactionRef.current = {
       ...transaction,
       targetRestoreTarget: cloneReaderRestoreTarget(transaction.targetRestoreTarget),
     };
+
+    if (pendingTransactionPromiseRef.current) {
+      return pendingTransactionPromiseRef.current.promise;
+    }
+
+    let resolvePromise!: () => void;
+    let rejectPromise!: (error: AppError) => void;
+    const promise = new Promise<void>((resolve, reject) => {
+      resolvePromise = resolve;
+      rejectPromise = reject;
+    });
+    pendingTransactionPromiseRef.current = {
+      promise,
+      reject: rejectPromise,
+      resolve: resolvePromise,
+    };
+    return promise;
+  }, []);
+
+  const getStrictModeSwitchTransaction = useCallback(() => {
+    return modeSwitchTransactionRef.current;
+  }, []);
+
+  const bufferStrictModeRestoreSettled = useCallback((result: RestoreSettledResult) => {
+    const transaction = modeSwitchTransactionRef.current;
+    if (!transaction?.strict || transaction.stage === 'restore_target') {
+      return false;
+    }
+
+    pendingBufferedRestoreSettledResultRef.current = result;
+    setDebugSnapshot('reader-mode-switch', {
+      chapterIndex: transaction.chapterIndex,
+      source: 'useReaderStrictModeSwitch.bufferStrictModeRestoreSettled',
+      sourceMode: transaction.sourceMode,
+      stage: transaction.stage,
+      status: 'buffered_restore_settled',
+      strictModeSwitchEnabled: true,
+      targetMode: transaction.targetMode,
+      bufferedResult: result,
+    });
+    debugLog('Reader', 'reader strict mode switch buffered restore-settled result', {
+      chapterIndex: transaction.chapterIndex,
+      sourceMode: transaction.sourceMode,
+      stage: transaction.stage,
+      targetMode: transaction.targetMode,
+      result,
+    });
+    return true;
+  }, []);
+
+  const consumeBufferedStrictModeRestoreSettled = useCallback(() => {
+    const bufferedResult = pendingBufferedRestoreSettledResultRef.current;
+    pendingBufferedRestoreSettledResultRef.current = null;
+    return bufferedResult;
   }, []);
 
   const flushPersistenceForStrictMode = useCallback(async () => {
@@ -205,9 +304,71 @@ export function useReaderStrictModeSwitch(): UseReaderStrictModeSwitchResult {
       stage: params.stage,
       targetMode: params.targetMode,
     });
+    if (params.stage === 'restore_target') {
+      pendingTransactionPromiseRef.current?.reject(error);
+    }
+    pendingTransactionPromiseRef.current = null;
     clearStrictModeSwitchTransaction();
     return error;
   }, [clearStrictModeSwitchTransaction]);
+
+  const setStrictModeSwitchTransaction = useCallback((transaction: ModeSwitchTransaction) => {
+    modeSwitchTransactionRef.current = {
+      ...transaction,
+      targetRestoreTarget: cloneReaderRestoreTarget(transaction.targetRestoreTarget),
+    };
+
+    if (restoreTimeoutRef.current) {
+      clearTimeout(restoreTimeoutRef.current);
+      restoreTimeoutRef.current = null;
+    }
+
+    if (transaction.stage !== 'restore_target') {
+      return;
+    }
+
+    const timeoutMs = getStrictModeSwitchRestoreTimeoutMs(transaction.targetMode);
+    restoreTimeoutRef.current = setTimeout(() => {
+      const activeTransaction = modeSwitchTransactionRef.current;
+      if (
+        !activeTransaction?.strict
+        || activeTransaction.stage !== 'restore_target'
+        || activeTransaction.chapterIndex !== transaction.chapterIndex
+        || activeTransaction.targetMode !== transaction.targetMode
+      ) {
+        return;
+      }
+
+      const restoreSnapshot = getDebugSnapshot<Record<string, unknown>>(
+        'reader-position-restore',
+      )?.value;
+      const pendingStatus = typeof restoreSnapshot?.status === 'string'
+        ? ` pendingStatus=${restoreSnapshot.status}`
+        : '';
+      const pendingReason = typeof restoreSnapshot?.reason === 'string'
+        ? ` pendingReason=${restoreSnapshot.reason}`
+        : '';
+      const pendingSource = typeof restoreSnapshot?.source === 'string'
+        ? ` pendingSource=${restoreSnapshot.source}`
+        : '';
+
+      finalizeStrictModeSwitchFailure({
+        chapterIndex: transaction.chapterIndex,
+        message: `restore_settled_timeout timeoutMs=${timeoutMs}${pendingStatus}${pendingReason}${pendingSource}`,
+        restoreResult: {
+          attempts: 1,
+          chapterIndex: transaction.chapterIndex,
+          mode: transaction.targetMode,
+          reason: 'execution_exception',
+          retryable: false,
+          status: 'failed',
+        },
+        sourceMode: transaction.sourceMode,
+        stage: 'restore_target',
+        targetMode: transaction.targetMode,
+      });
+    }, timeoutMs);
+  }, [finalizeStrictModeSwitchFailure]);
 
   const handleStrictModeRestoreSettled = useCallback((result: RestoreSettledResult): boolean => {
     const transaction = modeSwitchTransactionRef.current;
@@ -215,11 +376,11 @@ export function useReaderStrictModeSwitch(): UseReaderStrictModeSwitchResult {
       return false;
     }
 
-    if (result === 'failed') {
+    if (result === 'failed' || result === 'skipped') {
       const { lastRestoreResult } = readerSessionStore.getReaderSessionSnapshot();
       finalizeStrictModeSwitchFailure({
         chapterIndex: transaction.chapterIndex,
-        message: lastRestoreResult?.reason ?? 'restore failed',
+        message: lastRestoreResult?.reason ?? `restore ${result}`,
         restoreResult: lastRestoreResult,
         sourceMode: transaction.sourceMode,
         stage: 'restore_target',
@@ -228,9 +389,8 @@ export function useReaderStrictModeSwitch(): UseReaderStrictModeSwitchResult {
       return true;
     }
 
-    clearStrictModeSwitchTransaction();
-    return true;
-  }, [clearStrictModeSwitchTransaction, finalizeStrictModeSwitchFailure]);
+    return false;
+  }, [finalizeStrictModeSwitchFailure]);
 
   const shouldScheduleRestoreRetry = useCallback((
     target: ReaderRestoreTarget | null | undefined,
@@ -244,10 +404,15 @@ export function useReaderStrictModeSwitch(): UseReaderStrictModeSwitchResult {
   }, []);
 
   return {
+    bufferStrictModeRestoreSettled,
+    beginStrictModeSwitchTransaction,
     clearModeSwitchError,
     clearStrictModeSwitchTransaction,
+    completeStrictModeSwitchTransaction,
+    consumeBufferedStrictModeRestoreSettled,
     finalizeStrictModeSwitchFailure,
     flushPersistenceForStrictMode,
+    getStrictModeSwitchTransaction,
     handleStrictModeRestoreSettled,
     modeSwitchError,
     setStrictModeSwitchTransaction,

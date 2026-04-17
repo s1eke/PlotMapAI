@@ -106,6 +106,9 @@ export function ReaderRuntimeProvider({
   const currentAnchorResolverRef = useRef<() => ScrollModeAnchor | null>(() => null);
   const currentOriginalLocatorResolverRef = useRef<() => ReaderLocator | null>(() => null);
   const currentPagedLocatorResolverRef = useRef<() => ReaderLocator | null>(() => null);
+  const pagedLocatorPageIndexResolverRef = useRef<(locator: ReaderLocator) => number | null>(
+    () => null,
+  );
   const scrollLocatorOffsetResolverRef = useRef<(locator: ReaderLocator) => number | null>(
     () => null,
   );
@@ -181,6 +184,14 @@ export function ReaderRuntimeProvider({
         }
       };
     },
+    registerPagedLocatorPageIndexResolver: (resolver) => {
+      pagedLocatorPageIndexResolverRef.current = resolver;
+      return () => {
+        if (pagedLocatorPageIndexResolverRef.current === resolver) {
+          pagedLocatorPageIndexResolverRef.current = () => null;
+        }
+      };
+    },
     registerScrollChapterBodyElement: (index, element) => {
       if (element) {
         scrollChapterBodyElementsRef.current.set(index, element);
@@ -205,6 +216,7 @@ export function ReaderRuntimeProvider({
         }
       };
     },
+    resolvePagedLocatorPageIndex: (locator) => pagedLocatorPageIndexResolverRef.current(locator),
     resolveScrollLocatorOffset: (locator) => scrollLocatorOffsetResolverRef.current(locator),
   }), []);
 

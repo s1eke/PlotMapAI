@@ -187,13 +187,12 @@ export function useReaderPageViewModel(novelId: number): ReaderPageViewModel {
     }
 
     if (mode !== nextContentMode) {
-      restore.switchMode(nextContentMode).catch(() => undefined);
+      restore.switchMode(nextContentMode);
     }
   }, [lastContentMode, mode, preferences, restore]);
 
   const handleSetViewMode = useCallback((nextViewMode: 'original' | 'summary'): void => {
-    restore.switchMode(nextViewMode === 'summary' ? 'summary' : lastContentMode)
-      .catch(() => undefined);
+    restore.switchMode(nextViewMode === 'summary' ? 'summary' : lastContentMode);
   }, [lastContentMode, restore]);
 
   const handleViewportClick = useCallback((event: MouseEvent<HTMLDivElement>): void => {
