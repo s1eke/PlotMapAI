@@ -9,17 +9,6 @@ export interface ChapterDetectionRule {
   source?: ChapterDetectionRuleSource;
 }
 
-export interface DetectedChapter {
-  title: string;
-  start: number;
-  end: number;
-}
-
-export interface SplitChapter {
-  title: string;
-  content: string;
-}
-
 export interface PurifyRule {
   name?: string;
   group?: string;
@@ -50,13 +39,4 @@ export interface PurifiedChapter {
   title: string;
   content: string;
   wordCount?: number;
-}
-
-export interface ParsedTextDocument {
-  title: string;
-  chapters: SplitChapter[];
-  encoding: string;
-  fileHash: string;
-  rawText: string;
-  totalWords: number;
 }

@@ -1,19 +1,13 @@
 import { detectChapters, splitByChapters } from './chapterDetection';
 import { detectAndConvert } from './encoding';
-import { computeHash } from './hash';
-import type { ChapterDetectionRule, ParsedTextDocument } from './types';
-
-export interface TxtParseProgress {
-  current?: number;
-  detail?: string;
-  progress: number;
-  stage: 'hashing' | 'decoding' | 'chapters' | 'finalizing';
-  total?: number;
-}
+import { computeHash } from '@shared/text-processing';
+import type { ChapterDetectionRule } from '@shared/text-processing';
+import type { BookImportProgress } from '../progress';
+import type { ParsedTextDocument } from './types';
 
 function emitProgress(
-  onProgress: ((progress: TxtParseProgress) => void) | undefined,
-  progress: TxtParseProgress,
+  onProgress: ((progress: BookImportProgress) => void) | undefined,
+  progress: BookImportProgress,
 ): void {
   onProgress?.(progress);
 }
@@ -22,7 +16,7 @@ export async function parseTxtDocument(
   file: File,
   tocRules: ChapterDetectionRule[],
   options: {
-    onProgress?: (progress: TxtParseProgress) => void;
+    onProgress?: (progress: BookImportProgress) => void;
     signal?: AbortSignal;
   } = {},
 ): Promise<ParsedTextDocument> {

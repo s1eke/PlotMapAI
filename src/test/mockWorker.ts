@@ -2,12 +2,12 @@ import type {
   BookImportProgress,
 } from '@domains/book-import/services/progress';
 import type { ParseEpubPayload } from '@domains/book-import/workers/epubClient';
+import type { ParseTxtPayload } from '@domains/book-import/workers/txtClient';
 import type {
   GraphLayoutPayload,
   GraphLayoutProgress,
 } from '@domains/character-graph/workers/layoutClient';
 import type {
-  ParseTxtPayload,
   PurifyChapterPayload,
   PurifyChaptersPayload,
   PurifyTitlesPayload,
@@ -23,10 +23,10 @@ import {
   toAppError,
 } from '@shared/errors';
 import {
-  parseTxtDocument,
   purifyChapter,
   purifyTitles,
 } from '@shared/text-processing';
+import { parseTxtDocument } from '@domains/book-import/services/txt/parser';
 
 interface WorkerMessageEvent {
   data: WorkerTaskResponse<unknown, unknown>;
@@ -69,7 +69,7 @@ const TASK_HANDLERS: Record<string, WorkerTaskHandler> = {
     const parsePayload = payload as ParseTxtPayload;
     return parseTxtDocument(parsePayload.file, parsePayload.tocRules, {
       signal,
-      onProgress: emitProgress as (progress: TextProcessingProgress) => void,
+      onProgress: emitProgress as (progress: BookImportProgress) => void,
     });
   },
   'purify-chapter': (payload, emitProgress, signal) => {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { detectChapters, splitByChapters } from '../chapterDetector';
+import { detectChapters, splitByChapters } from '../chapterDetection';
 
 const ARABIC_DELIMITED_RULE = '^\\d+[.、:：]\\s*.+$';
 const CJK_DELIMITED_RULE = '^[零〇一二两三四五六七八九十百千万壹贰叁肆伍陆柒捌玖拾佰仟]+[.、:：]\\s*.+$';

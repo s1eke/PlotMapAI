@@ -1,5 +1,3 @@
-import type { SplitChapter } from './types';
-
 interface ChapterTextContentSource {
   content: string;
   title: string;
@@ -62,6 +60,6 @@ export function normalizeImportedChapter<T extends ChapterTextContentSource>(cha
   };
 }
 
-export function normalizeImportedChapters<T extends SplitChapter>(chapters: T[]): T[] {
+export function normalizeImportedChapters<T extends ChapterTextContentSource>(chapters: T[]): T[] {
   return chapters.map((chapter) => normalizeImportedChapter(chapter));
 }

@@ -6,8 +6,6 @@ import type {
 } from '@infra/workers';
 
 import type {
-  ChapterDetectionRule,
-  ParsedTextDocument,
   PurifiedChapter,
   PurifiedTitle,
   PurifyRule,
@@ -20,11 +18,6 @@ export interface TextProcessingProgress {
   progress: number;
   stage: string;
   total?: number;
-}
-
-export interface ParseTxtPayload {
-  file: File;
-  tocRules: ChapterDetectionRule[];
 }
 
 export interface PurifyTitlesPayload {
@@ -49,7 +42,6 @@ export interface PurifyChaptersPayload {
 }
 
 export interface TextProcessingTaskMap {
-  'parse-txt': WorkerTaskSpec<ParseTxtPayload, ParsedTextDocument, TextProcessingProgress>;
   'purify-chapter': WorkerTaskSpec<PurifyChapterPayload, PurifiedChapter, TextProcessingProgress>;
   'purify-chapters': WorkerTaskSpec<PurifyChaptersPayload, PurifiedChapter[], TextProcessingProgress>;
   'purify-titles': WorkerTaskSpec<PurifyTitlesPayload, PurifiedTitle[], TextProcessingProgress>;

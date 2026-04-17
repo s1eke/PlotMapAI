@@ -1,21 +1,10 @@
 import { registerWorkerTaskHandlers } from '@infra/workers';
 import type { WorkerTaskHandlerMap } from '@infra/workers';
 
-import { parseTxtDocument } from './txt';
 import { purifyChapter, purifyTitles } from './purify';
 import type { TextProcessingTaskMap } from './workerTypes';
 
 const handlers = {
-  'parse-txt': async (payload, emitProgress, signal) => {
-    return parseTxtDocument(
-      payload.file,
-      payload.tocRules,
-      {
-        signal,
-        onProgress: emitProgress,
-      },
-    );
-  },
   'purify-titles': async (payload, emitProgress, signal) => {
     signal.throwIfAborted();
     emitProgress({ progress: 25, stage: 'preparing' });

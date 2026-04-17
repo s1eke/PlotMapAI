@@ -1,10 +1,9 @@
 import type {
   ChapterDetectionRule,
   ChapterDetectionRuleSource,
-  DetectedChapter,
-  SplitChapter,
-} from './types';
-import { stripLeadingChapterTitle } from './chapterContent';
+} from '@shared/text-processing';
+import { stripLeadingChapterTitle } from '@shared/text-processing';
+import type { DetectedChapter, SplitChapter } from './types';
 
 const MIN_WEAK_CANDIDATE_COUNT = 3;
 const MIN_INCREMENTING_RATIO = 0.8;
