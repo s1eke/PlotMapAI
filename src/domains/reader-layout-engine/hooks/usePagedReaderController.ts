@@ -373,7 +373,8 @@ export function usePagedReaderController({
   const toolbarHasNext = pageIndex < effectivePageCount - 1 || Boolean(currentChapter?.hasNext);
 
   useEffect(() => {
-    if (!enabled || currentChapter?.index !== chapterIndex || pendingRestoreTargetRef.current) {
+    const activePendingRestoreTarget = pendingRestoreTargetRef.current ?? pendingRestoreTarget;
+    if (!enabled || currentChapter?.index !== chapterIndex || activePendingRestoreTarget) {
       return;
     }
 
@@ -405,6 +406,7 @@ export function usePagedReaderController({
     enabled,
     layoutQueries,
     pageIndex,
+    pendingRestoreTarget,
     pendingRestoreTargetRef,
     persistReaderState,
   ]);

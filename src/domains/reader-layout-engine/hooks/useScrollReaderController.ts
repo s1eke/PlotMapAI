@@ -7,6 +7,7 @@ import {
   useReaderViewportContext,
 } from '@shared/reader-runtime';
 import { debugLog, setDebugSnapshot } from '@shared/debug';
+import { getContainerProgress } from '@shared/utils/readerPosition';
 import { toCanonicalPositionFromLocator } from '@shared/utils/readerStoredState';
 
 import type {
@@ -127,6 +128,7 @@ export function useScrollReaderController({
     }
 
     const locator = layoutQueries.getCurrentOriginalLocator();
+    const scrollProgress = getContainerProgress(viewport.contentRef.current);
     if (!locator) {
       const persistFallbackSnapshot = {
         source: 'useScrollReaderController.handleReadingAnchorChange',
@@ -143,6 +145,7 @@ export function useScrollReaderController({
         edge: 'start',
       },
       hints: {
+        chapterProgress: scrollProgress,
         pageIndex: undefined,
         contentMode: 'scroll',
       },
@@ -164,6 +167,7 @@ export function useScrollReaderController({
     persistReaderState,
     persistence,
     setChapterIndex,
+    viewport.contentRef,
   ]);
 
   const scrollMode = useScrollModeChapters(

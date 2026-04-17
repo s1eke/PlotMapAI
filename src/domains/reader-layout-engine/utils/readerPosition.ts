@@ -7,6 +7,7 @@ export {
   getContainerProgress,
   getPageIndexFromProgress,
   hasReaderRestoreTarget,
+  resolvePagedRestoreTargetPageIndex,
   resolvePagedTargetPage,
   SCROLL_READING_ANCHOR_RATIO,
   shouldKeepReaderRestoreMask,

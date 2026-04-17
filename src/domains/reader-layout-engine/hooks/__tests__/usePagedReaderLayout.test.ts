@@ -135,6 +135,7 @@ function createHookProps(overrides?: {
   pageTarget?: 'start' | 'end' | null;
   paragraphSpacing?: number;
   pendingRestoreTarget?: {
+    chapterProgress?: number;
     chapterIndex: number;
     mode: 'paged';
     locator?: {
@@ -415,6 +416,58 @@ describe('usePagedReaderLayout', () => {
     expect(setPageIndex).toHaveBeenLastCalledWith(2);
     expect(clearPendingRestoreTarget).toHaveBeenCalled();
     expect(stopRestoreMask).toHaveBeenCalled();
+
+    animationFrames.restore();
+  });
+
+  it('falls back to chapter progress when a scroll-derived locator resolves to the first page', async () => {
+    const animationFrames = createAnimationFrameController();
+    const viewport = createViewport(600, 800);
+    const content = createContent(() => 1896);
+    const setPageCount = vi.fn();
+    const setPageIndex = vi.fn();
+    const notifyRestoreSettled = vi.fn();
+    const stopRestoreMask = vi.fn();
+    const pendingRestoreTarget = {
+      chapterIndex: 0,
+      chapterProgress: 0.9,
+      mode: 'paged' as const,
+      locator: {
+        blockIndex: 1,
+        chapterIndex: 0,
+        kind: 'text' as const,
+      },
+    };
+    const pendingRestoreTargetRef = { current: pendingRestoreTarget as ReaderRestoreTarget | null };
+    const clearPendingRestoreTarget = vi.fn(() => {
+      pendingRestoreTargetRef.current = null;
+    });
+
+    renderHook(() => usePagedReaderLayout({
+      ...createHookProps({
+        currentPagedLayout: createPagedLayoutWithStartLocator(2, 0, pendingRestoreTarget.locator),
+        pagedViewportElement: viewport,
+        pagedContentElement: content,
+        pendingRestoreTarget: null,
+        setPageCount,
+        setPageIndex,
+        notifyRestoreSettled,
+      }),
+      pendingRestoreTargetRef,
+      clearPendingRestoreTarget,
+      stopRestoreMask,
+    }));
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    await animationFrames.flushAnimationFrames();
+
+    expect(setPageCount).toHaveBeenLastCalledWith(2);
+    expect(setPageIndex).toHaveBeenLastCalledWith(1);
+    expect(clearPendingRestoreTarget).toHaveBeenCalledTimes(1);
+    expect(stopRestoreMask).toHaveBeenCalledTimes(1);
+    expect(notifyRestoreSettled).toHaveBeenCalledWith('completed');
 
     animationFrames.restore();
   });

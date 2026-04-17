@@ -131,6 +131,7 @@ export function useReaderRestoreController({
       chapterIndex: strictTransaction.chapterIndex,
       contentElement: viewport.contentRef.current,
       currentOriginalLocator: layoutQueries.getCurrentOriginalLocator(),
+      currentPageCount: navigation.getPagedState().pageCount,
       currentPageIndex: navigation.getPagedState().pageIndex,
       resolvePagedLocatorPageIndex: (locator) => (
         locator ? layoutQueries.resolvePagedLocatorPageIndex(locator) : null

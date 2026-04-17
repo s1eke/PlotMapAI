@@ -36,7 +36,7 @@ export function toRestoreTargetFromState(params: {
     locatorBoundary: !locator && hasCanonicalBoundary ? canonicalEdge : undefined,
   };
 
-  if (target.mode === 'summary') {
+  if (typeof normalizedState.hints?.chapterProgress === 'number') {
     target.chapterProgress = typeof normalizedState.hints?.chapterProgress === 'number'
       ? clampProgress(normalizedState.hints.chapterProgress)
       : undefined;
@@ -87,11 +87,14 @@ export function captureReaderStateSnapshot(params: {
     });
   }
 
+  const resolvedScrollProgress = getContainerProgress(params.viewportContentElement);
+
   if (params.currentOriginalLocator && !shouldPreferLatestReaderState) {
     return mergeStoredReaderState(nextState, {
       canonical: toCanonicalPositionFromLocator(params.currentOriginalLocator),
       hints: {
         ...nextState.hints,
+        chapterProgress: resolvedScrollProgress,
         pageIndex: undefined,
       },
     });
@@ -105,6 +108,7 @@ export function captureReaderStateSnapshot(params: {
       },
       hints: {
         ...nextState.hints,
+        chapterProgress: resolvedScrollProgress,
         pageIndex: undefined,
       },
     });
@@ -122,6 +126,7 @@ export function captureReaderStateSnapshot(params: {
       canonical: params.latestReaderState.canonical,
       hints: {
         ...nextState.hints,
+        chapterProgress: resolvedScrollProgress,
         pageIndex: undefined,
       },
     });

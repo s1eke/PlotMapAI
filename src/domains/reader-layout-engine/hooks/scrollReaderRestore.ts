@@ -12,6 +12,7 @@ import { debugLog, setDebugSnapshot } from '@shared/debug';
 import {
   canSkipReaderRestore,
   clampContainerScrollTop,
+  getContainerMaxScrollTop,
   SCROLL_READING_ANCHOR_RATIO,
 } from '@shared/utils/readerPosition';
 import {
@@ -33,6 +34,7 @@ const SCROLL_RESTORE_LOCATOR_SETTLE_FRAMES = 6;
 const SCROLL_RESTORE_LOCATOR_SETTLE_OFFSET_TOLERANCE_PX = 2;
 const SCROLL_RESTORE_SAME_BLOCK_SETTLE_OFFSET_TOLERANCE_PX = 64;
 const SCROLL_RESTORE_SCROLL_TOP_SETTLE_TOLERANCE_PX = 2;
+const SCROLL_RESTORE_PROGRESS_FALLBACK_TOLERANCE = 0.03;
 
 export function useScrollReaderRestore(params: UseScrollReaderRestoreParams): void {
   const {
@@ -90,6 +92,28 @@ export function useScrollReaderRestore(params: UseScrollReaderRestoreParams): vo
     const targetChapterIndex = target.locator?.chapterIndex ?? target.chapterIndex;
     const targetElement = scrollChapterElementsRef.current.get(targetChapterIndex) ?? null;
     const resolvedLocator = resolvePendingRestoreLocator(target);
+    const progressScrollTop = typeof target.chapterProgress === 'number'
+      ? clampContainerScrollTop(
+        container,
+        getContainerMaxScrollTop(container) * target.chapterProgress,
+      )
+      : null;
+    const resolvePreferredScrollTop = (candidateScrollTop: number): number => {
+      if (progressScrollTop === null || typeof target.chapterProgress !== 'number') {
+        return candidateScrollTop;
+      }
+
+      const maxScrollTop = getContainerMaxScrollTop(container);
+      const candidateProgress = maxScrollTop > 0 ? candidateScrollTop / maxScrollTop : 0;
+      if (
+        Math.abs(candidateProgress - target.chapterProgress)
+        > SCROLL_RESTORE_PROGRESS_FALLBACK_TOLERANCE
+      ) {
+        return progressScrollTop;
+      }
+
+      return candidateScrollTop;
+    };
 
     if (target.locatorBoundary !== undefined && resolvedLocator === null) {
       const hasResolvedBoundaryLayout = scrollLayouts.has(target.chapterIndex)
@@ -104,20 +128,22 @@ export function useScrollReaderRestore(params: UseScrollReaderRestoreParams): vo
 
     if (resolvedLocator) {
       if (target.locatorBoundary === 'start' && targetElement) {
+        const resolvedScrollTop = clampContainerScrollTop(container, targetElement.offsetTop);
         return restoreStepSuccess({
           locator: resolvedLocator,
-          scrollTop: clampContainerScrollTop(container, targetElement.offsetTop),
+          scrollTop: resolvePreferredScrollTop(resolvedScrollTop),
         });
       }
 
       const nextScrollTop = layoutQueries.resolveScrollLocatorOffset(resolvedLocator);
       if (nextScrollTop !== null) {
+        const resolvedScrollTop = clampContainerScrollTop(
+          container,
+          nextScrollTop - container.clientHeight * SCROLL_READING_ANCHOR_RATIO,
+        );
         return restoreStepSuccess({
           locator: resolvedLocator,
-          scrollTop: clampContainerScrollTop(
-            container,
-            nextScrollTop - container.clientHeight * SCROLL_READING_ANCHOR_RATIO,
-          ),
+          scrollTop: resolvePreferredScrollTop(resolvedScrollTop),
         });
       }
 
@@ -282,18 +308,46 @@ export function useScrollReaderRestore(params: UseScrollReaderRestoreParams): vo
       }
 
       const currentLocator = layoutQueries.getCurrentOriginalLocator();
-      if (expectedLocator && areRestoreLocatorsEquivalent(currentLocator, expectedLocator)) {
+      const container = viewportContentRef.current;
+      const shouldPreferProgressStability = Boolean(
+        activeTarget
+        && typeof activeTarget.chapterProgress === 'number',
+      );
+      const progressExpectedScrollTop = (
+        container
+        && activeTarget
+        && typeof activeTarget.chapterProgress === 'number'
+      )
+        ? clampContainerScrollTop(
+          container,
+          getContainerMaxScrollTop(container) * activeTarget.chapterProgress,
+        )
+        : expectedScrollTop;
+      if (
+        !shouldPreferProgressStability
+        && expectedLocator
+        && areRestoreLocatorsEquivalent(currentLocator, expectedLocator)
+      ) {
         finalizeSuccessfulRestore(activeTarget, completedResult, expectedLocator);
         return;
       }
-
-      const container = viewportContentRef.current;
       const scrollTopIsStable = container !== null
-        && Math.abs(container.scrollTop - expectedScrollTop)
+        && Math.abs(container.scrollTop - progressExpectedScrollTop)
           <= SCROLL_RESTORE_SCROLL_TOP_SETTLE_TOLERANCE_PX;
       if (scrollTopIsStable) {
         finalizeSuccessfulRestore(activeTarget, completedResult, expectedLocator ?? currentLocator);
         return;
+      }
+
+      if (
+        container
+        && activeTarget
+        && typeof activeTarget.chapterProgress === 'number'
+        && typeof activeTarget.locator?.pageIndex === 'number'
+      ) {
+        navigation.setChapterChangeSource('restore');
+        persistence.suppressScrollSyncTemporarily();
+        container.scrollTop = progressExpectedScrollTop;
       }
 
       const expectedOffset = expectedLocator

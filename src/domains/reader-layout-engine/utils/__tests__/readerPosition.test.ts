@@ -8,6 +8,7 @@ import {
   getContainerProgress,
   getPageIndexFromProgress,
   hasReaderRestoreTarget,
+  resolvePagedRestoreTargetPageIndex,
   resolvePagedTargetPage,
   shouldKeepReaderRestoreMask,
 } from '../readerPosition';
@@ -36,6 +37,25 @@ describe('readerPosition', () => {
     expect(getPageIndexFromProgress(0.5, 5)).toBe(2);
     expect(getPageIndexFromProgress(1, 5)).toBe(4);
     expect(getPageIndexFromProgress(0.6, 1)).toBe(0);
+  });
+
+  it('prefers progress-based paged restore when a scroll-derived locator collapses to the first page', () => {
+    expect(resolvePagedRestoreTargetPageIndex({
+      chapterProgress: 0.9,
+      resolvedLocatorPageIndex: 0,
+      totalPages: 2,
+    })).toBe(1);
+    expect(resolvePagedRestoreTargetPageIndex({
+      chapterProgress: 0.4,
+      resolvedLocatorPageIndex: 5,
+      totalPages: 20,
+    })).toBe(5);
+    expect(resolvePagedRestoreTargetPageIndex({
+      chapterProgress: 0.75,
+      locatorPageIndex: 3,
+      resolvedLocatorPageIndex: 0,
+      totalPages: 10,
+    })).toBe(3);
   });
 
   it('resolves paged chapter targets before falling back to the carried page index', () => {
@@ -128,6 +148,7 @@ describe('readerPosition', () => {
       chapterProgress: 0,
     })).toEqual({
       chapterIndex: 2,
+      chapterProgress: 0,
       mode: 'scroll',
       locatorBoundary: 'start',
       locator: undefined,
@@ -138,6 +159,7 @@ describe('readerPosition', () => {
       chapterProgress: 0.4,
     })).toEqual({
       chapterIndex: 2,
+      chapterProgress: 0.4,
       mode: 'scroll',
       locatorBoundary: 'start',
       locator: undefined,
@@ -148,6 +170,7 @@ describe('readerPosition', () => {
       chapterProgress: 1,
     })).toEqual({
       chapterIndex: 2,
+      chapterProgress: 1,
       mode: 'paged',
       locatorBoundary: 'start',
       locator: undefined,

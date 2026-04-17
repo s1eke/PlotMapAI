@@ -1,5 +1,5 @@
 import type { Dispatch, ReactNode, RefObject, SetStateAction } from 'react';
-import type { ChapterContent, ReaderLocator } from '@shared/contracts/reader';
+import type { ChapterContent } from '@shared/contracts/reader';
 import type { ReaderContextValue } from '@test/readerRuntimeTestUtils';
 import type { ChapterChangeSource, ReaderRestoreTarget } from '@shared/contracts/reader';
 
@@ -716,6 +716,52 @@ describe('useScrollReaderController', () => {
     });
 
     expect(persistReaderState).not.toHaveBeenCalled();
+    expect(setChapterIndex).not.toHaveBeenCalled();
+  });
+
+  it('persists scroll chapter progress alongside the canonical locator when anchors move', () => {
+    const persistReaderState = vi.fn();
+    const setChapterIndex = vi.fn();
+    const contentRef = {
+      current: makeContainer({
+        clientHeight: 600,
+        scrollHeight: 4000,
+        scrollTop: 2040,
+      }),
+    };
+    const contextValue = createReaderContextValue({
+      chapterIndex: 1,
+      contentRef,
+      setChapterIndex,
+      persistReaderState,
+    });
+    const props = createHookProps({ harness: contextValue });
+
+    renderHook(() => useScrollReaderController(props), {
+      wrapper: ({ children }: { children: ReactNode }) => ReaderContextProvider({
+        value: contextValue.contextValue,
+        children,
+      }),
+    });
+
+    act(() => {
+      scrollModeState.emitAnchor({
+        chapterIndex: 1,
+        chapterProgress: 0.6,
+      });
+    });
+
+    expect(persistReaderState).toHaveBeenCalledWith({
+      canonical: {
+        chapterIndex: 1,
+        edge: 'start',
+      },
+      hints: {
+        chapterProgress: 0.6,
+        contentMode: 'scroll',
+        pageIndex: undefined,
+      },
+    });
     expect(setChapterIndex).not.toHaveBeenCalled();
   });
 

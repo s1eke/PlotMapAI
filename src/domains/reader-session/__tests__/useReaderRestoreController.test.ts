@@ -1308,6 +1308,84 @@ describe('useReaderRestoreFlow', () => {
     vi.useRealTimers();
   });
 
+  it('accepts strict scroll-to-paged completion when chapter progress advances beyond a collapsed first-page locator', async () => {
+    vi.useFakeTimers();
+    setDebugFeatureEnabled('readerStrictModeSwitch', true);
+    vi.spyOn(readerSessionStore, 'flushPersistence').mockResolvedValue(undefined);
+    vi.spyOn(readerSessionStore, 'getReaderSessionSnapshot').mockImplementation(() => {
+      return createSessionStoreSnapshotMock({
+        lastPersistenceFailure: null,
+        persistenceStatus: 'healthy',
+      });
+    });
+
+    const locator = createLocator({
+      blockIndex: 18,
+      chapterIndex: 7,
+      lineIndex: 6,
+    });
+    const { hookProps, runtime } = createHookHarness({
+      sessionCommands: {
+        latestReaderStateRef: {
+          current: createStoredState({
+            canonical: locator,
+            hints: {
+              chapterProgress: 0.9,
+              contentMode: 'scroll',
+              viewMode: 'original',
+            },
+          }),
+        },
+        markUserInteracted: vi.fn(),
+        persistReaderState: vi.fn(),
+        setChapterIndex: vi.fn(),
+        setMode: vi.fn(),
+      },
+      sessionSnapshot: {
+        chapterIndex: 7,
+        mode: 'scroll',
+        pendingRestoreTarget: null,
+      },
+      runtime: {
+        getCurrentOriginalLocatorRef: {
+          current: () => locator,
+        },
+        pagedStateRef: {
+          current: { pageCount: 2, pageIndex: 0 },
+        },
+        resolvePagedLocatorPageIndexRef: {
+          current: () => 0,
+        },
+      },
+    });
+    const { result } = renderHook(() => useReaderRestoreFlow(hookProps), {
+      wrapper: runtime.Wrapper,
+    });
+
+    let switchModePromise: Promise<void> | null = null;
+    await act(async () => {
+      switchModePromise = result.current.switchMode('paged');
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
+    });
+
+    await act(async () => {
+      runtime.pagedStateRef.current = {
+        pageCount: 2,
+        pageIndex: 1,
+      };
+      expect(result.current.handleRestoreSettled('completed')).toBe(false);
+      await Promise.resolve();
+    });
+
+    await expect(switchModePromise).resolves.toBeUndefined();
+    expect(result.current.modeSwitchError).toBeNull();
+    vi.useRealTimers();
+  });
+
   it('consumes strict restore-settled results that arrive before the transaction reaches restore_target', async () => {
     vi.useFakeTimers();
     setDebugFeatureEnabled('readerStrictModeSwitch', true);

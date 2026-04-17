@@ -2,6 +2,7 @@ import { debugLog, setDebugSnapshot } from '@shared/debug';
 import { isReaderTraceEnabled, recordReaderTrace } from '@shared/reader-trace';
 import {
   canSkipReaderRestore,
+  resolvePagedRestoreTargetPageIndex,
   resolvePagedTargetPage,
 } from '@shared/utils/readerPosition';
 import {
@@ -127,18 +128,15 @@ export function attemptPagedRestore({
     }) => {
       let resolvedTargetPage: number | null = null;
       if (target.locator) {
-        resolvedTargetPage = layout
+        const resolvedLocatorPageIndex = layout
           ? findPageIndexForLocator(layout, target.locator)
           : null;
-        if (
-          resolvedTargetPage === null
-          && typeof target.locator.pageIndex === 'number'
-        ) {
-          resolvedTargetPage = Math.max(
-            0,
-            Math.min(totalPages - 1, target.locator.pageIndex),
-          );
-        }
+        resolvedTargetPage = resolvePagedRestoreTargetPageIndex({
+          chapterProgress: target.chapterProgress,
+          locatorPageIndex: target.locator.pageIndex,
+          resolvedLocatorPageIndex,
+          totalPages,
+        });
         if (resolvedTargetPage === null && !layout) {
           return restoreStepPending('layout_missing');
         }

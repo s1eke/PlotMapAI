@@ -60,6 +60,31 @@ export function getPageIndexFromProgress(progress: number | undefined, totalPage
   );
 }
 
+export function resolvePagedRestoreTargetPageIndex(params: {
+  chapterProgress?: number;
+  locatorPageIndex?: number;
+  resolvedLocatorPageIndex?: number | null;
+  totalPages: number;
+}): number | null {
+  const progressPageIndex = typeof params.chapterProgress === 'number'
+    ? getPageIndexFromProgress(params.chapterProgress, params.totalPages)
+    : null;
+
+  if (typeof params.locatorPageIndex === 'number') {
+    return Math.max(0, Math.min(params.totalPages - 1, params.locatorPageIndex));
+  }
+
+  if (typeof params.resolvedLocatorPageIndex === 'number') {
+    if (params.resolvedLocatorPageIndex === 0 && progressPageIndex !== null && progressPageIndex > 0) {
+      return progressPageIndex;
+    }
+
+    return Math.max(0, Math.min(params.totalPages - 1, params.resolvedLocatorPageIndex));
+  }
+
+  return progressPageIndex;
+}
+
 export function resolvePagedTargetPage(
   pageTarget: 'start' | 'end' | null | undefined,
   pageIndex: number,
@@ -144,7 +169,7 @@ export function createRestoreTargetFromPersistedState(
     locatorBoundary,
   };
 
-  if (target.mode === 'summary') {
+  if (typeof normalizedState.hints?.chapterProgress === 'number') {
     target.chapterProgress = typeof normalizedState.hints?.chapterProgress === 'number'
       ? clampProgress(normalizedState.hints.chapterProgress)
       : undefined;

@@ -8,6 +8,7 @@ import type {
 } from '@shared/contracts/reader';
 import {
   clampContainerScrollTop,
+  resolvePagedRestoreTargetPageIndex,
   SCROLL_READING_ANCHOR_RATIO,
 } from '@shared/utils/readerPosition';
 
@@ -129,6 +130,7 @@ export function verifyStrictModeRestoreCompletion(params: {
   chapterIndex: number;
   contentElement: HTMLDivElement | null;
   currentOriginalLocator: ReaderLocator | null;
+  currentPageCount: number;
   currentPageIndex: number;
   resolvePagedLocatorPageIndex: (target: ReaderRestoreTarget['locator']) => number | null;
   resolveScrollLocatorOffset: (
@@ -150,7 +152,12 @@ export function verifyStrictModeRestoreCompletion(params: {
   }
 
   if (params.targetMode === 'paged') {
-    const expectedPageIndex = params.resolvePagedLocatorPageIndex(targetRestoreTarget.locator);
+    const expectedPageIndex = resolvePagedRestoreTargetPageIndex({
+      chapterProgress: targetRestoreTarget.chapterProgress,
+      locatorPageIndex: targetRestoreTarget.locator.pageIndex,
+      resolvedLocatorPageIndex: params.resolvePagedLocatorPageIndex(targetRestoreTarget.locator),
+      totalPages: params.currentPageCount,
+    });
     if (expectedPageIndex === null) {
       return {
         message: 'strict_target_page_unresolvable',
