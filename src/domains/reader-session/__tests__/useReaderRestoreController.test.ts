@@ -1472,6 +1472,102 @@ describe('useReaderRestoreFlow', () => {
     }
   });
 
+  it('prefers the settled scroll locator over raw scrollTop during strict paged-to-scroll verification', async () => {
+    const animationFrames = createAnimationFrameController();
+    setDebugFeatureEnabled('readerStrictModeSwitch', true);
+    vi.spyOn(readerSessionStore, 'flushPersistence').mockResolvedValue(undefined);
+    vi.spyOn(readerSessionStore, 'getReaderSessionSnapshot').mockImplementation(() => {
+      return createSessionStoreSnapshotMock({
+        lastPersistenceFailure: null,
+        persistenceStatus: 'healthy',
+      });
+    });
+
+    const pagedLocator = createLocator({
+      blockIndex: 22,
+      chapterIndex: 5,
+      lineIndex: 4,
+      pageIndex: 3,
+    });
+    const settledScrollLocator = createLocator({
+      blockIndex: 22,
+      chapterIndex: 5,
+      lineIndex: 4,
+    });
+    const contentRef = {
+      current: makeContainer({
+        clientHeight: 600,
+        scrollHeight: 25000,
+        scrollTop: 13727,
+      }),
+    };
+    const getCurrentOriginalLocatorRef = {
+      current: () => null as ReaderLocator | null,
+    };
+    const { hookProps, runtime } = createHookHarness({
+      sessionCommands: {
+        latestReaderStateRef: {
+          current: createStoredState({
+            canonical: pagedLocator,
+            hints: {
+              chapterProgress: 0.4,
+              contentMode: 'paged',
+              pageIndex: 3,
+              viewMode: 'original',
+            },
+          }),
+        },
+        markUserInteracted: vi.fn(),
+        persistReaderState: vi.fn(),
+        setChapterIndex: vi.fn(),
+        setMode: vi.fn(),
+      },
+      sessionSnapshot: {
+        chapterIndex: 5,
+        mode: 'paged',
+        pendingRestoreTarget: null,
+      },
+      runtime: {
+        contentRef,
+        getCurrentOriginalLocatorRef,
+        getCurrentPagedLocatorRef: {
+          current: () => pagedLocator,
+        },
+        resolveScrollLocatorOffsetRef: {
+          current: (locator) => {
+            if (locator.lineIndex === settledScrollLocator.lineIndex) {
+              return 15546;
+            }
+            return 15546;
+          },
+        },
+      },
+    });
+    const { result } = renderHook(() => useReaderRestoreFlow(hookProps), {
+      wrapper: runtime.Wrapper,
+    });
+
+    try {
+      let switchModePromise: Promise<void> | null = null;
+      await act(async () => {
+        switchModePromise = result.current.switchMode('scroll');
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      act(() => {
+        getCurrentOriginalLocatorRef.current = () => settledScrollLocator;
+        expect(result.current.handleRestoreSettled('completed')).toBe(false);
+      });
+
+      await animationFrames.flushAnimationFrames();
+      await expect(switchModePromise).resolves.toBeUndefined();
+      expect(result.current.modeSwitchError).toBeNull();
+    } finally {
+      animationFrames.restore();
+    }
+  });
+
   it('restores the last content reading position when switching back from summary', () => {
     const persistReaderState = vi.fn();
     const markUserInteracted = vi.fn();

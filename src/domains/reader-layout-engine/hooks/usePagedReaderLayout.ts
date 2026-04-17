@@ -5,21 +5,8 @@ import type {
 } from '@shared/contracts/reader';
 import type { PaginatedChapterLayout } from '../layout-core/internal';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import {
-  findPageIndexForLocator,
-  getChapterBoundaryLocator,
-} from '../layout-core/internal';
-import {
-  canSkipReaderRestore,
-  resolvePagedTargetPage,
-} from '@shared/utils/readerPosition';
-import { debugLog, setDebugSnapshot } from '@shared/debug';
-import {
-  restoreStepFailure,
-  restoreStepPending,
-  restoreStepSuccess,
-  runRestoreSolver,
-} from '@shared/utils/readerRestoreSolver';
+import { setDebugSnapshot } from '@shared/debug';
+import { resolvePagedTargetPage } from '@shared/utils/readerPosition';
 import {
   getPagedMeasuredPageTurnStep,
   getPagedPageCount,
@@ -27,6 +14,7 @@ import {
   getPagedViewportSize,
   parseCssLength,
 } from './pagedLayoutMath';
+import { attemptPagedRestore } from './pagedReaderRestore';
 
 const TWO_COLUMN_GAP = 48;
 const MIN_COLUMN_WIDTH = 260;
@@ -65,20 +53,6 @@ interface UsePagedReaderLayoutResult {
   twoColumnGap: number;
   twoColumnWidth: number | undefined;
   readyChapterIndex: number | null;
-}
-
-function buildSkippedNoTargetResult(
-  chapterIndex: number,
-  attempts: number,
-): ReaderRestoreResult {
-  return {
-    status: 'skipped',
-    reason: 'no_target',
-    retryable: false,
-    attempts,
-    mode: 'paged',
-    chapterIndex,
-  };
 }
 
 export {
@@ -142,191 +116,25 @@ export function usePagedReaderLayout({
       ? resolvedPageTurnStep.step
       : idealPageTurnStep;
 
-  const attemptPagedRestore = useCallback((params: {
+  const handlePagedRestore = useCallback((params: {
     currentPageIndex: number;
     nextPageCount: number;
     pendingRestoreTarget: ReaderRestoreTarget;
   }): 'handled' | 'pending' => {
-    const { currentPageIndex, nextPageCount, pendingRestoreTarget } = params;
-
-    if (canSkipReaderRestore(pendingRestoreTarget)) {
-      const skippedSnapshot = {
-        source: 'usePagedReaderLayout',
-        mode: 'paged',
-        status: 'skipped',
-        chapterIndex,
-        reason: 'no_target',
-        target: pendingRestoreTarget,
-      };
-      setDebugSnapshot('reader-position-restore', skippedSnapshot);
-      debugLog('Reader', 'paged restore skipped because target is missing', skippedSnapshot);
-      recordRestoreResult(
-        buildSkippedNoTargetResult(
-          chapterIndex,
-          getRestoreAttempt(pendingRestoreTarget) + 1,
-        ),
-        pendingRestoreTarget,
-      );
-      clearPendingRestoreTarget();
-      stopRestoreMask();
-      notifyRestoreSettled('skipped');
-      return 'handled';
-    }
-
-    const solverOutcome = runRestoreSolver({
-      attempts: getRestoreAttempt(pendingRestoreTarget) + 1,
+    return attemptPagedRestore({
       chapterIndex,
-      hasTarget: true,
-      mode: 'paged',
-      modeMatchesTarget: pendingRestoreTarget.mode === 'paged',
-      parse: () => {
-        return restoreStepSuccess({
-          target: pendingRestoreTarget,
-          layout: currentPagedLayout,
-          currentPageIndex,
-          nextPageCount,
-        });
-      },
-      project: ({
-        target,
-        layout,
-        currentPageIndex: nextCurrentPageIndex,
-        nextPageCount: totalPages,
-      }) => {
-        let resolvedTargetPage: number | null = null;
-        if (target.locator) {
-          resolvedTargetPage = layout
-            ? findPageIndexForLocator(layout, target.locator)
-            : null;
-          if (
-            resolvedTargetPage === null
-            && typeof target.locator.pageIndex === 'number'
-          ) {
-            resolvedTargetPage = Math.max(
-              0,
-              Math.min(totalPages - 1, target.locator.pageIndex),
-            );
-          }
-          if (resolvedTargetPage === null && !layout) {
-            return restoreStepPending('layout_missing');
-          }
-        }
-        if (resolvedTargetPage === null && target.locatorBoundary !== undefined) {
-          if (!layout) {
-            return restoreStepPending('layout_missing');
-          }
-          const boundaryLocator = getChapterBoundaryLocator(
-            layout,
-            target.locatorBoundary,
-          );
-          if (!boundaryLocator) {
-            return restoreStepFailure('target_unresolvable', {
-              retryable: false,
-            });
-          }
-          resolvedTargetPage = findPageIndexForLocator(layout, boundaryLocator);
-        }
-        if (resolvedTargetPage === null && pendingPageTarget) {
-          resolvedTargetPage = resolvePagedTargetPage(
-            pendingPageTarget,
-            nextCurrentPageIndex,
-            totalPages,
-          );
-        }
-
-        if (resolvedTargetPage === null) {
-          return restoreStepFailure('target_unresolvable', {
-            retryable: false,
-          });
-        }
-
-        return restoreStepSuccess({
-          targetPageIndex: resolvedTargetPage,
-        });
-      },
-      execute: ({ targetPageIndex }) => {
-        if (targetPageIndex !== currentPageIndex) {
-          setPageIndex(targetPageIndex);
-        }
-
-        return restoreStepSuccess({
-          expectedPageIndex: targetPageIndex,
-          actualPageIndex: targetPageIndex,
-        });
-      },
-      validate: (_projected, executed) => {
-        const measuredError = {
-          metric: 'page_delta' as const,
-          delta: Math.abs(executed.actualPageIndex - executed.expectedPageIndex),
-          tolerance: 0,
-          expected: executed.expectedPageIndex,
-          actual: executed.actualPageIndex,
-        };
-
-        if (measuredError.delta > measuredError.tolerance) {
-          return restoreStepFailure('validation_exceeded_tolerance', {
-            retryable: true,
-            measuredError,
-          });
-        }
-
-        return restoreStepSuccess(measuredError);
-      },
-      buildContext: ({ executed }) => ({
-        pageIndex: executed.actualPageIndex,
-      }),
+      currentPageIndex: params.currentPageIndex,
+      nextPageCount: params.nextPageCount,
+      currentPagedLayout,
+      pendingPageTarget,
+      pendingRestoreTarget: params.pendingRestoreTarget,
+      getRestoreAttempt,
+      recordRestoreResult,
+      clearPendingRestoreTarget,
+      notifyRestoreSettled,
+      stopRestoreMask,
+      setPageIndex,
     });
-
-    if (solverOutcome.kind === 'pending') {
-      setDebugSnapshot('reader-position-restore', {
-        source: 'usePagedReaderLayout',
-        mode: 'paged',
-        status: 'pending',
-        chapterIndex,
-        reason: solverOutcome.reason,
-        retryable: solverOutcome.retryable,
-        target: pendingRestoreTarget,
-      });
-      return 'pending';
-    }
-
-    if (solverOutcome.result.status === 'failed') {
-      const failureRecord = recordRestoreResult(solverOutcome.result, pendingRestoreTarget);
-      if (failureRecord.scheduledRetry) {
-        return 'pending';
-      }
-
-      const failedSnapshot = {
-        source: 'usePagedReaderLayout',
-        mode: 'paged',
-        status: 'failed',
-        chapterIndex,
-        reason: solverOutcome.result.reason,
-        retryable: solverOutcome.result.retryable,
-        attempts: solverOutcome.result.attempts,
-        target: pendingRestoreTarget,
-      };
-      setDebugSnapshot('reader-position-restore', failedSnapshot);
-      debugLog('Reader', 'paged restore failed', failedSnapshot);
-      clearPendingRestoreTarget();
-      stopRestoreMask();
-      notifyRestoreSettled('failed');
-      return 'handled';
-    }
-
-    recordRestoreResult(solverOutcome.result, pendingRestoreTarget);
-    setDebugSnapshot('reader-position-restore', {
-      source: 'usePagedReaderLayout',
-      mode: 'paged',
-      status: solverOutcome.result.status,
-      chapterIndex,
-      resolvedPageIndex: solverOutcome.context?.pageIndex ?? null,
-      target: pendingRestoreTarget,
-    });
-    clearPendingRestoreTarget();
-    stopRestoreMask();
-    notifyRestoreSettled(solverOutcome.result.status);
-    return 'handled';
   }, [
     chapterIndex,
     clearPendingRestoreTarget,
@@ -385,7 +193,7 @@ export function usePagedReaderLayout({
         previousChapterIndex === chapterIndex ? previousChapterIndex : chapterIndex
       ));
 
-      if (attemptPagedRestore({
+      if (handlePagedRestore({
         currentPageIndex,
         nextPageCount: layoutDerivedPageCount,
         pendingRestoreTarget,
@@ -480,7 +288,7 @@ export function usePagedReaderLayout({
         previousChapterIndex === chapterIndex ? previousChapterIndex : chapterIndex
       ));
       if (hasRestorableTarget && pendingRestoreTarget) {
-        attemptPagedRestore({
+        handlePagedRestore({
           currentPageIndex,
           nextPageCount,
           pendingRestoreTarget,
@@ -490,7 +298,7 @@ export function usePagedReaderLayout({
 
     return () => cancelAnimationFrame(frameId);
   }, [
-    attemptPagedRestore,
+    handlePagedRestore,
     chapterIndex,
     currentChapter,
     currentPagedLayout,

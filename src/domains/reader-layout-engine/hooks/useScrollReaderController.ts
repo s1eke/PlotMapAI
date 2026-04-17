@@ -62,6 +62,8 @@ export function useScrollReaderController({
   } = sessionCommands;
   const scrollChapterBodyElementsRef = useRef<Map<number, HTMLDivElement>>(new Map());
   const [scrollModeChapters, setScrollModeChapters] = useState<number[]>([]);
+  const [retainedFocusedWindowChapterIndex, setRetainedFocusedWindowChapterIndex] =
+    useState<number | null>(null);
   const [, setVisibleScrollBlockRangeByChapter] =
     useState<Map<number, VisibleScrollBlockRange>>(new Map());
   const scrollAnchorSnapshotRef = useRef<ScrollAnchorSnapshot>({
@@ -73,6 +75,29 @@ export function useScrollReaderController({
   const fetchScrollChapterContent = useCallback((index: number) => {
     return fetchChapterContent(index);
   }, [fetchChapterContent]);
+  const retainFocusedWindowAfterRestore = useCallback((restoredChapterIndex: number) => {
+    setRetainedFocusedWindowChapterIndex((previousChapterIndex) => (
+      previousChapterIndex === restoredChapterIndex
+        ? previousChapterIndex
+        : restoredChapterIndex
+    ));
+  }, []);
+  const clearRetainedFocusedWindow = useCallback(() => {
+    setRetainedFocusedWindowChapterIndex((previousChapterIndex) => (
+      previousChapterIndex === null ? previousChapterIndex : null
+    ));
+  }, []);
+
+  useEffect(() => {
+    if (!enabled || chapterIndex !== retainedFocusedWindowChapterIndex) {
+      clearRetainedFocusedWindow();
+    }
+  }, [
+    chapterIndex,
+    clearRetainedFocusedWindow,
+    enabled,
+    retainedFocusedWindowChapterIndex,
+  ]);
 
   useScrollReaderWindowing({
     cache,
@@ -83,6 +108,7 @@ export function useScrollReaderController({
     fetchChapterContent: fetchScrollChapterContent,
     layoutQueries,
     pendingRestoreTargetRef,
+    retainedFocusedWindowChapterIndex,
     scrollAnchorSnapshotRef,
     scrollChapterBodyElementsRef,
     setScrollModeChapters,
@@ -150,6 +176,7 @@ export function useScrollReaderController({
     setScrollModeChapters,
     chapterDataRevision,
     handleReadingAnchorChange,
+    clearRetainedFocusedWindow,
   );
   const {
     getCurrentAnchor,
@@ -212,6 +239,7 @@ export function useScrollReaderController({
     pendingRestoreTargetRef,
     getRestoreAttempt,
     recordRestoreResult,
+    retainFocusedWindowAfterRestore,
     persistReaderState,
     persistence,
     scrollChapterBodyElementsRef,

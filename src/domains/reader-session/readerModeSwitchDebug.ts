@@ -46,6 +46,39 @@ function buildStrictModeLocatorUnavailableMessage(mode: 'paged' | 'scroll'): str
   return `live_${mode}_locator_missing`;
 }
 
+function areLayoutCursorsEquivalent(
+  left: ReaderLocator['startCursor'],
+  right: ReaderLocator['startCursor'],
+): boolean {
+  if (!left && !right) {
+    return true;
+  }
+
+  if (!left || !right) {
+    return false;
+  }
+
+  return left.segmentIndex === right.segmentIndex
+    && left.graphemeIndex === right.graphemeIndex;
+}
+
+function areStrictModeLocatorsEquivalent(
+  left: ReaderLocator | null | undefined,
+  right: ReaderLocator | null | undefined,
+): boolean {
+  if (!left || !right) {
+    return false;
+  }
+
+  return left.chapterIndex === right.chapterIndex
+    && left.blockIndex === right.blockIndex
+    && left.kind === right.kind
+    && left.lineIndex === right.lineIndex
+    && left.edge === right.edge
+    && areLayoutCursorsEquivalent(left.startCursor, right.startCursor)
+    && areLayoutCursorsEquivalent(left.endCursor, right.endCursor);
+}
+
 export function captureStrictModeSwitchState(params: {
   chapterIndex: number;
   currentOriginalLocator: ReaderLocator | null;
@@ -95,6 +128,7 @@ export function buildStrictModeRestoreFailureResult(params: {
 export function verifyStrictModeRestoreCompletion(params: {
   chapterIndex: number;
   contentElement: HTMLDivElement | null;
+  currentOriginalLocator: ReaderLocator | null;
   currentPageIndex: number;
   resolvePagedLocatorPageIndex: (target: ReaderRestoreTarget['locator']) => number | null;
   resolveScrollLocatorOffset: (
@@ -170,6 +204,36 @@ export function verifyStrictModeRestoreCompletion(params: {
         targetMode: params.targetMode,
       }),
     };
+  }
+
+  if (areStrictModeLocatorsEquivalent(params.currentOriginalLocator, targetRestoreTarget.locator)) {
+    return null;
+  }
+
+  if (params.currentOriginalLocator) {
+    const actualResolvedOffset = params.resolveScrollLocatorOffset(params.currentOriginalLocator);
+    if (actualResolvedOffset !== null) {
+      const delta = Math.abs(actualResolvedOffset - resolvedOffset);
+      if (delta <= 2) {
+        return null;
+      }
+
+      return {
+        message: `resolved_locator_offset_mismatch expected=${resolvedOffset} actual=${actualResolvedOffset}`,
+        restoreResult: buildStrictModeRestoreFailureResult({
+          chapterIndex: params.chapterIndex,
+          measuredError: {
+            actual: actualResolvedOffset,
+            delta,
+            expected: resolvedOffset,
+            metric: 'scroll_px',
+            tolerance: 2,
+          },
+          reason: 'validation_exceeded_tolerance',
+          targetMode: params.targetMode,
+        }),
+      };
+    }
   }
 
   const expectedScrollTop = clampContainerScrollTop(

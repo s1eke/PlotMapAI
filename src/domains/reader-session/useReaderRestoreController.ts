@@ -1,11 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
-import type { ChapterContent } from '@shared/contracts/reader';
-import type { ReaderSessionSnapshot } from './useReaderSession';
 import type {
   ReaderMode,
-  ReaderRestoreResult,
   ReaderRestoreTarget,
-  ReaderSessionCommands,
   RestoreSettledResult,
   StoredReaderState,
 } from '@shared/contracts/reader';
@@ -15,7 +11,6 @@ import {
   useReaderPersistenceRuntime,
   useReaderViewportContext,
 } from '@shared/reader-runtime';
-import { getContainerProgress } from '@shared/utils/readerPosition';
 import { createReaderStateModeHints } from '@shared/utils/readerMode';
 import { mergeStoredReaderState } from './state';
 import {
@@ -36,51 +31,14 @@ import {
   type StrictModeSwitchContentMode,
   useReaderStrictModeSwitch,
 } from './useReaderStrictModeSwitch';
+import {
+  type UseReaderRestoreControllerParams,
+  type UseReaderRestoreControllerResult,
+} from './readerRestoreControllerTypes';
 import { useSummaryRestoreRunner } from './useSummaryRestoreRunner';
+import { useSummaryProgressPersistence } from './useSummaryProgressPersistence';
 import { debugLog, setDebugSnapshot } from '@shared/debug';
-
-const STRICT_SCROLL_VERIFICATION_SETTLE_FRAMES = 3;
-interface UseReaderRestoreControllerParams {
-  sessionSnapshot: Pick<
-    ReaderSessionSnapshot,
-    'chapterIndex' | 'mode' | 'pendingRestoreTarget'
-  >;
-  sessionCommands: Pick<
-    ReaderSessionCommands,
-    | 'latestReaderStateRef'
-    | 'markUserInteracted'
-    | 'persistReaderState'
-    | 'setChapterIndex'
-    | 'setMode'
-  >;
-  currentChapter: ChapterContent | null;
-  summaryRestoreSignal: unknown;
-  isChapterAnalysisLoading: boolean;
-}
-export interface UseReaderRestoreControllerResult {
-  modeSwitchError: ReturnType<typeof useReaderStrictModeSwitch>['modeSwitchError'];
-  pendingRestoreTarget: ReaderRestoreTarget | null;
-  pendingRestoreTargetRef: React.MutableRefObject<ReaderRestoreTarget | null>;
-  captureCurrentReaderPosition: (options?: { flush?: boolean }) => StoredReaderState;
-  clearPendingRestoreTarget: () => void;
-  handleBeforeChapterChange: () => void;
-  handleContentScroll: () => void;
-  handleRestoreSettled: (result: RestoreSettledResult) => boolean;
-  switchMode: (targetMode: ReaderMode) => Promise<void>;
-  getRestoreAttempt: (target: ReaderRestoreTarget | null | undefined) => number;
-  recordRestoreResult: (
-    result: ReaderRestoreResult,
-    target: ReaderRestoreTarget | null | undefined,
-  ) => { scheduledRetry: boolean };
-  retryLastFailedRestore: () => boolean;
-  setPendingRestoreTarget: (
-    nextTarget: ReaderRestoreTarget | null,
-    options?: { force?: boolean },
-  ) => void;
-  startRestoreMaskForTarget: (target: ReaderRestoreTarget | null | undefined) => void;
-  stopRestoreMask: () => void;
-  suppressScrollSyncTemporarily: () => void;
-}
+export type { UseReaderRestoreControllerResult } from './readerRestoreControllerTypes';
 export function useReaderRestoreController({
   sessionSnapshot,
   sessionCommands,
@@ -93,13 +51,8 @@ export function useReaderRestoreController({
   const layoutQueries = useReaderLayoutQueries();
   const persistence = useReaderPersistenceRuntime();
   const { chapterIndex, mode, pendingRestoreTarget } = sessionSnapshot;
-  const {
-    latestReaderStateRef,
-    markUserInteracted,
-    persistReaderState,
-    setChapterIndex,
-    setMode,
-  } = sessionCommands;
+  const { latestReaderStateRef, markUserInteracted, persistReaderState, setChapterIndex, setMode } =
+    sessionCommands;
   const captureCurrentReaderPositionRef =
     useRef<(options?: { flush?: boolean }) => StoredReaderState>(() => ({}));
   const modeSnapshotRef = useRef<Record<ReaderMode, ReaderRestoreTarget | null>>({
@@ -108,7 +61,6 @@ export function useReaderRestoreController({
     summary: null,
   });
   const pendingStrictScrollVerificationFrameRef = useRef<number | null>(null);
-  const summaryProgressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isActiveChapterResolved = currentChapter?.index === chapterIndex;
   const {
     clearPendingRestoreTarget,
@@ -191,15 +143,11 @@ export function useReaderRestoreController({
     ],
   );
 
-  useEffect(() => {
-    captureCurrentReaderPositionRef.current = captureCurrentReaderPosition;
-  }, [captureCurrentReaderPosition]);
-
-  useEffect(() => {
-    return persistence.registerBeforeFlush(() => {
-      captureCurrentReaderPositionRef.current();
-    });
-  }, [persistence]);
+  useEffect(() => { captureCurrentReaderPositionRef.current = captureCurrentReaderPosition; },
+    [captureCurrentReaderPosition]);
+  useEffect(() =>
+    persistence.registerBeforeFlush(() => { captureCurrentReaderPositionRef.current(); }),
+  [persistence]);
 
   const cancelPendingStrictScrollVerification = useCallback(() => {
     if (pendingStrictScrollVerificationFrameRef.current !== null) {
@@ -220,6 +168,7 @@ export function useReaderRestoreController({
     const verificationFailure = verifyStrictModeRestoreCompletion({
       chapterIndex: strictTransaction.chapterIndex,
       contentElement: viewport.contentRef.current,
+      currentOriginalLocator: layoutQueries.getCurrentOriginalLocator(),
       currentPageIndex: navigation.getPagedState().pageIndex,
       resolvePagedLocatorPageIndex: (locator) => (
         locator ? layoutQueries.resolvePagedLocatorPageIndex(locator) : null
@@ -253,50 +202,6 @@ export function useReaderRestoreController({
     viewport.contentRef,
   ]);
 
-  const scheduleStrictScrollVerification = useCallback((
-    strictTransaction: NonNullable<ReturnType<typeof getStrictModeSwitchTransaction>>,
-  ) => {
-    cancelPendingStrictScrollVerification();
-
-    let settledFrameCount = 0;
-    const initialChapterIndex = strictTransaction.chapterIndex;
-    const initialSourceMode = strictTransaction.sourceMode;
-    const initialTargetMode = strictTransaction.targetMode;
-
-    const verifyAfterLayoutSettles = () => {
-      const activeTransaction = getStrictModeSwitchTransaction();
-      if (
-        !activeTransaction?.strict
-        || activeTransaction.stage !== 'restore_target'
-        || activeTransaction.chapterIndex !== initialChapterIndex
-        || activeTransaction.sourceMode !== initialSourceMode
-        || activeTransaction.targetMode !== initialTargetMode
-      ) {
-        pendingStrictScrollVerificationFrameRef.current = null;
-        return;
-      }
-
-      settledFrameCount += 1;
-      if (settledFrameCount < STRICT_SCROLL_VERIFICATION_SETTLE_FRAMES) {
-        pendingStrictScrollVerificationFrameRef.current = requestAnimationFrame(
-          verifyAfterLayoutSettles,
-        );
-        return;
-      }
-
-      pendingStrictScrollVerificationFrameRef.current = null;
-      verifyStrictModeRestoreTarget(activeTransaction);
-    };
-
-    pendingStrictScrollVerificationFrameRef.current = requestAnimationFrame(
-      verifyAfterLayoutSettles,
-    );
-  }, [
-    cancelPendingStrictScrollVerification,
-    getStrictModeSwitchTransaction,
-    verifyStrictModeRestoreTarget,
-  ]);
-
   const processStrictModeRestoreSettled = useCallback((result: RestoreSettledResult): boolean => {
     const strictTransaction = getStrictModeSwitchTransaction();
     if (!strictTransaction?.strict || strictTransaction.stage !== 'restore_target') {
@@ -305,7 +210,8 @@ export function useReaderRestoreController({
 
     if (result === 'completed') {
       if (strictTransaction.targetMode === 'scroll') {
-        scheduleStrictScrollVerification(strictTransaction);
+        cancelPendingStrictScrollVerification();
+        completeStrictModeSwitchTransaction();
         return true;
       }
 
@@ -316,9 +222,9 @@ export function useReaderRestoreController({
     return handleStrictModeRestoreSettled(result);
   }, [
     cancelPendingStrictScrollVerification,
+    completeStrictModeSwitchTransaction,
     getStrictModeSwitchTransaction,
     handleStrictModeRestoreSettled,
-    scheduleStrictScrollVerification,
     verifyStrictModeRestoreTarget,
   ]);
 
@@ -556,40 +462,19 @@ export function useReaderRestoreController({
   });
 
   useEffect(() => () => { captureCurrentReaderPositionRef.current(); }, []);
-  useEffect(() => () => {
-    if (summaryProgressTimerRef.current) {
-      clearTimeout(summaryProgressTimerRef.current);
-    }
-  }, []);
-  useEffect(() => {
-    if (summaryProgressTimerRef.current) {
-      clearTimeout(summaryProgressTimerRef.current);
-      summaryProgressTimerRef.current = null;
-    }
-  }, [chapterIndex, mode]);
+  const { handleContentScroll } = useSummaryProgressPersistence({
+    chapterIndex,
+    mode,
+    pendingRestoreTargetRef,
+    persistReaderState,
+    isScrollSyncSuppressed: persistence.isScrollSyncSuppressed,
+    viewportContentRef: viewport.contentRef,
+  });
   const handleBeforeChapterChange = useCallback(() => {
     clearPendingRestoreTarget();
     stopRestoreMask();
     suppressScrollSyncTemporarily();
   }, [clearPendingRestoreTarget, stopRestoreMask, suppressScrollSyncTemporarily]);
-  const handleContentScroll = useCallback(() => {
-    if (persistence.isScrollSyncSuppressed()) {
-      return;
-    }
-    if (mode !== 'summary' || pendingRestoreTargetRef.current) {
-      return;
-    }
-    if (summaryProgressTimerRef.current) {
-      clearTimeout(summaryProgressTimerRef.current);
-    }
-    summaryProgressTimerRef.current = setTimeout(() => {
-      persistReaderState({
-        hints: {
-          chapterProgress: getContainerProgress(viewport.contentRef.current),
-        },
-      });
-    }, 150);
-  }, [mode, pendingRestoreTargetRef, persistReaderState, persistence, viewport.contentRef]);
   return {
     modeSwitchError,
     pendingRestoreTarget,

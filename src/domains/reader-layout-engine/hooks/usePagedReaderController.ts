@@ -1,13 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type {
-  Chapter,
-  ChapterContent,
   PageTarget,
-  ReaderChapterCacheApi,
-  ReaderRestoreResult,
-  ReaderRestoreTarget,
-  ReaderSessionCommands,
-  ReaderSessionSnapshot,
 } from '@shared/contracts/reader';
 import {
   useReaderLayoutQueries,
@@ -28,77 +21,15 @@ import {
   usePagedReaderLayout,
 } from '../paged-runtime/internal';
 import { useReaderRenderCache } from '../render-cache/internal';
-type NavigationDirection = 'next' | 'prev';
-type DirectionalNavigationReplay = (
-  direction: NavigationDirection,
-  shouldAnimate: boolean,
-) => void;
-type PagedReaderRenderCache = ReturnType<typeof useReaderRenderCache>;
-type PagedReaderLayout =
-  PagedReaderRenderCache['pagedLayouts'] extends Map<number, infer Layout>
-    ? Layout
-    : never;
-const EMPTY_SCROLL_CHAPTERS: Array<{ chapter: ChapterContent; index: number }> = [];
-interface PagedReaderControllerPreferences {
-  fontSize: number;
-  lineSpacing: number;
-  paragraphSpacing: number;
-}
-interface UsePagedReaderControllerParams {
-  enabled: boolean;
-  novelId: number;
-  chapters: Chapter[];
-  currentChapter: ChapterContent | null;
-  chapterDataRevision: number;
-  sessionSnapshot: Pick<ReaderSessionSnapshot, 'chapterIndex'>;
-  sessionCommands: Pick<
-    ReaderSessionCommands,
-    'hasUserInteractedRef' | 'persistReaderState' | 'setChapterIndex'
-  >;
-  cache: Pick<ReaderChapterCacheApi, 'snapshotCachedChapters'>;
-  fetchChapterContent: (
-    index: number,
-    options?: {
-      signal?: AbortSignal;
-      onProgress?: (message: string) => void;
-    },
-  ) => Promise<ChapterContent>;
-  preferences: PagedReaderControllerPreferences;
-  pendingRestoreTarget: ReaderRestoreTarget | null;
-  pendingRestoreTargetRef: React.MutableRefObject<ReaderRestoreTarget | null>;
-  getRestoreAttempt: (target: ReaderRestoreTarget | null | undefined) => number;
-  recordRestoreResult: (
-    result: ReaderRestoreResult,
-    target: ReaderRestoreTarget | null | undefined,
-  ) => { scheduledRetry: boolean };
-  clearPendingRestoreTarget: () => void;
-  stopRestoreMask: () => void;
-  beforeChapterChange?: () => void;
-}
-export interface UsePagedReaderControllerResult {
-  currentPagedLayout: PagedReaderLayout | null;
-  currentPagedLayoutChapterIndex: number | null;
-  handlePagedContentRef: (element: HTMLDivElement | null) => void;
-  handlePagedViewportRef: (element: HTMLDivElement | null) => void;
-  nextChapterPreview: ChapterContent | null;
-  nextPagedLayout: PagedReaderLayout | null;
-  pageCount: number;
-  pageIndex: number;
-  pageTurnDirection: NavigationDirection;
-  pageTurnToken: number;
-  pendingPageTarget: PageTarget | null;
-  previousChapterPreview: ChapterContent | null;
-  previousPagedLayout: PagedReaderLayout | null;
-  goToChapter: (targetIndex: number, pageTarget?: PageTarget) => void;
-  goToNextPage: () => void;
-  goToNextPageSilently: () => void;
-  goToPrevPage: () => void;
-  goToPrevPageSilently: () => void;
-  handleNext: () => void;
-  handlePrev: () => void;
-  toolbarHasNext: boolean;
-  toolbarHasPrev: boolean;
-}
+import {
+  EMPTY_SCROLL_CHAPTERS,
+  type DirectionalNavigationReplay,
+  type NavigationDirection,
+  type UsePagedReaderControllerParams,
+  type UsePagedReaderControllerResult,
+} from './pagedReaderControllerTypes';
+
+export type { UsePagedReaderControllerResult } from './pagedReaderControllerTypes';
 export function usePagedReaderController({
   enabled,
   novelId,

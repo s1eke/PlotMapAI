@@ -61,6 +61,7 @@ export function useScrollReaderWindowing(params: {
     clearScrollChapterElements: () => void;
   };
   pendingRestoreTargetRef: MutableRefObject<ReaderRestoreTarget | null>;
+  retainedFocusedWindowChapterIndex: number | null;
   scrollAnchorSnapshotRef: MutableRefObject<ScrollAnchorSnapshot>;
   scrollChapterBodyElementsRef: MutableRefObject<Map<number, HTMLDivElement>>;
   setScrollModeChapters: Dispatch<SetStateAction<number[]>>;
@@ -77,6 +78,7 @@ export function useScrollReaderWindowing(params: {
     fetchChapterContent,
     layoutQueries,
     pendingRestoreTargetRef,
+    retainedFocusedWindowChapterIndex,
     scrollAnchorSnapshotRef,
     scrollChapterBodyElementsRef,
     setScrollModeChapters,
@@ -117,8 +119,11 @@ export function useScrollReaderWindowing(params: {
 
     const activePendingTarget = pendingRestoreTargetRef.current;
     const shouldFocusRestoreWindow =
-      activePendingTarget?.mode === 'scroll'
-      && activePendingTarget.chapterIndex === chapterIndex;
+      (
+        activePendingTarget?.mode === 'scroll'
+        && activePendingTarget.chapterIndex === chapterIndex
+      )
+      || retainedFocusedWindowChapterIndex === chapterIndex;
     const nextWindow = shouldFocusRestoreWindow
       ? buildFocusedScrollWindow(chapterIndex, chaptersLength)
       : buildScrollWindow(chapterIndex, chaptersLength);
@@ -142,6 +147,7 @@ export function useScrollReaderWindowing(params: {
     enabled,
     fetchChapterContent,
     pendingRestoreTargetRef,
+    retainedFocusedWindowChapterIndex,
     setScrollModeChapters,
   ]);
 }
