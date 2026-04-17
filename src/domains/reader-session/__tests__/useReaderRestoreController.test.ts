@@ -17,6 +17,16 @@ import { getReaderSessionSnapshot, resetReaderSessionStoreForTests } from '../re
 import * as readerSessionStore from '../readerSessionStore';
 import { useReaderRestoreFlow } from '../useReaderRestoreFlow';
 
+const readerTraceMocks = vi.hoisted(() => ({
+  enabled: false,
+  recordReaderTrace: vi.fn(),
+}));
+
+vi.mock('@shared/reader-trace', () => ({
+  isReaderTraceEnabled: () => readerTraceMocks.enabled,
+  recordReaderTrace: readerTraceMocks.recordReaderTrace,
+}));
+
 function makeContainer({
   scrollTop = 0,
   scrollHeight = 1000,
@@ -293,6 +303,7 @@ function createHookHarness(overrides: CreateHookPropsOptions = {}) {
       chapterIndex,
       mode,
       pendingRestoreTarget,
+      restoreStatus: 'ready' as const,
       ...overrides.sessionSnapshot,
     },
     summaryRestoreSignal: null,
@@ -324,6 +335,8 @@ describe('useReaderRestoreFlow', () => {
     vi.restoreAllMocks();
     resetReaderSessionStoreForTests();
     setDebugFeatureEnabled('readerStrictModeSwitch', false);
+    readerTraceMocks.enabled = false;
+    readerTraceMocks.recordReaderTrace.mockReset();
   });
 
   it('keeps summary progress restore targets but clears original-mode progress-only ones', () => {
@@ -375,6 +388,7 @@ describe('useReaderRestoreFlow', () => {
   });
 
   it('forces summary restores to chapter-start progress without locator hints', () => {
+    readerTraceMocks.enabled = true;
     const persistReaderState = vi.fn();
     const { hookProps, runtime } = createHookHarness({
       sessionCommands: {
@@ -416,6 +430,25 @@ describe('useReaderRestoreFlow', () => {
         viewMode: 'summary',
       }),
     }));
+    const traceCalls = readerTraceMocks.recordReaderTrace.mock.calls;
+    expect(traceCalls.map(([eventName]) => eventName)).toEqual(expect.arrayContaining([
+      'mode_switch_started',
+      'mode_switch_target_resolved',
+      'mode_switch_finished',
+    ]));
+    expect(traceCalls).toContainEqual([
+      'mode_switch_target_resolved',
+      expect.objectContaining({
+        chapterIndex: 5,
+        mode: 'summary',
+        details: expect.objectContaining({
+          chapterProgress: 0,
+          sourceMode: 'scroll',
+          strict: false,
+          targetMode: 'summary',
+        }),
+      }),
+    ]);
   });
 
   it('persists summary scroll progress through the durable pipeline after debounce', () => {
@@ -509,6 +542,49 @@ describe('useReaderRestoreFlow', () => {
     expect(setMode).toHaveBeenCalledWith('paged');
   });
 
+  it('enters restoring-position immediately for non-strict content-mode switches', () => {
+    const { hookProps, runtime } = createHookHarness({
+      sessionCommands: {
+        latestReaderStateRef: {
+          current: createStoredState({
+            canonical: createLocator({
+              chapterIndex: 7,
+            }),
+          }),
+        },
+        markUserInteracted: vi.fn(),
+        persistReaderState: vi.fn(),
+        setChapterIndex: vi.fn(),
+        setMode: vi.fn(),
+      },
+      sessionSnapshot: {
+        chapterIndex: 7,
+        mode: 'scroll',
+        pendingRestoreTarget: null,
+      },
+      runtime: {
+        getCurrentOriginalLocatorRef: {
+          current: () => createLocator({
+            chapterIndex: 7,
+          }),
+        },
+      },
+    });
+    const { result } = renderHook(() => useReaderRestoreFlow(hookProps), {
+      wrapper: runtime.Wrapper,
+    });
+
+    act(() => {
+      result.current.switchMode('paged');
+    });
+
+    expect(getReaderSessionSnapshot().restoreStatus).toBe('restoring-position');
+    expect(getReaderSessionSnapshot().pendingRestoreTarget).toMatchObject({
+      chapterIndex: 7,
+      mode: 'paged',
+    });
+  });
+
   it('clears mode-switch rollback state after a successful restore settle', () => {
     const { hookProps, runtime } = createHookHarness({
       sessionSnapshot: {
@@ -537,6 +613,7 @@ describe('useReaderRestoreFlow', () => {
   });
 
   it('rolls back mode-switch state when restore fails', () => {
+    readerTraceMocks.enabled = true;
     const persistReaderState = vi.fn();
     const setMode = vi.fn();
     const setChapterIndex = vi.fn();
@@ -603,9 +680,21 @@ describe('useReaderRestoreFlow', () => {
     }), {
       flush: true,
     });
+    expect(readerTraceMocks.recordReaderTrace.mock.calls).toContainEqual([
+      'mode_switch_rollback',
+      expect.objectContaining({
+        chapterIndex: 7,
+        mode: 'scroll',
+        details: expect.objectContaining({
+          failedMode: 'scroll',
+          rollbackMode: 'scroll',
+        }),
+      }),
+    ]);
   });
 
   it('does not enter the target mode when strict mode-switch source capture persistence fails', async () => {
+    readerTraceMocks.enabled = true;
     setDebugFeatureEnabled('readerStrictModeSwitch', true);
     vi.spyOn(readerSessionStore, 'flushPersistence').mockResolvedValue(undefined);
     vi.spyOn(readerSessionStore, 'getReaderSessionSnapshot')
@@ -656,6 +745,18 @@ describe('useReaderRestoreFlow', () => {
     expect(result.current.modeSwitchError?.code).toBe('READER_MODE_SWITCH_FAILED');
     expect(result.current.modeSwitchError?.message).toContain('stage=capture_source');
     expect(result.current.modeSwitchError?.message).toContain('switch=scroll->paged');
+    expect(readerTraceMocks.recordReaderTrace).toHaveBeenCalledWith(
+      'mode_switch_error',
+      expect.objectContaining({
+        chapterIndex: 5,
+        mode: 'scroll',
+        details: expect.objectContaining({
+          stage: 'capture_source',
+          strict: true,
+          targetMode: 'paged',
+        }),
+      }),
+    );
   });
 
   it('clears the pending restore target and surfaces an error when strict mode target persistence fails', async () => {

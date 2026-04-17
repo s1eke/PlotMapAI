@@ -18,6 +18,7 @@ import {
 import { useReaderPageImageOverlay } from '@domains/reader-media';
 import { useReaderPreferences } from '@domains/reader-shell';
 import { AppErrorCode } from '@shared/errors';
+import { isReaderTraceEnabled, recordReaderTrace } from '@shared/reader-trace';
 import { useReaderViewportContext } from '@shared/reader-runtime';
 import { resolveContentModeFromPageTurnMode } from '@shared/utils/readerMode';
 import { useReaderReparseRecoveryController } from './useReaderReparseRecoveryController';
@@ -176,8 +177,25 @@ export function useReaderPageViewModel(novelId: number): ReaderPageViewModel {
       return;
     }
 
-    preferences.setPageTurnMode(nextMode);
     const nextContentMode = resolveContentModeFromPageTurnMode(nextMode);
+    if (isReaderTraceEnabled()) {
+      recordReaderTrace('page_turn_mode_requested', {
+        chapterIndex,
+        mode,
+        pageTurnMode: nextMode,
+        restoreStatus: lifecycle.lifecycleStatus,
+        details: {
+          currentMode: mode,
+          currentPageTurnMode: preferences.pageTurnMode,
+          lastContentMode,
+          nextContentMode,
+          nextPageTurnMode: nextMode,
+          viewMode,
+        },
+      });
+    }
+
+    preferences.setPageTurnMode(nextMode);
 
     if (mode === 'summary') {
       if (lastContentMode !== nextContentMode) {
@@ -189,7 +207,15 @@ export function useReaderPageViewModel(novelId: number): ReaderPageViewModel {
     if (mode !== nextContentMode) {
       restore.switchMode(nextContentMode);
     }
-  }, [lastContentMode, mode, preferences, restore]);
+  }, [
+    chapterIndex,
+    lastContentMode,
+    lifecycle.lifecycleStatus,
+    mode,
+    preferences,
+    restore,
+    viewMode,
+  ]);
 
   const handleSetViewMode = useCallback((nextViewMode: 'original' | 'summary'): void => {
     restore.switchMode(nextViewMode === 'summary' ? 'summary' : lastContentMode);
@@ -274,6 +300,7 @@ export function useReaderPageViewModel(novelId: number): ReaderPageViewModel {
       renderableChapter: viewport.renderableChapter,
       showLoadingOverlay: lifecycle.showLoadingOverlay,
       isRestoringPosition: lifecycle.isRestoringPosition,
+      restoreStatus: lifecycle.lifecycleStatus,
       loadingLabel: lifecycle.loadingLabel,
       onBlockedInteraction: dismissBlockedInteraction,
       onContentClick: handleViewportClick,

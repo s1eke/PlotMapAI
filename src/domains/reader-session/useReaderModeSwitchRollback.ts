@@ -8,6 +8,7 @@ import type {
 import type { ReaderSessionCommands } from '@shared/contracts/reader';
 import { buildStoredReaderState } from './state';
 import { debugLog, setDebugSnapshot } from '@shared/debug';
+import { isReaderTraceEnabled, recordReaderTrace } from '@shared/reader-trace';
 
 interface ModeSwitchRollbackSnapshot {
   previousChapterIndex: number;
@@ -91,6 +92,18 @@ export function useReaderModeSwitchRollback({
       ...rollbackSnapshot,
       rollbackPending: true,
     };
+    if (isReaderTraceEnabled()) {
+      recordReaderTrace('mode_switch_rollback', {
+        chapterIndex: rollbackSnapshot.previousChapterIndex,
+        mode: rollbackSnapshot.previousMode,
+        details: {
+          failedMode,
+          hasLocator: Boolean(rollbackSnapshot.previousRestoreTarget.locator),
+          locatorBoundary: rollbackSnapshot.previousRestoreTarget.locatorBoundary ?? null,
+          rollbackMode: rollbackSnapshot.previousMode,
+        },
+      });
+    }
     suppressScrollSyncTemporarily();
     rememberModeState(rollbackSnapshot.previousRestoreTarget);
     setPendingRestoreTarget(rollbackSnapshot.previousRestoreTarget, { force: true });

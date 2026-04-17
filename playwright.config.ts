@@ -41,7 +41,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: `npm run build && npm run preview -- --host ${HOST} --port ${PORT}`,
+    command: `npm run preview:trace -- --host ${HOST} --port ${PORT}`,
     url: BASE_URL,
     reuseExistingServer: SHOULD_REUSE_EXISTING_SERVER,
     timeout: 180_000,

@@ -17,6 +17,11 @@ const pagedControllerTestState = vi.hoisted(() => ({
   pagedLayoutsByIndex: new Map<number, unknown>(),
   readyChapterIndex: 0,
 }));
+const readerTraceMocks = vi.hoisted(() => ({
+  enabled: false,
+  markReaderTraceSuspect: vi.fn(),
+  recordReaderTrace: vi.fn(),
+}));
 
 vi.mock('../../paged-runtime/internal', async () => {
   const actual = await vi.importActual<typeof import('../../paged-runtime/internal')>(
@@ -40,6 +45,12 @@ vi.mock('../../render-cache/internal', () => ({
 
 vi.mock('../../layout-core/internal', () => ({
   resolveCurrentPagedLocator: vi.fn(() => pagedControllerTestState.currentPagedLocator),
+}));
+
+vi.mock('@shared/reader-trace', () => ({
+  isReaderTraceEnabled: () => readerTraceMocks.enabled,
+  markReaderTraceSuspect: readerTraceMocks.markReaderTraceSuspect,
+  recordReaderTrace: readerTraceMocks.recordReaderTrace,
 }));
 
 function createLocator(chapterIndex: number, pageIndex: number): ReaderLocator {
@@ -181,6 +192,9 @@ function setupHook(
 describe('usePagedReaderController', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    readerTraceMocks.enabled = false;
+    readerTraceMocks.markReaderTraceSuspect.mockReset();
+    readerTraceMocks.recordReaderTrace.mockReset();
     pagedControllerTestState.chapterPreviews = {
       nextChapterPreview: null,
       pagedChapters: [],
@@ -423,5 +437,44 @@ describe('usePagedReaderController', () => {
     });
 
     expect(sessionCommands.persistReaderState).toHaveBeenCalledTimes(1);
+  });
+
+  it('marks page turn animations that fire while a restore target is still pending', async () => {
+    readerTraceMocks.enabled = true;
+    pagedControllerTestState.pagedLayoutsByIndex = new Map([
+      [0, createPagedLayout(3)],
+    ]);
+    pagedControllerTestState.readyChapterIndex = 0;
+    pagedControllerTestState.currentPagedLocator = createLocator(0, 0);
+
+    const pendingRestoreTargetRef = {
+      current: {
+        chapterIndex: 0,
+        mode: 'paged' as const,
+        locator: createLocator(0, 2),
+      },
+    };
+    const { result } = setupHook({
+      pendingRestoreTargetRef,
+    });
+
+    act(() => {
+      result.current.goToNextPage();
+    });
+
+    await waitFor(() => {
+      expect(readerTraceMocks.markReaderTraceSuspect).toHaveBeenCalledWith(
+        'page_turn_animation_during_restore',
+        expect.objectContaining({
+          chapterIndex: 0,
+          mode: 'paged',
+          details: expect.objectContaining({
+            direction: 'next',
+            nextToken: 1,
+            pageIndex: 1,
+          }),
+        }),
+      );
+    });
   });
 });

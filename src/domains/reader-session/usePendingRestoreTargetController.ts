@@ -4,6 +4,7 @@ import type { ReaderRestoreTarget } from '@shared/contracts/reader';
 import type { ReaderPersistenceRuntimeValue } from '@shared/contracts/reader';
 
 import { beginRestore, completeRestore, setPendingRestoreTarget } from './readerSessionStore';
+import { isReaderTraceEnabled, recordReaderTrace } from '@shared/reader-trace';
 import { shouldKeepReaderRestoreMask } from '@shared/utils/readerPosition';
 
 export function usePendingRestoreTargetController(params: {
@@ -32,6 +33,13 @@ export function usePendingRestoreTargetController(params: {
     options?: { force?: boolean },
   ) => {
     if (!nextTarget) {
+      if (isReaderTraceEnabled()) {
+        recordReaderTrace('restore_target_cleared', {
+          details: {
+            source: 'usePendingRestoreTargetController.setPendingRestoreTarget',
+          },
+        });
+      }
       pendingRestoreTargetOverrideRef.current = null;
       pendingRestoreTargetRef.current = null;
       setPendingRestoreTarget(null);
@@ -39,6 +47,18 @@ export function usePendingRestoreTargetController(params: {
     }
 
     if (options?.force) {
+      if (isReaderTraceEnabled()) {
+        recordReaderTrace('restore_target_set', {
+          chapterIndex: nextTarget.chapterIndex,
+          mode: nextTarget.mode,
+          details: {
+            chapterProgress: nextTarget.chapterProgress ?? null,
+            force: true,
+            hasLocator: Boolean(nextTarget.locator),
+            locatorBoundary: nextTarget.locatorBoundary ?? null,
+          },
+        });
+      }
       pendingRestoreTargetOverrideRef.current = nextTarget;
       pendingRestoreTargetRef.current = nextTarget;
       setPendingRestoreTarget(nextTarget);
@@ -46,12 +66,32 @@ export function usePendingRestoreTargetController(params: {
     }
 
     const maskedTarget = shouldKeepReaderRestoreMask(nextTarget) ? nextTarget : null;
+    if (isReaderTraceEnabled()) {
+      recordReaderTrace(maskedTarget ? 'restore_target_set' : 'restore_target_cleared', {
+        chapterIndex: nextTarget.chapterIndex,
+        mode: nextTarget.mode,
+        details: {
+          chapterProgress: nextTarget.chapterProgress ?? null,
+          force: false,
+          hasLocator: Boolean(nextTarget.locator),
+          locatorBoundary: nextTarget.locatorBoundary ?? null,
+          maskedOut: !maskedTarget,
+        },
+      });
+    }
     pendingRestoreTargetOverrideRef.current = null;
     pendingRestoreTargetRef.current = maskedTarget;
     setPendingRestoreTarget(maskedTarget);
   }, []);
 
   const clearPendingRestoreTarget = useCallback(() => {
+    if (isReaderTraceEnabled()) {
+      recordReaderTrace('restore_target_cleared', {
+        details: {
+          source: 'usePendingRestoreTargetController.clearPendingRestoreTarget',
+        },
+      });
+    }
     pendingRestoreTargetOverrideRef.current = null;
     pendingRestoreTargetRef.current = null;
     setPendingRestoreTarget(null);

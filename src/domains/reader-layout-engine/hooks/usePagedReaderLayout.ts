@@ -6,6 +6,7 @@ import type {
 import type { PaginatedChapterLayout } from '../layout-core/internal';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { setDebugSnapshot } from '@shared/debug';
+import { isReaderTraceEnabled, recordReaderTrace } from '@shared/reader-trace';
 import { resolvePagedTargetPage } from '@shared/utils/readerPosition';
 import {
   getPagedMeasuredPageTurnStep,
@@ -15,6 +16,10 @@ import {
   parseCssLength,
 } from './pagedLayoutMath';
 import { attemptPagedRestore } from './pagedReaderRestore';
+import {
+  canAttemptPagedRestoreWithoutViewportMeasurement,
+  resolveTracePagedRestoreTargetPage,
+} from './pagedRestoreTrace';
 
 const TWO_COLUMN_GAP = 48;
 const MIN_COLUMN_WIDTH = 260;
@@ -61,7 +66,6 @@ export {
   getPagedScrollLeft,
   getPagedViewportSize,
 };
-
 
 export function usePagedReaderLayout({
   chapterIndex,
@@ -186,8 +190,42 @@ export function usePagedReaderLayout({
     const layoutDerivedPageCount = currentPagedLayout
       ? Math.max(1, currentPagedLayout.pageSlices.length)
       : 1;
+    const isPagedViewportReady = Boolean(
+      pagedViewportElement
+      && pagedContentElement
+      && pagedViewportSize.width
+      && pagedViewportSize.height,
+    );
 
-    if (hasRestorableTarget && pendingRestoreTarget && currentPagedLayout) {
+    if (
+      hasRestorableTarget
+      && pendingRestoreTarget
+      && currentPagedLayout
+      && canAttemptPagedRestoreWithoutViewportMeasurement(pendingRestoreTarget)
+    ) {
+      const resolvedTargetPage = resolveTracePagedRestoreTargetPage({
+        currentPageIndex,
+        currentPagedLayout,
+        nextPageCount: layoutDerivedPageCount,
+        pendingPageTarget,
+        pendingRestoreTarget,
+      });
+      if (isReaderTraceEnabled()) {
+        recordReaderTrace('paged_restore_attempt', {
+          chapterIndex,
+          mode: 'paged',
+          details: {
+            currentPageIndex,
+            hasRestorableTarget,
+            nextPageCount: layoutDerivedPageCount,
+            pendingPageTarget,
+            readyChapterIndex: resolvedLayoutChapterIndex,
+            resolvedTargetPage,
+            viewportHeight: pagedViewportSize.height,
+            viewportWidth: pagedViewportSize.width,
+          },
+        });
+      }
       setPageCount(layoutDerivedPageCount);
       setResolvedLayoutChapterIndex((previousChapterIndex) => (
         previousChapterIndex === chapterIndex ? previousChapterIndex : chapterIndex
@@ -200,18 +238,35 @@ export function usePagedReaderLayout({
       }) !== 'pending') {
         return;
       }
+
+      if (isReaderTraceEnabled()) {
+        recordReaderTrace('paged_restore_pending', {
+          chapterIndex,
+          mode: 'paged',
+          details: {
+            currentPageIndex,
+            hasRestorableTarget,
+            nextPageCount: layoutDerivedPageCount,
+            pendingPageTarget,
+            readyChapterIndex: resolvedLayoutChapterIndex,
+            reason: 'restore_solver_pending',
+            resolvedTargetPage,
+            viewportHeight: pagedViewportSize.height,
+            viewportWidth: pagedViewportSize.width,
+          },
+        });
+      }
     }
 
     if (
       isLoading
-      || !pagedViewportSize.width
-      || !pagedViewportSize.height
+      || !isPagedViewportReady
     ) {
       let pendingReason: 'layout_missing' | 'container_missing' | 'execution_exception' =
         'execution_exception';
       if (!currentPagedLayout) {
         pendingReason = 'layout_missing';
-      } else if (!pagedViewportSize.width || !pagedViewportSize.height) {
+      } else if (!isPagedViewportReady) {
         pendingReason = 'container_missing';
       }
 
@@ -231,6 +286,29 @@ export function usePagedReaderLayout({
         viewportHeight: pagedViewportSize.height,
         viewportWidth: pagedViewportSize.width,
       });
+      if (hasRestorableTarget && pendingRestoreTarget && isReaderTraceEnabled()) {
+        recordReaderTrace('paged_restore_pending', {
+          chapterIndex,
+          mode: 'paged',
+          details: {
+            currentPageIndex,
+            hasRestorableTarget,
+            nextPageCount: layoutDerivedPageCount,
+            pendingPageTarget,
+            readyChapterIndex: resolvedLayoutChapterIndex,
+            reason: pendingReason,
+            resolvedTargetPage: resolveTracePagedRestoreTargetPage({
+              currentPageIndex,
+              currentPagedLayout,
+              nextPageCount: layoutDerivedPageCount,
+              pendingPageTarget,
+              pendingRestoreTarget,
+            }),
+            viewportHeight: pagedViewportSize.height,
+            viewportWidth: pagedViewportSize.width,
+          },
+        });
+      }
       setPageCount(layoutDerivedPageCount);
       return;
     }
@@ -288,11 +366,50 @@ export function usePagedReaderLayout({
         previousChapterIndex === chapterIndex ? previousChapterIndex : chapterIndex
       ));
       if (hasRestorableTarget && pendingRestoreTarget) {
-        handlePagedRestore({
+        const resolvedTargetPage = resolveTracePagedRestoreTargetPage({
+          currentPageIndex,
+          currentPagedLayout,
+          nextPageCount,
+          pendingPageTarget,
+          pendingRestoreTarget,
+        });
+        if (isReaderTraceEnabled()) {
+          recordReaderTrace('paged_restore_attempt', {
+            chapterIndex,
+            mode: 'paged',
+            details: {
+              currentPageIndex,
+              hasRestorableTarget,
+              nextPageCount,
+              pendingPageTarget,
+              readyChapterIndex: resolvedLayoutChapterIndex,
+              resolvedTargetPage,
+              viewportHeight: pagedViewportSize.height,
+              viewportWidth: pagedViewportSize.width,
+            },
+          });
+        }
+        if (handlePagedRestore({
           currentPageIndex,
           nextPageCount,
           pendingRestoreTarget,
-        });
+        }) === 'pending' && isReaderTraceEnabled()) {
+          recordReaderTrace('paged_restore_pending', {
+            chapterIndex,
+            mode: 'paged',
+            details: {
+              currentPageIndex,
+              hasRestorableTarget,
+              nextPageCount,
+              pendingPageTarget,
+              readyChapterIndex: resolvedLayoutChapterIndex,
+              reason: 'restore_solver_pending',
+              resolvedTargetPage,
+              viewportHeight: pagedViewportSize.height,
+              viewportWidth: pagedViewportSize.width,
+            },
+          });
+        }
       }
     });
 
@@ -317,6 +434,7 @@ export function usePagedReaderLayout({
     pendingRestoreTargetValue,
     pendingRestoreTargetRef,
     clearPendingPageTarget,
+    resolvedLayoutChapterIndex,
     setPageCount,
     setPageIndex,
   ]);

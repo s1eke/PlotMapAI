@@ -1,7 +1,11 @@
 import type { Dispatch, SetStateAction } from 'react';
-import type { ReaderRestoreResult, ReaderRestoreTarget } from '@shared/contracts/reader';
+import type {
+  ReaderLocator,
+  ReaderRestoreResult,
+  ReaderRestoreTarget,
+} from '@shared/contracts/reader';
 import type { PaginatedChapterLayout } from '../../utils/readerLayout';
-import { act, renderHook } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -99,7 +103,28 @@ function createPagedLayout(pageCount: number): PaginatedChapterLayout {
         items: [],
       }],
       id: `page-${index}`,
+      pageIndex: index,
     })),
+  };
+}
+
+function createPagedLayoutWithStartLocator(
+  pageCount: number,
+  targetPageIndex: number,
+  locator: ReaderLocator,
+): PaginatedChapterLayout {
+  const baseLayout = createPagedLayout(pageCount);
+
+  return {
+    ...baseLayout,
+    pageSlices: baseLayout.pageSlices.map((pageSlice, index) => (
+      index === targetPageIndex
+        ? {
+          ...pageSlice,
+          startLocator: locator,
+        }
+        : pageSlice
+    )),
   };
 }
 
@@ -438,6 +463,89 @@ describe('usePagedReaderLayout', () => {
     expect(clearPendingRestoreTarget).toHaveBeenCalledTimes(1);
     expect(stopRestoreMask).toHaveBeenCalledTimes(1);
     expect(notifyRestoreSettled).toHaveBeenCalledWith('completed');
+  });
+
+  it('waits for paged viewport measurement before restoring locator-only targets', async () => {
+    const animationFrames = createAnimationFrameController();
+    const targetLocator: ReaderLocator = {
+      blockIndex: 6,
+      chapterIndex: 0,
+      kind: 'text',
+      lineIndex: 0,
+    };
+    const viewport = createViewport(600, 800);
+    const content = createContent(() => 1896);
+    const setPageCount = vi.fn();
+    const setPageIndex = vi.fn();
+    const notifyRestoreSettled = vi.fn();
+    const stopRestoreMask = vi.fn();
+    const pendingRestoreTarget = {
+      chapterIndex: 0,
+      mode: 'paged' as const,
+      locator: targetLocator,
+    };
+    const pendingRestoreTargetRef = { current: pendingRestoreTarget as ReaderRestoreTarget | null };
+    const clearPendingRestoreTarget = vi.fn(() => {
+      pendingRestoreTargetRef.current = null;
+    });
+
+    const { rerender } = renderHook(
+      (props: ReturnType<typeof createHookProps>) => usePagedReaderLayout(props),
+      {
+        initialProps: {
+          ...createHookProps({
+            currentPagedLayout: createPagedLayoutWithStartLocator(3, 2, targetLocator),
+            pagedViewportElement: null,
+            pagedContentElement: null,
+            pendingRestoreTarget: null,
+            setPageCount,
+            setPageIndex,
+            notifyRestoreSettled,
+          }),
+          pendingRestoreTargetRef,
+          clearPendingRestoreTarget,
+          stopRestoreMask,
+        },
+      },
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(setPageCount).toHaveBeenLastCalledWith(3);
+    expect(setPageIndex).not.toHaveBeenCalled();
+    expect(clearPendingRestoreTarget).not.toHaveBeenCalled();
+    expect(stopRestoreMask).not.toHaveBeenCalled();
+    expect(notifyRestoreSettled).not.toHaveBeenCalled();
+
+    act(() => {
+      rerender({
+        ...createHookProps({
+          currentPagedLayout: createPagedLayoutWithStartLocator(3, 2, targetLocator),
+          pagedViewportElement: viewport,
+          pagedContentElement: content,
+          pendingRestoreTarget: null,
+          setPageCount,
+          setPageIndex,
+          notifyRestoreSettled,
+        }),
+        pendingRestoreTargetRef,
+        clearPendingRestoreTarget,
+        stopRestoreMask,
+      });
+    });
+
+    await animationFrames.flushAnimationFrames();
+
+    await waitFor(() => {
+      expect(setPageIndex).toHaveBeenCalledWith(2);
+    });
+    expect(clearPendingRestoreTarget).toHaveBeenCalledTimes(1);
+    expect(stopRestoreMask).toHaveBeenCalledTimes(1);
+    expect(notifyRestoreSettled).toHaveBeenCalledWith('completed');
+
+    animationFrames.restore();
   });
 
   it('does not reapply the current page index during ordinary paged turns', async () => {

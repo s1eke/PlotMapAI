@@ -1,4 +1,5 @@
 import { debugLog, setDebugSnapshot } from '@shared/debug';
+import { isReaderTraceEnabled, recordReaderTrace } from '@shared/reader-trace';
 import {
   canSkipReaderRestore,
   resolvePagedTargetPage,
@@ -67,6 +68,20 @@ export function attemptPagedRestore({
   setPageIndex,
 }: AttemptPagedRestoreParams): 'handled' | 'pending' {
   if (canSkipReaderRestore(pendingRestoreTarget)) {
+    if (isReaderTraceEnabled()) {
+      recordReaderTrace('paged_restore_completed', {
+        chapterIndex,
+        mode: 'paged',
+        details: {
+          attempts: getRestoreAttempt(pendingRestoreTarget) + 1,
+          currentPageIndex,
+          nextPageCount,
+          reason: 'no_target',
+          resolvedTargetPage: null,
+          status: 'skipped',
+        },
+      });
+    }
     const skippedSnapshot = {
       source: 'usePagedReaderLayout',
       mode: 'paged',
@@ -191,6 +206,7 @@ export function attemptPagedRestore({
     },
     buildContext: ({ executed }) => ({
       pageIndex: executed.actualPageIndex,
+      resolvedTargetPage: executed.expectedPageIndex,
     }),
   });
 
@@ -208,6 +224,20 @@ export function attemptPagedRestore({
   }
 
   if (solverOutcome.result.status === 'failed') {
+    if (isReaderTraceEnabled()) {
+      recordReaderTrace('paged_restore_failed', {
+        chapterIndex,
+        mode: 'paged',
+        details: {
+          attempts: solverOutcome.result.attempts,
+          currentPageIndex,
+          nextPageCount,
+          reason: solverOutcome.result.reason,
+          resolvedTargetPage: null,
+          retryable: solverOutcome.result.retryable,
+        },
+      });
+    }
     const failureRecord = recordRestoreResult(solverOutcome.result, pendingRestoreTarget);
     if (failureRecord.scheduledRetry) {
       return 'pending';
@@ -232,6 +262,20 @@ export function attemptPagedRestore({
   }
 
   recordRestoreResult(solverOutcome.result, pendingRestoreTarget);
+  if (isReaderTraceEnabled()) {
+    recordReaderTrace('paged_restore_completed', {
+      chapterIndex,
+      mode: 'paged',
+      details: {
+        attempts: solverOutcome.result.attempts,
+        currentPageIndex,
+        nextPageCount,
+        reason: solverOutcome.result.reason,
+        resolvedTargetPage: solverOutcome.context?.resolvedTargetPage ?? null,
+        status: solverOutcome.result.status,
+      },
+    });
+  }
   setDebugSnapshot('reader-position-restore', {
     source: 'usePagedReaderLayout',
     mode: 'paged',

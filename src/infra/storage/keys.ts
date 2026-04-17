@@ -5,6 +5,8 @@ export const APP_SETTING_KEYS = {
 
 export const CACHE_KEYS = {
   readerPreferences: 'reader-preferences',
+  readerTraceEnabled: 'reader-trace-enabled',
+  readerTraceLastDump: 'reader-trace-last-dump',
   installPromptDismissedAt: 'plotmapai_install_prompt_dismissed_at',
   updatePromptDismissed: 'plotmapai_update_prompt_dismissed',
   readerBootstrap: (novelId: number) => `reader-bootstrap:${novelId}`,

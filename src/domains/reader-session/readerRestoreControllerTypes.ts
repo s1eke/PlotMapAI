@@ -13,7 +13,7 @@ import type { useReaderStrictModeSwitch } from './useReaderStrictModeSwitch';
 export interface UseReaderRestoreControllerParams {
   sessionSnapshot: Pick<
     ReaderSessionSnapshot,
-    'chapterIndex' | 'mode' | 'pendingRestoreTarget'
+    'chapterIndex' | 'mode' | 'pendingRestoreTarget' | 'restoreStatus'
   >;
   sessionCommands: Pick<
     ReaderSessionCommands,

@@ -1,12 +1,13 @@
 import { useEffect } from 'react';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import type { ChapterContent } from '@shared/contracts/reader';
+import type { ChapterContent, RestoreStatus } from '@shared/contracts/reader';
 import {
   PagedReaderContent,
   ScrollReaderContent,
   SummaryReaderContent,
 } from '@domains/reader-layout-engine';
+import { isReaderTraceEnabled, recordReaderTrace } from '@shared/reader-trace';
 import { cn } from '@shared/utils/cn';
 
 interface ReaderViewportProps {
@@ -17,6 +18,7 @@ interface ReaderViewportProps {
   renderableChapter: ChapterContent | null;
   showLoadingOverlay: boolean;
   isRestoringPosition: boolean;
+  restoreStatus?: RestoreStatus;
   loadingLabel?: string | null;
   onBlockedInteraction?: () => void;
   onContentClick: React.MouseEventHandler<HTMLDivElement>;
@@ -37,6 +39,7 @@ export default function ReaderViewport({
   renderableChapter,
   showLoadingOverlay,
   isRestoringPosition,
+  restoreStatus,
   loadingLabel,
   onBlockedInteraction,
   onContentClick,
@@ -77,6 +80,44 @@ export default function ReaderViewport({
       viewport.removeEventListener('touchmove', handleTouchMove);
     };
   }, [contentRef, interactionLocked, onBlockedInteraction]);
+
+  useEffect(() => {
+    if (!isReaderTraceEnabled()) {
+      return;
+    }
+
+    let branch: 'paged' | 'scroll' | 'summary' = 'scroll';
+    if (isPagedMode) {
+      branch = 'paged';
+    } else if (viewMode === 'summary') {
+      branch = 'summary';
+    }
+    const pagedChapter = pagedContentProps?.chapter?.index ?? null;
+    const renderChapterIndex = renderableChapter?.index ?? pagedChapter;
+
+    recordReaderTrace('viewport_branch_rendered', {
+      chapterIndex: renderChapterIndex,
+      mode: branch,
+      restoreStatus: restoreStatus ?? null,
+      details: {
+        branch,
+        isPagedMode,
+        isRestoringPosition,
+        pageIndex: pagedContentProps?.pageIndex ?? null,
+        showLoadingOverlay,
+        viewMode,
+      },
+    });
+  }, [
+    isPagedMode,
+    isRestoringPosition,
+    pagedContentProps?.chapter?.index,
+    pagedContentProps?.pageIndex,
+    renderableChapter?.index,
+    restoreStatus,
+    showLoadingOverlay,
+    viewMode,
+  ]);
 
   return (
     <div

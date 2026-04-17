@@ -7,6 +7,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
 import { analyzeChapter } from '@application/use-cases/analysis';
 import { loadReaderSession } from '@application/use-cases/library';
+import { CACHE_KEYS, storage } from '@infra/storage';
 
 import ReaderPage from '../reader';
 
@@ -255,9 +256,9 @@ vi.mock('@shared/reader-runtime', () => ({
   }),
 }));
 
-function renderPage() {
+function renderPage(initialEntry = '/novel/1/read') {
   return render(
-    <MemoryRouter initialEntries={['/novel/1/read']}>
+    <MemoryRouter initialEntries={[initialEntry]}>
       <Routes>
         <Route path="/novel/:id/read" element={<ReaderPage />} />
       </Routes>
@@ -267,7 +268,10 @@ function renderPage() {
 
 describe('application ReaderPage', () => {
   beforeEach(() => {
+    vi.stubEnv('VITE_ENABLE_READER_TRACE', 'true');
     vi.clearAllMocks();
+    window.localStorage.clear();
+    delete window.PlotMapAIReaderTrace;
     vi.mocked(readerSurfaceMocks.useReaderReadingSurfaceController).mockClear();
     vi.mocked(analyzeChapter).mockResolvedValue({
       analysis: {
@@ -298,6 +302,26 @@ describe('application ReaderPage', () => {
         originalEncoding: 'utf-8',
       },
     });
+  });
+
+  it('registers hidden reader trace tools and syncs the query toggle on mount', () => {
+    const view = renderPage('/novel/1/read?readerTrace=1');
+
+    expect(storage.cache.getJson<boolean>(CACHE_KEYS.readerTraceEnabled)).toBe(true);
+    expect(window.PlotMapAIReaderTrace).toBeDefined();
+
+    view.unmount();
+
+    expect(window.PlotMapAIReaderTrace).toBeUndefined();
+  });
+
+  it('does not expose trace tools when the build flag is disabled', () => {
+    vi.stubEnv('VITE_ENABLE_READER_TRACE', '');
+
+    renderPage('/novel/1/read?readerTrace=1');
+
+    expect(storage.cache.getJson<boolean>(CACHE_KEYS.readerTraceEnabled)).toBe(false);
+    expect(window.PlotMapAIReaderTrace).toBeUndefined();
   });
 
   it('wires the summary panel analyze action through the application use-case', async () => {

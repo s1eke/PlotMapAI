@@ -102,6 +102,10 @@ const readerOverlayMocks = vi.hoisted(() => ({
   handleImageActivate: vi.fn(),
   handleRegisterImageElement: vi.fn(),
 }));
+const readerTraceMocks = vi.hoisted(() => ({
+  enabled: false,
+  recordReaderTrace: vi.fn(),
+}));
 
 const readerSurfaceMocks: ReaderSurfaceMockState = vi.hoisted(() => ({
   buildContentPropsArgs: null,
@@ -265,6 +269,8 @@ function resetReaderSurfaceMocks(): void {
   readerShellMocks.setReaderTheme.mockReset();
   readerShellMocks.switchMode.mockReset();
   readerShellMocks.toggleSidebar.mockReset();
+  readerTraceMocks.enabled = false;
+  readerTraceMocks.recordReaderTrace.mockReset();
 }
 
 vi.mock('react-i18next', () => ({
@@ -338,6 +344,11 @@ vi.mock('@domains/reader-media', () => ({
     imageViewerProps: readerSurfaceMocks.imageViewerProps,
     isImageViewerOpen: readerSurfaceMocks.isImageViewerOpen,
   }),
+}));
+
+vi.mock('@shared/reader-trace', () => ({
+  isReaderTraceEnabled: () => readerTraceMocks.enabled,
+  recordReaderTrace: readerTraceMocks.recordReaderTrace,
 }));
 
 vi.mock('@shared/reader-runtime', () => ({
@@ -493,6 +504,32 @@ describe('useReaderPageViewModel', () => {
 
     expect(readerShellMocks.setPageTurnMode).toHaveBeenCalledWith('scroll');
     expect(readerShellMocks.switchMode).toHaveBeenCalledWith('scroll');
+  });
+
+  it('records page turn mode requests when reader trace is enabled', () => {
+    readerTraceMocks.enabled = true;
+    readerSurfaceMocks.mode = 'paged';
+    readerSurfaceMocks.viewMode = 'original';
+    readerSurfaceMocks.isPagedMode = true;
+
+    const { result } = renderHook(() => useReaderPageViewModel(1));
+
+    act(() => {
+      result.current.toolbarProps?.setPageTurnMode('scroll');
+    });
+
+    expect(readerTraceMocks.recordReaderTrace).toHaveBeenCalledWith(
+      'page_turn_mode_requested',
+      expect.objectContaining({
+        chapterIndex: 0,
+        mode: 'paged',
+        details: expect.objectContaining({
+          currentPageTurnMode: 'cover',
+          nextContentMode: 'scroll',
+          nextPageTurnMode: 'scroll',
+        }),
+      }),
+    );
   });
 
   it('maps top bar view changes into switchMode targets', () => {

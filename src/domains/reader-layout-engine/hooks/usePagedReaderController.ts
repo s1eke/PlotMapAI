@@ -28,6 +28,7 @@ import {
   type UsePagedReaderControllerParams,
   type UsePagedReaderControllerResult,
 } from './pagedReaderControllerTypes';
+import { usePagedReaderControllerTrace } from './usePagedReaderControllerTrace';
 
 export type { UsePagedReaderControllerResult } from './pagedReaderControllerTypes';
 export function usePagedReaderController({
@@ -414,6 +415,16 @@ export function usePagedReaderController({
       pageIndex,
     });
   }, [effectivePageCount, navigation, pageIndex]);
+  usePagedReaderControllerTrace({
+    chapterIndex,
+    currentChapterIndex: currentChapter?.index ?? null,
+    effectivePageCount,
+    enabled,
+    pageIndex,
+    pageTurnDirection: pageTurnState.direction,
+    pageTurnToken: pageTurnState.token,
+    pendingRestoreTargetRef,
+  });
 
   return {
     currentPagedLayout,
