@@ -1,6 +1,7 @@
 import type {
   ReaderLocator,
   ReaderRestoreResult,
+  ReaderRestoreTarget,
 } from '@shared/contracts/reader';
 import type { UseScrollReaderRestoreParams } from './scrollReaderRestoreTypes';
 
