@@ -6,7 +6,7 @@ import {
   READER_CONTENT_THEME_CLASSES,
   READER_CONTENT_MEASURED_TOKEN_NAMES,
   READER_CONTENT_VISUAL_TOKEN_NAMES,
-} from '@shared/reader-content';
+} from '@shared/reader-rendering';
 import { READER_THEMES } from '@domains/reader-shell';
 
 import { resolveReaderContentRootProps } from '../readerContentStyling';

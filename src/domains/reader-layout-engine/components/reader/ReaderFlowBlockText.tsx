@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react';
 
-import { READER_CONTENT_CLASS_NAMES } from '@shared/reader-content';
+import { READER_CONTENT_CLASS_NAMES } from '@shared/reader-rendering';
 import { cn } from '@shared/utils/cn';
 
 import {

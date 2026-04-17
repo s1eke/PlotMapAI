@@ -4,7 +4,7 @@ import type {
   ReaderContentLeafVariant,
   ReaderContentMode,
   ReaderContentVisualToken,
-} from '@shared/reader-content';
+} from '@shared/reader-rendering';
 import type { ReaderBlock } from './readerLayoutTypes';
 
 import {
@@ -14,7 +14,7 @@ import {
   READER_CONTENT_MODE_CLASSES,
   READER_CONTENT_THEME_CLASSES,
   createReaderContentMeasuredTokenValues,
-} from '@shared/reader-content';
+} from '@shared/reader-rendering';
 import { cn } from '@shared/utils/cn';
 
 const LEAF_CLASSES_BY_VARIANT = Object.fromEntries(

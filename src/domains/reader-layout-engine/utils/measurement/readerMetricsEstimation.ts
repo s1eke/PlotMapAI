@@ -11,7 +11,7 @@ import {
   resolveReaderImageSize,
 } from '../layout/readerLayoutShared';
 import { getRichScrollHorizontalTextWidth } from '../layout/richScroll';
-import { READER_CONTENT_TOKEN_DEFAULTS } from '@shared/reader-content';
+import { READER_CONTENT_TOKEN_DEFAULTS } from '@shared/reader-rendering';
 import { getRichInlinePlainText } from '@shared/text-processing';
 
 export interface EstimatedReaderBlockMetric {

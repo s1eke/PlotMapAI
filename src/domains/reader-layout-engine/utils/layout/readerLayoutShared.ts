@@ -8,7 +8,7 @@ import type {
 } from './readerLayoutTypes';
 
 import { buildChapterBlockSequence } from '@shared/text-processing/chapterBlocks';
-import { READER_CONTENT_TOKEN_DEFAULTS } from '@shared/reader-content';
+import { READER_CONTENT_TOKEN_DEFAULTS } from '@shared/reader-rendering';
 
 import {
   buildRichScrollReaderBlocks,

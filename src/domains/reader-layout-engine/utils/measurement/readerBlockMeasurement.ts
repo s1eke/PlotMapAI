@@ -5,7 +5,7 @@ import type {
 } from '../layout/readerLayoutTypes';
 import type { ReaderTextLayoutEngine } from './readerTextMeasurement';
 
-import { READER_CONTENT_TOKEN_DEFAULTS } from '@shared/reader-content';
+import { READER_CONTENT_TOKEN_DEFAULTS } from '@shared/reader-rendering';
 import { getRichInlinePlainText } from '@shared/text-processing';
 import { measureTextHeightWithBrowserLayout } from './readerTextMeasurement';
 

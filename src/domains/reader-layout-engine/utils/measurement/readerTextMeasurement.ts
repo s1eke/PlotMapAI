@@ -16,7 +16,7 @@ import {
 import {
   createReaderContentMeasuredTokenValues,
   READER_CONTENT_MEASURED_TOKEN_NAMES,
-} from '@shared/reader-content';
+} from '@shared/reader-rendering';
 
 const MAX_PRETEXT_CACHE_SIZE = 256;
 const PRETEXT_CACHE = new Map<string, PreparedTextWithSegments | null>();

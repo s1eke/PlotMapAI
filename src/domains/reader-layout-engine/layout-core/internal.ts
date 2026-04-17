@@ -73,6 +73,6 @@ export type { ReaderContentRootProps, ReaderContentRootTheme } from '../utils/la
 export {
   createReaderImageEntryId,
   sortReaderImageGalleryEntries,
-} from '@shared/reader-content';
+} from '@shared/reader-rendering';
 export type { ReaderImageActivationPayload, ReaderImageGalleryEntry } from '@shared/contracts/reader';
 export { preloadReaderImageResources } from '@domains/reader-media';

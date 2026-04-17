@@ -10,7 +10,7 @@ import {
   READER_CONTENT_SOURCE_STRUCTURE_SPECS,
   READER_CONTENT_THEME_CLASSES,
   READER_CONTENT_VISUAL_TOKENS,
-} from '@shared/reader-content';
+} from '@shared/reader-rendering';
 import { READER_THEMES } from '../readerThemes';
 
 describe('reader content contract', () => {

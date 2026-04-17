@@ -1,8 +1,8 @@
 import type {
   ReaderContentVisualToken,
-} from '@shared/reader-content';
+} from '@shared/reader-rendering';
 
-import { READER_CONTENT_VISUAL_TOKEN_NAMES } from '@shared/reader-content';
+import { READER_CONTENT_VISUAL_TOKEN_NAMES } from '@shared/reader-rendering';
 
 export interface ReaderThemeConfig {
   bg: string;
