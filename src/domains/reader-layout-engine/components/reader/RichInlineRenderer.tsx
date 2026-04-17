@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import type { Mark, RichInline } from '@shared/contracts';
 
 import { READER_CONTENT_CLASS_NAMES } from '@shared/reader-content';
-import { getRichInlineTypographyStyle } from '../../utils/richInlineTypography';
+import { getRichInlineTypographyStyle } from '../../utils/typography/richInlineTypography';
 
 function getMarkStyle(
   mark: Mark,

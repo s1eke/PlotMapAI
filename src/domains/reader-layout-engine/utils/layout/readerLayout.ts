@@ -9,12 +9,12 @@ export {
   createReaderTypographyMetrics,
   getReaderLayoutPretextCacheSizeForTests,
   resetReaderLayoutPretextCacheForTests,
-} from './readerTextMeasurement';
+} from '../measurement/readerTextMeasurement';
 export {
   measurePagedReaderChapterLayout,
   measureScrollReaderChapterLayout,
   measureReaderChapterLayout,
-} from './readerChapterMeasurement';
+} from '../measurement/readerChapterMeasurement';
 export {
   buildStaticPagedChapterTree,
   buildStaticScrollChapterTree,
@@ -39,7 +39,7 @@ export {
   getOffsetForLocatorInStaticTree,
   getPageStartLocator,
   getPageStartLocatorFromStaticTree,
-} from './readerLocator';
+} from '../locator/readerLocator';
 export { PAGED_VIEWPORT_TOP_PADDING_PX } from './readerLayoutTypes';
 export type {
   MeasuredChapterLayout,
@@ -73,4 +73,4 @@ export type {
 export type {
   ReaderRichTextLayoutResult,
   ReaderTextLayoutEngine,
-} from './readerTextMeasurement';
+} from '../measurement/readerTextMeasurement';

@@ -3,7 +3,7 @@ import type {
   ReaderImagePageItem,
   ReaderTextPageItem,
   StaticTextLine,
-} from '../../utils/readerLayout';
+} from '../../utils/layout/readerLayout';
 
 import RichInlineRenderer from './RichInlineRenderer';
 

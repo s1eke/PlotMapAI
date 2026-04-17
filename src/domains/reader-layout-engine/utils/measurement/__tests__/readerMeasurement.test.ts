@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { createFakeReaderTextLayoutEngine } from '../../test/createFakeReaderTextLayoutEngine';
+import { createFakeReaderTextLayoutEngine } from '../../../test/createFakeReaderTextLayoutEngine';
 import {
   createReaderTypographyMetrics,
   createScrollImageLayoutConstraints,
@@ -8,7 +8,7 @@ import {
   measureScrollReaderChapterLayout,
   measureReaderChapterLayout,
   resetReaderLayoutPretextCacheForTests,
-} from '../readerLayout';
+} from '../../layout/readerLayout';
 
 describe('readerMeasurement', () => {
   afterEach(() => {
@@ -315,7 +315,7 @@ describe('readerMeasurement', () => {
       createReaderTypographyMetrics: createTypography,
       measureReaderChapterLayout: measureLayout,
       resetReaderLayoutPretextCacheForTests: resetCache,
-    } = await import('../readerLayout');
+    } = await import('../../layout/readerLayout');
 
     const typography = createTypography(16, 1.6, 16, 400);
     const measuredLayout = measureLayout({
@@ -363,7 +363,7 @@ describe('readerMeasurement', () => {
       getReaderLayoutPretextCacheSizeForTests: getCacheSize,
       measureReaderChapterLayout: measureLayout,
       resetReaderLayoutPretextCacheForTests: resetCache,
-    } = await import('../readerLayout');
+    } = await import('../../layout/readerLayout');
 
     const typography = createTypography(18, 1.8, 16, 600);
 

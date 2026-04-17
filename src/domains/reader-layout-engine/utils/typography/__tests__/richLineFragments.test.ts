@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { ReaderMeasuredLine } from '../readerLayout';
+import type { ReaderMeasuredLine } from '../../layout/readerLayout';
 
 import { createRichLineFragments } from '../richLineFragments';
 

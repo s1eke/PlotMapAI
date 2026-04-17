@@ -1,7 +1,7 @@
 export {
   clearReaderRenderCacheMemoryForNovel,
   deletePersistedReaderRenderCache,
-} from '../utils/readerRenderCache';
+} from '../utils/render-cache/readerRenderCache';
 export {
   calculateVisibleScrollBlockRanges,
   resolveCurrentPagedLocator,

@@ -14,13 +14,13 @@ import {
 } from '@shared/debug';
 import { useReaderContentRuntime } from '@shared/reader-runtime';
 
-import { clearReaderRenderCacheMemoryForNovel } from '../utils/readerRenderCache';
+import { clearReaderRenderCacheMemoryForNovel } from '../utils/render-cache/readerRenderCache';
 import {
   buildPreheatTargets,
   buildVisibleRenderTargets,
   collectLoadedImageKeys,
   getActiveVariant,
-} from '../utils/readerRenderCachePlanning';
+} from '../utils/render-cache/readerRenderCachePlanning';
 import { preloadReaderImageResources } from '../layout-core/internal';
 import { useReaderRenderPreheater } from './useReaderRenderPreheater';
 import { useReaderRenderViewport } from './useReaderRenderViewport';

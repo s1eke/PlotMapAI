@@ -27,7 +27,7 @@ describe('readerRenderCache', () => {
       createReaderTypographyMetrics,
       getPagedContentHeight,
       resetReaderLayoutPretextCacheForTests,
-    } = await import('../readerLayout');
+    } = await import('../../layout/readerLayout');
     const { buildStaticRenderManifest } = await import('../readerRenderCache');
 
     const chapter = {
@@ -129,7 +129,7 @@ describe('readerRenderCache', () => {
     const {
       createReaderLayoutSignature,
       createReaderTypographyMetrics,
-    } = await import('../readerLayout');
+    } = await import('../../layout/readerLayout');
     const {
       READER_RENDER_CACHE_TTL_MS,
       buildStaticRenderManifest,
@@ -219,7 +219,7 @@ describe('readerRenderCache', () => {
     const {
       createReaderLayoutSignature,
       createReaderTypographyMetrics,
-    } = await import('../readerLayout');
+    } = await import('../../layout/readerLayout');
     const {
       buildStaticRenderManifest,
       getReaderRenderCacheRecordFromDexie,
@@ -280,7 +280,7 @@ describe('readerRenderCache', () => {
       createReaderLayoutSignature,
       createReaderTypographyMetrics,
       getPagedContentHeight,
-    } = await import('../readerLayout');
+    } = await import('../../layout/readerLayout');
     const {
       buildStaticRenderTree,
       coercePagedTree,
@@ -471,7 +471,7 @@ describe('readerRenderCache', () => {
       createReaderLayoutSignature,
       createReaderTypographyMetrics,
       getPagedContentHeight,
-    } = await import('../readerLayout');
+    } = await import('../../layout/readerLayout');
     const {
       buildStaticRenderTree,
       coercePagedTree,
@@ -571,7 +571,7 @@ describe('readerRenderCache', () => {
       createReaderLayoutSignature,
       createReaderTypographyMetrics,
       getPagedContentHeight,
-    } = await import('../readerLayout');
+    } = await import('../../layout/readerLayout');
     const {
       READER_RENDERER_VERSION,
       buildStaticRenderTree,
@@ -643,7 +643,7 @@ describe('readerRenderCache', () => {
     const {
       createReaderLayoutSignature,
       createReaderTypographyMetrics,
-    } = await import('../readerLayout');
+    } = await import('../../layout/readerLayout');
 
     await db.delete();
     await db.open();

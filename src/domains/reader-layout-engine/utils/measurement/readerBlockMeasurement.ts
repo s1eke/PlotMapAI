@@ -2,7 +2,7 @@ import type { RichInline } from '@shared/contracts';
 import type {
   ReaderTypographyMetrics,
   VirtualBlockMetrics,
-} from './readerLayoutTypes';
+} from '../layout/readerLayoutTypes';
 import type { ReaderTextLayoutEngine } from './readerTextMeasurement';
 
 import { READER_CONTENT_TOKEN_DEFAULTS } from '@shared/reader-content';

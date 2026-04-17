@@ -8,7 +8,7 @@ import type {
   StaticPagedChapterTree,
   StaticScrollChapterTree,
   StaticSummaryShellTree,
-} from './readerLayout';
+} from '../layout/readerLayout';
 import type {
   ReaderLayoutFeatureSet,
   ReaderRenderCacheEntry,
@@ -20,7 +20,7 @@ import {
   createChapterContentHash,
   createReaderRenderQueryManifest,
   serializeReaderLayoutSignature,
-} from './readerLayout';
+} from '../layout/readerLayout';
 import { READER_RENDERER_VERSION } from './readerRenderCacheCore';
 
 export function createReaderRenderCacheEntry<TTree extends StaticChapterRenderTree>(params: {

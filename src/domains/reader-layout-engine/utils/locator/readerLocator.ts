@@ -8,7 +8,7 @@ import type {
   StaticScrollChapterTree,
   VirtualBlockMetrics,
   VisibleBlockRange,
-} from './readerLayoutTypes';
+} from '../layout/readerLayoutTypes';
 import {
   areLocatorsEquivalent,
   findBoundaryMetric,

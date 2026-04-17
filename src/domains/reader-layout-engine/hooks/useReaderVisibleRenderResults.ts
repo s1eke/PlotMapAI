@@ -6,8 +6,8 @@ import type {
   StaticScrollChapterTree,
   StaticSummaryShellTree,
 } from '../layout-core/internal';
-import type { ReaderRenderCacheSource } from '../utils/readerRenderCache';
-import type { ReaderVisibleRenderTarget } from '../utils/readerRenderCachePlanning';
+import type { ReaderRenderCacheSource } from '../utils/render-cache/readerRenderCache';
+import type { ReaderVisibleRenderTarget } from '../utils/render-cache/readerRenderCachePlanning';
 import type { ReaderVisibleRenderResultsResult } from './readerRenderCacheTypes';
 import type { RichBlock } from '@shared/contracts';
 
@@ -22,12 +22,12 @@ import {
   getReaderRenderCacheEntryFromMemory,
   persistReaderRenderCacheEntry,
   primeReaderRenderCacheEntry,
-} from '../utils/readerRenderCache';
+} from '../utils/render-cache/readerRenderCache';
 import {
   buildChapterImageDimensionsMap,
   countPageItems,
   summarizeCacheSources,
-} from '../utils/readerRenderCachePlanning';
+} from '../utils/render-cache/readerRenderCachePlanning';
 
 interface VisibleRenderResult {
   entry: ReturnType<typeof buildStaticRenderTree>;

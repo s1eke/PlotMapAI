@@ -4,13 +4,13 @@ import type {
   ReaderImageLayoutConstraints,
   ReaderRenderQueryManifest,
   ReaderTypographyMetrics,
-} from './readerLayoutTypes';
+} from '../layout/readerLayoutTypes';
 
 import {
   getApproximateMaxCharsPerLine,
   resolveReaderImageSize,
-} from './readerLayoutShared';
-import { getRichScrollHorizontalTextWidth } from './richScroll';
+} from '../layout/readerLayoutShared';
+import { getRichScrollHorizontalTextWidth } from '../layout/richScroll';
 import { READER_CONTENT_TOKEN_DEFAULTS } from '@shared/reader-content';
 import { getRichInlinePlainText } from '@shared/text-processing';
 

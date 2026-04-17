@@ -4,9 +4,9 @@ import type {
   ReaderRenderQueryManifest,
   ReaderRenderVariant,
   StaticChapterRenderTree,
-} from './readerLayout';
+} from '../layout/readerLayout';
 
-import { shouldUseRichScrollBlocks } from './richScroll';
+import { shouldUseRichScrollBlocks } from '../layout/richScroll';
 
 export const READER_RENDER_CACHE_PERSISTED_LIMIT = 240;
 export const READER_RENDER_CACHE_TTL_MS = 14 * 24 * 60 * 60 * 1000;

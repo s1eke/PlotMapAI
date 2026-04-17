@@ -13,7 +13,7 @@ import type {
 import {
   createMetricEndLocator,
   createMetricStartLocator,
-} from './readerLocator';
+} from '../locator/readerLocator';
 import {
   buildPagedReaderBlocks,
   buildReaderBlocks,
@@ -28,7 +28,7 @@ import {
   createEstimatedMetricStartLocator,
   estimatePaginatedManifestPageCount,
   estimateReaderBlockMetric,
-} from './readerMetricsEstimation';
+} from '../measurement/readerMetricsEstimation';
 
 export function estimateReaderRenderQueryManifest(params: {
   chapter: ChapterContent;

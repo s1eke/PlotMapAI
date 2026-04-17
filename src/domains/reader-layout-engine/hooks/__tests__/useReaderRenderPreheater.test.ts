@@ -203,10 +203,10 @@ vi.mock('@shared/debug', () => ({
 }));
 
 vi.mock('@domains/reader-media', () => imageCacheMock);
-vi.mock('../../utils/readerRenderCache', () => renderCacheMock);
+vi.mock('../../utils/render-cache/readerRenderCache', () => renderCacheMock);
 
 import type { ChapterContent } from '@shared/contracts/reader';
-import type { ReaderLayoutSignature } from '../../utils/readerLayout';
+import type { ReaderLayoutSignature } from '../../utils/layout/readerLayout';
 import { useReaderRenderPreheater } from '../useReaderRenderPreheater';
 
 function createChapter(index: number, totalChapters: number): ChapterContent {

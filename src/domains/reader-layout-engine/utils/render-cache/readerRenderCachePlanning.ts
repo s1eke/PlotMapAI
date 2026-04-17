@@ -4,7 +4,7 @@ import type {
   ReaderLayoutSignature,
   ReaderRenderVariant,
   StaticPagedChapterTree,
-} from './readerLayout';
+} from '../layout/readerLayout';
 import type {
   ReaderLayoutFeatureSet,
   ReaderRenderCacheSource,
@@ -15,7 +15,7 @@ import { extractImageKeysFromChapter } from '@shared/text-processing';
 import {
   createChapterContentHash,
   serializeReaderLayoutSignature,
-} from './readerLayout';
+} from '../layout/readerLayout';
 import {
   buildReaderRenderCacheKey,
   READER_RENDERER_VERSION,

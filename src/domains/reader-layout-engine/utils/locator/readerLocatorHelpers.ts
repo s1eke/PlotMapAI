@@ -3,7 +3,7 @@ import type {
   ReaderLocator,
   ReaderPageItem,
   VirtualBlockMetrics,
-} from './readerLayoutTypes';
+} from '../layout/readerLayoutTypes';
 
 export function areLayoutCursorsEquivalent(
   left: ReaderLocator['startCursor'],

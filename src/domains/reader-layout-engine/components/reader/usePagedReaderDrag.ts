@@ -1,8 +1,8 @@
 import type { ChapterContent } from '@shared/contracts/reader';
 import type { MotionValue, PanInfo } from 'motion/react';
 import type { ReaderPageTurnMode } from '../../constants/pageTurnMode';
-import type { PageSlice, PaginatedChapterLayout } from '../../utils/readerLayout';
-import type { PendingCommittedPageOverride } from '../../utils/pagedDragRenderState';
+import type { PageSlice, PaginatedChapterLayout } from '../../utils/layout/readerLayout';
+import type { PendingCommittedPageOverride } from '../../utils/restore/pagedDragRenderState';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { animate, useMotionValue, useTransform } from 'motion/react';
@@ -16,7 +16,7 @@ import {
   clampDragOffset,
   getPagedDragLayerOffsets,
   shouldCommitPageTurnDrag,
-} from '../../utils/pagedDrag';
+} from '../../utils/restore/pagedDrag';
 
 const DRAG_START_THRESHOLD_PX = 8;
 const PAGED_IMAGE_ACTIVATION_GUARD_MS = 280;

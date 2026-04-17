@@ -1,5 +1,5 @@
 import type { Mark, RichInline } from '@shared/contracts';
-import type { ReaderMeasuredLine } from './readerLayoutTypes';
+import type { ReaderMeasuredLine } from '../layout/readerLayoutTypes';
 
 import { getRichInlinePlainText } from '@shared/text-processing';
 

@@ -1,4 +1,4 @@
-import type { ReaderLayoutSignature } from '../readerLayout';
+import type { ReaderLayoutSignature } from '../../layout/readerLayout';
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 

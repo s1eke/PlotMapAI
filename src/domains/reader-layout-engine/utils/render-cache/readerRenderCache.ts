@@ -5,7 +5,7 @@ import type {
   ReaderRenderVariant,
   ReaderTypographyMetrics,
   StaticChapterRenderTree,
-} from './readerLayout';
+} from '../layout/readerLayout';
 
 import {
   buildStaticPagedChapterTree,
@@ -13,7 +13,7 @@ import {
   buildStaticSummaryShellTree,
   createScrollImageLayoutConstraints,
   estimateReaderRenderQueryManifest,
-} from './readerLayout';
+} from '../layout/readerLayout';
 import type { ReaderRenderCacheEntry, ReaderRenderCacheManifestEntry } from './readerRenderCacheCore';
 
 export {

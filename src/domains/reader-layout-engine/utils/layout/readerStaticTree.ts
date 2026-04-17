@@ -1,6 +1,6 @@
 import type { ChapterContent } from '@shared/contracts/reader';
 import type { ReaderImageDimensions } from '@domains/reader-media';
-import type { ReaderTextLayoutEngine } from './readerTextMeasurement';
+import type { ReaderTextLayoutEngine } from '../measurement/readerTextMeasurement';
 import type {
   MeasuredChapterLayout,
   PageSlice,
@@ -17,12 +17,12 @@ import { PAGED_VIEWPORT_TOP_PADDING_PX } from './readerLayoutTypes';
 import {
   getItemEndLocator,
   getItemStartLocator,
-} from './readerLocator';
+} from '../locator/readerLocator';
 import {
   measurePagedReaderChapterLayout,
   measureScrollReaderChapterLayout,
-} from './readerChapterMeasurement';
-import { createRichLineFragments } from './richLineFragments';
+} from '../measurement/readerChapterMeasurement';
+import { createRichLineFragments } from '../typography/richLineFragments';
 
 export function getPagedContentHeight(pagedViewportHeight: number): number {
   return Math.max(0, pagedViewportHeight - PAGED_VIEWPORT_TOP_PADDING_PX);

@@ -1,6 +1,6 @@
-import type { ReaderPageTurnMode } from '../constants/pageTurnMode';
+import type { ReaderPageTurnMode } from '../../constants/pageTurnMode';
 
-import type { PageTurnDirection } from '../animations/pageTurnAnimations';
+import type { PageTurnDirection } from '../../animations/pageTurnAnimations';
 
 const DRAG_COMMIT_RATIO = 0.22;
 const DRAG_COMMIT_VELOCITY = 420;

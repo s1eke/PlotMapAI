@@ -24,7 +24,7 @@ import {
   createReaderTypographyMetrics,
   measureScrollReaderChapterLayout,
   measureReaderChapterLayout,
-} from '../../../utils/readerLayout';
+} from '../../../utils/layout/readerLayout';
 
 const TEXT_LAYOUT_ENGINE = createFakeReaderTextLayoutEngine({ maxCharsPerLine: 28 });
 

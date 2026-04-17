@@ -12,7 +12,7 @@ import type {
   ReaderMeasuredLine,
   ReaderTextPageItem,
   VirtualBlockMetrics,
-} from '../readerLayoutTypes';
+} from '../../layout/readerLayoutTypes';
 
 function createMeasuredLine(text: string, lineIndex: number): ReaderMeasuredLine {
   return {

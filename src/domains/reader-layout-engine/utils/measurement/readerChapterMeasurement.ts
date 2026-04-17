@@ -5,22 +5,22 @@ import type {
   ReaderImageLayoutConstraints,
   ReaderTypographyMetrics,
   VirtualBlockMetrics,
-} from './readerLayoutTypes';
+} from '../layout/readerLayoutTypes';
 import type { ReaderTextLayoutEngine } from './readerTextMeasurement';
 
 import {
   buildPagedReaderBlocks,
   buildReaderBlocks,
   resolveReaderImageSize,
-} from './readerLayoutShared';
+} from '../layout/readerLayoutShared';
 import {
   buildRichScrollReaderBlocks,
   getRichScrollHorizontalTextWidth,
   getRichScrollRuleHeight,
   shouldUseRichScrollBlocks,
-} from './richScroll';
+} from '../layout/richScroll';
 import { getRichInlinePlainText } from '@shared/text-processing';
-import { createRichLineFragments } from './richLineFragments';
+import { createRichLineFragments } from '../typography/richLineFragments';
 
 import { measureCaptionLines, measureTableRows } from './readerBlockMeasurement';
 import { browserReaderTextLayoutEngine } from './readerTextMeasurement';

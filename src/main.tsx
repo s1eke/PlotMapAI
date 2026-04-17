@@ -1,7 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import './index.css';
-import './domains/reader-shell/styles/readerContent.css';
+import './shared/reader-rendering/readerContent.css';
 import './i18n/config';
 import App from '@app/App';
 import { initializeAppSafely } from '@app/bootstrap/startup';

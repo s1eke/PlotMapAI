@@ -1,7 +1,7 @@
 import type { Transaction } from 'dexie';
 
 import type { ReaderRenderCacheRecord as PersistedReaderRenderCacheRecord } from '@infra/db/reader';
-import type { ReaderRenderVariant, StaticChapterRenderTree } from './readerLayout';
+import type { ReaderRenderVariant, StaticChapterRenderTree } from '../layout/readerLayout';
 import type {
   ReaderRenderCacheEntry,
   ReaderRenderCacheLookupParams,

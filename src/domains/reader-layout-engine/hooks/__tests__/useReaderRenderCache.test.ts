@@ -297,14 +297,14 @@ vi.mock('@shared/debug', () => ({
 
 vi.mock('@domains/reader-media', () => imageCacheMock);
 
-vi.mock('../../utils/readerRenderCache', () => renderCacheMock);
+vi.mock('../../utils/render-cache/readerRenderCache', () => renderCacheMock);
 
 import type { Chapter, ChapterContent } from '@shared/contracts/reader';
 import {
   createReaderLayoutSignature,
   createReaderViewportMetrics,
   serializeReaderLayoutSignature,
-} from '../../utils/readerLayout';
+} from '../../utils/layout/readerLayout';
 import { useReaderRenderCache } from '../useReaderRenderCache';
 
 function createChapter(index: number, totalChapters: number): ChapterContent {

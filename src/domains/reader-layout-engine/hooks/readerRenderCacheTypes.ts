@@ -12,7 +12,7 @@ import type {
 import type {
   ReaderLayoutFeatureSet,
   ReaderRenderCacheSource,
-} from '../utils/readerRenderCache';
+} from '../utils/render-cache/readerRenderCache';
 
 export interface UseReaderRenderCacheParams {
   chapters: Chapter[];

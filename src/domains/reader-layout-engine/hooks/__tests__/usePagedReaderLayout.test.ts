@@ -4,7 +4,7 @@ import type {
   ReaderRestoreResult,
   ReaderRestoreTarget,
 } from '@shared/contracts/reader';
-import type { PaginatedChapterLayout } from '../../utils/readerLayout';
+import type { PaginatedChapterLayout } from '../../utils/layout/readerLayout';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 

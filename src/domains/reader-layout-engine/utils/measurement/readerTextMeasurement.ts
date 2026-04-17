@@ -1,18 +1,18 @@
 import type { PreparedTextWithSegments } from '@chenglou/pretext';
 import type { RichInline } from '@shared/contracts';
-import type { ReaderMeasuredLine, ReaderTypographyMetrics } from './readerLayoutTypes';
+import type { ReaderMeasuredLine, ReaderTypographyMetrics } from '../layout/readerLayoutTypes';
 
 import {
   layoutWithLines,
   prepareWithSegments,
 } from '@chenglou/pretext';
 
-import { getApproximateMaxCharsPerLine } from './readerLayoutShared';
+import { getApproximateMaxCharsPerLine } from '../layout/readerLayoutShared';
 import {
   getRichTextLayoutCacheSizeForTests,
   layoutRichTextWithPretext,
   resetRichTextLayoutCacheForTests,
-} from './richTextLayout';
+} from '../typography/richTextLayout';
 import {
   createReaderContentMeasuredTokenValues,
   READER_CONTENT_MEASURED_TOKEN_NAMES,

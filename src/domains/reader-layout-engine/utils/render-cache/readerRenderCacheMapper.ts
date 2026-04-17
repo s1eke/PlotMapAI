@@ -9,7 +9,7 @@ import type {
   ReaderLocator,
   ReaderRenderQueryManifest,
   StaticChapterRenderTree,
-} from './readerLayout';
+} from '../layout/readerLayout';
 import type {
   ReaderRenderCacheRecord as DomainReaderRenderCacheRecord,
 } from './readerRenderCache';

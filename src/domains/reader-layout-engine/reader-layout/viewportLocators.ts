@@ -7,7 +7,7 @@ import type {
   ReaderPageColumn,
   ReaderPageItem,
   ReaderTextPageItem,
-} from '../utils/readerLayout';
+} from '../utils/layout/readerLayout';
 import {
   findVisibleBlockRange,
   findLocatorForLayoutOffset,
@@ -15,7 +15,7 @@ import {
   getChapterBoundaryLocator,
   getOffsetForLocator,
   getPageStartLocator,
-} from '../utils/readerLayout';
+} from '../utils/layout/readerLayout';
 import {
   resolvePagedTargetPage,
   SCROLL_READING_ANCHOR_RATIO,

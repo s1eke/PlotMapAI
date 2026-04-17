@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { createFakeReaderTextLayoutEngine } from '../../test/createFakeReaderTextLayoutEngine';
+import { createFakeReaderTextLayoutEngine } from '../../../test/createFakeReaderTextLayoutEngine';
 import { createReaderLayoutSignature } from '../readerLayoutShared';
-import { createReaderTypographyMetrics } from '../readerTextMeasurement';
+import { createReaderTypographyMetrics } from '../../measurement/readerTextMeasurement';
 import {
   buildStaticPagedChapterTree,
   composePaginatedChapterLayout,

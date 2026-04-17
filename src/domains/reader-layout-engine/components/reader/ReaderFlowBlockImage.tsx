@@ -10,7 +10,7 @@ import { READER_CONTENT_CLASS_NAMES } from '@shared/reader-content';
 import { cn } from '@shared/utils/cn';
 
 import { useReaderImageResource } from '@domains/reader-media';
-import { getReaderContentBlockClassName } from '../../utils/readerContentStyling';
+import { getReaderContentBlockClassName } from '../../utils/layout/readerContentStyling';
 import type { RenderImageItem } from './readerFlowBlockShared';
 import {
   renderRichLineFragments,

@@ -1,4 +1,4 @@
-import type { PaginatedChapterLayout } from './readerLayout';
+import type { PaginatedChapterLayout } from '../layout/readerLayout';
 import { resolvePagedTargetPage } from './readerPosition';
 
 export interface PendingCommittedPageOverride {

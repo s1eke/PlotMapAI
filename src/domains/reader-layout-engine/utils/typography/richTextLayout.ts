@@ -1,6 +1,6 @@
 import type { LayoutLine } from '@chenglou/pretext';
 import type { RichInline } from '@shared/contracts';
-import type { ReaderMeasuredLine } from './readerLayoutTypes';
+import type { ReaderMeasuredLine } from '../layout/readerLayoutTypes';
 
 import {
   layoutWithLines,
