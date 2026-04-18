@@ -12,18 +12,33 @@ import {
 describe('architecture contracts', () => {
   it('loads the repository architecture contract', () => {
     expect(loadArchitectureContract()).toMatchObject({
+      metricDefaults: {
+        metricBudgets: {
+          effectiveLines: 500,
+        },
+      },
       layers: expect.arrayContaining([
         expect.objectContaining({ name: 'app', root: 'src/app' }),
         expect.objectContaining({ name: 'domains', root: 'src/domains' }),
       ]),
       moduleHealth: expect.objectContaining({
         scopes: expect.arrayContaining([
-          expect.objectContaining({ name: 'book-import', maxLines: 240 }),
-          expect.objectContaining({ name: 'app-debug', maxLines: 220 }),
+          expect.objectContaining({
+            metricBudgets: expect.objectContaining({ crossLayerImports: 4 }),
+            name: 'book-import',
+          }),
+          expect.objectContaining({
+            metricBudgets: expect.objectContaining({ importCount: 9 }),
+            name: 'app-debug',
+          }),
         ]),
       }),
       readerArchitecture: expect.objectContaining({
-        maxFileLines: 500,
+        metricBudgets: expect.objectContaining({
+          crossLayerImports: 10,
+          importCount: 16,
+          maxFunctionLines: 380,
+        }),
         stableBarrels: expect.arrayContaining([
           expect.objectContaining({ path: 'src/domains/reader-layout-engine/index.ts' }),
           expect.objectContaining({ path: 'src/domains/reader-content/index.ts' }),
@@ -66,37 +81,73 @@ describe('architecture contracts', () => {
 
   it('rejects missing required reader architecture fields', () => {
     const contract = structuredClone(loadArchitectureContract());
-    delete contract.readerArchitecture.passThrough.message;
+    delete contract.readerArchitecture.metricBudgets;
 
     expect(() => validateArchitectureContract(contract)).toThrow(
-      'architecture contract.readerArchitecture.passThrough.message must be a non-empty string.',
+      'architecture contract.readerArchitecture.metricBudgets must be an object.',
     );
   });
 
   it('rejects missing required module health scope fields', () => {
     const contract = structuredClone(loadArchitectureContract());
-    delete contract.moduleHealth.scopes[0].maxLines;
+    delete contract.moduleHealth.scopes[0].metricBudgets;
 
     expect(() => validateArchitectureContract(contract)).toThrow(
-      'architecture contract.moduleHealth.scopes[0].maxLines must be a positive integer.',
+      'architecture contract.moduleHealth.scopes[0].metricBudgets must be an object.',
     );
   });
 
   it('rejects module health allowlist entries without reasons', () => {
     const contract = structuredClone(loadArchitectureContract());
-    delete contract.moduleHealth.scopes[0].allowlist[0].reason;
+    delete contract.moduleHealth.scopes[0].metricAllowlist[0].reason;
 
     expect(() => validateArchitectureContract(contract)).toThrow(
-      'architecture contract.moduleHealth.scopes[0].allowlist[0].reason must be a non-empty string.',
+      'architecture contract.moduleHealth.scopes[0].metricAllowlist[0].reason must be a non-empty string.',
     );
   });
 
   it('rejects module health paths that do not exist', () => {
     const contract = structuredClone(loadArchitectureContract());
-    contract.moduleHealth.scopes[0].allowlist[0].path = 'src/domains/book-import/missing.ts';
+    contract.moduleHealth.scopes[0].metricAllowlist[0].path = 'src/domains/book-import/missing.ts';
 
     expect(() => validateArchitectureContract(contract)).toThrow(
-      'architecture contract.moduleHealth.scopes[0].allowlist[0].path references a missing path: src/domains/book-import/missing.ts',
+      'architecture contract.moduleHealth.scopes[0].metricAllowlist[0].path references a missing path: src/domains/book-import/missing.ts',
+    );
+  });
+
+  it('rejects unsupported module health metric keys', () => {
+    const contract = structuredClone(loadArchitectureContract());
+    contract.moduleHealth.scopes[0].metricBudgets.physicalLines = 500;
+
+    expect(() => validateArchitectureContract(contract)).toThrow(
+      'architecture contract.moduleHealth.scopes[0].metricBudgets.physicalLines is not a supported module health metric.',
+    );
+  });
+
+  it('rejects allowlist entries without metrics', () => {
+    const contract = structuredClone(loadArchitectureContract());
+    delete contract.moduleHealth.scopes[0].metricAllowlist[0].metrics;
+
+    expect(() => validateArchitectureContract(contract)).toThrow(
+      'architecture contract.moduleHealth.scopes[0].metricAllowlist[0].metrics must be an array of non-empty strings.',
+    );
+  });
+
+  it('rejects allowlist metrics that are not enabled for a scope', () => {
+    const contract = structuredClone(loadArchitectureContract());
+    contract.moduleHealth.scopes[2].metricAllowlist[0].metrics = ['importCount'];
+
+    expect(() => validateArchitectureContract(contract)).toThrow(
+      'architecture contract.moduleHealth.scopes[2].metricAllowlist[0].metrics[0] references a metric that is not enabled for this scope: importCount',
+    );
+  });
+
+  it('rejects reader allowlist paths outside the reader scope', () => {
+    const contract = structuredClone(loadArchitectureContract());
+    contract.readerArchitecture.metricAllowlist[0].path = 'src/domains/book-import/bookImportService.ts';
+
+    expect(() => validateArchitectureContract(contract)).toThrow(
+      'architecture contract.readerArchitecture.metricAllowlist[0].path must resolve to a file covered by this scope: src/domains/book-import/bookImportService.ts',
     );
   });
 });

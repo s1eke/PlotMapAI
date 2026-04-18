@@ -1,7 +1,27 @@
 import { readdirSync, readFileSync, statSync } from 'fs';
 import { extname, isAbsolute, relative, resolve } from 'path';
 
+import ts from 'typescript';
+
 import { normalizePath } from './repositoryFacts.mjs';
+
+export const MODULE_HEALTH_METRIC_KEYS = [
+  'effectiveLines',
+  'maxFunctionLines',
+  'importCount',
+  'crossLayerImports',
+];
+
+const MODULE_HEALTH_METRIC_INDEX = new Map(
+  MODULE_HEALTH_METRIC_KEYS.map((metric, index) => [metric, index]),
+);
+
+export const MODULE_HEALTH_METRIC_TITLES = {
+  crossLayerImports: (limit, context = 'module health') => `${context} over ${limit} cross-layer imports`,
+  effectiveLines: (limit, context = 'global hard cap') => `${context} over ${limit} effective lines`,
+  importCount: (limit, context = 'module health') => `${context} over ${limit} imports`,
+  maxFunctionLines: (limit, context = 'module health') => `${context} over ${limit} function lines`,
+};
 
 export function stripComments(source) {
   return source
@@ -9,12 +29,18 @@ export function stripComments(source) {
     .replace(/\/\/.*$/gm, '');
 }
 
-export function countFileLines(source) {
+export function countEffectiveLines(source) {
   if (source.length === 0) {
     return 0;
   }
 
-  return source.split(/\r?\n/).length;
+  // Preserve the historical 500-line hard cap semantics, but count logical lines
+  // so comments and whitespace do not trigger structural alarms on their own.
+  return stripComments(source)
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .length;
 }
 
 function escapeRegexCharacter(character) {
@@ -210,39 +236,242 @@ export function findInvalidStableBarrelExports(filePath, source, stableBarrels) 
     }));
 }
 
+function getFunctionLikeName(node) {
+  if (node.name && ts.isIdentifier(node.name)) {
+    return node.name.text;
+  }
+
+  if (ts.isVariableDeclaration(node.parent) && ts.isIdentifier(node.parent.name)) {
+    return node.parent.name.text;
+  }
+
+  if (ts.isPropertyAssignment(node.parent)) {
+    if (ts.isIdentifier(node.parent.name) || ts.isStringLiteral(node.parent.name)) {
+      return node.parent.name.text;
+    }
+  }
+
+  if (ts.isBinaryExpression(node.parent) && ts.isIdentifier(node.parent.left)) {
+    return node.parent.left.text;
+  }
+
+  return '<anonymous>';
+}
+
+function resolveFileLayer(filePath) {
+  if (filePath.startsWith('src/app/')) {
+    return 'app';
+  }
+  if (filePath.startsWith('src/application/')) {
+    return 'application';
+  }
+  if (filePath.startsWith('src/domains/')) {
+    return 'domains';
+  }
+  if (filePath.startsWith('src/shared/')) {
+    return 'shared';
+  }
+  if (filePath.startsWith('src/infra/')) {
+    return 'infra';
+  }
+
+  return 'other';
+}
+
+function resolveImportLayer(specifier) {
+  if (!specifier.startsWith('@')) {
+    return 'other';
+  }
+
+  const segment = specifier.split('/')[0];
+  if (segment === '@app') {
+    return 'app';
+  }
+  if (segment === '@application') {
+    return 'application';
+  }
+  if (segment === '@domains') {
+    return 'domains';
+  }
+  if (segment === '@shared') {
+    return 'shared';
+  }
+  if (segment === '@infra') {
+    return 'infra';
+  }
+
+  return 'other';
+}
+
+export function collectModuleHealthMetrics(filePath, source) {
+  const sourceFile = ts.createSourceFile(
+    filePath,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    filePath.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+  );
+  const currentLayer = resolveFileLayer(filePath);
+  let importCount = 0;
+  let crossLayerImports = 0;
+  const crossLayerImportSpecifiers = [];
+  let maxFunctionLines = 0;
+  let maxFunctionName = '<none>';
+  let maxFunctionStartLine = 0;
+
+  function visit(node) {
+    if (ts.isImportDeclaration(node)) {
+      importCount += 1;
+      const specifier = node.moduleSpecifier.text ?? '';
+      const targetLayer = resolveImportLayer(specifier);
+
+      if (targetLayer !== 'other' && targetLayer !== currentLayer) {
+        crossLayerImports += 1;
+        crossLayerImportSpecifiers.push(specifier);
+      }
+    }
+
+    if (
+      ts.isFunctionDeclaration(node)
+      || ts.isMethodDeclaration(node)
+      || ts.isArrowFunction(node)
+      || ts.isFunctionExpression(node)
+    ) {
+      const startLine =
+        sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1;
+      const endLine = sourceFile.getLineAndCharacterOfPosition(node.end).line + 1;
+      const lineCount = endLine - startLine + 1;
+
+      if (lineCount > maxFunctionLines) {
+        maxFunctionLines = lineCount;
+        maxFunctionName = getFunctionLikeName(node);
+        maxFunctionStartLine = startLine;
+      }
+    }
+
+    ts.forEachChild(node, visit);
+  }
+
+  visit(sourceFile);
+
+  return {
+    crossLayerImportSpecifiers,
+    crossLayerImports,
+    effectiveLines: countEffectiveLines(source),
+    importCount,
+    maxFunctionLines,
+    maxFunctionName,
+    maxFunctionStartLine,
+  };
+}
+
+function buildMetricAllowlistIndex(metricAllowlist = []) {
+  return new Map(metricAllowlist.map((entry) => [entry.path, new Set(entry.metrics)]));
+}
+
+function buildMetricViolation(metric, filePath, limit, metrics) {
+  if (metric === 'effectiveLines') {
+    return {
+      actual: metrics.effectiveLines,
+      filePath,
+      limit,
+      metric,
+    };
+  }
+
+  if (metric === 'maxFunctionLines') {
+    return {
+      actual: metrics.maxFunctionLines,
+      filePath,
+      functionName: metrics.maxFunctionName,
+      limit,
+      metric,
+      startLine: metrics.maxFunctionStartLine,
+    };
+  }
+
+  if (metric === 'importCount') {
+    return {
+      actual: metrics.importCount,
+      filePath,
+      limit,
+      metric,
+    };
+  }
+
+  return {
+    actual: metrics.crossLayerImports,
+    filePath,
+    limit,
+    metric,
+    specifiers: metrics.crossLayerImportSpecifiers,
+  };
+}
+
+function sortMetricViolations(metricViolations) {
+  return metricViolations.sort((left, right) => (
+    (MODULE_HEALTH_METRIC_INDEX.get(left.metric) ?? Number.MAX_SAFE_INTEGER)
+    - (MODULE_HEALTH_METRIC_INDEX.get(right.metric) ?? Number.MAX_SAFE_INTEGER)
+    || left.filePath.localeCompare(right.filePath)
+    || left.actual - right.actual
+  ));
+}
+
+export function groupMetricViolations(metricViolations) {
+  const groups = new Map();
+
+  MODULE_HEALTH_METRIC_KEYS.forEach((metric) => {
+    groups.set(metric, []);
+  });
+
+  metricViolations.forEach((violation) => {
+    const entries = groups.get(violation.metric);
+    if (entries) {
+      entries.push(violation);
+    }
+  });
+
+  return groups;
+}
+
 export function evaluateModuleHealth(files, config) {
-  const allowlistedFiles = new Set((config.allowlist ?? []).map((entry) => entry.path));
-  const oversizedFiles = [];
+  const metricAllowlist = buildMetricAllowlistIndex(config.metricAllowlist);
+  const metricViolations = [];
   const passThroughFiles = [];
   const invalidStableBarrelExports = [];
 
   Object.entries(files).forEach(([filePath, source]) => {
-    if (!allowlistedFiles.has(filePath)) {
-      const lineCount = countFileLines(source);
-      if (lineCount > config.maxFileLines) {
-        oversizedFiles.push({ filePath, lineCount });
+    const metrics = collectModuleHealthMetrics(filePath, source);
+    const allowlistedMetrics = metricAllowlist.get(filePath) ?? new Set();
+
+    Object.entries(config.metricBudgets ?? {}).forEach(([metric, limit]) => {
+      if (allowlistedMetrics.has(metric)) {
+        return;
       }
 
-      if (
-        config.passThrough?.enabled
-        && isPassThroughModuleFile(filePath, source, config.passThrough)
-      ) {
-        passThroughFiles.push(filePath);
+      const actual = metrics[metric];
+      if (typeof actual === 'number' && actual > limit) {
+        metricViolations.push(buildMetricViolation(metric, filePath, limit, metrics));
       }
+    });
 
-      invalidStableBarrelExports.push(
-        ...findInvalidStableBarrelExports(filePath, source, config.stableBarrels ?? []),
-      );
+    if (
+      config.passThrough?.enabled
+      && isPassThroughModuleFile(filePath, source, config.passThrough)
+    ) {
+      passThroughFiles.push(filePath);
     }
+
+    invalidStableBarrelExports.push(
+      ...findInvalidStableBarrelExports(filePath, source, config.stableBarrels ?? []),
+    );
   });
 
   return {
     invalidStableBarrelExports: invalidStableBarrelExports.sort((left, right) => (
       left.filePath.localeCompare(right.filePath) || left.line.localeCompare(right.line)
     )),
-    oversizedFiles: oversizedFiles.sort((left, right) => (
-      right.lineCount - left.lineCount || left.filePath.localeCompare(right.filePath)
-    )),
+    metricViolations: sortMetricViolations(metricViolations),
     passThroughFiles: passThroughFiles.sort(),
   };
 }

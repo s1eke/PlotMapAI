@@ -1,6 +1,7 @@
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
+import { MODULE_HEALTH_METRIC_KEYS, matchesAnyPattern } from './moduleHealth.mjs';
 import { createRepositoryFacts, REPOSITORY_ROOT } from './repositoryFacts.mjs';
 
 const ARCHITECTURE_CONTRACT_PATH = 'scripts/architecture/contracts/architecture.json';
@@ -116,7 +117,65 @@ function assertStableBarrels(value, label, facts, { allowEmpty = false } = {}) {
   });
 }
 
-function validateReaderArchitecture(readerArchitecture, facts) {
+function assertMetricBudgets(
+  value,
+  label,
+  { allowEmpty = false, allowEffectiveLines = true } = {},
+) {
+  assertObject(value, label);
+  const entries = Object.entries(value);
+
+  if (!allowEmpty && entries.length === 0) {
+    fail(`${label} must not be empty.`);
+  }
+
+  entries.forEach(([metric, budget]) => {
+    if (!MODULE_HEALTH_METRIC_KEYS.includes(metric)) {
+      fail(`${label}.${metric} is not a supported module health metric.`);
+    }
+    if (!allowEffectiveLines && metric === 'effectiveLines') {
+      fail(`${label}.effectiveLines must be declared in architecture contract.metricDefaults.metricBudgets.`);
+    }
+    assertPositiveInteger(budget, `${label}.${metric}`);
+  });
+}
+
+function assertMetricAllowlist(
+  value,
+  label,
+  facts,
+  {
+    enabledMetrics,
+    filePatterns,
+    ignorePatterns = [],
+  },
+) {
+  if (!Array.isArray(value)) {
+    fail(`${label} must be an array.`);
+  }
+
+  value.forEach((entry, index) => {
+    const entryLabel = `${label}[${index}]`;
+    assertObject(entry, entryLabel);
+    assertNonEmptyString(entry.path, `${entryLabel}.path`);
+    assertExistingPath(entry.path, `${entryLabel}.path`, facts);
+    if (
+      !matchesAnyPattern(entry.path, filePatterns)
+      || matchesAnyPattern(entry.path, ignorePatterns)
+    ) {
+      fail(`${entryLabel}.path must resolve to a file covered by this scope: ${entry.path}`);
+    }
+    assertStringArray(entry.metrics, `${entryLabel}.metrics`);
+    entry.metrics.forEach((metric, metricIndex) => {
+      if (!enabledMetrics.has(metric)) {
+        fail(`${entryLabel}.metrics[${metricIndex}] references a metric that is not enabled for this scope: ${metric}`);
+      }
+    });
+    assertNonEmptyString(entry.reason, `${entryLabel}.reason`);
+  });
+}
+
+function validateReaderArchitecture(readerArchitecture, metricDefaults, facts) {
   assertObject(readerArchitecture, 'architecture contract.readerArchitecture');
   assertPatternArray(
     readerArchitecture.sourceDirectories,
@@ -138,9 +197,23 @@ function validateReaderArchitecture(readerArchitecture, facts) {
     facts,
     { allowEmpty: true },
   );
-  assertPositiveInteger(
-    readerArchitecture.maxFileLines,
-    'architecture contract.readerArchitecture.maxFileLines',
+  assertMetricBudgets(
+    readerArchitecture.metricBudgets,
+    'architecture contract.readerArchitecture.metricBudgets',
+    { allowEffectiveLines: false },
+  );
+  assertMetricAllowlist(
+    readerArchitecture.metricAllowlist,
+    'architecture contract.readerArchitecture.metricAllowlist',
+    facts,
+    {
+      enabledMetrics: new Set([
+        ...Object.keys(metricDefaults.metricBudgets),
+        ...Object.keys(readerArchitecture.metricBudgets),
+      ]),
+      filePatterns: readerArchitecture.includeFiles,
+      ignorePatterns: readerArchitecture.ignoreFiles,
+    },
   );
 
   assertObject(
@@ -207,7 +280,7 @@ function validateReaderArchitecture(readerArchitecture, facts) {
   );
 }
 
-function validateModuleHealth(moduleHealth, facts) {
+function validateModuleHealth(moduleHealth, metricDefaults, facts) {
   assertObject(moduleHealth, 'architecture contract.moduleHealth');
   assertStringArray(
     moduleHealth.fileExtensions,
@@ -248,9 +321,11 @@ function validateModuleHealth(moduleHealth, facts) {
       facts,
       { allowEmpty: true },
     );
-    assertPositiveInteger(
-      scope.maxLines,
-      `architecture contract.moduleHealth.scopes[${index}].maxLines`,
+    const scopeMetricBudgets = scope.metricBudgets;
+    assertMetricBudgets(
+      scopeMetricBudgets,
+      `architecture contract.moduleHealth.scopes[${index}].metricBudgets`,
+      { allowEmpty: true, allowEffectiveLines: false },
     );
     assertBoolean(
       scope.checkPassThroughReExports,
@@ -276,25 +351,19 @@ function validateModuleHealth(moduleHealth, facts) {
       fail(`architecture contract.moduleHealth.scopes[${index}].passThroughFiles must not be empty when pass-through checks are enabled.`);
     }
 
-    if (!Array.isArray(scope.allowlist)) {
-      fail(`architecture contract.moduleHealth.scopes[${index}].allowlist must be an array.`);
-    }
-    scope.allowlist.forEach((entry, allowlistIndex) => {
-      assertObject(entry, `architecture contract.moduleHealth.scopes[${index}].allowlist[${allowlistIndex}]`);
-      assertNonEmptyString(
-        entry.path,
-        `architecture contract.moduleHealth.scopes[${index}].allowlist[${allowlistIndex}].path`,
-      );
-      assertExistingPath(
-        entry.path,
-        `architecture contract.moduleHealth.scopes[${index}].allowlist[${allowlistIndex}].path`,
-        facts,
-      );
-      assertNonEmptyString(
-        entry.reason,
-        `architecture contract.moduleHealth.scopes[${index}].allowlist[${allowlistIndex}].reason`,
-      );
-    });
+    assertMetricAllowlist(
+      scope.metricAllowlist,
+      `architecture contract.moduleHealth.scopes[${index}].metricAllowlist`,
+      facts,
+      {
+        enabledMetrics: new Set([
+          ...Object.keys(metricDefaults.metricBudgets),
+          ...Object.keys(scopeMetricBudgets),
+        ]),
+        filePatterns: scope.files,
+        ignorePatterns: scope.ignores,
+      },
+    );
   });
 }
 
@@ -303,8 +372,16 @@ export function validateArchitectureContract(contract, facts = createRepositoryF
   if (!Array.isArray(contract.layers) || contract.layers.length === 0) {
     fail('architecture contract.layers must be a non-empty array.');
   }
-  validateReaderArchitecture(contract.readerArchitecture, facts);
-  validateModuleHealth(contract.moduleHealth, facts);
+  assertObject(contract.metricDefaults, 'architecture contract.metricDefaults');
+  assertMetricBudgets(
+    contract.metricDefaults.metricBudgets,
+    'architecture contract.metricDefaults.metricBudgets',
+  );
+  if (!Object.prototype.hasOwnProperty.call(contract.metricDefaults.metricBudgets, 'effectiveLines')) {
+    fail('architecture contract.metricDefaults.metricBudgets.effectiveLines must be declared.');
+  }
+  validateReaderArchitecture(contract.readerArchitecture, contract.metricDefaults, facts);
+  validateModuleHealth(contract.moduleHealth, contract.metricDefaults, facts);
   assertObject(contract.rules, 'architecture contract.rules');
 
   const layerNames = new Set();

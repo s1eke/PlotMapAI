@@ -2,7 +2,13 @@ import { fileURLToPath } from 'url';
 import { resolve } from 'path';
 
 import { loadArchitectureContract } from './architecture/contracts.mjs';
-import { collectConfiguredFiles, evaluateModuleHealth } from './architecture/moduleHealth.mjs';
+import {
+  collectConfiguredFiles,
+  evaluateModuleHealth,
+  groupMetricViolations,
+  MODULE_HEALTH_METRIC_KEYS,
+  MODULE_HEALTH_METRIC_TITLES,
+} from './architecture/moduleHealth.mjs';
 
 function printWarningSection(title, lines) {
   if (lines.length === 0) {
@@ -15,10 +21,13 @@ function printWarningSection(title, lines) {
   });
 }
 
-function buildScopeConfig(moduleHealth, scope) {
+function buildScopeConfig(metricDefaults, moduleHealth, scope) {
   return {
-    allowlist: scope.allowlist,
-    maxFileLines: scope.maxLines,
+    metricAllowlist: scope.metricAllowlist,
+    metricBudgets: {
+      ...metricDefaults.metricBudgets,
+      ...scope.metricBudgets,
+    },
     passThrough: {
       ...moduleHealth.passThrough,
       enabled: scope.checkPassThroughReExports,
@@ -29,7 +38,13 @@ function buildScopeConfig(moduleHealth, scope) {
   };
 }
 
-function evaluateModuleHealthScope(rootDirectory, moduleHealth, scope, requestedPaths) {
+function evaluateModuleHealthScope(
+  rootDirectory,
+  metricDefaults,
+  moduleHealth,
+  scope,
+  requestedPaths,
+) {
   const files = collectConfiguredFiles(rootDirectory, {
     requestedPaths,
     includePatterns: scope.files,
@@ -37,29 +52,62 @@ function evaluateModuleHealthScope(rootDirectory, moduleHealth, scope, requested
     fileExtensions: moduleHealth.fileExtensions,
   });
 
-  return evaluateModuleHealth(files, buildScopeConfig(moduleHealth, scope));
+  return evaluateModuleHealth(
+    files,
+    buildScopeConfig(metricDefaults, moduleHealth, scope),
+  );
+}
+
+function formatMetricViolation(metric, violation) {
+  if (metric === 'maxFunctionLines') {
+    return `${violation.filePath} -> ${violation.functionName} @ line ${violation.startLine} (${violation.actual} > ${violation.limit})`;
+  }
+
+  if (metric === 'crossLayerImports') {
+    return `${violation.filePath} -> ${violation.actual} imports [${violation.specifiers.join(', ')}]`;
+  }
+
+  return `${violation.filePath} (${violation.actual} > ${violation.limit})`;
 }
 
 export function runModuleHealthCheck(argv = process.argv.slice(2)) {
   const rootDirectory = resolve(fileURLToPath(new URL('..', import.meta.url)));
-  const { moduleHealth } = loadArchitectureContract(rootDirectory);
+  const { metricDefaults, moduleHealth } = loadArchitectureContract(rootDirectory);
   const requestedPaths = argv.filter((argument) => argument !== '--strict');
   const results = moduleHealth.scopes.map((scope) => ({
-    result: evaluateModuleHealthScope(rootDirectory, moduleHealth, scope, requestedPaths),
+    metricBudgets: {
+      ...metricDefaults.metricBudgets,
+      ...scope.metricBudgets,
+    },
+    result: evaluateModuleHealthScope(
+      rootDirectory,
+      metricDefaults,
+      moduleHealth,
+      scope,
+      requestedPaths,
+    ),
     scope,
   }));
 
   let warningCount = 0;
-  results.forEach(({ scope, result }) => {
+  results.forEach(({ metricBudgets, scope, result }) => {
     warningCount +=
       result.invalidStableBarrelExports.length
-      + result.oversizedFiles.length
+      + result.metricViolations.length
       + result.passThroughFiles.length;
 
-    printWarningSection(
-      `${scope.name} files over ${scope.maxLines} lines`,
-      result.oversizedFiles.map(({ filePath, lineCount }) => `${filePath} (${lineCount} lines)`),
-    );
+    const violationsByMetric = groupMetricViolations(result.metricViolations);
+    MODULE_HEALTH_METRIC_KEYS.forEach((metric) => {
+      const metricBudget = metricBudgets[metric];
+      if (!metricBudget) {
+        return;
+      }
+      printWarningSection(
+        `${scope.name} ${MODULE_HEALTH_METRIC_TITLES[metric](metricBudget)}`,
+        (violationsByMetric.get(metric) ?? [])
+          .map((violation) => formatMetricViolation(metric, violation)),
+      );
+    });
     printWarningSection(
       `${scope.name} pass-through re-export files`,
       result.passThroughFiles,

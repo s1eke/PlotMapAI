@@ -26,6 +26,11 @@
       "canDependOn": []
     }
   ],
+  "metricDefaults": {
+    "metricBudgets": {
+      "effectiveLines": 500
+    }
+  },
   "readerArchitecture": {
     "sourceDirectories": [
       "src/application/pages/reader",
@@ -43,7 +48,53 @@
       "src/application/pages/reader/**/__tests__/**",
       "src/domains/reader-*/**/__tests__/**"
     ],
-    "maxFileLines": 500,
+    "metricBudgets": {
+      "maxFunctionLines": 380,
+      "importCount": 16,
+      "crossLayerImports": 10
+    },
+    "metricAllowlist": [
+      {
+        "path": "src/application/pages/reader/useReaderLifecycleController.ts",
+        "metrics": ["maxFunctionLines"],
+        "reason": "Reader page lifecycle orchestration still spans restore, hydration, and surface handoff."
+      },
+      {
+        "path": "src/application/pages/reader/useReaderPageViewModel.tsx",
+        "metrics": ["importCount", "crossLayerImports"],
+        "reason": "The page view-model still composes multiple reader subdomains while the shell remains centralized."
+      },
+      {
+        "path": "src/domains/reader-layout-engine/hooks/scrollReaderRestore.ts",
+        "metrics": ["maxFunctionLines"],
+        "reason": "Scroll restore remains consolidated while scroll and paged restore flows still share recovery semantics."
+      },
+      {
+        "path": "src/domains/reader-layout-engine/hooks/usePagedReaderController.ts",
+        "metrics": ["maxFunctionLines"],
+        "reason": "Paged controller orchestration still coordinates layout, restore, and visibility in one hook."
+      },
+      {
+        "path": "src/domains/reader-layout-engine/hooks/usePagedReaderLayout.ts",
+        "metrics": ["maxFunctionLines"],
+        "reason": "Paged layout measurement and viewport planning are still co-located during layout engine stabilization."
+      },
+      {
+        "path": "src/domains/reader-media/hooks/useReaderImageViewerPointerHandlers.ts",
+        "metrics": ["maxFunctionLines"],
+        "reason": "Image viewer pointer gesture handling remains centralized while the reader media surface stabilizes."
+      },
+      {
+        "path": "src/domains/reader-session/useReaderRestoreController.ts",
+        "metrics": ["maxFunctionLines", "importCount"],
+        "reason": "Restore orchestration still centralizes session resume branching while the reader session split settles."
+      },
+      {
+        "path": "src/domains/reader-shell/components/ReaderToolbar.tsx",
+        "metrics": ["maxFunctionLines"],
+        "reason": "Toolbar rendering still keeps action wiring and mode branching together while the surface evolves."
+      }
+    ],
     "restrictedImports": {
       "files": [
         "src/domains/reader-layout-engine/**/*.{ts,tsx}"
@@ -116,30 +167,34 @@
         "ignores": [
           "src/domains/book-import/**/__tests__/**"
         ],
-        "maxLines": 240,
+        "metricBudgets": {
+          "maxFunctionLines": 140,
+          "importCount": 16,
+          "crossLayerImports": 4
+        },
         "checkPassThroughReExports": false,
         "passThroughFiles": [],
         "checkStableBarrels": false,
         "stableBarrels": [],
-        "allowlist": [
+        "metricAllowlist": [
           {
             "path": "src/domains/book-import/bookImportService.ts",
+            "metrics": ["crossLayerImports"],
             "reason": "Import orchestration still centralizes parse result shaping and progress coordination."
           },
           {
             "path": "src/domains/book-import/services/epub/core.ts",
+            "metrics": ["maxFunctionLines", "importCount"],
             "reason": "EPUB archive loading and manifest traversal remain co-located during parser stabilization."
           },
           {
             "path": "src/domains/book-import/services/epub/epubDomToRichBlocks.ts",
+            "metrics": ["effectiveLines"],
             "reason": "Rich-content block conversion is still one state machine until the capability registry lands."
           },
           {
-            "path": "src/domains/book-import/services/epub/markup.ts",
-            "reason": "Markup scanning stays centralized while EPUB parsing avoids DOMParser in workers."
-          },
-          {
             "path": "src/domains/book-import/services/txt/chapterDetection.ts",
+            "metrics": ["effectiveLines"],
             "reason": "TXT chapter heuristics remain consolidated until rule decomposition is planned."
           }
         ]
@@ -152,14 +207,19 @@
         "ignores": [
           "src/application/services/**/__tests__/**"
         ],
-        "maxLines": 200,
+        "metricBudgets": {
+          "maxFunctionLines": 80,
+          "importCount": 12,
+          "crossLayerImports": 10
+        },
         "checkPassThroughReExports": false,
         "passThroughFiles": [],
         "checkStableBarrels": false,
         "stableBarrels": [],
-        "allowlist": [
+        "metricAllowlist": [
           {
             "path": "src/application/services/bookLifecycleService.ts",
+            "metrics": ["importCount", "crossLayerImports"],
             "reason": "Import transaction orchestration and asset persistence are still coordinated in one service."
           }
         ]
@@ -172,23 +232,18 @@
         "ignores": [
           "src/shared/text-processing/**/__tests__/**"
         ],
-        "maxLines": 200,
+        "metricBudgets": {
+          "maxFunctionLines": 170
+        },
         "checkPassThroughReExports": false,
         "passThroughFiles": [],
         "checkStableBarrels": false,
         "stableBarrels": [],
-        "allowlist": [
-          {
-            "path": "src/shared/text-processing/purify.ts",
-            "reason": "Purification rule execution remains centralized to keep stage ordering consistent."
-          },
+        "metricAllowlist": [
           {
             "path": "src/shared/text-processing/richPagination.ts",
+            "metrics": ["maxFunctionLines"],
             "reason": "Pagination projection logic stays consolidated until renderer-specific splits are introduced."
-          },
-          {
-            "path": "src/shared/text-processing/richPurify.ts",
-            "reason": "Rich block sanitization still shares one traversal pipeline for deterministic output."
           }
         ]
       },
@@ -200,22 +255,19 @@
         "ignores": [
           "src/app/debug/**/__tests__/**"
         ],
-        "maxLines": 220,
+        "metricBudgets": {
+          "maxFunctionLines": 165,
+          "importCount": 9,
+          "crossLayerImports": 3
+        },
         "checkPassThroughReExports": false,
         "passThroughFiles": [],
         "checkStableBarrels": false,
         "stableBarrels": [],
-        "allowlist": [
-          {
-            "path": "src/app/debug/debugPanelShared.ts",
-            "reason": "Shared debug snapshot formatting and labels stay together for operator workflows."
-          },
-          {
-            "path": "src/app/debug/useDebugPanelState.ts",
-            "reason": "Debug panel state orchestration remains centralized while the panel surface evolves."
-          },
+        "metricAllowlist": [
           {
             "path": "src/app/debug/DebugWorkspaceSections.tsx",
+            "metrics": ["effectiveLines", "importCount", "crossLayerImports"],
             "reason": "The debug workspace keeps page sections together until the tools surface stabilizes."
           }
         ]

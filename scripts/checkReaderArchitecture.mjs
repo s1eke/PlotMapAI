@@ -6,11 +6,17 @@ import {
   collectConfiguredFiles,
   evaluateModuleHealth,
   findInvalidStableBarrelExports,
+  groupMetricViolations,
   matchesAnyPattern,
+  MODULE_HEALTH_METRIC_KEYS,
+  MODULE_HEALTH_METRIC_TITLES,
   isPassThroughModuleFile,
 } from './architecture/moduleHealth.mjs';
 
-const READER_ARCHITECTURE = loadArchitectureContract().readerArchitecture;
+const {
+  metricDefaults: METRIC_DEFAULTS,
+  readerArchitecture: READER_ARCHITECTURE,
+} = loadArchitectureContract();
 const READER_LAYOUT_ENGINE_ROOT_BARREL = READER_ARCHITECTURE.stableBarrels.find(
   (entry) => entry.path === 'src/domains/reader-layout-engine/index.ts',
 );
@@ -24,8 +30,12 @@ function findImportMatches(source, pattern) {
 
 function buildReaderModuleHealthConfig(options = {}) {
   return {
-    allowlist: [],
-    maxFileLines: options.maxFileLines ?? READER_ARCHITECTURE.maxFileLines,
+    metricAllowlist: READER_ARCHITECTURE.metricAllowlist,
+    metricBudgets: {
+      ...METRIC_DEFAULTS.metricBudgets,
+      ...READER_ARCHITECTURE.metricBudgets,
+      ...options.metricBudgets,
+    },
     passThrough: {
       ...READER_ARCHITECTURE.passThrough,
       enabled: true,
@@ -33,8 +43,6 @@ function buildReaderModuleHealthConfig(options = {}) {
     stableBarrels: READER_ARCHITECTURE.stableBarrels,
   };
 }
-
-export const READER_FILE_LINE_LIMIT = READER_ARCHITECTURE.maxFileLines;
 
 export function findRestrictedReaderImports(filePath, source) {
   if (!matchesAnyPattern(filePath, READER_ARCHITECTURE.restrictedImports.files)) {
@@ -99,7 +107,7 @@ export function evaluateReaderArchitecture(files, options = {}) {
     invalidRootBarrelExports: moduleHealthResult.invalidStableBarrelExports
       .filter((entry) => entry.filePath === READER_LAYOUT_ENGINE_ROOT_BARREL?.path)
       .map(({ filePath, line }) => ({ filePath, line })),
-    oversizedFiles: moduleHealthResult.oversizedFiles,
+    metricViolations: moduleHealthResult.metricViolations,
     passThroughFiles: moduleHealthResult.passThroughFiles,
     readerFamilyDeepImports: readerFamilyDeepImports.sort((left, right) => (
       left.filePath.localeCompare(right.filePath)
@@ -133,6 +141,18 @@ function printWarningSection(title, lines) {
   });
 }
 
+function formatMetricViolation(metric, violation) {
+  if (metric === 'maxFunctionLines') {
+    return `${violation.filePath} -> ${violation.functionName} @ line ${violation.startLine} (${violation.actual} > ${violation.limit})`;
+  }
+
+  if (metric === 'crossLayerImports') {
+    return `${violation.filePath} -> ${violation.actual} imports [${violation.specifiers.join(', ')}]`;
+  }
+
+  return `${violation.filePath} (${violation.actual} > ${violation.limit})`;
+}
+
 export function runReaderArchitectureCheck(
   argv = process.argv.slice(2),
   env = process.env,
@@ -145,15 +165,27 @@ export function runReaderArchitectureCheck(
   const warningCount =
     result.invalidReaderContentRootExports.length
     + result.invalidRootBarrelExports.length
-    + result.oversizedFiles.length
+    + result.metricViolations.length
     + result.readerFamilyDeepImports.length
     + result.restrictedImports.length
     + result.passThroughFiles.length;
 
-  printWarningSection(
-    `files over ${READER_FILE_LINE_LIMIT} lines`,
-    result.oversizedFiles.map(({ filePath, lineCount }) => `${filePath} (${lineCount} lines)`),
-  );
+  const metricViolationsByType = groupMetricViolations(result.metricViolations);
+  const metricBudgets = {
+    ...METRIC_DEFAULTS.metricBudgets,
+    ...READER_ARCHITECTURE.metricBudgets,
+  };
+  MODULE_HEALTH_METRIC_KEYS.forEach((metric) => {
+    const metricBudget = metricBudgets[metric];
+    if (!metricBudget) {
+      return;
+    }
+    printWarningSection(
+      MODULE_HEALTH_METRIC_TITLES[metric](metricBudget),
+      (metricViolationsByType.get(metric) ?? [])
+        .map((violation) => formatMetricViolation(metric, violation)),
+    );
+  });
   printWarningSection(
     READER_ARCHITECTURE.restrictedImports.message,
     result.restrictedImports.map(({ filePath, specifier }) => `${filePath} -> ${specifier}`),

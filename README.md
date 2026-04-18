@@ -195,9 +195,9 @@ README 只保留高层说明；精确规则、allowlist 和阈值统一收敛到
 当前自动化门禁覆盖的重点包括：
 
 - `app / application / domains / shared / infra` 之间的导入边界
-- Reader 家族的文件体量、deep import、稳定 barrel 暴露面和 pass-through re-export
+- Reader 家族的逻辑行数硬上限、函数长度、导入耦合、deep import、稳定 barrel 暴露面和 pass-through re-export
 - Dexie 表 ownership 与 application 层跨域编排白名单
-- `book-import`、`application/services`、`shared/text-processing`、`app/debug` 的热点模块体量
+- `book-import`、`application/services`、`shared/text-processing`、`app/debug` 的热点模块逻辑行数硬上限、函数长度与导入耦合
 - rich-content support matrix、类型契约、EPUB parser、Reader content contract 与 plain-text projection 的防漂移校验
 
 ## 核心数据流
