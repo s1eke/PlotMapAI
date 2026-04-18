@@ -1,25 +1,25 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  RICH_BLOCK_TYPES as EXPORTED_RICH_BLOCK_TYPES,
-  RICH_INLINE_TYPES as EXPORTED_RICH_INLINE_TYPES,
-  RICH_MARKS as EXPORTED_RICH_MARKS,
-  RICH_TEXT_ALIGNS as EXPORTED_RICH_TEXT_ALIGNS,
-} from '../rich-content';
-import {
   RICH_BLOCK_TYPES,
   RICH_CONTENT_CAPABILITIES,
   RICH_INLINE_TYPES,
   RICH_MARKS,
   RICH_TEXT_ALIGNS,
 } from '../rich-content-capabilities';
+import {
+  RICH_BLOCK_TYPES as BARREL_RICH_BLOCK_TYPES,
+  RICH_INLINE_TYPES as BARREL_RICH_INLINE_TYPES,
+  RICH_MARKS as BARREL_RICH_MARKS,
+  RICH_TEXT_ALIGNS as BARREL_RICH_TEXT_ALIGNS,
+} from '../index';
 
 describe('rich content capabilities contract', () => {
-  it('re-exports discriminant constants from the capability registry', () => {
-    expect(EXPORTED_RICH_BLOCK_TYPES).toEqual(RICH_BLOCK_TYPES);
-    expect(EXPORTED_RICH_INLINE_TYPES).toEqual(RICH_INLINE_TYPES);
-    expect(EXPORTED_RICH_MARKS).toEqual(RICH_MARKS);
-    expect(EXPORTED_RICH_TEXT_ALIGNS).toEqual(RICH_TEXT_ALIGNS);
+  it('keeps registry constants available from the root contracts barrel', () => {
+    expect(BARREL_RICH_BLOCK_TYPES).toEqual(RICH_BLOCK_TYPES);
+    expect(BARREL_RICH_INLINE_TYPES).toEqual(RICH_INLINE_TYPES);
+    expect(BARREL_RICH_MARKS).toEqual(RICH_MARKS);
+    expect(BARREL_RICH_TEXT_ALIGNS).toEqual(RICH_TEXT_ALIGNS);
   });
 
   it('keeps AST targets aligned with exported block, inline, mark, and align variants', () => {

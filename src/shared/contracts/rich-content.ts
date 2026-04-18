@@ -2,18 +2,10 @@ import type {
   RichBlockType,
   RichInlineType,
   RichMark,
-  RichTextAlign as RichTextAlignValue,
-} from './rich-content-capabilities';
-
-export {
-  RICH_BLOCK_TYPES,
-  RICH_INLINE_TYPES,
-  RICH_MARKS,
-  RICH_TEXT_ALIGNS,
+  RichTextAlign,
 } from './rich-content-capabilities';
 
 export type Mark = RichMark;
-export type RichTextAlign = RichTextAlignValue;
 export type { RichBlockType, RichInlineType };
 
 interface RichAnchorTarget {

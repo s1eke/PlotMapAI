@@ -1,8 +1,8 @@
 import type {
   RichBlock,
   RichInline,
-  RichTextAlign,
 } from './rich-content';
+import type { RichTextAlign } from './rich-content-capabilities';
 
 export type PaginationContainer =
   | 'body'
