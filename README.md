@@ -114,7 +114,8 @@ npm run dev:debug
 | `npm run build` | `tsc -b` + `vite build` + bundle budget 校验 |
 | `npm run analyze` | 输出 bundle 可视化分析报告 |
 | `npm run preview` | 预览生产构建 |
-| `npm run lint` | ESLint + 表权属校验 + 模块健康门禁 + Reader 架构门禁 |
+| `npm run lint` | ESLint + 表权属校验 + 模块健康门禁 + capability drift gate + Reader 架构门禁 |
+| `npm run lint:capabilities` | 校验 rich-content capability registry 与 support matrix 文档同步 |
 | `npm run lint:ownership` | 执行 Dexie 表 ownership 静态校验 |
 | `npm run lint:module-health` | 执行热点目录模块健康门禁 |
 | `npm test` | 运行 Vitest（单次） |
@@ -185,6 +186,8 @@ README 只保留高层说明；精确规则、allowlist 和阈值统一收敛到
 
 - 分层与 Reader 规则 contract: [`scripts/architecture/contracts/architecture.json`](scripts/architecture/contracts/architecture.json)
 - Dexie 表 ownership contract: [`scripts/architecture/contracts/table-ownership.json`](scripts/architecture/contracts/table-ownership.json)
+- rich-content capability registry: [`src/shared/contracts/rich-content-capabilities.ts`](src/shared/contracts/rich-content-capabilities.ts)
+- rich-content support matrix gate: [`scripts/checkRichContentCapabilities.mjs`](scripts/checkRichContentCapabilities.mjs)
 - Reader 专项门禁: [`scripts/checkReaderArchitecture.mjs`](scripts/checkReaderArchitecture.mjs)
 - 表 ownership 门禁: [`scripts/checkTableOwnership.mjs`](scripts/checkTableOwnership.mjs)
 - 热点目录模块健康门禁: [`scripts/checkModuleHealth.mjs`](scripts/checkModuleHealth.mjs)
@@ -195,6 +198,7 @@ README 只保留高层说明；精确规则、allowlist 和阈值统一收敛到
 - Reader 家族的文件体量、deep import、稳定 barrel 暴露面和 pass-through re-export
 - Dexie 表 ownership 与 application 层跨域编排白名单
 - `book-import`、`application/services`、`shared/text-processing`、`app/debug` 的热点模块体量
+- rich-content support matrix、类型契约、EPUB parser、Reader content contract 与 plain-text projection 的防漂移校验
 
 ## 核心数据流
 

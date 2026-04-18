@@ -115,4 +115,47 @@ describe('epubDomToRichBlocks', () => {
       },
     ]);
   });
+
+  it('maps supported inline marks and downgrades unsupported rich structures deterministically', () => {
+    const root = sanitizeEpubHtml(`
+      <html>
+        <body>
+          <p>
+            <u>Under</u>
+            <s>Strike</s>
+            <sup>1</sup>
+            <sub>2</sub>
+          </p>
+          <table>
+            <tr><td><img data-plotmapai-image-key="img_2" />Wide cell</td></tr>
+          </table>
+          <svg><text>Chart fallback</text></svg>
+        </body>
+      </html>
+    `);
+
+    const blocks = normalizeRichBlocks(epubDomToRichBlocks(root));
+
+    expect(blocks).toMatchObject([
+      {
+        type: 'paragraph',
+        children: [
+          { type: 'text', text: 'Under', marks: ['underline'] },
+          { type: 'text', text: 'Strike', marks: ['strike'] },
+          { type: 'text', text: '1', marks: ['sup'] },
+          { type: 'text', text: '2', marks: ['sub'] },
+        ],
+      },
+      {
+        type: 'unsupported',
+        originalTag: 'table',
+        fallbackText: 'Wide cell',
+      },
+      {
+        type: 'unsupported',
+        originalTag: 'svg',
+        fallbackText: 'Chart fallback',
+      },
+    ]);
+  });
 });

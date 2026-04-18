@@ -11,7 +11,7 @@ describe('tooling integration', () => {
     const packageJson = JSON.parse(readFileSync(`${REPOSITORY_ROOT}/package.json`, 'utf8'));
 
     expect(packageJson.scripts.lint).toBe(
-      'eslint . && npm run lint:ownership && npm run lint:module-health && node scripts/checkReaderArchitecture.mjs --strict',
+      'eslint . && npm run lint:ownership && npm run lint:module-health && npm run lint:capabilities && node scripts/checkReaderArchitecture.mjs --strict',
     );
   });
 
@@ -20,6 +20,8 @@ describe('tooling integration', () => {
 
     expect(readme).toContain('scripts/architecture/contracts/architecture.json');
     expect(readme).toContain('scripts/architecture/contracts/table-ownership.json');
+    expect(readme).toContain('src/shared/contracts/rich-content-capabilities.ts');
+    expect(readme).toContain('scripts/checkRichContentCapabilities.mjs');
     expect(readme).toContain('scripts/checkReaderArchitecture.mjs');
     expect(readme).toContain('scripts/checkTableOwnership.mjs');
     expect(readme).toContain('scripts/checkModuleHealth.mjs');

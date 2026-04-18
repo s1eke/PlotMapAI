@@ -107,4 +107,32 @@ describe('richTextToPlainText', () => {
       'North Lock |  | Open after dusk',
     ].join('\n'));
   });
+
+  it('flattens internal links to text and preserves poem line breaks', () => {
+    const text = richTextToPlainText([
+      {
+        type: 'paragraph',
+        children: [
+          {
+            type: 'link',
+            href: '#intro',
+            children: [{ type: 'text', text: 'Jump back' }],
+          },
+          { type: 'text', text: ' now.' },
+        ],
+      },
+      {
+        type: 'poem',
+        lines: [
+          [{ type: 'text', text: 'Line one' }],
+          [{ type: 'text', text: 'Line two' }],
+        ],
+      },
+    ]);
+
+    expect(text).toBe([
+      'Jump back now.',
+      'Line one\nLine two',
+    ].join('\n\n'));
+  });
 });
