@@ -8,7 +8,7 @@ import {
   setPageTurnMode,
   setReaderPreferences,
   waitForReaderViewportImages,
-} from './helpers/readerVisualHarness';
+} from '../helpers/readerVisualHarness';
 
 test.describe('reader visual regression', () => {
   test('renders the rich scroll viewport baseline', async ({ page }) => {

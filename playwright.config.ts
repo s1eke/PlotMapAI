@@ -40,6 +40,14 @@ export default defineConfig({
         browserName: 'chromium',
       },
     },
+    {
+      name: 'mobile-chromium',
+      use: {
+        ...devices['Pixel 7'],
+        browserName: 'chromium',
+      },
+      testMatch: ['smoke/**', 'flow/**'],
+    },
   ],
   webServer: {
     command: `npm run preview:trace -- --host ${HOST} --port ${PORT}`,

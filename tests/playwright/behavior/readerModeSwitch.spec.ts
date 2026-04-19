@@ -14,7 +14,7 @@ import {
   waitForReaderBranch,
   type PersistedReadingProgressSnapshot,
   type ReaderViewportSnapshot,
-} from './helpers/readerVisualHarness';
+} from '../helpers/readerVisualHarness';
 
 const ROUND_TRIP_ITERATIONS = 6;
 const BASELINE_SCROLL_PROGRESS_CANDIDATES = [0.45, 0.72, 0.9] as const;

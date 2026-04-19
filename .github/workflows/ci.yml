@@ -91,8 +91,8 @@ jobs:
           path: dist
           if-no-files-found: error
 
-  visual:
-    name: Visual Regression
+  e2e:
+    name: E2E Tests
     if: ${{ github.event_name != 'schedule' }}
     runs-on: ubuntu-latest
 
@@ -112,14 +112,14 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Run visual regression suite
-        run: npx playwright test
+      - name: Run E2E test suite
+        run: npm run test:e2e
 
       - name: Upload Playwright failure artifacts
         if: ${{ failure() }}
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-visual-failures
+          name: playwright-e2e-failures
           path: test-results
           if-no-files-found: ignore
           retention-days: 14
@@ -131,7 +131,7 @@ jobs:
       - lint
       - test
       - build
-      - visual
+      - e2e
     runs-on: ubuntu-latest
     permissions:
       contents: write

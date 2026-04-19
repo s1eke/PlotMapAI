@@ -5,7 +5,7 @@ import { expect, test } from '@playwright/test';
 import {
   importFixtureToDetailPage,
   openReaderFromDetailPage,
-} from './helpers/readerVisualHarness';
+} from '../helpers/readerVisualHarness';
 
 const MANUAL_TRACE_FLAG = process.env.PLAYWRIGHT_MANUAL_READER_TRACE === '1';
 const TRACE_ITERATIONS = Number.parseInt(
