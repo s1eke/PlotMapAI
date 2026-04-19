@@ -257,12 +257,15 @@ export async function openReaderFromDetailPage(page: Page): Promise<void> {
   });
 }
 
-export async function enableReaderTrace(page: Page): Promise<void> {
+export async function enableReaderTrace(
+  page: Page,
+  initialBranch: 'scroll' | 'paged' = 'scroll',
+): Promise<void> {
   const nextUrl = new URL(page.url());
   nextUrl.searchParams.set('readerTrace', '1');
   await page.goto(nextUrl.toString());
   await disableAnimations(page);
-  await waitForReaderBranch(page, 'scroll');
+  await waitForReaderBranch(page, initialBranch);
   await page.evaluate(() => {
     const traceWindow = window as ReaderTraceWindow;
     traceWindow.PlotMapAIReaderTrace?.clear();
@@ -577,6 +580,53 @@ export async function seedChapterRichContent(
 
     db.close();
   }, params);
+}
+
+export interface VisibleContentAnchor {
+  offsetTop: number;
+  tagName: string;
+  textSnippet: string;
+}
+
+export async function readVisibleContentAnchor(page: Page): Promise<VisibleContentAnchor | null> {
+  return page.evaluate(() => {
+    const viewport = document.querySelector('[data-testid="reader-viewport"]');
+    if (!(viewport instanceof HTMLElement)) {
+      return null;
+    }
+
+    const isPaged = Boolean(document.querySelector('[data-testid="paged-reader-interactive"]'));
+    const container = isPaged
+      ? document.querySelector('[data-testid="paged-reader-page-frame"]')
+      : viewport;
+
+    if (!(container instanceof HTMLElement)) {
+      return null;
+    }
+
+    const candidates = Array.from(container.querySelectorAll('p, h1, h2, h3, h4, h5, h6'));
+    const viewportRect = viewport.getBoundingClientRect();
+    const visibleTop = viewportRect.top;
+    const visibleBottom = viewportRect.bottom;
+
+    for (const element of candidates) {
+      const rect = element.getBoundingClientRect();
+      if (rect.top >= visibleTop && rect.top < visibleBottom && rect.height > 0) {
+        const text = (element.textContent ?? '').trim();
+        if (text.length === 0) {
+          continue;
+        }
+
+        return {
+          offsetTop: Math.round(rect.top - visibleTop),
+          tagName: element.tagName.toLowerCase(),
+          textSnippet: text.slice(0, 80),
+        };
+      }
+    }
+
+    return null;
+  });
 }
 
 export async function seedChapterAnalysis(page: Page, params: {
