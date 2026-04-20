@@ -26,7 +26,7 @@ describe('flushReaderStateWithCapture', () => {
 
     // 1. 验证 runBeforeFlush 严谨地只被执行了 1 次
     expect(persistence.runBeforeFlush).toHaveBeenCalledTimes(1);
-    
+
     // 2. 验证底层的 flushPersistence 也被执行了 1 次
     expect(flushPersistenceSpy).toHaveBeenCalledTimes(1);
 
