@@ -7,7 +7,7 @@ import type {
   StaticScrollChapterTree,
   StaticSummaryShellTree,
   VirtualBlockMetrics,
-} from '../utils/readerLayout';
+} from '../utils/layout/readerLayout';
 
 import { buildChapterBlockSequence } from '@shared/text-processing';
 
@@ -15,7 +15,7 @@ import {
   createReaderTypographyMetrics,
   createReaderViewportMetrics,
   type ReaderViewportMetrics,
-} from '../utils/readerLayout';
+} from '../utils/layout/readerLayout';
 
 interface DeterministicReaderRenderCacheParams {
   contentRef: RefObject<HTMLDivElement | null>;

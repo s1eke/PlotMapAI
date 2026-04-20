@@ -4,8 +4,8 @@ import type { ChapterContent } from '@shared/contracts/reader';
 import type {
   ReaderLayoutSignature,
   ReaderTypographyMetrics,
-} from '../../utils/readerLayout';
-import type { ReaderVisibleRenderTarget } from '../../utils/readerRenderCachePlanning';
+} from '../../utils/layout/readerLayout';
+import type { ReaderVisibleRenderTarget } from '../../utils/render-cache/readerRenderCachePlanning';
 
 const {
   mockBuildStaticRenderTree,
@@ -23,7 +23,7 @@ vi.mock('@shared/debug', () => ({
   debugLog: vi.fn(),
 }));
 
-vi.mock('../../utils/readerRenderCache', () => ({
+vi.mock('../../utils/render-cache/readerRenderCache', () => ({
   buildStaticRenderTree: mockBuildStaticRenderTree,
   coercePagedTree: (entry: { variantFamily?: string }) => (
     entry.variantFamily === 'original-paged'
@@ -37,7 +37,7 @@ vi.mock('../../utils/readerRenderCache', () => ({
   primeReaderRenderCacheEntry: vi.fn(),
 }));
 
-vi.mock('../../utils/readerRenderCachePlanning', () => ({
+vi.mock('../../utils/render-cache/readerRenderCachePlanning', () => ({
   buildChapterImageDimensionsMap: vi.fn(() => new Map()),
   countPageItems: mockCountPageItems,
   summarizeCacheSources: mockSummarizeCacheSources,

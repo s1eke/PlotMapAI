@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   READER_CONTENT_VISUAL_TOKEN_NAMES,
   READER_CONTENT_VISUAL_TOKENS,
-} from '@shared/reader-content';
+} from '@shared/reader-rendering';
 import { READER_SLIDER_CONFIG, MOBILE_SLIDER_KEYS, OVERFLOW_SLIDER_KEYS } from '../readerSliderConfig';
 import { READER_THEME_DISPLAY } from '../readerThemeConfig';
 import { READER_THEMES } from '../readerThemes';

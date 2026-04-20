@@ -2,7 +2,7 @@ import { createWorkerTaskRunner } from '@infra/workers';
 import type { WorkerTaskOptions } from '@infra/workers';
 import { AppErrorCode } from '@shared/errors';
 import type { PurifyRule } from '@shared/text-processing';
-import type { ParsedBook } from '../services/bookParser';
+import type { ParsedBook } from '../services/types';
 import type { BookImportProgress } from '../services/progress';
 
 export interface ParseEpubPayload {

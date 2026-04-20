@@ -2,12 +2,12 @@ import type { ReactElement } from 'react';
 
 import { lazy, Suspense } from 'react';
 
-import { useFileHandling } from '@app/providers/FileHandlingContext';
+import { useFileHandling } from '@shared/pwa/FileHandlingContext';
 
 import BookshelfScreen from './BookshelfScreen';
 import { useBookshelfPageViewModel } from './useBookshelfPageViewModel';
 
-const LazyUploadModal = lazy(() => import('../../components/UploadModal'));
+const LazyUploadModal = lazy(() => import('./UploadModal'));
 
 export default function BookshelfPage(): ReactElement {
   const { pendingLaunchFiles, consumePendingLaunchFiles } = useFileHandling();

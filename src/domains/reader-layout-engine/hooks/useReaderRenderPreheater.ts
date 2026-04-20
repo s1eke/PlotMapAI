@@ -5,7 +5,7 @@ import type {
   ReaderRenderVariant,
   ReaderTypographyMetrics,
 } from '../layout-core/internal';
-import type { ReaderRenderPreheatTarget } from '../utils/readerRenderCachePlanning';
+import type { ReaderRenderPreheatTarget } from '../utils/render-cache/readerRenderCachePlanning';
 import type {
   ReaderRenderPreheaterResult,
   UseReaderRenderCacheParams,
@@ -30,11 +30,11 @@ import {
   READER_RENDERER_VERSION,
   resolveReaderLayoutFeatureSet,
   warmReaderRenderImages,
-} from '../utils/readerRenderCache';
+} from '../utils/render-cache/readerRenderCache';
 import {
   buildChapterImageDimensionsMap,
   buildChapterImageLayoutKey,
-} from '../utils/readerRenderCachePlanning';
+} from '../utils/render-cache/readerRenderCachePlanning';
 
 interface UseReaderRenderPreheaterParams {
   currentChapterIndex: number | null;

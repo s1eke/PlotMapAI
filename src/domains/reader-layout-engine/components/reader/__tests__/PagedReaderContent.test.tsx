@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createReaderContextWrapper } from '@test/readerRuntimeTestUtils';
 
-import { READER_CONTENT_CLASS_NAMES } from '@shared/reader-content';
+import { READER_CONTENT_CLASS_NAMES } from '@shared/reader-rendering';
 import { projectTxtPlainTextToRichBlocks } from '@shared/text-processing';
 
 import PagedReaderContent from '../PagedReaderContent';
@@ -16,12 +16,12 @@ import {
   getPagedContentHeight,
   measurePagedReaderChapterLayout,
   measureReaderChapterLayout,
-} from '../../../utils/readerLayout';
+} from '../../../utils/layout/readerLayout';
 import {
   clampDragOffset,
   getPagedDragLayerOffsets,
   shouldCommitPageTurnDrag,
-} from '../../../utils/pagedDrag';
+} from '../../../utils/restore/pagedDrag';
 
 const preloadReaderImageResourcesSpy = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 const useReaderImageResourceMock = vi.hoisted(() => vi.fn());

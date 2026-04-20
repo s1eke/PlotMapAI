@@ -6,22 +6,8 @@ import { db } from '@infra/db';
 import { AppErrorCode, createAppError } from '@shared/errors';
 
 import { mapNovelRecordToView } from './mappers';
+import type { NovelView } from './types';
 import { clearNovelCoverResourcesForNovel } from './utils/novelCoverResourceCache';
-
-export interface NovelView {
-  id: number;
-  title: string;
-  author: string;
-  description: string;
-  tags: string[];
-  fileType: string;
-  hasCover: boolean;
-  originalFilename: string;
-  originalEncoding: string;
-  totalWords: number;
-  chapterCount: number;
-  createdAt: string;
-}
 
 export interface CreateImportedNovelInput {
   author: string;

@@ -6,21 +6,21 @@ import type {
 } from '@shared/contracts/reader';
 import type {
   StaticScrollBlockNode,
-} from '../../utils/readerLayout';
+} from '../../utils/layout/readerLayout';
 
 import { useTranslation } from 'react-i18next';
 
-import { READER_CONTENT_CLASS_NAMES } from '@shared/reader-content';
+import { READER_CONTENT_CLASS_NAMES } from '@shared/reader-rendering';
 import { cn } from '@shared/utils/cn';
 import { useReaderImageResource } from '@domains/reader-media';
 import {
   getReaderContentBlockClassName,
   getReaderContentContextClassName,
-} from '../../utils/readerContentStyling';
+} from '../../utils/layout/readerContentStyling';
 import {
   formatRichScrollListMarker,
   resolveRichScrollBlockInsets,
-} from '../../utils/richScroll';
+} from '../../utils/layout/richScroll';
 import RichInlineRenderer from './RichInlineRenderer';
 
 interface RichBlockRendererProps {

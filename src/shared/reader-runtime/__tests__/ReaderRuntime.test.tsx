@@ -226,6 +226,26 @@ describe('ReaderRuntime', () => {
     expect(restoreSettledHandler).toHaveBeenCalledTimes(1);
   });
 
+  it('rejects async before-flush handlers in development and tests', () => {
+    const asyncBeforeFlushHandler = vi.fn(async () => undefined);
+    const { result } = renderHook(() => useRuntimeHarness(), {
+      wrapper: createWrapper(),
+    });
+
+    act(() => {
+      result.current.persistence.registerBeforeFlush(asyncBeforeFlushHandler);
+    });
+
+    expect(() => {
+      act(() => {
+        result.current.persistence.runBeforeFlush();
+      });
+    }).toThrowError(
+      'registerBeforeFlush handlers must stay synchronous. Capture async state ahead of flush and read it synchronously during runBeforeFlush().',
+    );
+    expect(asyncBeforeFlushHandler).toHaveBeenCalledTimes(1);
+  });
+
   it('releases temporary scroll sync suppression after two animation frames', async () => {
     const animationFrameController = createAnimationFrameController();
     const { result } = renderHook(() => useRuntimeHarness(), {

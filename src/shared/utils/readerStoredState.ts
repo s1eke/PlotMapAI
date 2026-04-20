@@ -1,6 +1,7 @@
 import type {
   CanonicalPosition,
   ReaderLocator,
+  ReaderViewMode,
   StoredReaderState,
 } from '@shared/contracts/reader';
 
@@ -16,6 +17,12 @@ function isContentMode(
   value: unknown,
 ): value is NonNullable<NonNullable<StoredReaderState['hints']>['contentMode']> {
   return value === 'scroll' || value === 'paged';
+}
+
+function isViewMode(
+  value: unknown,
+): value is NonNullable<NonNullable<StoredReaderState['hints']>['viewMode']> {
+  return value === 'original' || value === 'summary';
 }
 
 function toChapterBoundaryCanonical(
@@ -43,12 +50,28 @@ function resolveLegacyContentMode(
   return undefined;
 }
 
+function resolveLegacyViewMode(
+  source: Record<string, unknown>,
+): ReaderViewMode | undefined {
+  if (isViewMode(source.viewMode)) {
+    return source.viewMode;
+  }
+  if (source.mode === 'summary') {
+    return 'summary';
+  }
+  if (isContentMode(source.mode)) {
+    return 'original';
+  }
+  return undefined;
+}
+
 function buildLegacyHints(
   chapterProgress: number | undefined,
   pageIndex: number | undefined,
   contentMode: NonNullable<NonNullable<StoredReaderState['hints']>['contentMode']> | undefined,
+  viewMode: ReaderViewMode | undefined,
 ): StoredReaderState['hints'] {
-  if (chapterProgress === undefined && pageIndex === undefined && !contentMode) {
+  if (chapterProgress === undefined && pageIndex === undefined && !contentMode && !viewMode) {
     return undefined;
   }
 
@@ -56,6 +79,7 @@ function buildLegacyHints(
     chapterProgress,
     pageIndex,
     contentMode,
+    viewMode,
   };
 }
 
@@ -232,8 +256,11 @@ function normalizeHints(raw: unknown): StoredReaderState['hints'] {
   const contentMode = parsed.contentMode === 'scroll' || parsed.contentMode === 'paged'
     ? parsed.contentMode
     : undefined;
+  const viewMode = isViewMode(parsed.viewMode)
+    ? parsed.viewMode
+    : undefined;
 
-  if (chapterProgress === undefined && pageIndex === undefined && !contentMode) {
+  if (chapterProgress === undefined && pageIndex === undefined && !contentMode && !viewMode) {
     return undefined;
   }
 
@@ -241,6 +268,7 @@ function normalizeHints(raw: unknown): StoredReaderState['hints'] {
     chapterProgress,
     pageIndex,
     contentMode,
+    viewMode,
   };
 }
 
@@ -266,10 +294,12 @@ export function sanitizeStoredReaderState(raw: unknown): StoredReaderState | nul
       : legacyLocator?.pageIndex,
   );
   const legacyContentMode = resolveLegacyContentMode(parsed);
+  const legacyViewMode = resolveLegacyViewMode(parsed);
   const hints = normalizedHints ?? buildLegacyHints(
     legacyChapterProgress,
     legacyPageIndex,
     legacyContentMode,
+    legacyViewMode,
   );
 
   return buildStoredReaderState({
@@ -320,10 +350,14 @@ export function buildStoredReaderState(
   const legacyContentMode = resolveLegacyContentMode(
     legacyState ?? {},
   );
+  const legacyViewMode = resolveLegacyViewMode(
+    legacyState ?? {},
+  );
   const hints = normalizedHints ?? buildLegacyHints(
     legacyChapterProgress,
     legacyPageIndex,
     legacyContentMode,
+    legacyViewMode,
   );
 
   return {
@@ -347,12 +381,19 @@ export function mergeStoredReaderState(
     nextCanonical?.chapterIndex !== canonicalBaseState.canonical?.chapterIndex;
 
   const baseHints = canonicalBaseState.hints;
+  const rawOverrideHints = overrideState.hints && typeof overrideState.hints === 'object'
+    ? overrideState.hints as Record<string, unknown>
+    : null;
   const overrideHints = normalizeHints(overrideState.hints) ?? overrideState.hints;
-  const hasOverrideHints = Boolean(overrideHints && typeof overrideHints === 'object');
+  const hasOverrideHints = Boolean(rawOverrideHints);
   const hasChapterProgressOverride = hasOverrideHints
-    && hasOwn(overrideHints as Record<string, unknown>, 'chapterProgress');
+    && hasOwn(rawOverrideHints as Record<string, unknown>, 'chapterProgress');
   const hasPageIndexOverride = hasOverrideHints
-    && hasOwn(overrideHints as Record<string, unknown>, 'pageIndex');
+    && hasOwn(rawOverrideHints as Record<string, unknown>, 'pageIndex');
+  const hasContentModeOverride = hasOverrideHints
+    && hasOwn(rawOverrideHints as Record<string, unknown>, 'contentMode');
+  const hasViewModeOverride = hasOverrideHints
+    && hasOwn(rawOverrideHints as Record<string, unknown>, 'viewMode');
 
   let nextChapterProgress: number | undefined;
   if (hasChapterProgressOverride) {
@@ -368,11 +409,17 @@ export function mergeStoredReaderState(
     nextPageIndex = baseHints?.pageIndex;
   }
 
-  const nextContentMode = overrideHints?.contentMode ?? baseHints?.contentMode;
+  const nextContentMode = hasContentModeOverride
+    ? overrideHints?.contentMode
+    : baseHints?.contentMode;
+  const nextViewMode = hasViewModeOverride
+    ? overrideHints?.viewMode
+    : baseHints?.viewMode;
   const nextHints = buildLegacyHints(
     nextChapterProgress,
     nextPageIndex,
     nextContentMode,
+    nextViewMode,
   );
 
   return buildStoredReaderState({

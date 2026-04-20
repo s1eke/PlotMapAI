@@ -269,12 +269,59 @@
     "panelTitle": "调试面板",
     "titleWithCount": "调试（{{count}}）",
     "clearLogs": "清空日志",
+    "copyEntry": "复制",
+    "copied": "已复制",
+    "workspace": {
+      "subtitle": "一个全屏调试工作台，用来集中查看调试开关、诊断快照和实时日志流。",
+      "close": "关闭调试工作台",
+      "sectionsLabel": "调试工作台分区",
+      "pages": {
+        "logs": "日志",
+        "errors": "报错",
+        "diagnostics": "诊断",
+        "tools": "工具"
+      },
+      "errorsEmpty": "暂无错误",
+      "diagnostics": {
+        "count": "{{count}} 条快照",
+        "viewJson": "查看 JSON",
+        "hideJson": "收起 JSON"
+      },
+      "tools": {
+        "featuresTitle": "调试开关",
+        "actionsTitle": "快捷动作"
+      },
+      "sections": {
+        "controls": "控制",
+        "diagnostics": "诊断",
+        "logs": "日志"
+      },
+      "summary": {
+        "logs": "日志条目",
+        "errors": "错误数量",
+        "snapshots": "快照数量",
+        "activeFlags": "启用开关",
+        "noActiveFlags": "当前没有启用任何调试开关。"
+      },
+      "controls": {
+        "featuresTitle": "调试开关",
+        "featuresDescription": "只影响当前调试会话的行为，不修改持久化应用设置。",
+        "actionsTitle": "快捷动作",
+        "actionsDescription": "集中触发导航、PWA 提示和阅读恢复相关的调试动作。"
+      },
+      "diagnosticsDescription": "展示阅读器、导入流程和存储状态的最新结构化诊断快照。",
+      "logsDescription": "实时事件流，保留筛选能力和结构化错误详情。"
+    },
     "filters": {
       "all": "全部",
       "errors": "错误",
       "logs": "日志"
     },
     "features": {
+      "readerStrictModeSwitch": {
+        "label": "严格模式切换",
+        "description": "禁用翻页/滚动模式切换兜底，失败后立即中止并报错"
+      },
       "readerTelemetry": {
         "label": "Reader 遥测",
         "description": "输出更详细的阅读布局快照和预热来源日志"
@@ -532,6 +579,7 @@
     "CHAPTER_NOT_FOUND": "章节不存在。",
     "CHAPTER_STRUCTURED_CONTENT_MISSING": "当前书籍缺少增强排版数据，请重新解析源文件。",
     "CHAPTER_MISSING": "找不到指定章节，无法继续分析。",
+    "READER_MODE_SWITCH_FAILED": "切换阅读模式失败：{{message}}",
     "INTERNAL_ERROR": "系统内部错误：{{message}}",
     "CHUNK_COMPLETED": "该章节块分析已完成。",
     "CHUNKS_NOT_FOUND": "分析分块不存在，请重新开始分析。",

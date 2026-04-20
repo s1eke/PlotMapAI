@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { deleteNovelAndCleanupArtifacts } from '@application/use-cases/library';
+import { deleteNovelAndCleanupArtifacts } from '@application/use-cases/book-detail';
 
 import { useBookDetailDeleteFlow } from '../useBookDetailDeleteFlow';
 
@@ -9,13 +9,9 @@ vi.mock('@shared/debug', () => ({
   reportAppError: vi.fn(),
 }));
 
-vi.mock('@application/use-cases/library', async () => {
-  const actual = await vi.importActual<typeof import('@application/use-cases/library')>('@application/use-cases/library');
-  return {
-    ...actual,
-    deleteNovelAndCleanupArtifacts: vi.fn(),
-  };
-});
+vi.mock('@application/use-cases/book-detail', () => ({
+  deleteNovelAndCleanupArtifacts: vi.fn(),
+}));
 
 describe('useBookDetailDeleteFlow', () => {
   beforeEach(() => {

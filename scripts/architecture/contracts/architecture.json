@@ -1,0 +1,364 @@
+{
+  "layers": [
+    {
+      "name": "app",
+      "root": "src/app",
+      "canDependOn": ["application", "domains", "shared", "infra"]
+    },
+    {
+      "name": "application",
+      "root": "src/application",
+      "canDependOn": ["domains", "shared", "infra"]
+    },
+    {
+      "name": "domains",
+      "root": "src/domains",
+      "canDependOn": ["shared", "infra"]
+    },
+    {
+      "name": "shared",
+      "root": "src/shared",
+      "canDependOn": ["infra"]
+    },
+    {
+      "name": "infra",
+      "root": "src/infra",
+      "canDependOn": ["shared"]
+    }
+  ],
+  "metricDefaults": {
+    "metricBudgets": {
+      "effectiveLines": 500
+    }
+  },
+  "readerArchitecture": {
+    "sourceDirectories": [
+      "src/application/pages/reader",
+      "src/domains"
+    ],
+    "fileExtensions": [
+      ".ts",
+      ".tsx"
+    ],
+    "includeFiles": [
+      "src/application/pages/reader/**/*.{ts,tsx}",
+      "src/domains/reader-*/**/*.{ts,tsx}"
+    ],
+    "ignoreFiles": [
+      "src/application/pages/reader/**/__tests__/**",
+      "src/domains/reader-*/**/__tests__/**"
+    ],
+    "metricBudgets": {
+      "maxFunctionLines": 380,
+      "importCount": 16,
+      "crossLayerImports": 10
+    },
+    "metricAllowlist": [
+      {
+        "path": "src/application/pages/reader/useReaderLifecycleController.ts",
+        "metrics": ["maxFunctionLines"],
+        "reason": "Reader page lifecycle orchestration still spans restore, hydration, and surface handoff."
+      },
+      {
+        "path": "src/application/pages/reader/useReaderPageViewModel.tsx",
+        "metrics": ["importCount", "crossLayerImports"],
+        "reason": "The page view-model still composes multiple reader subdomains while the shell remains centralized."
+      },
+      {
+        "path": "src/domains/reader-layout-engine/hooks/scrollReaderRestore.ts",
+        "metrics": ["maxFunctionLines"],
+        "reason": "Scroll restore remains consolidated while scroll and paged restore flows still share recovery semantics."
+      },
+      {
+        "path": "src/domains/reader-layout-engine/hooks/usePagedReaderController.ts",
+        "metrics": ["maxFunctionLines"],
+        "reason": "Paged controller orchestration still coordinates layout, restore, and visibility in one hook."
+      },
+      {
+        "path": "src/domains/reader-layout-engine/hooks/usePagedReaderLayout.ts",
+        "metrics": ["maxFunctionLines"],
+        "reason": "Paged layout measurement and viewport planning are still co-located during layout engine stabilization."
+      },
+      {
+        "path": "src/domains/reader-media/hooks/useReaderImageViewerPointerHandlers.ts",
+        "metrics": ["maxFunctionLines"],
+        "reason": "Image viewer pointer gesture handling remains centralized while the reader media surface stabilizes."
+      },
+      {
+        "path": "src/domains/reader-session/restore/useReaderRestoreController.ts",
+        "metrics": ["maxFunctionLines", "importCount"],
+        "reason": "Restore orchestration still centralizes session resume branching while the reader session split settles."
+      },
+      {
+        "path": "src/domains/reader-shell/components/ReaderToolbar.tsx",
+        "metrics": ["maxFunctionLines"],
+        "reason": "Toolbar rendering still keeps action wiring and mode branching together while the surface evolves."
+      }
+    ],
+    "restrictedImports": {
+      "files": [
+        "src/domains/reader-layout-engine/**/*.{ts,tsx}"
+      ],
+      "pattern": "from\\s+['\\\"](@domains\\/reader-(?:content|session|shell)(?:\\/[^'\\\"]*)?)['\\\"]",
+      "message": "reader-layout-engine importing reader-shell / reader-content / reader-session"
+    },
+    "deepImports": {
+      "pattern": "from\\s+['\\\"](@domains\\/reader-[^/'\\\"]+\\/[^'\\\"]+)['\\\"]",
+      "message": "reader-family code importing reader-domain internals instead of barrels/relative paths"
+    },
+    "passThrough": {
+      "files": [
+        "src/domains/reader-*/**/*.{ts,tsx}"
+      ],
+      "ignoreIndexFiles": true,
+      "exportLinePattern": "^export\\s+(type\\s+)?\\{[^}]+\\}\\s+from\\s+['\\\"][^'\\\"]+['\\\"];?$",
+      "exportStarLinePattern": "^export\\s+\\*\\s+from\\s+['\\\"][^'\\\"]+['\\\"];?$",
+      "message": "pass-through re-export files in the Reader family"
+    },
+    "stableBarrels": [
+      {
+        "path": "src/domains/reader-layout-engine/index.ts",
+        "message": "reader-layout-engine root barrel exporting non-stable symbols",
+        "allowedLines": [
+          "export { PagedReaderContent } from './paged-runtime';",
+          "export { usePagedReaderController as usePagedReaderViewportController } from './paged-runtime';",
+          "export type { UsePagedReaderControllerResult as UsePagedReaderViewportControllerResult } from './paged-runtime';",
+          "export { ScrollReaderContent } from './scroll-runtime';",
+          "export { useScrollReaderController as useScrollReaderViewportController } from './scroll-runtime';",
+          "export type { UseScrollReaderControllerResult as UseScrollReaderViewportControllerResult } from './scroll-runtime';",
+          "export { SummaryReaderContent } from './layout-core';",
+          "export { resolveReaderContentRootProps } from './layout-core';",
+          "export type { ReaderContentRootProps, ReaderContentRootTheme } from './layout-core';",
+          "export { clearReaderRenderCacheMemoryForNovel, deletePersistedReaderRenderCache } from './render-cache';"
+        ]
+      },
+      {
+        "path": "src/domains/reader-content/index.ts",
+        "message": "reader-content root barrel exporting non-stable symbols",
+        "allowedLines": [
+          "export type { Chapter, ChapterContent, ReaderChapterCacheApi } from '@shared/contracts/reader';",
+          "export { useReaderChapterData } from './hooks/useReaderChapterData';",
+          "export type {",
+          "ReaderHydrateDataResult,",
+          "ReaderLoadActiveChapterParams,",
+          "ReaderLoadActiveChapterResult,",
+          "ReaderLoadActiveChapterRuntime,",
+          "UseReaderChapterDataResult,",
+          "} from './hooks/useReaderChapterData';"
+        ]
+      }
+    ]
+  },
+  "moduleHealth": {
+    "fileExtensions": [
+      ".ts",
+      ".tsx"
+    ],
+    "passThrough": {
+      "exportLinePattern": "^export\\s+(type\\s+)?\\{[^}]+\\}\\s+from\\s+['\\\"][^'\\\"]+['\\\"];?$",
+      "exportStarLinePattern": "^export\\s+\\*\\s+from\\s+['\\\"][^'\\\"]+['\\\"];?$"
+    },
+    "scopes": [
+      {
+        "name": "book-import",
+        "files": [
+          "src/domains/book-import/**/*.{ts,tsx}"
+        ],
+        "ignores": [
+          "src/domains/book-import/**/__tests__/**"
+        ],
+        "metricBudgets": {
+          "maxFunctionLines": 140,
+          "importCount": 16,
+          "crossLayerImports": 4
+        },
+        "checkPassThroughReExports": false,
+        "passThroughFiles": [],
+        "checkStableBarrels": false,
+        "stableBarrels": [],
+        "metricAllowlist": [
+          {
+            "path": "src/domains/book-import/bookImportService.ts",
+            "metrics": ["crossLayerImports"],
+            "reason": "Import orchestration still centralizes parse result shaping and progress coordination."
+          },
+          {
+            "path": "src/domains/book-import/services/epub/core.ts",
+            "metrics": ["maxFunctionLines", "importCount"],
+            "reason": "EPUB archive loading and manifest traversal remain co-located during parser stabilization."
+          },
+          {
+            "path": "src/domains/book-import/services/epub/epubDomToRichBlocks.ts",
+            "metrics": ["effectiveLines"],
+            "reason": "Rich-content block conversion is still one state machine until the capability registry lands."
+          },
+          {
+            "path": "src/domains/book-import/services/txt/chapterDetection.ts",
+            "metrics": ["effectiveLines"],
+            "reason": "TXT chapter heuristics remain consolidated until rule decomposition is planned."
+          }
+        ]
+      },
+      {
+        "name": "application-services",
+        "files": [
+          "src/application/services/**/*.{ts,tsx}"
+        ],
+        "ignores": [
+          "src/application/services/**/__tests__/**"
+        ],
+        "metricBudgets": {
+          "maxFunctionLines": 80,
+          "importCount": 12,
+          "crossLayerImports": 10
+        },
+        "checkPassThroughReExports": false,
+        "passThroughFiles": [],
+        "checkStableBarrels": false,
+        "stableBarrels": [],
+        "metricAllowlist": [
+          {
+            "path": "src/application/services/bookLifecycleService.ts",
+            "metrics": ["importCount", "crossLayerImports"],
+            "reason": "Import transaction orchestration and asset persistence are still coordinated in one service."
+          }
+        ]
+      },
+      {
+        "name": "shared-text-processing",
+        "files": [
+          "src/shared/text-processing/**/*.{ts,tsx}"
+        ],
+        "ignores": [
+          "src/shared/text-processing/**/__tests__/**"
+        ],
+        "metricBudgets": {
+          "maxFunctionLines": 170
+        },
+        "checkPassThroughReExports": false,
+        "passThroughFiles": [],
+        "checkStableBarrels": false,
+        "stableBarrels": [],
+        "metricAllowlist": [
+          {
+            "path": "src/shared/text-processing/richPagination.ts",
+            "metrics": ["maxFunctionLines"],
+            "reason": "Pagination projection logic stays consolidated until renderer-specific splits are introduced."
+          }
+        ]
+      },
+      {
+        "name": "app-debug",
+        "files": [
+          "src/app/debug/**/*.{ts,tsx}"
+        ],
+        "ignores": [
+          "src/app/debug/**/__tests__/**"
+        ],
+        "metricBudgets": {
+          "maxFunctionLines": 165,
+          "importCount": 9,
+          "crossLayerImports": 3
+        },
+        "checkPassThroughReExports": false,
+        "passThroughFiles": [],
+        "checkStableBarrels": false,
+        "stableBarrels": [],
+        "metricAllowlist": [
+          {
+            "path": "src/app/debug/DebugWorkspaceSections.tsx",
+            "metrics": ["effectiveLines", "importCount", "crossLayerImports"],
+            "reason": "The debug workspace keeps page sections together until the tools surface stabilizes."
+          }
+        ]
+      }
+    ]
+  },
+  "dependencyGraph": {
+    "sourceDirectories": [
+      "src"
+    ],
+    "fileExtensions": [
+      ".ts",
+      ".tsx"
+    ],
+    "includeOnly": "^src",
+    "excludePathPattern": "(^|/)(__tests__|test)(/|$)",
+    "tsConfig": "tsconfig.app.json",
+    "allowedDomainDependencies": [
+      {
+        "from": "reader-content",
+        "to": [
+          "reader-media"
+        ]
+      },
+      {
+        "from": "reader-layout-engine",
+        "to": [
+          "reader-media"
+        ]
+      },
+      {
+        "from": "reader-shell",
+        "to": [
+          "reader-layout-engine",
+          "reader-media",
+          "reader-session"
+        ]
+      }
+    ],
+    "cycleBaseline": [],
+    "reports": {
+      "json": "dist/analysis/dependency-graph-report.json",
+      "html": "dist/analysis/dependency-graph-report.html"
+    }
+  },
+  "rules": {
+    "domainEntryConsumers": {
+      "files": ["src/app/**/*.{ts,tsx}", "src/application/**/*.{ts,tsx}"],
+      "restrictedSubpathPattern": "@domains/*/*",
+      "message": "Import domains only via @domains/<domain>."
+    },
+    "specialInfraDbRestrictions": [
+      {
+        "domain": "book-import",
+        "files": ["src/domains/book-import/**/*.{ts,tsx}"],
+        "ignores": ["src/domains/book-import/**/__tests__/**"],
+        "restrictedImports": ["@infra/db", "@infra/db/*"],
+        "message": "book-import is parse-only and must not access Dexie directly."
+      },
+      {
+        "domain": "reader-content",
+        "files": ["src/domains/reader-content/**/*.{ts,tsx}"],
+        "ignores": ["src/domains/reader-content/**/__tests__/**"],
+        "restrictedImports": ["@infra/db", "@infra/db/*"],
+        "message": "reader-content must consume application-registered read models instead of Dexie directly."
+      }
+    ],
+    "readerFamily": {
+      "files": ["src/domains/reader-*/**/*.{ts,tsx}"],
+      "restrictedImports": [
+        {
+          "group": ["@app/*", "@app/*/*"],
+          "message": "domain code must not depend on app code."
+        },
+        {
+          "group": ["@application/*", "@application/*/*"],
+          "message": "domain code must not depend on application code."
+        },
+        {
+          "group": ["@domains/*", "!@domains/reader-*", "!@domains/reader-*/*"],
+          "message": "reader-family domain code must not depend on unrelated domains."
+        },
+        {
+          "group": ["@domains/reader-*/*"],
+          "message": "reader-family code must import sibling reader domains via barrels and same-domain modules via relative paths."
+        },
+        {
+          "group": ["@domains/*/*", "!@domains/reader-*/*"],
+          "message": "reader-family domain code must not depend on unrelated domain internals."
+        }
+      ]
+    }
+  }
+}

@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  RICH_BLOCK_TYPES,
+  RICH_CONTENT_CAPABILITIES,
+  RICH_READER_INLINE_VARIANTS,
+} from '@shared/contracts';
+import {
   READER_CONTENT_CLASS_NAMES,
   READER_CONTENT_CONTEXT_SPECS,
   READER_CONTENT_INLINE_SPECS,
@@ -10,7 +15,7 @@ import {
   READER_CONTENT_SOURCE_STRUCTURE_SPECS,
   READER_CONTENT_THEME_CLASSES,
   READER_CONTENT_VISUAL_TOKENS,
-} from '@shared/reader-content';
+} from '@shared/reader-rendering';
 import { READER_THEMES } from '../readerThemes';
 
 describe('reader content contract', () => {
@@ -56,17 +61,7 @@ describe('reader content contract', () => {
     const sourceBlockTypes = READER_CONTENT_SOURCE_STRUCTURE_SPECS
       .map((spec) => spec.sourceBlockType);
 
-    expect(sourceBlockTypes).toEqual([
-      'heading',
-      'paragraph',
-      'blockquote',
-      'list',
-      'image',
-      'hr',
-      'poem',
-      'table',
-      'unsupported',
-    ]);
+    expect(sourceBlockTypes).toEqual(RICH_BLOCK_TYPES);
     expect(new Set(sourceBlockTypes).size).toBe(sourceBlockTypes.length);
   });
 
@@ -122,18 +117,42 @@ describe('reader content contract', () => {
   it('covers every inline semantic variant exactly once', () => {
     const inlineVariants = READER_CONTENT_INLINE_SPECS.map((spec) => spec.inlineVariant);
 
-    expect(inlineVariants).toEqual([
-      'text',
-      'lineBreak',
-      'link',
-      'bold',
-      'italic',
-      'underline',
-      'strike',
-      'sup',
-      'sub',
-    ]);
+    expect(inlineVariants).toEqual(RICH_READER_INLINE_VARIANTS);
     expect(new Set(inlineVariants).size).toBe(inlineVariants.length);
+  });
+
+  it('covers every reader-implemented capability declared in the registry', () => {
+    const sourceBlockTypeSet = new Set(
+      READER_CONTENT_SOURCE_STRUCTURE_SPECS.map((spec) => spec.sourceBlockType),
+    );
+    const inlineVariantSet = new Set(
+      READER_CONTENT_INLINE_SPECS.map((spec) => spec.inlineVariant),
+    );
+    const leafVariantSet = new Set(
+      READER_CONTENT_LEAF_SPECS.map((spec) => spec.leafVariant),
+    );
+    const contextVariantSet = new Set(
+      READER_CONTENT_CONTEXT_SPECS.map((spec) => spec.contextVariant),
+    );
+
+    RICH_CONTENT_CAPABILITIES
+      .filter((capability) => capability.implementationState.reader === 'implemented')
+      .forEach((capability) => {
+        expect(capability.readerCoverage).toBeDefined();
+
+        capability.readerCoverage?.sourceBlockTypes?.forEach((sourceBlockType) => {
+          expect(sourceBlockTypeSet.has(sourceBlockType)).toBe(true);
+        });
+        capability.readerCoverage?.inlineVariants?.forEach((inlineVariant) => {
+          expect(inlineVariantSet.has(inlineVariant)).toBe(true);
+        });
+        capability.readerCoverage?.leafVariants?.forEach((leafVariant) => {
+          expect(leafVariantSet.has(leafVariant)).toBe(true);
+        });
+        capability.readerCoverage?.contextVariants?.forEach((contextVariant) => {
+          expect(contextVariantSet.has(contextVariant)).toBe(true);
+        });
+      });
   });
 
   it('binds every contract spec back to exported tokens and prefixed helper classes', () => {

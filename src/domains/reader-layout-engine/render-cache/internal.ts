@@ -19,12 +19,12 @@ export {
   countPageItems,
   getActiveVariant,
   summarizeCacheSources,
-} from '../utils/readerRenderCachePlanning';
+} from '../utils/render-cache/readerRenderCachePlanning';
 export type {
   ReaderRenderPreheatTarget,
   ReaderVisibleRenderTarget,
   ScrollRenderMode,
-} from '../utils/readerRenderCachePlanning';
+} from '../utils/render-cache/readerRenderCachePlanning';
 export {
   buildStaticRenderManifest,
   buildStaticRenderTree,
@@ -41,8 +41,8 @@ export {
   READER_RENDERER_VERSION,
   resolveReaderLayoutFeatureSet,
   warmReaderRenderImages,
-} from '../utils/readerRenderCache';
+} from '../utils/render-cache/readerRenderCache';
 export type {
   ReaderLayoutFeatureSet,
   ReaderRenderCacheSource,
-} from '../utils/readerRenderCache';
+} from '../utils/render-cache/readerRenderCache';

@@ -18,4 +18,4 @@ export {
   releaseNovelCoverResource,
   resetNovelCoverResourceCacheForTests,
 } from './utils/novelCoverResourceCache';
-export type { NovelView } from './novelRepository';
+export type { NovelView } from './types';

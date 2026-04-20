@@ -2,7 +2,6 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import InstallPrompt from '../InstallPrompt';
-import { DEBUG_SHOW_INSTALL_PROMPT_EVENT } from '@app/debug/pwaDebugTools';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -89,16 +88,6 @@ describe('InstallPrompt', () => {
 
     await waitFor(() => {
       expect(screen.queryByRole('button', { name: 'pwa.install' })).not.toBeInTheDocument();
-    });
-  });
-
-  it('can be triggered manually in debug mode through the custom debug event', async () => {
-    render(<InstallPrompt />);
-
-    window.dispatchEvent(new CustomEvent(DEBUG_SHOW_INSTALL_PROMPT_EVENT));
-
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'pwa.install' })).toBeInTheDocument();
     });
   });
 });

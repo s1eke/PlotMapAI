@@ -1,17 +1,19 @@
-import type { StoredReaderState } from '@shared/contracts/reader';
+import type { PersistedReadingProgress, StoredReaderState } from '@shared/contracts/reader';
 
 import {
-  buildStoredReaderState,
-  sanitizeStoredReaderState,
-} from '@shared/utils/readerStoredState';
+  buildPersistedReadingProgress,
+  createLegacyPersistedReadingProgress,
+  sanitizePersistedReadingProgress,
+} from '@shared/utils/readerPersistedProgress';
+import { sanitizeStoredReaderState } from '@shared/utils/readerStoredState';
 
 import { CACHE_KEYS, storage } from './index';
 
-const READER_BOOTSTRAP_SNAPSHOT_VERSION = 2 as const;
+const READER_BOOTSTRAP_SNAPSHOT_VERSION = 3 as const;
 
 export interface ReaderBootstrapSnapshot {
   version: typeof READER_BOOTSTRAP_SNAPSHOT_VERSION;
-  state: StoredReaderState;
+  progress: PersistedReadingProgress;
 }
 
 function parseStoredReaderBootstrapState(raw: unknown): StoredReaderState | null {
@@ -24,18 +26,30 @@ function parseReaderBootstrapSnapshot(raw: unknown): ReaderBootstrapSnapshot | n
   }
 
   const parsed = raw as Record<string, unknown>;
+  if (parsed.version === 2) {
+    const state = parseStoredReaderBootstrapState(parsed.state);
+    if (!state) {
+      return null;
+    }
+
+    return {
+      version: READER_BOOTSTRAP_SNAPSHOT_VERSION,
+      progress: createLegacyPersistedReadingProgress(state),
+    };
+  }
+
   if (parsed.version !== READER_BOOTSTRAP_SNAPSHOT_VERSION) {
     return null;
   }
 
-  const state = parseStoredReaderBootstrapState(parsed.state);
-  if (!state) {
+  const progress = sanitizePersistedReadingProgress(parsed.progress);
+  if (!progress) {
     return null;
   }
 
   return {
     version: READER_BOOTSTRAP_SNAPSHOT_VERSION,
-    state,
+    progress,
   };
 }
 
@@ -53,7 +67,7 @@ export function readReaderBootstrapSnapshot(
 
 export function writeReaderBootstrapSnapshot(
   novelId: number,
-  state: StoredReaderState,
+  progress: PersistedReadingProgress,
 ): void {
   if (!novelId) {
     return;
@@ -61,7 +75,7 @@ export function writeReaderBootstrapSnapshot(
 
   storage.cache.set(CACHE_KEYS.readerBootstrap(novelId), {
     version: READER_BOOTSTRAP_SNAPSHOT_VERSION,
-    state: buildStoredReaderState(state),
+    progress: buildPersistedReadingProgress(progress),
   } satisfies ReaderBootstrapSnapshot);
 }
 

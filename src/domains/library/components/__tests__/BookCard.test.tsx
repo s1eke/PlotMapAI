@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 
 import BookCard from '../BookCard';
 import { useNovelCoverResource } from '../../hooks/useNovelCoverResource';
-import type { NovelView } from '../../novelRepository';
+import type { NovelView } from '../../types';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),

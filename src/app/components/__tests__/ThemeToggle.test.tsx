@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ThemeProvider } from '@app/providers/ThemeContext';
 import { resetAppThemeStoreForTests } from '@shared/stores/appThemeStore';
 import { CACHE_KEYS, storage } from '@infra/storage';
+import { db } from '@infra/db';
 import ThemeToggle from '../ThemeToggle';
 
 const LEGACY_THEME_CACHE_KEY = 'theme';
@@ -13,8 +14,9 @@ vi.mock('react-i18next', () => ({
 }));
 
 describe('ThemeToggle', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     localStorage.clear();
+    await db.appSettings.clear();
     document.documentElement.classList.remove('dark');
     resetAppThemeStoreForTests();
   });

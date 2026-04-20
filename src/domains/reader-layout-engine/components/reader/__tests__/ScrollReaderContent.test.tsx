@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { READER_CONTENT_CLASS_NAMES } from '@shared/reader-content';
+import { READER_CONTENT_CLASS_NAMES } from '@shared/reader-rendering';
 import { projectTxtPlainTextToRichBlocks } from '@shared/text-processing';
 
 const useReaderImageResourceMock = vi.hoisted(() => vi.fn());
@@ -24,7 +24,7 @@ import {
   createReaderTypographyMetrics,
   measureScrollReaderChapterLayout,
   measureReaderChapterLayout,
-} from '../../../utils/readerLayout';
+} from '../../../utils/layout/readerLayout';
 
 const TEXT_LAYOUT_ENGINE = createFakeReaderTextLayoutEngine({ maxCharsPerLine: 28 });
 

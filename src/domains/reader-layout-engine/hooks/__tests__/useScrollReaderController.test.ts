@@ -12,9 +12,12 @@ const scrollModeState = vi.hoisted(() => {
   let onReadingAnchorChange: ((
     anchor: { chapterIndex: number; chapterProgress: number },
   ) => void) | undefined;
+  let onHandledUserScroll: (() => void) | undefined;
 
   return {
-    handleScroll: vi.fn(),
+    handleScroll: vi.fn(() => {
+      onHandledUserScroll?.();
+    }),
     scrollChapterElementsRef: { current: new Map<number, HTMLDivElement>() },
     scrollViewportTop: 0,
     syncViewportState: vi.fn(),
@@ -25,7 +28,11 @@ const scrollModeState = vi.hoisted(() => {
     reset() {
       currentAnchor = null;
       onReadingAnchorChange = undefined;
+      onHandledUserScroll = undefined;
       this.handleScroll.mockReset();
+      this.handleScroll.mockImplementation(() => {
+        onHandledUserScroll?.();
+      });
       this.scrollChapterElementsRef.current = new Map();
       this.scrollViewportTop = 0;
       this.syncViewportState.mockReset();
@@ -35,8 +42,14 @@ const scrollModeState = vi.hoisted(() => {
     ) {
       onReadingAnchorChange = callback;
     },
+    setOnHandledUserScroll(callback: (() => void) | undefined) {
+      onHandledUserScroll = callback;
+    },
     setScrollViewportTop(nextScrollViewportTop: number) {
       this.scrollViewportTop = nextScrollViewportTop;
+    },
+    emitHandledUserScroll() {
+      onHandledUserScroll?.();
     },
     takeCurrentAnchor() {
       return currentAnchor;
@@ -55,8 +68,10 @@ vi.mock('../useScrollModeChapters', () => ({
     _setScrollModeChapters: Dispatch<SetStateAction<number[]>>,
     _chapterDataRevision: number,
     onReadingAnchorChange?: (anchor: { chapterIndex: number; chapterProgress: number }) => void,
+    onHandledUserScroll?: () => void,
   ) => {
     scrollModeState.setOnReadingAnchorChange(onReadingAnchorChange);
+    scrollModeState.setOnHandledUserScroll(onHandledUserScroll);
     return {
       getCurrentAnchor: () => scrollModeState.takeCurrentAnchor(),
       handleScroll: scrollModeState.handleScroll,
@@ -164,8 +179,21 @@ function createAnimationFrameController() {
     }
   }
 
+  async function flushNextAnimationFrame() {
+    if (frameCallbacks.length === 0) {
+      return;
+    }
+
+    const queuedCallbacks = frameCallbacks.splice(0, frameCallbacks.length);
+    await act(async () => {
+      queuedCallbacks.forEach((callback) => callback?.(0));
+      await Promise.resolve();
+    });
+  }
+
   return {
     flushAnimationFrames,
+    flushNextAnimationFrame,
     restore() {
       requestAnimationFrameSpy.mockRestore();
       cancelAnimationFrameSpy.mockRestore();
@@ -691,6 +719,52 @@ describe('useScrollReaderController', () => {
     expect(setChapterIndex).not.toHaveBeenCalled();
   });
 
+  it('persists scroll chapter progress alongside the canonical locator when anchors move', () => {
+    const persistReaderState = vi.fn();
+    const setChapterIndex = vi.fn();
+    const contentRef = {
+      current: makeContainer({
+        clientHeight: 600,
+        scrollHeight: 4000,
+        scrollTop: 2040,
+      }),
+    };
+    const contextValue = createReaderContextValue({
+      chapterIndex: 1,
+      contentRef,
+      setChapterIndex,
+      persistReaderState,
+    });
+    const props = createHookProps({ harness: contextValue });
+
+    renderHook(() => useScrollReaderController(props), {
+      wrapper: ({ children }: { children: ReactNode }) => ReaderContextProvider({
+        value: contextValue.contextValue,
+        children,
+      }),
+    });
+
+    act(() => {
+      scrollModeState.emitAnchor({
+        chapterIndex: 1,
+        chapterProgress: 0.6,
+      });
+    });
+
+    expect(persistReaderState).toHaveBeenCalledWith({
+      canonical: {
+        chapterIndex: 1,
+        edge: 'start',
+      },
+      hints: {
+        chapterProgress: 0.6,
+        contentMode: 'scroll',
+        pageIndex: undefined,
+      },
+    });
+    expect(setChapterIndex).not.toHaveBeenCalled();
+  });
+
   it('ignores programmatic scroll sync while scroll restoration is temporarily suppressed', () => {
     const persistReaderState = vi.fn();
     const setChapterIndex = vi.fn();
@@ -869,6 +943,225 @@ describe('useScrollReaderController', () => {
       );
       expect(clearPendingRestoreTarget).toHaveBeenCalled();
       expect(stopRestoreMask).toHaveBeenCalled();
+    } finally {
+      animationFrames.restore();
+    }
+  });
+
+  it('accepts restores when scrollTop settles at the target even if the live locator drifts', async () => {
+    const animationFrames = createAnimationFrameController();
+    const contentRef = {
+      current: makeContainer({
+        clientHeight: 600,
+        scrollHeight: 8000,
+      }),
+    };
+    const currentChapter = createChapter(
+      1,
+      3,
+      'Paragraph 1\nParagraph 2\nParagraph 3\nParagraph 4',
+    );
+    const targetLocator: ReaderLocator = {
+      chapterIndex: 1,
+      blockIndex: 10,
+      kind: 'text',
+      lineIndex: 0,
+    };
+    const driftedLocator: ReaderLocator = {
+      chapterIndex: 1,
+      blockIndex: 11,
+      kind: 'text',
+      lineIndex: 0,
+    };
+    const clearPendingRestoreTarget = vi.fn();
+    const stopRestoreMask = vi.fn();
+    const onRestoreSettled = vi.fn();
+    const contextValue = createReaderContextValue({
+      chapterIndex: 1,
+      contentRef,
+      chapterCacheRef: {
+        current: new Map([[currentChapter.index, currentChapter]]),
+      },
+      restoreSettledHandlerRef: {
+        current: onRestoreSettled,
+      },
+    });
+    const props = createHookProps({
+      currentChapter,
+      pendingRestoreTarget: {
+        chapterIndex: 1,
+        locator: targetLocator,
+        mode: 'scroll',
+      },
+      pendingRestoreTargetRef: {
+        current: {
+          chapterIndex: 1,
+          locator: targetLocator,
+          mode: 'scroll',
+        },
+      },
+      clearPendingRestoreTarget,
+      stopRestoreMask,
+      harness: contextValue,
+    });
+
+    try {
+      renderHook(
+        () => useScrollReaderController(props),
+        {
+          wrapper: ({ children }: { children: ReactNode }) => ReaderContextProvider({
+            value: contextValue.contextValue,
+            children,
+          }),
+        },
+      );
+
+      const targetOffset = 3990;
+      contextValue.getCurrentOriginalLocatorRef.current = () => driftedLocator;
+      contextValue.resolveScrollLocatorOffsetRef.current = (locator) => {
+        if (locator.blockIndex === targetLocator.blockIndex) {
+          return targetOffset;
+        }
+        if (locator.blockIndex === driftedLocator.blockIndex) {
+          return targetOffset + 48.4;
+        }
+        return null;
+      };
+
+      for (let index = 0; index < 8 && onRestoreSettled.mock.calls.length === 0; index += 1) {
+        await animationFrames.flushNextAnimationFrame();
+      }
+
+      expect(contentRef.current.scrollTop).toBe(
+        Math.round(targetOffset - contentRef.current.clientHeight * SCROLL_READING_ANCHOR_RATIO),
+      );
+      expect(onRestoreSettled).toHaveBeenCalledWith('completed');
+
+      for (
+        let index = 0;
+        index < 4 && clearPendingRestoreTarget.mock.calls.length === 0;
+        index += 1
+      ) {
+        await animationFrames.flushNextAnimationFrame();
+      }
+
+      expect(clearPendingRestoreTarget).toHaveBeenCalled();
+      expect(stopRestoreMask).toHaveBeenCalled();
+    } finally {
+      animationFrames.restore();
+    }
+  });
+
+  it('keeps the focused scroll window after restore until the user scrolls again', async () => {
+    const animationFrames = createAnimationFrameController();
+    const contentRef = {
+      current: makeContainer({
+        clientHeight: 600,
+      }),
+    };
+    const currentChapter = createChapter(
+      1,
+      4,
+      'Paragraph 1\nParagraph 2\nParagraph 3\nParagraph 4',
+    );
+    const previousChapter = createChapter(0, 4, 'Earlier chapter');
+    const scrollLayout = createDeterministicScrollLayout(currentChapter);
+    const targetMetric = scrollLayout.metrics[1];
+    const chapterBodyOffsetTop = 120;
+    const locator: ReaderLocator = {
+      chapterIndex: 1,
+      blockIndex: targetMetric.block.blockIndex,
+      kind: 'text',
+      lineIndex: 0,
+    };
+    const clearPendingRestoreTarget = vi.fn();
+    const stopRestoreMask = vi.fn();
+    const onRestoreSettled = vi.fn();
+    const chapterCacheRef = {
+      current: new Map<number, ChapterContent>([
+        [currentChapter.index, currentChapter],
+        [previousChapter.index, previousChapter],
+      ]),
+    };
+    const contextValue = createReaderContextValue({
+      chapterIndex: 1,
+      contentRef,
+      chapterCacheRef,
+      restoreSettledHandlerRef: {
+        current: onRestoreSettled,
+      },
+    });
+    let hookProps = createHookProps({
+      chapters: [
+        { index: 0, title: 'Chapter 1', wordCount: 100 },
+        { index: 1, title: 'Chapter 2', wordCount: 100 },
+        { index: 2, title: 'Chapter 3', wordCount: 100 },
+        { index: 3, title: 'Chapter 4', wordCount: 100 },
+      ],
+      currentChapter,
+      pendingRestoreTarget: {
+        chapterIndex: 1,
+        locator,
+        mode: 'scroll',
+      },
+      pendingRestoreTargetRef: {
+        current: {
+          chapterIndex: 1,
+          locator,
+          mode: 'scroll',
+        },
+      },
+      clearPendingRestoreTarget,
+      stopRestoreMask,
+      harness: contextValue,
+    });
+
+    try {
+      const { result, rerender } = renderHook(
+        (props: ReturnType<typeof createHookProps>) => useScrollReaderController(props),
+        {
+          initialProps: hookProps,
+          wrapper: ({ children }: { children: ReactNode }) => ReaderContextProvider({
+            value: contextValue.contextValue,
+            children,
+          }),
+        },
+      );
+
+      act(() => {
+        result.current.handleScrollChapterElement(1, makeChapterElement({
+          offsetHeight: 1200,
+          offsetTop: chapterBodyOffsetTop,
+        }));
+        result.current.handleScrollChapterBodyElement(1, makeChapterBodyElement({
+          offsetTop: chapterBodyOffsetTop,
+        }));
+      });
+
+      await animationFrames.flushAnimationFrames();
+
+      expect(onRestoreSettled).toHaveBeenCalledWith('completed');
+      expect(result.current.renderableScrollLayouts.map(({ index }) => index)).toEqual([1]);
+
+      hookProps = {
+        ...hookProps,
+        pendingRestoreTarget: null,
+        pendingRestoreTargetRef: { current: null },
+        chapterDataRevision: 1,
+      };
+      rerender(hookProps);
+
+      await waitFor(() => {
+        expect(result.current.renderableScrollLayouts.map(({ index }) => index)).toEqual([1]);
+      });
+
+      act(() => {
+        result.current.handleContentScroll();
+      });
+
+      await waitFor(() => {
+        expect(result.current.renderableScrollLayouts.map(({ index }) => index)).toContain(0);
+      });
     } finally {
       animationFrames.restore();
     }

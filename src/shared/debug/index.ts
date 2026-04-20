@@ -7,6 +7,7 @@ const isDebug = import.meta.env.VITE_DEBUG === 'true';
 export const MAX_LOGS = 500;
 
 export interface DebugFeatureFlags {
+  readerStrictModeSwitch: boolean;
   readerTelemetry: boolean;
 }
 
@@ -46,6 +47,7 @@ const featureListeners = new Set<FeatureListener>();
 const snapshotEntries = new Map<string, DebugSnapshotEntry>();
 const snapshotListeners = new Set<SnapshotListener>();
 const debugFeatureFlags: DebugFeatureFlags = {
+  readerStrictModeSwitch: false,
   readerTelemetry: false,
 };
 

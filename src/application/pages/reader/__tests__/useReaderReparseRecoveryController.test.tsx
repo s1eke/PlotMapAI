@@ -1,7 +1,7 @@
 import { renderHook, act } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { reparseBookAndRefreshDetail } from '@application/use-cases/library';
+import { reparseBookAndRefreshDetail } from '@application/use-cases/book-detail';
 import { AppErrorCode, createAppError } from '@shared/errors';
 import { reportAppError, setDebugSnapshot } from '@shared/debug';
 
@@ -13,7 +13,7 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
-vi.mock('@application/use-cases/library', () => ({
+vi.mock('@application/use-cases/book-detail', () => ({
   reparseBookAndRefreshDetail: vi.fn(),
 }));
 

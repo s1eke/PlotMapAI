@@ -1,4 +1,4 @@
-import type { ChapterImageGalleryEntry } from '@shared/text-processing';
+import type { ChapterImageGalleryEntry } from '@shared/text-processing/imageGallery';
 
 export interface ReaderImageActivationPayload {
   blockIndex: number;

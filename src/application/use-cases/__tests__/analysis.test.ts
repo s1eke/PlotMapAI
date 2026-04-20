@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { loadAnalysisBookChapters } from '@application/services/analysisTextProjectionService';
+import { projectNovelText } from '@application/read-models/novel-text-projection';
 import { analysisService, buildRuntimeAnalysisConfig } from '@domains/analysis';
 import { novelRepository } from '@domains/library';
 import { getAiConfig } from '@domains/settings';
@@ -20,8 +20,8 @@ vi.mock('@domains/library', () => ({
   },
 }));
 
-vi.mock('@application/services/analysisTextProjectionService', () => ({
-  loadAnalysisBookChapters: vi.fn(),
+vi.mock('@application/read-models/novel-text-projection', () => ({
+  projectNovelText: vi.fn(),
 }));
 
 vi.mock('@domains/settings', () => ({
@@ -51,7 +51,7 @@ describe('application analysis use-cases', () => {
       title: 'Mock Novel',
       totalWords: 100,
     });
-    vi.mocked(loadAnalysisBookChapters).mockResolvedValue([
+    vi.mocked(projectNovelText).mockResolvedValue([
       {
         chapterIndex: 0,
         content: 'chapter content',

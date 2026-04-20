@@ -1,13 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  projectTxtPlainTextToRichBlocks,
-  runParseTxtTask,
-} from '@shared/text-processing';
+import { projectTxtPlainTextToRichBlocks } from '@shared/text-processing';
+import { runParseTxtTask } from '../../workers/txtClient';
 
 import { parseTxt } from '../txtParser';
 
-vi.mock('@shared/text-processing', () => ({
+vi.mock('@shared/text-processing', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@shared/text-processing')>(),
   projectTxtPlainTextToRichBlocks: vi.fn((plainText: string) => [{
     type: 'paragraph' as const,
     children: [{
@@ -15,6 +14,9 @@ vi.mock('@shared/text-processing', () => ({
       text: plainText,
     }],
   }]),
+}));
+
+vi.mock('@domains/book-import/workers/txtClient', () => ({
   runParseTxtTask: vi.fn(),
 }));
 
@@ -43,7 +45,7 @@ describe('parseTxt', () => {
     });
   });
 
-  it('maps shared text-processing progress details into book import progress updates', async () => {
+  it('forwards txt worker progress details into book import progress updates', async () => {
     const onProgress = vi.fn();
 
     await parseTxt(

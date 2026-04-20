@@ -1,6 +1,6 @@
 import type { NovelRecord } from '@infra/db/library';
 
-import type { NovelView } from './novelRepository';
+import type { NovelView } from './types';
 
 export function mapNovelRecordToView(novel: NovelRecord): NovelView {
   return {

@@ -18,10 +18,8 @@ import type {
 import { debugLog, reportAppError, setDebugSnapshot } from '@shared/debug';
 import { AppErrorCode, toAppError, type AppError } from '@shared/errors';
 import { useReaderContentRuntime } from '@shared/reader-runtime';
-import {
-  createRestoreTargetFromNavigationIntent,
-  createRestoreTargetFromPersistedState,
-} from '@shared/utils/readerPosition';
+import { resolvePersistedReaderMode } from '@shared/utils/readerMode';
+import { createRestoreTargetFromNavigationIntent, createRestoreTargetFromPersistedState } from '@shared/utils/readerPosition';
 import { getStoredChapterIndex } from '@shared/utils/readerStoredState';
 import { extractImageKeysFromChapter } from '@shared/text-processing';
 import {
@@ -174,19 +172,29 @@ export function useReaderChapterData({
         canonical: storedState.canonical,
         hints: storedState.hints,
       };
-      const nextMode = nextStoredState.hints?.contentMode ?? 'scroll';
+      const resolvedMode = resolvePersistedReaderMode(nextStoredState, {
+        fallbackContentMode: 'scroll',
+      });
+      const nextMode = resolvedMode.mode;
       const nextStoredChapterIndex = getStoredChapterIndex(nextStoredState);
       const modeResolutionSnapshot = {
         source: 'useReaderChapterData.hydrateReaderData',
         novelId: resolvedNovelId,
         resolvedMode: nextMode,
+        persistedHintViewMode: nextStoredState.hints?.viewMode ?? null,
         persistedHintContentMode: nextStoredState.hints?.contentMode ?? null,
+        resolvedViewMode: resolvedMode.viewMode,
+        resolvedContentMode: resolvedMode.contentMode,
         persistedPageIndex: nextStoredState.hints?.pageIndex ?? null,
         persistedChapterIndex: nextStoredChapterIndex,
-        fallbackReason:
-          nextStoredState.hints?.contentMode == null
+        fallbackReason: [
+          resolvedMode.usedViewModeFallback
+            ? 'missing-hints.viewMode -> fallback-to-original'
+            : null,
+          resolvedMode.usedContentModeFallback
             ? 'missing-hints.contentMode -> fallback-to-scroll'
             : null,
+        ].filter(Boolean).join(', ') || null,
       };
       setDebugSnapshot('reader-mode-resolution', modeResolutionSnapshot);
       debugLog('Reader', 'hydrate reader data mode snapshot', modeResolutionSnapshot);
@@ -249,7 +257,8 @@ export function useReaderChapterData({
           ...nextStoredState.hints,
           chapterProgress: hasChapter ? nextStoredState.hints?.chapterProgress : 0,
           pageIndex: hasChapter ? nextStoredState.hints?.pageIndex : undefined,
-          contentMode: nextMode,
+          contentMode: resolvedMode.contentMode,
+          viewMode: resolvedMode.viewMode,
         },
       };
 

@@ -1,10 +1,9 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import userEvent from '@testing-library/user-event';
 
 import ReloadPrompt from '../ReloadPrompt';
 import { __resetRegisterSwState, __setRegisterSwState } from '@test/mocks/pwaRegisterReact';
-import { DEBUG_SHOW_UPDATE_TOAST_EVENT } from '@app/debug/pwaDebugTools';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -72,18 +71,6 @@ describe('ReloadPrompt', () => {
       expect(screen.queryByText('pwa.updateAvailable')).not.toBeInTheDocument();
     });
     expect(localStorage.getItem('plotmapai_update_prompt_dismissed')).toContain('1.0.1-test');
-  });
-
-  it('can show the toast manually through the debug event', () => {
-    render(<ReloadPrompt />);
-
-    act(() => {
-      window.dispatchEvent(new CustomEvent(DEBUG_SHOW_UPDATE_TOAST_EVENT));
-    });
-
-    return waitFor(() => {
-      expect(screen.getByText('pwa.updateAvailable')).toBeInTheDocument();
-    });
   });
 
   it('switches to the updating label while refreshing', async () => {

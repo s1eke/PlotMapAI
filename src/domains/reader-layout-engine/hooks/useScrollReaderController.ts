@@ -7,6 +7,7 @@ import {
   useReaderViewportContext,
 } from '@shared/reader-runtime';
 import { debugLog, setDebugSnapshot } from '@shared/debug';
+import { getContainerProgress } from '@shared/utils/readerPosition';
 import { toCanonicalPositionFromLocator } from '@shared/utils/readerStoredState';
 
 import type {
@@ -62,6 +63,8 @@ export function useScrollReaderController({
   } = sessionCommands;
   const scrollChapterBodyElementsRef = useRef<Map<number, HTMLDivElement>>(new Map());
   const [scrollModeChapters, setScrollModeChapters] = useState<number[]>([]);
+  const [retainedFocusedWindowChapterIndex, setRetainedFocusedWindowChapterIndex] =
+    useState<number | null>(null);
   const [, setVisibleScrollBlockRangeByChapter] =
     useState<Map<number, VisibleScrollBlockRange>>(new Map());
   const scrollAnchorSnapshotRef = useRef<ScrollAnchorSnapshot>({
@@ -73,6 +76,29 @@ export function useScrollReaderController({
   const fetchScrollChapterContent = useCallback((index: number) => {
     return fetchChapterContent(index);
   }, [fetchChapterContent]);
+  const retainFocusedWindowAfterRestore = useCallback((restoredChapterIndex: number) => {
+    setRetainedFocusedWindowChapterIndex((previousChapterIndex) => (
+      previousChapterIndex === restoredChapterIndex
+        ? previousChapterIndex
+        : restoredChapterIndex
+    ));
+  }, []);
+  const clearRetainedFocusedWindow = useCallback(() => {
+    setRetainedFocusedWindowChapterIndex((previousChapterIndex) => (
+      previousChapterIndex === null ? previousChapterIndex : null
+    ));
+  }, []);
+
+  useEffect(() => {
+    if (!enabled || chapterIndex !== retainedFocusedWindowChapterIndex) {
+      clearRetainedFocusedWindow();
+    }
+  }, [
+    chapterIndex,
+    clearRetainedFocusedWindow,
+    enabled,
+    retainedFocusedWindowChapterIndex,
+  ]);
 
   useScrollReaderWindowing({
     cache,
@@ -83,6 +109,7 @@ export function useScrollReaderController({
     fetchChapterContent: fetchScrollChapterContent,
     layoutQueries,
     pendingRestoreTargetRef,
+    retainedFocusedWindowChapterIndex,
     scrollAnchorSnapshotRef,
     scrollChapterBodyElementsRef,
     setScrollModeChapters,
@@ -101,6 +128,7 @@ export function useScrollReaderController({
     }
 
     const locator = layoutQueries.getCurrentOriginalLocator();
+    const scrollProgress = getContainerProgress(viewport.contentRef.current);
     if (!locator) {
       const persistFallbackSnapshot = {
         source: 'useScrollReaderController.handleReadingAnchorChange',
@@ -117,6 +145,7 @@ export function useScrollReaderController({
         edge: 'start',
       },
       hints: {
+        chapterProgress: scrollProgress,
         pageIndex: undefined,
         contentMode: 'scroll',
       },
@@ -138,6 +167,7 @@ export function useScrollReaderController({
     persistReaderState,
     persistence,
     setChapterIndex,
+    viewport.contentRef,
   ]);
 
   const scrollMode = useScrollModeChapters(
@@ -150,6 +180,7 @@ export function useScrollReaderController({
     setScrollModeChapters,
     chapterDataRevision,
     handleReadingAnchorChange,
+    clearRetainedFocusedWindow,
   );
   const {
     getCurrentAnchor,
@@ -212,6 +243,7 @@ export function useScrollReaderController({
     pendingRestoreTargetRef,
     getRestoreAttempt,
     recordRestoreResult,
+    retainFocusedWindowAfterRestore,
     persistReaderState,
     persistence,
     scrollChapterBodyElementsRef,

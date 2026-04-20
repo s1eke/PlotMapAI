@@ -14,6 +14,7 @@ export type {
   CanonicalPosition,
   ChapterChangeSource,
   PageTarget,
+  PersistedReadingProgress,
   ReaderLocatorBoundary,
   ReaderLifecycleEvent,
   ReaderLifecycleEventType,
@@ -31,6 +32,7 @@ export type {
   ReaderSessionCommands,
   ReaderSessionSnapshot,
   ReaderSessionState,
+  ReaderViewMode,
   RestoreStatus,
   StoredReaderState,
 } from './session';

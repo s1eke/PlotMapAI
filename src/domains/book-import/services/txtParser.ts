@@ -1,13 +1,12 @@
-import type { ParsedBook } from './bookParser';
+import type { ParsedBook } from './types';
 import type { WorkerTaskOptions } from '@infra/workers';
-import type { ChapterDetectionRule, ParsedTextDocument } from '@shared/text-processing';
+import type { ChapterDetectionRule } from '@shared/text-processing';
 import type { BookImportProgress } from './progress';
 
 import { debugLog } from '@shared/debug';
-import {
-  projectTxtPlainTextToRichBlocks,
-  runParseTxtTask,
-} from '@shared/text-processing';
+import { projectTxtPlainTextToRichBlocks } from '@shared/text-processing';
+import { runParseTxtTask } from '../workers/txtClient';
+import type { ParsedTextDocument } from './txt/types';
 
 function mapParsedDocument(document: ParsedTextDocument): ParsedBook {
   return {
@@ -39,15 +38,7 @@ export async function parseTxt(
     { file, tocRules },
     {
       signal: options.signal,
-      onProgress: (progress) => {
-        options.onProgress?.({
-          current: progress.current,
-          detail: progress.detail,
-          progress: progress.progress,
-          stage: progress.stage as BookImportProgress['stage'],
-          total: progress.total,
-        });
-      },
+      onProgress: options.onProgress,
     },
   );
 

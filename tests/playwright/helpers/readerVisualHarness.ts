@@ -12,6 +12,14 @@ type ReaderPageTurnModeLabel = 'Cover' | 'No Animation' | 'Slide' | 'Vertical';
 
 type ReaderPageTurnModeId = 'cover' | 'none' | 'slide' | 'scroll';
 type ReaderThemeId = 'auto' | 'paper' | 'parchment' | 'green' | 'night';
+type ReaderBranch = 'paged' | 'scroll' | 'unknown';
+
+interface ReaderTraceWindow extends Window {
+  PlotMapAIReaderTrace?: {
+    clear: () => void;
+    enable: () => void;
+  };
+}
 
 interface SeedRichInlineText {
   marks?: Array<'bold' | 'italic' | 'underline' | 'strike' | 'sup' | 'sub'>;
@@ -126,6 +134,37 @@ interface ReaderPreferenceOverrides {
   readerTheme?: ReaderThemeId;
 }
 
+export interface ReaderViewportSnapshot {
+  branch: ReaderBranch;
+  clientHeight: number | null;
+  currentPage: number | null;
+  currentPageIndex: number | null;
+  hasPagedInteractive: boolean;
+  maxScrollTop: number | null;
+  overflowY: string | null;
+  pageCount: number | null;
+  pageIndicator: string | null;
+  scrollHeight: number | null;
+  scrollProgress: number | null;
+  scrollTop: number | null;
+}
+
+export interface PersistedReadingProgressSnapshot {
+  canonical: {
+    blockIndex: number | null;
+    chapterIndex: number | null;
+    edge: 'start' | 'end' | null;
+    kind: string | null;
+    lineIndex: number | null;
+  };
+  chapterProgress: number | null;
+  contentMode: 'scroll' | 'paged' | null;
+  pageIndex: number | null;
+  revision: number | null;
+  updatedAt: string | null;
+  viewMode: 'original' | 'summary' | null;
+}
+
 interface SeedChapterRichContentParams {
   chapterIndex: number;
   contentVersion?: number;
@@ -216,6 +255,197 @@ export async function openReaderFromDetailPage(page: Page): Promise<void> {
   await expect(page.getByTestId('reader-viewport')).toBeVisible({
     timeout: 30_000,
   });
+}
+
+export async function enableReaderTrace(
+  page: Page,
+  initialBranch: 'scroll' | 'paged' = 'scroll',
+): Promise<void> {
+  const nextUrl = new URL(page.url());
+  nextUrl.searchParams.set('readerTrace', '1');
+  await page.goto(nextUrl.toString());
+  await disableAnimations(page);
+  await waitForReaderBranch(page, initialBranch);
+  await page.evaluate(() => {
+    const traceWindow = window as ReaderTraceWindow;
+    traceWindow.PlotMapAIReaderTrace?.clear();
+    traceWindow.PlotMapAIReaderTrace?.enable();
+  });
+}
+
+export async function readReaderViewportSnapshot(page: Page): Promise<ReaderViewportSnapshot> {
+  return page.evaluate(() => {
+    const pagedInteractive = document.querySelector('[data-testid="paged-reader-interactive"]');
+    const viewport = document.querySelector('[data-testid="reader-viewport"]');
+    const style = viewport instanceof HTMLElement ? window.getComputedStyle(viewport) : null;
+    let branch: ReaderBranch = 'unknown';
+
+    if (pagedInteractive) {
+      branch = 'paged';
+    } else if (style?.overflowY === 'auto') {
+      branch = 'scroll';
+    }
+
+    const scrollTop = viewport instanceof HTMLElement ? viewport.scrollTop : null;
+    const scrollHeight = viewport instanceof HTMLElement ? viewport.scrollHeight : null;
+    const clientHeight = viewport instanceof HTMLElement ? viewport.clientHeight : null;
+    const maxScrollTop = (
+      typeof scrollHeight === 'number'
+      && typeof clientHeight === 'number'
+    )
+      ? Math.max(0, scrollHeight - clientHeight)
+      : null;
+    const scrollProgress = (
+      typeof scrollTop === 'number'
+      && typeof maxScrollTop === 'number'
+      && maxScrollTop > 0
+    )
+      ? scrollTop / maxScrollTop
+      : null;
+
+    let pageIndicator: string | null = null;
+    const pageFrame = document.querySelector('[data-testid="paged-reader-page-frame"]');
+    const chapterWrapper = pageFrame instanceof HTMLElement ? pageFrame.firstElementChild : null;
+    const header = chapterWrapper instanceof HTMLElement ? chapterWrapper.firstElementChild : null;
+    if (header instanceof HTMLElement) {
+      const indicatorText = Array.from(header.querySelectorAll('div'))
+        .map((element) => element.textContent?.trim() ?? '')
+        .find((text) => /^\d+\s*\/\s*\d+$/u.test(text));
+      pageIndicator = indicatorText ?? null;
+    }
+
+    const pageMatch = pageIndicator?.match(/^(\d+)\s*\/\s*(\d+)$/u) ?? null;
+    const currentPage = pageMatch ? Number(pageMatch[1]) : null;
+    const pageCount = pageMatch ? Number(pageMatch[2]) : null;
+
+    return {
+      branch,
+      clientHeight,
+      currentPage,
+      currentPageIndex: currentPage === null ? null : currentPage - 1,
+      hasPagedInteractive: Boolean(pagedInteractive),
+      maxScrollTop,
+      overflowY: style?.overflowY ?? null,
+      pageCount,
+      pageIndicator,
+      scrollHeight,
+      scrollProgress,
+      scrollTop,
+    } satisfies ReaderViewportSnapshot;
+  });
+}
+
+export async function waitForReaderBranch(
+  page: Page,
+  branch: Exclude<ReaderBranch, 'unknown'>,
+  options?: {
+    timeout?: number;
+  },
+): Promise<ReaderViewportSnapshot> {
+  await expect.poll(async () => {
+    const snapshot = await readReaderViewportSnapshot(page);
+    return snapshot.branch;
+  }, {
+    timeout: options?.timeout ?? 30_000,
+  }).toBe(branch);
+
+  const stabilizedSnapshot = await readReaderViewportSnapshot(page);
+  if (stabilizedSnapshot.branch !== branch) {
+    throw new Error(`Expected reader branch ${branch}, but it did not stabilize.`);
+  }
+
+  return stabilizedSnapshot;
+}
+
+export async function readPersistedReadingProgress(
+  page: Page,
+  novelId: number,
+): Promise<PersistedReadingProgressSnapshot | null> {
+  return page.evaluate(async (targetNovelId) => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('PlotMapAI');
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve(request.result);
+    });
+
+    try {
+      const record = await new Promise<Record<string, unknown> | undefined>((resolve, reject) => {
+        const transaction = db.transaction(['readingProgress'], 'readonly');
+        transaction.onerror = () => reject(transaction.error);
+        const store = transaction.objectStore('readingProgress');
+        const request = store.index('novelId').get(targetNovelId);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve(request.result as Record<string, unknown> | undefined);
+      });
+
+      if (!record) {
+        return null;
+      }
+
+      const canonical = (
+        record.canonical
+        && typeof record.canonical === 'object'
+        && !Array.isArray(record.canonical)
+      )
+        ? record.canonical as Record<string, unknown>
+        : null;
+
+      return {
+        canonical: {
+          blockIndex: typeof canonical?.blockIndex === 'number' ? canonical.blockIndex : null,
+          chapterIndex: typeof canonical?.chapterIndex === 'number' ? canonical.chapterIndex : null,
+          edge: canonical?.edge === 'start' || canonical?.edge === 'end' ? canonical.edge : null,
+          kind: typeof canonical?.kind === 'string' ? canonical.kind : null,
+          lineIndex: typeof canonical?.lineIndex === 'number' ? canonical.lineIndex : null,
+        },
+        chapterProgress: typeof record.chapterProgress === 'number' ? record.chapterProgress : null,
+        contentMode: record.contentMode === 'scroll' || record.contentMode === 'paged'
+          ? record.contentMode
+          : null,
+        pageIndex: typeof record.pageIndex === 'number' ? record.pageIndex : null,
+        revision: typeof record.revision === 'number' ? record.revision : null,
+        updatedAt: typeof record.updatedAt === 'string' ? record.updatedAt : null,
+        viewMode: record.viewMode === 'original' || record.viewMode === 'summary'
+          ? record.viewMode
+          : null,
+      } satisfies PersistedReadingProgressSnapshot;
+    } finally {
+      db.close();
+    }
+  }, novelId);
+}
+
+export async function waitForPersistedReadingProgress(
+  page: Page,
+  novelId: number,
+  predicate: (snapshot: PersistedReadingProgressSnapshot | null) => boolean = (snapshot) => (
+    snapshot !== null
+  ),
+  options?: {
+    description?: string;
+    timeout?: number;
+  },
+): Promise<PersistedReadingProgressSnapshot> {
+  let matchingSnapshot: PersistedReadingProgressSnapshot | null = null;
+
+  await expect.poll(async () => {
+    const snapshot = await readPersistedReadingProgress(page, novelId);
+    if (predicate(snapshot) && snapshot) {
+      matchingSnapshot = snapshot;
+      return true;
+    }
+
+    return false;
+  }, {
+    message: options?.description,
+    timeout: options?.timeout ?? 10_000,
+  }).toBe(true);
+
+  if (!matchingSnapshot) {
+    throw new Error('Persisted reading progress did not satisfy the expected condition.');
+  }
+
+  return matchingSnapshot;
 }
 
 export async function waitForReaderViewportImages(
@@ -350,6 +580,53 @@ export async function seedChapterRichContent(
 
     db.close();
   }, params);
+}
+
+export interface VisibleContentAnchor {
+  offsetTop: number;
+  tagName: string;
+  textSnippet: string;
+}
+
+export async function readVisibleContentAnchor(page: Page): Promise<VisibleContentAnchor | null> {
+  return page.evaluate(() => {
+    const viewport = document.querySelector('[data-testid="reader-viewport"]');
+    if (!(viewport instanceof HTMLElement)) {
+      return null;
+    }
+
+    const isPaged = Boolean(document.querySelector('[data-testid="paged-reader-interactive"]'));
+    const container = isPaged
+      ? document.querySelector('[data-testid="paged-reader-page-frame"]')
+      : viewport;
+
+    if (!(container instanceof HTMLElement)) {
+      return null;
+    }
+
+    const candidates = Array.from(container.querySelectorAll('p, h1, h2, h3, h4, h5, h6'));
+    const viewportRect = viewport.getBoundingClientRect();
+    const visibleTop = viewportRect.top;
+    const visibleBottom = viewportRect.bottom;
+
+    for (const element of candidates) {
+      const rect = element.getBoundingClientRect();
+      if (rect.top >= visibleTop && rect.top < visibleBottom && rect.height > 0) {
+        const text = (element.textContent ?? '').trim();
+        if (text.length === 0) {
+          continue;
+        }
+
+        return {
+          offsetTop: Math.round(rect.top - visibleTop),
+          tagName: element.tagName.toLowerCase(),
+          textSnippet: text.slice(0, 80),
+        };
+      }
+    }
+
+    return null;
+  });
 }
 
 export async function seedChapterAnalysis(page: Page, params: {

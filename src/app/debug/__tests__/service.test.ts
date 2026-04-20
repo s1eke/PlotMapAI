@@ -113,8 +113,10 @@ describe('debug', () => {
     vi.stubEnv('VITE_DEBUG', 'true');
     const mod = await import('@shared/debug');
     expect(mod.getDebugFeatureFlags()).toEqual({
+      readerStrictModeSwitch: false,
       readerTelemetry: false,
     });
+    expect(mod.isDebugFeatureEnabled('readerStrictModeSwitch')).toBe(false);
     expect(mod.isDebugFeatureEnabled('readerTelemetry')).toBe(false);
   });
 
@@ -124,16 +126,25 @@ describe('debug', () => {
     const listener = vi.fn();
     const unsubscribe = mod.debugFeatureSubscribe(listener);
 
+    mod.setDebugFeatureEnabled('readerStrictModeSwitch', true);
+
+    expect(mod.isDebugFeatureEnabled('readerStrictModeSwitch')).toBe(true);
+    expect(listener).toHaveBeenCalledWith({
+      readerStrictModeSwitch: true,
+      readerTelemetry: false,
+    });
+
     mod.setDebugFeatureEnabled('readerTelemetry', true);
 
     expect(mod.isDebugFeatureEnabled('readerTelemetry')).toBe(true);
-    expect(listener).toHaveBeenCalledWith({
+    expect(listener).toHaveBeenLastCalledWith({
+      readerStrictModeSwitch: true,
       readerTelemetry: true,
     });
 
     unsubscribe();
     mod.setDebugFeatureEnabled('readerTelemetry', false);
-    expect(listener).toHaveBeenCalledTimes(1);
+    expect(listener).toHaveBeenCalledTimes(2);
   });
 
   it('registerPwaDebugTools exposes window debug methods in debug mode', async () => {

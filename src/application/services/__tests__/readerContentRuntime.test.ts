@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { purificationRuleRepository } from '@domains/settings';
 import { db } from '@infra/db';
 import { AppErrorCode } from '@shared/errors';
 
@@ -7,12 +8,15 @@ import {
   applicationReaderContentRuntime,
   loadPurifiedBookChapters,
 } from '../readerContentRuntime';
+import { resetNovelTextProjectionCacheForTests } from '@application/read-models/novel-text-projection';
 
 describe('applicationReaderContentRuntime', () => {
   beforeEach(async () => {
     vi.restoreAllMocks();
+    resetNovelTextProjectionCacheForTests();
     await db.delete();
     await db.open();
+    await purificationRuleRepository.clearAllPurificationRules();
     await db.novels.add({
       title: 'Reader Novel',
       author: 'Author',

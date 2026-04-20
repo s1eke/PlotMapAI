@@ -17,6 +17,11 @@ const pagedControllerTestState = vi.hoisted(() => ({
   pagedLayoutsByIndex: new Map<number, unknown>(),
   readyChapterIndex: 0,
 }));
+const readerTraceMocks = vi.hoisted(() => ({
+  enabled: false,
+  markReaderTraceSuspect: vi.fn(),
+  recordReaderTrace: vi.fn(),
+}));
 
 vi.mock('../../paged-runtime/internal', async () => {
   const actual = await vi.importActual<typeof import('../../paged-runtime/internal')>(
@@ -40,6 +45,12 @@ vi.mock('../../render-cache/internal', () => ({
 
 vi.mock('../../layout-core/internal', () => ({
   resolveCurrentPagedLocator: vi.fn(() => pagedControllerTestState.currentPagedLocator),
+}));
+
+vi.mock('@shared/reader-trace', () => ({
+  isReaderTraceEnabled: () => readerTraceMocks.enabled,
+  markReaderTraceSuspect: readerTraceMocks.markReaderTraceSuspect,
+  recordReaderTrace: readerTraceMocks.recordReaderTrace,
 }));
 
 function createLocator(chapterIndex: number, pageIndex: number): ReaderLocator {
@@ -128,6 +139,7 @@ function createHookProps(
 
 function setupHook(
   overrides: Partial<Parameters<typeof usePagedReaderController>[0]> = {},
+  contextOverrides: Parameters<typeof createReaderContextWrapper>[0] = {},
 ) {
   const sessionCommands = overrides.sessionCommands ?? createSessionCommands();
   const cache = overrides.cache ?? {
@@ -143,7 +155,7 @@ function setupHook(
   const clearPendingRestoreTarget = overrides.clearPendingRestoreTarget ?? vi.fn();
   const stopRestoreMask = overrides.stopRestoreMask ?? vi.fn();
   const beforeChapterChange = overrides.beforeChapterChange ?? vi.fn();
-  const { value, Wrapper } = createReaderContextWrapper();
+  const { value, Wrapper } = createReaderContextWrapper(contextOverrides);
 
   const buildProps = (
     nextOverrides: Partial<Parameters<typeof usePagedReaderController>[0]> = {},
@@ -180,6 +192,9 @@ function setupHook(
 describe('usePagedReaderController', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    readerTraceMocks.enabled = false;
+    readerTraceMocks.markReaderTraceSuspect.mockReset();
+    readerTraceMocks.recordReaderTrace.mockReset();
     pagedControllerTestState.chapterPreviews = {
       nextChapterPreview: null,
       pagedChapters: [],
@@ -265,6 +280,32 @@ describe('usePagedReaderController', () => {
         }),
       }));
     });
+  });
+
+  it('synchronizes the runtime paged state immediately when layout-driven restores update the page index', async () => {
+    pagedControllerTestState.pagedLayoutsByIndex = new Map([
+      [0, createPagedLayout(3)],
+    ]);
+    pagedControllerTestState.readyChapterIndex = 0;
+
+    const setPagedState = vi.fn();
+    const { result } = setupHook({}, {
+      setPagedState,
+    });
+    const pagedLayoutArgs = vi.mocked(usePagedReaderLayout).mock.calls.at(-1)?.[0];
+    expect(pagedLayoutArgs).toBeTruthy();
+
+    setPagedState.mockClear();
+
+    act(() => {
+      pagedLayoutArgs?.setPageIndex(2);
+      expect(setPagedState).toHaveBeenLastCalledWith({
+        pageCount: 3,
+        pageIndex: 2,
+      });
+    });
+
+    expect(result.current.pageIndex).toBe(2);
   });
 
   it('commits chapter navigation at page boundaries and tracks the pending page target', () => {
@@ -396,5 +437,91 @@ describe('usePagedReaderController', () => {
     });
 
     expect(sessionCommands.persistReaderState).toHaveBeenCalledTimes(1);
+  });
+
+  it('persists the current paged page after the pending restore target state clears without a page change', async () => {
+    const locator = createLocator(0, 0);
+    const pendingRestoreTarget = {
+      chapterIndex: 0,
+      mode: 'paged' as const,
+      locator,
+    };
+    const pendingRestoreTargetRef = {
+      current: pendingRestoreTarget,
+    };
+
+    pagedControllerTestState.pagedLayoutsByIndex = new Map([
+      [0, createPagedLayout(2)],
+    ]);
+    pagedControllerTestState.readyChapterIndex = 0;
+    pagedControllerTestState.currentPagedLocator = locator;
+
+    const { rerender, buildProps, sessionCommands } = setupHook({
+      pendingRestoreTarget,
+      pendingRestoreTargetRef,
+    });
+
+    expect(sessionCommands.persistReaderState).not.toHaveBeenCalled();
+
+    pendingRestoreTargetRef.current = null;
+
+    act(() => {
+      rerender(buildProps({
+        pendingRestoreTarget: null,
+      }));
+    });
+
+    await waitFor(() => {
+      expect(sessionCommands.persistReaderState).toHaveBeenLastCalledWith(expect.objectContaining({
+        canonical: expect.objectContaining({
+          chapterIndex: 0,
+          blockIndex: 0,
+          kind: 'text',
+        }),
+        hints: expect.objectContaining({
+          pageIndex: 0,
+          contentMode: 'paged',
+        }),
+      }));
+    });
+  });
+
+  it('marks page turn animations that fire while a restore target is still pending', async () => {
+    readerTraceMocks.enabled = true;
+    pagedControllerTestState.pagedLayoutsByIndex = new Map([
+      [0, createPagedLayout(3)],
+    ]);
+    pagedControllerTestState.readyChapterIndex = 0;
+    pagedControllerTestState.currentPagedLocator = createLocator(0, 0);
+
+    const pendingRestoreTargetRef = {
+      current: {
+        chapterIndex: 0,
+        mode: 'paged' as const,
+        locator: createLocator(0, 2),
+      },
+    };
+    const { result } = setupHook({
+      pendingRestoreTargetRef,
+    });
+
+    act(() => {
+      result.current.goToNextPage();
+    });
+
+    await waitFor(() => {
+      expect(readerTraceMocks.markReaderTraceSuspect).toHaveBeenCalledWith(
+        'page_turn_animation_during_restore',
+        expect.objectContaining({
+          chapterIndex: 0,
+          mode: 'paged',
+          details: expect.objectContaining({
+            direction: 'next',
+            nextToken: 1,
+            pageIndex: 1,
+          }),
+        }),
+      );
+    });
   });
 });

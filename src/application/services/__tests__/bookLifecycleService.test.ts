@@ -10,6 +10,8 @@ import { novelRepository } from '@domains/library';
 import { db } from '@infra/db';
 import { CACHE_KEYS, storage } from '@infra/storage';
 
+import { invalidateNovelTextProjectionCache } from '@application/read-models/novel-text-projection';
+
 vi.mock('@domains/book-import', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@domains/book-import')>();
   return {
@@ -20,6 +22,10 @@ vi.mock('@domains/book-import', async (importOriginal) => {
     },
   };
 });
+
+vi.mock('@application/read-models/novel-text-projection', () => ({
+  invalidateNovelTextProjectionCache: vi.fn(),
+}));
 
 describe('bookLifecycleService', () => {
   beforeEach(async () => {
@@ -150,6 +156,7 @@ describe('bookLifecycleService', () => {
     });
     await expect(db.readerRenderCache.count()).resolves.toBe(0);
     expect(storage.cache.getJson(CACHE_KEYS.readerBootstrap(1))).toBeNull();
+    expect(invalidateNovelTextProjectionCache).toHaveBeenCalledWith(1);
   });
 
   it('deletes all persisted artifacts for a novel through coordinated owner APIs', async () => {
@@ -284,6 +291,7 @@ describe('bookLifecycleService', () => {
     expect(await db.readingProgress.count()).toBe(0);
     expect(await db.readerRenderCache.count()).toBe(0);
     expect(storage.cache.getJson(CACHE_KEYS.readerBootstrap(novelId))).toBeNull();
+    expect(invalidateNovelTextProjectionCache).toHaveBeenCalledWith(novelId);
   });
 
   it('reparses a novel by overwriting content and clearing stale artifacts', async () => {
@@ -518,6 +526,7 @@ describe('bookLifecycleService', () => {
       importFormatVersion: 3,
     });
     expect(storage.cache.getJson(CACHE_KEYS.readerBootstrap(novelId))).toBeNull();
+    expect(invalidateNovelTextProjectionCache).toHaveBeenCalledWith(novelId);
   });
 
   it('rejects reparsing when the selected file type does not match the existing book', async () => {
@@ -546,6 +555,7 @@ describe('bookLifecycleService', () => {
       userMessageKey: 'reader.reparse.fileTypeMismatch',
     });
     expect(bookImportService.parseBookImport).not.toHaveBeenCalled();
+    expect(invalidateNovelTextProjectionCache).not.toHaveBeenCalled();
   });
 
   it('keeps the previous novel data intact when reparsing fails mid-transaction', async () => {

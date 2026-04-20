@@ -232,10 +232,14 @@ export interface ReadingProgressRecord {
   id: number;
   novelId: number;
   canonical?: CanonicalPositionRecord;
+  pageIndex?: number;
+  chapterProgress?: number;
+  contentMode?: 'scroll' | 'paged';
+  viewMode?: 'original' | 'summary';
+  revision?: number;
   // Legacy mixed-model fields retained only for read/drop compatibility.
   chapterIndex?: number;
   mode?: string;
-  chapterProgress?: number;
   locator?: ReaderLocatorRecord;
   updatedAt: string;
 }

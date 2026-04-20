@@ -27,7 +27,7 @@ import {
 import {
   flushReaderPreferencesPersistence,
 } from '../../hooks/readerPreferencesStore';
-import { flushPersistence } from '@domains/reader-session';
+import { flushReaderStateWithCapture } from '@domains/reader-session';
 
 interface ReaderProviderProps {
   children: ReactNode;
@@ -56,9 +56,8 @@ function ReaderPersistenceBoundary({ children }: ReaderPersistenceBoundaryProps)
 
   useEffect(() => {
     const flushReaderPersistence = async (): Promise<void> => {
-      persistence.runBeforeFlush();
       await Promise.all([
-        flushPersistence(),
+        flushReaderStateWithCapture(persistence),
         flushReaderPreferencesPersistence(),
       ]).catch(() => undefined);
     };
@@ -137,9 +136,11 @@ export function ReaderContextProvider({
     registerCurrentAnchorResolver: value.registerCurrentAnchorResolver,
     registerCurrentOriginalLocatorResolver: value.registerCurrentOriginalLocatorResolver,
     registerCurrentPagedLocatorResolver: value.registerCurrentPagedLocatorResolver,
+    registerPagedLocatorPageIndexResolver: value.registerPagedLocatorPageIndexResolver,
     registerScrollChapterBodyElement: value.registerScrollChapterBodyElement,
     registerScrollChapterElement: value.registerScrollChapterElement,
     registerScrollLocatorOffsetResolver: value.registerScrollLocatorOffsetResolver,
+    resolvePagedLocatorPageIndex: value.resolvePagedLocatorPageIndex,
     resolveScrollLocatorOffset: value.resolveScrollLocatorOffset,
   }), [
     value.clearScrollChapterBodyElements,
@@ -153,9 +154,11 @@ export function ReaderContextProvider({
     value.registerCurrentAnchorResolver,
     value.registerCurrentOriginalLocatorResolver,
     value.registerCurrentPagedLocatorResolver,
+    value.registerPagedLocatorPageIndexResolver,
     value.registerScrollChapterBodyElement,
     value.registerScrollChapterElement,
     value.registerScrollLocatorOffsetResolver,
+    value.resolvePagedLocatorPageIndex,
     value.resolveScrollLocatorOffset,
   ]);
 

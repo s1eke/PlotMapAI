@@ -1,6 +1,6 @@
 import type { WorkerTaskOptions } from '@infra/workers';
 import type { PurifyRule } from '@shared/text-processing';
-import type { ParsedBook } from '../bookParser';
+import type { ParsedBook } from '../types';
 import type { BookImportProgress } from '../progress';
 import { runParseEpubTask } from '../../workers/epubClient';
 

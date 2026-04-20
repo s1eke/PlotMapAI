@@ -34,7 +34,7 @@ export {
   measureScrollReaderChapterLayout,
   PAGED_VIEWPORT_TOP_PADDING_PX,
   serializeReaderLayoutSignature,
-} from '../utils/readerLayout';
+} from '../utils/layout/readerLayout';
 export type {
   MeasuredChapterLayout,
   PageSlice,
@@ -64,15 +64,15 @@ export type {
   StaticTextLine,
   VirtualBlockMetrics,
   VisibleBlockRange,
-} from '../utils/readerLayout';
+} from '../utils/layout/readerLayout';
 export {
   getReaderContentBlockClassName,
   resolveReaderContentRootProps,
-} from '../utils/readerContentStyling';
-export type { ReaderContentRootProps, ReaderContentRootTheme } from '../utils/readerContentStyling';
+} from '../utils/layout/readerContentStyling';
+export type { ReaderContentRootProps, ReaderContentRootTheme } from '../utils/layout/readerContentStyling';
 export {
   createReaderImageEntryId,
   sortReaderImageGalleryEntries,
-} from '@shared/reader-content';
+} from '@shared/reader-rendering';
 export type { ReaderImageActivationPayload, ReaderImageGalleryEntry } from '@shared/contracts/reader';
 export { preloadReaderImageResources } from '@domains/reader-media';

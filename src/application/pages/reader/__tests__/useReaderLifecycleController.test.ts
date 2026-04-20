@@ -7,7 +7,7 @@ import type {
   ReaderLoadActiveChapterResult,
 } from '@domains/reader-content';
 import { useReaderLifecycleController } from '@application/pages/reader/useReaderLifecycleController';
-import { resetReaderSessionStoreForTests } from '@domains/reader-session';
+import { buildStoredReaderState, resetReaderSessionStoreForTests } from '@domains/reader-session';
 import type { ReaderRestoreTarget, StoredReaderState } from '@shared/contracts/reader';
 
 function createDeferred<T>() {
@@ -22,14 +22,14 @@ function createDeferred<T>() {
 }
 
 function createStoredState(overrides: StoredReaderState = {}): StoredReaderState {
-  return {
+  return buildStoredReaderState({
     chapterIndex: 1,
     mode: 'scroll',
     chapterProgress: undefined,
     lastContentMode: 'scroll',
     locator: undefined,
     ...overrides,
-  };
+  });
 }
 
 function createRestoreTarget(
@@ -65,6 +65,21 @@ function createChapterContent(index: number) {
   };
 }
 
+function createViewportContainer() {
+  const element = document.createElement('div');
+  Object.defineProperty(element, 'scrollTop', {
+    configurable: true,
+    writable: true,
+    value: 240,
+  });
+  Object.defineProperty(element, 'scrollLeft', {
+    configurable: true,
+    writable: true,
+    value: 36,
+  });
+  return element as HTMLDivElement;
+}
+
 function createProps(
   overrides: Partial<Parameters<typeof useReaderLifecycleController>[0]> = {},
 ) {
@@ -81,6 +96,7 @@ function createProps(
   }));
   const resetReaderContent = vi.fn();
   const clearPendingRestoreTarget = vi.fn();
+  const pendingRestoreTargetRef = { current: null as ReaderRestoreTarget | null };
   const setPendingRestoreTarget = vi.fn();
   const startRestoreMaskForTarget = vi.fn();
   const stopRestoreMask = vi.fn();
@@ -101,6 +117,7 @@ function createProps(
     },
     restoreFlow: {
       pendingRestoreTarget: null,
+      pendingRestoreTargetRef,
       clearPendingRestoreTarget,
       setPendingRestoreTarget,
       startRestoreMaskForTarget,
@@ -143,6 +160,7 @@ describe('useReaderLifecycleController', () => {
         },
         restoreFlow: {
           pendingRestoreTarget: null,
+          pendingRestoreTargetRef: { current: null },
           clearPendingRestoreTarget: vi.fn(),
           setPendingRestoreTarget,
           startRestoreMaskForTarget,
@@ -178,6 +196,7 @@ describe('useReaderLifecycleController', () => {
       },
       restoreFlow: {
         pendingRestoreTarget: null,
+        pendingRestoreTargetRef: { current: null },
         clearPendingRestoreTarget: vi.fn(),
         setPendingRestoreTarget,
         startRestoreMaskForTarget,
@@ -388,6 +407,7 @@ describe('useReaderLifecycleController', () => {
         },
         restoreFlow: {
           pendingRestoreTarget: null,
+          pendingRestoreTargetRef: { current: null },
           clearPendingRestoreTarget,
           setPendingRestoreTarget,
           startRestoreMaskForTarget,
@@ -430,6 +450,7 @@ describe('useReaderLifecycleController', () => {
       },
       restoreFlow: {
         pendingRestoreTarget: persistedRestoreTarget,
+        pendingRestoreTargetRef: { current: persistedRestoreTarget },
         clearPendingRestoreTarget,
         setPendingRestoreTarget,
         startRestoreMaskForTarget,
@@ -455,6 +476,107 @@ describe('useReaderLifecycleController', () => {
     );
     expect(startRestoreMaskForTarget).toHaveBeenLastCalledWith(persistedRestoreTarget);
     expect(clearPendingRestoreTarget).toHaveBeenCalledTimes(1);
+  });
+
+  it('reuses the mode-switch restore target from the ref before the session snapshot catches up', async () => {
+    const hydrateDeferred = createDeferred<ReaderHydrateDataResult>();
+    const loadDeferred = createDeferred<ReaderLoadActiveChapterResult>();
+    const persistedRestoreTarget = createRestoreTarget({
+      chapterIndex: 2,
+      mode: 'paged',
+      locatorBoundary: 'start',
+      chapterProgress: undefined,
+    });
+    const hydrateReaderData = vi.fn(() => hydrateDeferred.promise);
+    const loadActiveChapter = vi.fn(() => loadDeferred.promise);
+    const clearPendingRestoreTarget = vi.fn();
+    const setPendingRestoreTarget = vi.fn();
+    const startRestoreMaskForTarget = vi.fn();
+
+    const { result, rerender } = renderHook(useReaderLifecycleController, {
+      initialProps: createProps({
+        chapterIndex: 0,
+        mode: 'scroll',
+        currentPagedLayoutChapterIndex: null,
+        chapterData: {
+          chapters: [],
+          currentChapter: null,
+          loadingMessage: 'loading',
+          readerError: null,
+          hydrateReaderData,
+          loadActiveChapter,
+          resetReaderContent: vi.fn(),
+        },
+        restoreFlow: {
+          pendingRestoreTarget: null,
+          pendingRestoreTargetRef: { current: null },
+          clearPendingRestoreTarget,
+          setPendingRestoreTarget,
+          startRestoreMaskForTarget,
+          stopRestoreMask: vi.fn(),
+        },
+      }),
+      wrapper: Wrapper,
+    });
+
+    await act(async () => {
+      hydrateDeferred.resolve({
+        hasChapters: true,
+        initialRestoreTarget: null,
+        resolvedState: createStoredState({
+          chapterIndex: 2,
+          mode: 'paged',
+          lastContentMode: 'paged',
+        }),
+        storedState: createStoredState({
+          chapterIndex: 2,
+          mode: 'paged',
+          lastContentMode: 'paged',
+        }),
+      });
+      await Promise.resolve();
+    });
+
+    rerender(createProps({
+      chapterIndex: 2,
+      mode: 'paged',
+      currentPagedLayoutChapterIndex: null,
+      chapterData: {
+        chapters: [createChapter(2)],
+        currentChapter: createChapterContent(2),
+        loadingMessage: null,
+        readerError: null,
+        hydrateReaderData,
+        loadActiveChapter,
+        resetReaderContent: vi.fn(),
+      },
+      restoreFlow: {
+        pendingRestoreTarget: null,
+        pendingRestoreTargetRef: { current: persistedRestoreTarget },
+        clearPendingRestoreTarget,
+        setPendingRestoreTarget,
+        startRestoreMaskForTarget,
+        stopRestoreMask: vi.fn(),
+      },
+    }));
+
+    await act(async () => {
+      loadDeferred.resolve({
+        navigationRestoreTarget: null,
+        shouldClearNavigationSource: true,
+        shouldResetViewport: true,
+      });
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(result.current.lifecycleStatus).toBe('restoring-position');
+    });
+    expect(setPendingRestoreTarget).toHaveBeenLastCalledWith(
+      persistedRestoreTarget,
+      { force: true },
+    );
+    expect(startRestoreMaskForTarget).toHaveBeenLastCalledWith(persistedRestoreTarget);
   });
 
   it('keeps the loading overlay visible for paged restores until the layout consumes the restore target', async () => {
@@ -484,6 +606,7 @@ describe('useReaderLifecycleController', () => {
         },
         restoreFlow: {
           pendingRestoreTarget: null,
+          pendingRestoreTargetRef: { current: null },
           clearPendingRestoreTarget: vi.fn(),
           setPendingRestoreTarget: vi.fn(),
           startRestoreMaskForTarget: vi.fn(),
@@ -526,6 +649,7 @@ describe('useReaderLifecycleController', () => {
       },
       restoreFlow: {
         pendingRestoreTarget: null,
+        pendingRestoreTargetRef: { current: null },
         clearPendingRestoreTarget: vi.fn(),
         setPendingRestoreTarget: vi.fn(),
         startRestoreMaskForTarget: vi.fn(),
@@ -562,6 +686,7 @@ describe('useReaderLifecycleController', () => {
       },
       restoreFlow: {
         pendingRestoreTarget: restoreTarget,
+        pendingRestoreTargetRef: { current: restoreTarget },
         clearPendingRestoreTarget: vi.fn(),
         setPendingRestoreTarget: vi.fn(),
         startRestoreMaskForTarget: vi.fn(),
@@ -586,6 +711,7 @@ describe('useReaderLifecycleController', () => {
       },
       restoreFlow: {
         pendingRestoreTarget: null,
+        pendingRestoreTargetRef: { current: null },
         clearPendingRestoreTarget: vi.fn(),
         setPendingRestoreTarget: vi.fn(),
         startRestoreMaskForTarget: vi.fn(),
@@ -631,6 +757,61 @@ describe('useReaderLifecycleController', () => {
       expect(result.current.lifecycleStatus).toBe('ready');
     });
     expect(loadActiveChapter).not.toHaveBeenCalled();
+  });
+
+  it('does not reset the viewport before a same-chapter restore-driven mode switch', async () => {
+    const contentRef = { current: createViewportContainer() };
+    const { Wrapper: RuntimeWrapper } = createReaderContextWrapper({
+      contentRef,
+    });
+    const restoreTarget = createRestoreTarget({
+      chapterIndex: 1,
+      locatorBoundary: 'start',
+      mode: 'scroll',
+    });
+    const hydrateReaderData = vi.fn(async () => ({
+      hasChapters: true,
+      initialRestoreTarget: null,
+      resolvedState: createStoredState({ chapterIndex: 1, mode: 'scroll' }),
+      storedState: createStoredState({ chapterIndex: 1, mode: 'scroll' }),
+    }));
+    const loadActiveChapter = vi.fn(async () => ({
+      navigationRestoreTarget: null,
+      shouldClearNavigationSource: true,
+      shouldResetViewport: true,
+    }));
+
+    renderHook(useReaderLifecycleController, {
+      initialProps: createProps({
+        chapterIndex: 1,
+        mode: 'scroll',
+        chapterData: {
+          chapters: [createChapter(1)],
+          currentChapter: createChapterContent(1),
+          loadingMessage: null,
+          readerError: null,
+          hydrateReaderData,
+          loadActiveChapter,
+          resetReaderContent: vi.fn(),
+        },
+        restoreFlow: {
+          pendingRestoreTarget: restoreTarget,
+          pendingRestoreTargetRef: { current: restoreTarget },
+          clearPendingRestoreTarget: vi.fn(),
+          setPendingRestoreTarget: vi.fn(),
+          startRestoreMaskForTarget: vi.fn(),
+          stopRestoreMask: vi.fn(),
+        },
+      }),
+      wrapper: RuntimeWrapper,
+    });
+
+    await waitFor(() => {
+      expect(loadActiveChapter).toHaveBeenCalled();
+    });
+
+    expect(contentRef.current.scrollTop).toBe(240);
+    expect(contentRef.current.scrollLeft).toBe(36);
   });
 
   it('surfaces errors when the active chapter load fails', async () => {

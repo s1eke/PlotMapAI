@@ -2,8 +2,8 @@
 
 import { describe, expect, it } from 'vitest';
 
+import { loadArchitectureContract } from '../architecture/contracts.mjs';
 import {
-  READER_FILE_LINE_LIMIT,
   evaluateReaderArchitecture,
   findInvalidReaderContentRootExports,
   findInvalidReaderLayoutEngineRootExports,
@@ -13,18 +13,85 @@ import {
 } from '../checkReaderArchitecture.mjs';
 
 describe('checkReaderArchitecture', () => {
-  it('flags oversized reader files over the configured threshold', () => {
+  const { metricDefaults, readerArchitecture } = loadArchitectureContract();
+  const readerMetricBudgets = {
+    ...metricDefaults.metricBudgets,
+    ...readerArchitecture.metricBudgets,
+  };
+  const readerLayoutEngineBarrel = readerArchitecture.stableBarrels.find(
+    (entry) => entry.path === 'src/domains/reader-layout-engine/index.ts',
+  );
+  const readerContentBarrel = readerArchitecture.stableBarrels.find(
+    (entry) => entry.path === 'src/domains/reader-content/index.ts',
+  );
+
+  it('uses the shared effective-line hard cap for reader files', () => {
+    const lineCount = readerMetricBudgets.effectiveLines + 1;
     const result = evaluateReaderArchitecture({
       'src/application/pages/reader/useReaderReadingSurfaceController.tsx':
-        `${'line\n'.repeat(READER_FILE_LINE_LIMIT + 1)}`,
+        `${'const line = 1;\n'.repeat(lineCount)}`,
     });
 
-    expect(result.oversizedFiles).toEqual([
+    expect(result.metricViolations).toContainEqual(
       expect.objectContaining({
+        actual: lineCount,
         filePath: 'src/application/pages/reader/useReaderReadingSurfaceController.tsx',
-        lineCount: READER_FILE_LINE_LIMIT + 2,
+        limit: readerMetricBudgets.effectiveLines,
+        metric: 'effectiveLines',
       }),
-    ]);
+    );
+  });
+
+  it('flags reader files with functions over the configured health threshold', () => {
+    const bodyLineCount = readerMetricBudgets.maxFunctionLines + 1;
+    const result = evaluateReaderArchitecture({
+      'src/domains/reader-layout-engine/hooks/useReaderMetrics.ts': [
+        'export const useReaderMetrics = () => {',
+        ...Array.from({ length: bodyLineCount }, (_, index) => `  const line${index} = ${index};`),
+        '  return line0;',
+        '};',
+      ].join('\n'),
+    });
+
+    expect(result.metricViolations).toContainEqual(
+      expect.objectContaining({
+        filePath: 'src/domains/reader-layout-engine/hooks/useReaderMetrics.ts',
+        functionName: 'useReaderMetrics',
+        limit: readerMetricBudgets.maxFunctionLines,
+        metric: 'maxFunctionLines',
+        startLine: 1,
+      }),
+    );
+  });
+
+  it('flags reader files with excessive imports and cross-layer imports', () => {
+    const importLines = Array.from({ length: readerMetricBudgets.importCount + 1 }, (_, index) => (
+      `import { thing${index} } from '@domains/reader-content';`
+    ));
+    const result = evaluateReaderArchitecture({
+      'src/application/pages/reader/useReaderMetrics.ts': [
+        ...importLines,
+        'export const useReaderMetrics = () => null;',
+      ].join('\n'),
+    });
+
+    expect(result.metricViolations).toContainEqual(
+      expect.objectContaining({
+        actual: readerMetricBudgets.importCount + 1,
+        filePath: 'src/application/pages/reader/useReaderMetrics.ts',
+        limit: readerMetricBudgets.importCount,
+        metric: 'importCount',
+      }),
+    );
+    expect(result.metricViolations).toContainEqual(
+      expect.objectContaining({
+        actual: readerMetricBudgets.importCount + 1,
+        filePath: 'src/application/pages/reader/useReaderMetrics.ts',
+        limit: readerMetricBudgets.crossLayerImports,
+        metric: 'crossLayerImports',
+        specifiers: Array.from({ length: readerMetricBudgets.importCount + 1 }, () => '@domains/reader-content'),
+      }),
+    );
   });
 
   it('finds restricted reader-layout-engine imports into sibling reader domains', () => {
@@ -55,7 +122,7 @@ describe('checkReaderArchitecture', () => {
 
   it('flags reader-layout-engine root barrel exports outside the stable public surface', () => {
     expect(findInvalidReaderLayoutEngineRootExports(
-      'src/domains/reader-layout-engine/index.ts',
+      readerLayoutEngineBarrel?.path ?? 'src/domains/reader-layout-engine/index.ts',
       [
         'export { PagedReaderContent } from \'./paged-runtime\';',
         'export { buildStaticPagedChapterTree } from \'./layout-core\';',
@@ -67,7 +134,7 @@ describe('checkReaderArchitecture', () => {
 
   it('flags reader-content root barrel exports outside the stable public surface', () => {
     expect(findInvalidReaderContentRootExports(
-      'src/domains/reader-content/index.ts',
+      readerContentBarrel?.path ?? 'src/domains/reader-content/index.ts',
       [
         'export type { Chapter, ChapterContent, ReaderChapterCacheApi } from \'@shared/contracts/reader\';',
         'export { readerContentService } from \'./readerContentService\';',
@@ -91,7 +158,7 @@ describe('checkReaderArchitecture', () => {
 
   it('includes invalid reader-layout-engine root barrel exports in the aggregated result', () => {
     const result = evaluateReaderArchitecture({
-      'src/domains/reader-layout-engine/index.ts': [
+      [readerLayoutEngineBarrel?.path ?? 'src/domains/reader-layout-engine/index.ts']: [
         'export { PagedReaderContent } from \'./paged-runtime\';',
         'export { resolveReaderContentRootProps } from \'./layout-core\';',
         'export { buildStaticPagedChapterTree } from \'./layout-core\';',
@@ -100,7 +167,7 @@ describe('checkReaderArchitecture', () => {
 
     expect(result.invalidRootBarrelExports).toEqual([
       expect.objectContaining({
-        filePath: 'src/domains/reader-layout-engine/index.ts',
+        filePath: readerLayoutEngineBarrel?.path ?? 'src/domains/reader-layout-engine/index.ts',
         line: 'export { buildStaticPagedChapterTree } from \'./layout-core\';',
       }),
     ]);
@@ -110,7 +177,7 @@ describe('checkReaderArchitecture', () => {
     const result = evaluateReaderArchitecture({
       'src/domains/reader-layout-engine/hooks/useScrollReaderController.ts':
         'import { ReaderContextProvider } from \'@domains/reader-shell/pages/reader-page/ReaderContext\';\n',
-      'src/domains/reader-content/index.ts': [
+      [readerContentBarrel?.path ?? 'src/domains/reader-content/index.ts']: [
         'export type { Chapter, ChapterContent, ReaderChapterCacheApi } from \'@shared/contracts/reader\';',
         'export { readerContentService } from \'./readerContentService\';',
       ].join('\n'),
@@ -124,7 +191,7 @@ describe('checkReaderArchitecture', () => {
     ]);
     expect(result.invalidReaderContentRootExports).toEqual([
       expect.objectContaining({
-        filePath: 'src/domains/reader-content/index.ts',
+        filePath: readerContentBarrel?.path ?? 'src/domains/reader-content/index.ts',
         line: 'export { readerContentService } from \'./readerContentService\';',
       }),
     ]);

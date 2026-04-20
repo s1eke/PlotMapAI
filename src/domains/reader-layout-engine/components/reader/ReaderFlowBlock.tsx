@@ -3,7 +3,7 @@ import type {
   ReaderImageActivationPayload,
   ReaderImageGalleryEntry,
 } from '@shared/contracts/reader';
-import type { StaticReaderNode } from '../../utils/readerLayout';
+import type { StaticReaderNode } from '../../utils/layout/readerLayout';
 
 import { ReaderFlowBlockImage } from './ReaderFlowBlockImage';
 import { ReaderFlowBlockText } from './ReaderFlowBlockText';

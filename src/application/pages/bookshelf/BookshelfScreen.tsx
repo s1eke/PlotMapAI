@@ -3,7 +3,7 @@ import type { ReactElement, ReactNode } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import { appPaths } from '@app/router/paths';
+import { appPaths } from '@shared/routing/appPaths';
 import { BookCard } from '@domains/library';
 import { translateAppError } from '@shared/errors';
 import { cn } from '@shared/utils/cn';

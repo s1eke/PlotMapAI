@@ -6,7 +6,7 @@ import type { ReaderImageViewerProps } from '../components/reader/ReaderImageVie
 
 import { useEffect, useMemo } from 'react';
 import { useReaderContentRuntime } from '@shared/reader-runtime';
-import { createReaderImageEntryId } from '@shared/reader-content';
+import { createReaderImageEntryId } from '@shared/reader-rendering';
 
 import { preloadReaderImageResources, clearReaderImageResourcesForNovel } from '../utils/readerImageResourceCache';
 import { useReaderPageImageGalleryIndex } from './useReaderPageImageGalleryIndex';

@@ -1,9 +1,13 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { db } from '@infra/db';
-import { purificationRuleRepository } from '../purificationRuleRepository';
+import {
+  purificationRuleRepository,
+  resetPurificationRuleRepositorySnapshotsForTests,
+} from '../purificationRuleRepository';
 
 describe('purificationRuleRepository', () => {
   beforeEach(async () => {
+    resetPurificationRuleRepositorySnapshotsForTests();
     await db.delete();
     await db.open();
     localStorage.clear();
@@ -12,6 +16,15 @@ describe('purificationRuleRepository', () => {
   it('getPurificationRules returns empty array when no rules', async () => {
     const rules = await purificationRuleRepository.getPurificationRules();
     expect(rules).toEqual([]);
+  });
+
+  it('reuses the enabled rules snapshot until the underlying rules change', async () => {
+    const firstSnapshot = await purificationRuleRepository.getEnabledPurificationRulesSnapshot();
+    const secondSnapshot = await purificationRuleRepository.getEnabledPurificationRulesSnapshot();
+
+    expect(firstSnapshot).toBe(secondSnapshot);
+    expect(firstSnapshot.version).toBe(0);
+    expect(firstSnapshot.rules).toEqual([]);
   });
 
   it('createPurificationRule creates a new rule', async () => {
@@ -24,6 +37,59 @@ describe('purificationRuleRepository', () => {
     expect(rule.pattern).toBe('foo');
     expect(rule.replacement).toBe('bar');
     expect(rule.isDefault).toBe(false);
+  });
+
+  it('bumps the enabled rules snapshot version after create, update, toggle, delete, clear, and upload', async () => {
+    const initialSnapshot = await purificationRuleRepository.getEnabledPurificationRulesSnapshot();
+
+    const created = await purificationRuleRepository.createPurificationRule({
+      name: 'Versioned',
+      pattern: 'foo',
+      replacement: 'bar',
+    });
+    let snapshot = await purificationRuleRepository.getEnabledPurificationRulesSnapshot();
+    expect(snapshot.version).toBe(initialSnapshot.version + 1);
+    expect(snapshot.rules).toHaveLength(1);
+
+    await purificationRuleRepository.updatePurificationRule(created.id, { replacement: 'baz' });
+    snapshot = await purificationRuleRepository.getEnabledPurificationRulesSnapshot();
+    expect(snapshot.version).toBe(initialSnapshot.version + 2);
+    expect(snapshot.rules[0]?.replacement).toBe('baz');
+
+    await purificationRuleRepository.updatePurificationRule(created.id, { isEnabled: false });
+    snapshot = await purificationRuleRepository.getEnabledPurificationRulesSnapshot();
+    expect(snapshot.version).toBe(initialSnapshot.version + 3);
+    expect(snapshot.rules).toEqual([]);
+
+    await purificationRuleRepository.updatePurificationRule(created.id, { isEnabled: true });
+    snapshot = await purificationRuleRepository.getEnabledPurificationRulesSnapshot();
+    expect(snapshot.version).toBe(initialSnapshot.version + 4);
+    expect(snapshot.rules).toHaveLength(1);
+
+    await purificationRuleRepository.deletePurificationRule(created.id);
+    snapshot = await purificationRuleRepository.getEnabledPurificationRulesSnapshot();
+    expect(snapshot.version).toBe(initialSnapshot.version + 5);
+    expect(snapshot.rules).toEqual([]);
+
+    await purificationRuleRepository.createPurificationRule({
+      name: 'Clear me',
+      pattern: 'clear',
+      replacement: '',
+    });
+    await purificationRuleRepository.clearAllPurificationRules();
+    snapshot = await purificationRuleRepository.getEnabledPurificationRulesSnapshot();
+    expect(snapshot.version).toBe(initialSnapshot.version + 7);
+    expect(snapshot.rules).toEqual([]);
+
+    await purificationRuleRepository.uploadPurificationRulesYaml(new File([`
+- name: Uploaded
+  pattern: uploaded
+  replacement: value
+`], 'purification.yaml', { type: 'text/yaml' }));
+    snapshot = await purificationRuleRepository.getEnabledPurificationRulesSnapshot();
+    expect(snapshot.version).toBe(initialSnapshot.version + 8);
+    expect(snapshot.rules).toHaveLength(1);
+    expect(snapshot.rules[0]?.pattern).toBe('uploaded');
   });
 
   it('createPurificationRule throws without name or pattern', async () => {

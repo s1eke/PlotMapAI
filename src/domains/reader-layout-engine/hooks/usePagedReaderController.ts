@@ -1,13 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type {
-  Chapter,
-  ChapterContent,
   PageTarget,
-  ReaderChapterCacheApi,
-  ReaderRestoreResult,
-  ReaderRestoreTarget,
-  ReaderSessionCommands,
-  ReaderSessionSnapshot,
 } from '@shared/contracts/reader';
 import {
   useReaderLayoutQueries,
@@ -18,89 +11,26 @@ import {
 import { debugLog, setDebugSnapshot } from '@shared/debug';
 import { createCanonicalPositionFromNavigationIntent } from '@shared/utils/readerPosition';
 import { toCanonicalPositionFromLocator } from '@shared/utils/readerStoredState';
-import { resolveCurrentPagedLocator } from '../layout-core/internal';
+import {
+  findPageIndexForLocator,
+  resolveCurrentPagedLocator,
+} from '../layout-core/internal';
 import {
   usePagedChapterPreviews,
   usePagedChapterTransition,
   usePagedReaderLayout,
 } from '../paged-runtime/internal';
 import { useReaderRenderCache } from '../render-cache/internal';
-type NavigationDirection = 'next' | 'prev';
-type DirectionalNavigationReplay = (
-  direction: NavigationDirection,
-  shouldAnimate: boolean,
-) => void;
-type PagedReaderRenderCache = ReturnType<typeof useReaderRenderCache>;
-type PagedReaderLayout =
-  PagedReaderRenderCache['pagedLayouts'] extends Map<number, infer Layout>
-    ? Layout
-    : never;
+import {
+  EMPTY_SCROLL_CHAPTERS,
+  type DirectionalNavigationReplay,
+  type NavigationDirection,
+  type UsePagedReaderControllerParams,
+  type UsePagedReaderControllerResult,
+} from './pagedReaderControllerTypes';
+import { usePagedReaderControllerTrace } from './usePagedReaderControllerTrace';
 
-const EMPTY_SCROLL_CHAPTERS: Array<{ chapter: ChapterContent; index: number }> = [];
-
-interface PagedReaderControllerPreferences {
-  fontSize: number;
-  lineSpacing: number;
-  paragraphSpacing: number;
-}
-
-interface UsePagedReaderControllerParams {
-  enabled: boolean;
-  novelId: number;
-  chapters: Chapter[];
-  currentChapter: ChapterContent | null;
-  chapterDataRevision: number;
-  sessionSnapshot: Pick<ReaderSessionSnapshot, 'chapterIndex'>;
-  sessionCommands: Pick<
-    ReaderSessionCommands,
-    'hasUserInteractedRef' | 'persistReaderState' | 'setChapterIndex'
-  >;
-  cache: Pick<ReaderChapterCacheApi, 'snapshotCachedChapters'>;
-  fetchChapterContent: (
-    index: number,
-    options?: {
-      signal?: AbortSignal;
-      onProgress?: (message: string) => void;
-    },
-  ) => Promise<ChapterContent>;
-  preferences: PagedReaderControllerPreferences;
-  pendingRestoreTarget: ReaderRestoreTarget | null;
-  pendingRestoreTargetRef: React.MutableRefObject<ReaderRestoreTarget | null>;
-  getRestoreAttempt: (target: ReaderRestoreTarget | null | undefined) => number;
-  recordRestoreResult: (
-    result: ReaderRestoreResult,
-    target: ReaderRestoreTarget | null | undefined,
-  ) => { scheduledRetry: boolean };
-  clearPendingRestoreTarget: () => void;
-  stopRestoreMask: () => void;
-  beforeChapterChange?: () => void;
-}
-
-export interface UsePagedReaderControllerResult {
-  currentPagedLayout: PagedReaderLayout | null;
-  currentPagedLayoutChapterIndex: number | null;
-  handlePagedContentRef: (element: HTMLDivElement | null) => void;
-  handlePagedViewportRef: (element: HTMLDivElement | null) => void;
-  nextChapterPreview: ChapterContent | null;
-  nextPagedLayout: PagedReaderLayout | null;
-  pageCount: number;
-  pageIndex: number;
-  pageTurnDirection: NavigationDirection;
-  pageTurnToken: number;
-  pendingPageTarget: PageTarget | null;
-  previousChapterPreview: ChapterContent | null;
-  previousPagedLayout: PagedReaderLayout | null;
-  goToChapter: (targetIndex: number, pageTarget?: PageTarget) => void;
-  goToNextPage: () => void;
-  goToNextPageSilently: () => void;
-  goToPrevPage: () => void;
-  goToPrevPageSilently: () => void;
-  handleNext: () => void;
-  handlePrev: () => void;
-  toolbarHasNext: boolean;
-  toolbarHasPrev: boolean;
-}
-
+export type { UsePagedReaderControllerResult } from './pagedReaderControllerTypes';
 export function usePagedReaderController({
   enabled,
   novelId,
@@ -145,12 +75,10 @@ export function usePagedReaderController({
   const [pagedContentElement, setPagedContentElement] = useState<HTMLDivElement | null>(null);
   const [pagedViewportElement, setPagedViewportElement] = useState<HTMLDivElement | null>(null);
   const replayDirectionalNavigationRef = useRef<DirectionalNavigationReplay>(() => {});
-
   useEffect(() => {
     if (enabled) {
       return;
     }
-
     setPageIndex(0);
     setPageCount(1);
     setPendingPageTarget(null);
@@ -161,7 +89,6 @@ export function usePagedReaderController({
     setPagedContentElement(null);
     setPagedViewportElement(null);
   }, [enabled, navigation, viewport.pagedViewportRef]);
-
   const {
     nextChapterPreview,
     pagedChapters,
@@ -174,7 +101,6 @@ export function usePagedReaderController({
     enabled,
     novelId,
   });
-
   const handlePagedViewportRef = useCallback((element: HTMLDivElement | null) => {
     viewport.pagedViewportRef.current = element;
     setPagedViewportElement((previousElement) => (
@@ -187,7 +113,6 @@ export function usePagedReaderController({
       previousElement === element ? previousElement : element
     ));
   }, []);
-
   const renderCache = useReaderRenderCache({
     chapters,
     currentChapter: enabled ? currentChapter : null,
@@ -203,7 +128,6 @@ export function usePagedReaderController({
     scrollChapters: EMPTY_SCROLL_CHAPTERS,
     viewMode: 'original',
   });
-
   const currentPagedLayout = enabled && currentChapter
     ? renderCache.pagedLayouts.get(currentChapter.index) ?? null
     : null;
@@ -216,9 +140,22 @@ export function usePagedReaderController({
   const effectivePageCount = currentPagedLayout
     ? Math.max(1, currentPagedLayout.pageSlices.length)
     : pageCount;
-
+  const effectivePageCountRef = useRef(effectivePageCount);
+  effectivePageCountRef.current = effectivePageCount;
+  const setPageIndexAndSyncRuntime = useCallback((nextPageIndex: React.SetStateAction<number>) => {
+    setPageIndex((previousPageIndex) => {
+      const resolvedPageIndex = typeof nextPageIndex === 'function'
+        ? nextPageIndex(previousPageIndex)
+        : nextPageIndex;
+      navigation.setPagedState({
+        pageCount: effectivePageCountRef.current,
+        pageIndex: resolvedPageIndex,
+      });
+      return resolvedPageIndex;
+    });
+  }, [navigation]);
   useEffect(() => {
-    return layoutQueries.registerCurrentPagedLocatorResolver(() => {
+    const unregisterCurrentLocator = layoutQueries.registerCurrentPagedLocatorResolver(() => {
       return resolveCurrentPagedLocator({
         currentPagedLayout,
         isPagedMode: enabled,
@@ -226,13 +163,18 @@ export function usePagedReaderController({
         viewMode: 'original',
       });
     });
+    const unregisterPageIndexResolver = layoutQueries.registerPagedLocatorPageIndexResolver(
+      (locator) => findPageIndexForLocator(currentPagedLayout, locator),
+    );
+    return () => {
+      unregisterCurrentLocator();
+      unregisterPageIndexResolver();
+    };
   }, [currentPagedLayout, enabled, layoutQueries, pageIndex]);
-
   const clearPendingPageTarget = useCallback(() => {
     navigation.setPendingPageTarget(null);
     setPendingPageTarget(null);
   }, [navigation]);
-
   const pagedLayout = usePagedReaderLayout({
     chapterIndex,
     currentChapter,
@@ -252,7 +194,7 @@ export function usePagedReaderController({
     notifyRestoreSettled: persistence.notifyRestoreSettled,
     stopRestoreMask,
     setPageCount,
-    setPageIndex,
+    setPageIndex: setPageIndexAndSyncRuntime,
     fontSize: preferences.fontSize,
     lineSpacing: preferences.lineSpacing,
     paragraphSpacing: preferences.paragraphSpacing,
@@ -321,7 +263,7 @@ export function usePagedReaderController({
     }
 
     if (pageIndex < effectivePageCount - 1) {
-      setPageIndex((previousPageIndex) => previousPageIndex + 1);
+      setPageIndexAndSyncRuntime((previousPageIndex) => previousPageIndex + 1);
       return true;
     }
 
@@ -340,6 +282,7 @@ export function usePagedReaderController({
     isPageNavigationReady,
     pageIndex,
     requestChapterNavigation,
+    setPageIndexAndSyncRuntime,
   ]);
 
   const stepPrevPage = useCallback((allowChapterTransition: boolean) => {
@@ -352,7 +295,7 @@ export function usePagedReaderController({
     }
 
     if (pageIndex > 0) {
-      setPageIndex((previousPageIndex) => previousPageIndex - 1);
+      setPageIndexAndSyncRuntime((previousPageIndex) => previousPageIndex - 1);
       return true;
     }
 
@@ -369,6 +312,7 @@ export function usePagedReaderController({
     isPageNavigationReady,
     pageIndex,
     requestChapterNavigation,
+    setPageIndexAndSyncRuntime,
   ]);
 
   useLayoutEffect(() => {
@@ -429,7 +373,8 @@ export function usePagedReaderController({
   const toolbarHasNext = pageIndex < effectivePageCount - 1 || Boolean(currentChapter?.hasNext);
 
   useEffect(() => {
-    if (!enabled || currentChapter?.index !== chapterIndex || pendingRestoreTargetRef.current) {
+    const activePendingRestoreTarget = pendingRestoreTargetRef.current ?? pendingRestoreTarget;
+    if (!enabled || currentChapter?.index !== chapterIndex || activePendingRestoreTarget) {
       return;
     }
 
@@ -461,6 +406,7 @@ export function usePagedReaderController({
     enabled,
     layoutQueries,
     pageIndex,
+    pendingRestoreTarget,
     pendingRestoreTargetRef,
     persistReaderState,
   ]);
@@ -471,6 +417,16 @@ export function usePagedReaderController({
       pageIndex,
     });
   }, [effectivePageCount, navigation, pageIndex]);
+  usePagedReaderControllerTrace({
+    chapterIndex,
+    currentChapterIndex: currentChapter?.index ?? null,
+    effectivePageCount,
+    enabled,
+    pageIndex,
+    pageTurnDirection: pageTurnState.direction,
+    pageTurnToken: pageTurnState.token,
+    pendingRestoreTargetRef,
+  });
 
   return {
     currentPagedLayout,

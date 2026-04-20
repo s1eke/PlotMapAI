@@ -3,11 +3,12 @@ import type { ReactNode } from 'react';
 import { renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createReaderContextWrapper } from '@test/readerRuntimeTestUtils';
-import { DEBUG_RETRY_READER_RESTORE_EVENT } from '@app/debug/pwaDebugTools';
+import { DEBUG_RETRY_READER_RESTORE_EVENT } from '@shared/pwa/pwaDebugTools';
 
 import { useReaderReadingSurfaceController } from '../useReaderReadingSurfaceController';
 
 const surfaceMocks = vi.hoisted(() => {
+  const useReaderChapterData = vi.fn();
   const chapter = {
     index: 0,
     title: 'Chapter 1',
@@ -102,6 +103,8 @@ const surfaceMocks = vi.hoisted(() => {
       getRestoreAttempt: vi.fn(() => 0),
       handleBeforeChapterChange: vi.fn(),
       handleContentScroll: vi.fn(),
+      handleRestoreSettled: vi.fn(() => false),
+      modeSwitchError: null as { code: string } | null,
       pendingRestoreTarget: null,
       pendingRestoreTargetRef: { current: null },
       recordRestoreResult: vi.fn(() => ({ scheduledRetry: false })),
@@ -130,11 +133,15 @@ const surfaceMocks = vi.hoisted(() => {
       mode: 'summary' as const,
       viewMode: 'summary' as const,
     },
+    useReaderChapterData,
   };
 });
 
 vi.mock('@domains/reader-content', () => ({
-  useReaderChapterData: () => surfaceMocks.chapterData,
+  useReaderChapterData: (params: unknown) => {
+    surfaceMocks.useReaderChapterData(params);
+    return surfaceMocks.chapterData;
+  },
 }));
 
 vi.mock('@domains/reader-layout-engine', () => ({
@@ -185,6 +192,7 @@ vi.mock('@domains/reader-session', () => ({
       markUserInteracted: vi.fn(),
       persistReaderState: vi.fn(),
       setChapterIndex: vi.fn(),
+      setLastContentMode: vi.fn(),
       setMode: vi.fn(),
     },
     snapshot: surfaceMocks.sessionSnapshot,
@@ -202,13 +210,15 @@ vi.mock('../useReaderNavigation', () => ({
 describe('useReaderReadingSurfaceController', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    surfaceMocks.useReaderChapterData.mockClear();
     surfaceMocks.sessionSnapshot.mode = 'summary';
     surfaceMocks.sessionSnapshot.viewMode = 'summary';
     surfaceMocks.sessionSnapshot.isPagedMode = false;
+    surfaceMocks.restoreFlow.modeSwitchError = null;
     surfaceMocks.scrollController.renderableScrollLayouts = [];
   });
 
-  it('builds summary content props and registers restore-settled handling', () => {
+  it('builds summary content props and registers wrapped restore-settled handling', () => {
     const { Wrapper } = createReaderContextWrapper({
       registerRestoreSettledHandler: surfaceMocks.registerRestoreSettledHandler,
     });
@@ -240,13 +250,95 @@ describe('useReaderReadingSurfaceController', () => {
       chapter: surfaceMocks.chapter,
       headerBgClassName: 'bg-header',
     });
+    expect(result.current.modeSwitchError).toBeNull();
     expect(contentProps.scrollContentProps).toBeUndefined();
-    expect(surfaceMocks.registerRestoreSettledHandler)
-      .toHaveBeenCalledWith(surfaceMocks.lifecycle.handleRestoreSettled);
+    expect(surfaceMocks.registerRestoreSettledHandler).toHaveBeenCalledTimes(1);
+
+    const registeredHandler = surfaceMocks.registerRestoreSettledHandler.mock.calls[0]?.[0];
+    expect(registeredHandler).toBeTypeOf('function');
+
+    surfaceMocks.restoreFlow.handleRestoreSettled.mockReturnValueOnce(true);
+    registeredHandler('failed');
+    expect(surfaceMocks.restoreFlow.handleRestoreSettled).toHaveBeenCalledWith('failed');
+    expect(surfaceMocks.lifecycle.handleRestoreSettled).not.toHaveBeenCalled();
+
+    surfaceMocks.restoreFlow.handleRestoreSettled.mockReturnValueOnce(false);
+    registeredHandler('completed');
+    expect(surfaceMocks.restoreFlow.handleRestoreSettled).toHaveBeenCalledWith('completed');
+    expect(surfaceMocks.lifecycle.handleRestoreSettled).toHaveBeenCalledWith('completed');
 
     result.current.viewport.handleViewportScroll();
     expect(surfaceMocks.restoreFlow.handleContentScroll).toHaveBeenCalledTimes(1);
     expect(surfaceMocks.scrollController.handleContentScroll).not.toHaveBeenCalled();
+  });
+
+  it('keeps a stable restore-settled subscription while dispatching to the latest callbacks', () => {
+    const { Wrapper } = createReaderContextWrapper({
+      registerRestoreSettledHandler: surfaceMocks.registerRestoreSettledHandler,
+    });
+    const analysisController = {
+      analyzeChapter: vi.fn(),
+      getChapterAnalysis: vi.fn(),
+      getStatus: vi.fn(),
+      renderSummaryPanel: vi.fn(() => 'summary-panel'),
+    };
+
+    const { rerender } = renderHook(() => useReaderReadingSurfaceController({
+      analysisController,
+      novelId: 1,
+      preferences: surfaceMocks.preferences,
+    }), {
+      wrapper: Wrapper,
+    });
+
+    const registeredHandler = surfaceMocks.registerRestoreSettledHandler.mock.calls[0]?.[0];
+    expect(registeredHandler).toBeTypeOf('function');
+
+    const nextRestoreFlowHandler = vi.fn(() => false);
+    const nextLifecycleHandler = vi.fn();
+    surfaceMocks.restoreFlow.handleRestoreSettled = nextRestoreFlowHandler;
+    surfaceMocks.lifecycle.handleRestoreSettled = nextLifecycleHandler;
+
+    rerender();
+
+    expect(surfaceMocks.registerRestoreSettledHandler).toHaveBeenCalledTimes(1);
+
+    registeredHandler('completed');
+
+    expect(nextRestoreFlowHandler).toHaveBeenCalledWith('completed');
+    expect(nextLifecycleHandler).toHaveBeenCalledWith('completed');
+  });
+
+  it('keeps the chapter content resolved callback stable across rerenders', () => {
+    const { Wrapper } = createReaderContextWrapper();
+
+    const { rerender } = renderHook(() => useReaderReadingSurfaceController({
+      analysisController: {
+        analyzeChapter: vi.fn(),
+        getChapterAnalysis: vi.fn(),
+        getStatus: vi.fn(),
+        renderSummaryPanel: vi.fn(() => 'summary-panel'),
+      },
+      novelId: 1,
+      preferences: surfaceMocks.preferences,
+    }), {
+      wrapper: Wrapper,
+    });
+
+    expect(surfaceMocks.useReaderChapterData).toHaveBeenCalledTimes(1);
+    const firstCall = surfaceMocks.useReaderChapterData.mock.calls[0]?.[0] as {
+      onChapterContentResolved?: () => void;
+    };
+
+    rerender();
+
+    expect(surfaceMocks.useReaderChapterData).toHaveBeenCalledTimes(2);
+    const secondCall = surfaceMocks.useReaderChapterData.mock.calls[1]?.[0] as {
+      onChapterContentResolved?: () => void;
+    };
+
+    expect(firstCall.onChapterContentResolved).toBeTypeOf('function');
+    expect(secondCall.onChapterContentResolved).toBe(firstCall.onChapterContentResolved);
   });
 
   it('builds scroll content props and dispatches viewport scroll to the scroll controller', () => {
@@ -286,6 +378,7 @@ describe('useReaderReadingSurfaceController', () => {
       novelId: 1,
       readerTheme: 'paper',
     });
+    expect(result.current.modeSwitchError).toBeNull();
     expect(contentProps.summaryContentProps).toBeUndefined();
 
     result.current.viewport.handleViewportScroll();
@@ -312,5 +405,29 @@ describe('useReaderReadingSurfaceController', () => {
     window.dispatchEvent(new CustomEvent(DEBUG_RETRY_READER_RESTORE_EVENT));
 
     expect(surfaceMocks.restoreFlow.retryLastFailedRestore).toHaveBeenCalledTimes(1);
+  });
+
+  it('exposes the strict mode-switch error from the restore flow', () => {
+    surfaceMocks.restoreFlow.modeSwitchError = {
+      code: 'READER_MODE_SWITCH_FAILED',
+    };
+    const { Wrapper } = createReaderContextWrapper();
+
+    const { result } = renderHook(() => useReaderReadingSurfaceController({
+      analysisController: {
+        analyzeChapter: vi.fn(),
+        getChapterAnalysis: vi.fn(),
+        getStatus: vi.fn(),
+        renderSummaryPanel: vi.fn(() => 'summary-panel'),
+      },
+      novelId: 1,
+      preferences: surfaceMocks.preferences,
+    }), {
+      wrapper: Wrapper,
+    });
+
+    expect(result.current.modeSwitchError).toEqual({
+      code: 'READER_MODE_SWITCH_FAILED',
+    });
   });
 });

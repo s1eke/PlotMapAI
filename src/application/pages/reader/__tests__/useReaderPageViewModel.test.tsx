@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { analyzeChapter } from '@application/use-cases/analysis';
-import { loadReaderSession } from '@application/use-cases/library';
+import { loadReaderSession } from '@application/use-cases/reader';
 import { analysisService } from '@domains/analysis';
 import { useReaderInput } from '@domains/reader-interaction';
 import { AppErrorCode } from '@shared/errors';
@@ -63,6 +63,7 @@ interface ReaderSurfaceMockState {
   loadingLabel: string;
   lastContentMode: 'scroll' | 'paged';
   mode: 'summary' | 'scroll' | 'paged';
+  modeSwitchError: TestReaderError | null;
   pageTurnMode: 'cover' | 'scroll' | 'slide' | 'none';
   paragraphSpacing: number;
   readerError: TestReaderError | null;
@@ -79,11 +80,12 @@ const readerShellMocks = vi.hoisted(() => ({
   setFontSize: vi.fn(),
   setIsChromeVisible: vi.fn(),
   setIsSidebarOpen: vi.fn(),
+  setLastContentMode: vi.fn(),
   setLineSpacing: vi.fn(),
   setPageTurnMode: vi.fn(),
   setParagraphSpacing: vi.fn(),
   setReaderTheme: vi.fn(),
-  switchMode: vi.fn(),
+  switchMode: vi.fn(() => Promise.resolve()),
   toggleSidebar: vi.fn(),
 }));
 
@@ -99,6 +101,10 @@ const readerOverlayMocks = vi.hoisted(() => ({
   closeImageViewer: vi.fn(),
   handleImageActivate: vi.fn(),
   handleRegisterImageElement: vi.fn(),
+}));
+const readerTraceMocks = vi.hoisted(() => ({
+  enabled: false,
+  recordReaderTrace: vi.fn(),
 }));
 
 const readerSurfaceMocks: ReaderSurfaceMockState = vi.hoisted(() => ({
@@ -127,6 +133,7 @@ const readerSurfaceMocks: ReaderSurfaceMockState = vi.hoisted(() => ({
   loadingLabel: 'reader.loading',
   lastContentMode: 'scroll',
   mode: 'summary',
+  modeSwitchError: null,
   pageTurnMode: 'cover',
   paragraphSpacing: 1.2,
   readerError: null,
@@ -233,6 +240,7 @@ function resetReaderSurfaceMocks(): void {
   readerSurfaceMocks.loadingLabel = 'reader.loading';
   readerSurfaceMocks.lastContentMode = 'scroll';
   readerSurfaceMocks.mode = 'summary';
+  readerSurfaceMocks.modeSwitchError = null;
   readerSurfaceMocks.pageTurnMode = 'cover';
   readerSurfaceMocks.paragraphSpacing = 1.2;
   readerSurfaceMocks.readerError = null;
@@ -254,12 +262,15 @@ function resetReaderSurfaceMocks(): void {
   readerShellMocks.setFontSize.mockReset();
   readerShellMocks.setIsChromeVisible.mockReset();
   readerShellMocks.setIsSidebarOpen.mockReset();
+  readerShellMocks.setLastContentMode.mockReset();
   readerShellMocks.setLineSpacing.mockReset();
   readerShellMocks.setPageTurnMode.mockReset();
   readerShellMocks.setParagraphSpacing.mockReset();
   readerShellMocks.setReaderTheme.mockReset();
   readerShellMocks.switchMode.mockReset();
   readerShellMocks.toggleSidebar.mockReset();
+  readerTraceMocks.enabled = false;
+  readerTraceMocks.recordReaderTrace.mockReset();
 }
 
 vi.mock('react-i18next', () => ({
@@ -270,7 +281,7 @@ vi.mock('@application/use-cases/analysis', () => ({
   analyzeChapter: vi.fn(),
 }));
 
-vi.mock('@application/use-cases/library', () => ({
+vi.mock('@application/use-cases/reader', () => ({
   loadReaderSession: vi.fn(),
 }));
 
@@ -335,6 +346,11 @@ vi.mock('@domains/reader-media', () => ({
   }),
 }));
 
+vi.mock('@shared/reader-trace', () => ({
+  isReaderTraceEnabled: () => readerTraceMocks.enabled,
+  recordReaderTrace: readerTraceMocks.recordReaderTrace,
+}));
+
 vi.mock('@shared/reader-runtime', () => ({
   useReaderViewportContext: () => ({
     contentRef: { current: null },
@@ -371,6 +387,7 @@ vi.mock('../useReaderReadingSurfaceController', () => ({
       showLoadingOverlay: readerSurfaceMocks.showLoadingOverlay,
       lifecycleStatus: readerSurfaceMocks.lifecycleStatus,
     },
+    modeSwitchError: readerSurfaceMocks.modeSwitchError,
     navigation: {
       goToChapter: readerNavigationMocks.goToChapter,
       goToNextPage: readerNavigationMocks.goToNextPage,
@@ -381,6 +398,7 @@ vi.mock('../useReaderReadingSurfaceController', () => ({
       toolbarHasPrev: false,
     },
     restore: {
+      setLastContentMode: readerShellMocks.setLastContentMode,
       switchMode: readerShellMocks.switchMode,
     },
     sessionSnapshot: {
@@ -434,9 +452,10 @@ describe('useReaderPageViewModel', () => {
     expect(analysisService.getStatus).toBeTypeOf('function');
   });
 
-  it('updates page turn preferences without changing content mode in summary mode', () => {
+  it('updates page turn preferences and last content mode without changing content mode in summary mode', () => {
     readerSurfaceMocks.mode = 'summary';
     readerSurfaceMocks.viewMode = 'summary';
+    readerSurfaceMocks.lastContentMode = 'paged';
 
     const { result } = renderHook(() => useReaderPageViewModel(1));
 
@@ -445,7 +464,31 @@ describe('useReaderPageViewModel', () => {
     });
 
     expect(readerShellMocks.setPageTurnMode).toHaveBeenCalledWith('scroll');
+    expect(readerShellMocks.setLastContentMode).toHaveBeenCalledWith('scroll');
     expect(readerShellMocks.switchMode).not.toHaveBeenCalled();
+  });
+
+  it('returns to the updated content mode after leaving summary mode', () => {
+    readerSurfaceMocks.mode = 'summary';
+    readerSurfaceMocks.viewMode = 'summary';
+    readerSurfaceMocks.lastContentMode = 'paged';
+
+    const { result, rerender } = renderHook(() => useReaderPageViewModel(1));
+
+    act(() => {
+      result.current.toolbarProps?.setPageTurnMode('scroll');
+    });
+
+    expect(readerShellMocks.setLastContentMode).toHaveBeenCalledWith('scroll');
+
+    readerSurfaceMocks.lastContentMode = 'scroll';
+    rerender();
+
+    act(() => {
+      result.current.topBarProps.onSetViewMode('original');
+    });
+
+    expect(readerShellMocks.switchMode).toHaveBeenCalledWith('scroll');
   });
 
   it('maps page turn mode changes back into content mode while in original reading mode', () => {
@@ -461,6 +504,32 @@ describe('useReaderPageViewModel', () => {
 
     expect(readerShellMocks.setPageTurnMode).toHaveBeenCalledWith('scroll');
     expect(readerShellMocks.switchMode).toHaveBeenCalledWith('scroll');
+  });
+
+  it('records page turn mode requests when reader trace is enabled', () => {
+    readerTraceMocks.enabled = true;
+    readerSurfaceMocks.mode = 'paged';
+    readerSurfaceMocks.viewMode = 'original';
+    readerSurfaceMocks.isPagedMode = true;
+
+    const { result } = renderHook(() => useReaderPageViewModel(1));
+
+    act(() => {
+      result.current.toolbarProps?.setPageTurnMode('scroll');
+    });
+
+    expect(readerTraceMocks.recordReaderTrace).toHaveBeenCalledWith(
+      'page_turn_mode_requested',
+      expect.objectContaining({
+        chapterIndex: 0,
+        mode: 'paged',
+        details: expect.objectContaining({
+          currentPageTurnMode: 'cover',
+          nextContentMode: 'scroll',
+          nextPageTurnMode: 'scroll',
+        }),
+      }),
+    );
   });
 
   it('maps top bar view changes into switchMode targets', () => {
@@ -545,6 +614,22 @@ describe('useReaderPageViewModel', () => {
     await waitFor(() => {
       expect(result.current.reparseRecovery.accept).toBe('.txt');
     });
+  });
+
+  it('prefers the strict mode-switch error over the lifecycle reader error', () => {
+    readerSurfaceMocks.readerError = {
+      code: AppErrorCode.CHAPTER_NOT_FOUND,
+    };
+    readerSurfaceMocks.modeSwitchError = {
+      code: AppErrorCode.READER_MODE_SWITCH_FAILED,
+    };
+
+    const { result } = renderHook(() => useReaderPageViewModel(1));
+
+    expect(result.current.readerError).toEqual({
+      code: AppErrorCode.READER_MODE_SWITCH_FAILED,
+    });
+    expect(result.current.reparseRecovery.visible).toBe(false);
   });
 
   it('omits toolbar props while loading overlays are visible or no current chapter is available', () => {

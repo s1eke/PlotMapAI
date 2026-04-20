@@ -8,13 +8,13 @@ import {
 import { novelRepository } from '@domains/library';
 import { getAiConfig } from '@domains/settings';
 
-import { loadAnalysisBookChapters } from '@application/services/analysisTextProjectionService';
+import { projectNovelText } from '@application/read-models/novel-text-projection';
 
 async function loadAnalysisExecutionContext(novelId: number): Promise<AnalysisExecutionContext> {
   const [storedConfig, novel, chapters] = await Promise.all([
     getAiConfig(),
     novelRepository.get(novelId),
-    loadAnalysisBookChapters(novelId),
+    projectNovelText(novelId),
   ]);
 
   return {

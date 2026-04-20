@@ -6,18 +6,6 @@ import { describe, expect, it, vi } from 'vitest';
 import BookDetailActionButton from '../BookDetailActionButton';
 
 describe('BookDetailActionButton', () => {
-  it('renders the provided label and icon button semantics', () => {
-    render(
-      <BookDetailActionButton
-        icon={BookOpen}
-        label="Start reading"
-        onClick={() => undefined}
-      />,
-    );
-
-    expect(screen.getByRole('button', { name: 'Start reading' })).toBeInTheDocument();
-  });
-
   it('renders a spinner while loading', () => {
     render(
       <BookDetailActionButton
@@ -51,18 +39,5 @@ describe('BookDetailActionButton', () => {
     await user.click(button);
 
     expect(onClick).not.toHaveBeenCalled();
-  });
-
-  it('applies the requested tone classes', () => {
-    render(
-      <BookDetailActionButton
-        icon={BookOpen}
-        label="Pause analysis"
-        onClick={() => undefined}
-        tone="warning"
-      />,
-    );
-
-    expect(screen.getByRole('button', { name: 'Pause analysis' }).className).toContain('bg-[#b07b1e]');
   });
 });

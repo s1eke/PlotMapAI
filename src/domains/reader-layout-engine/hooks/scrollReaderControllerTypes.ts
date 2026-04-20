@@ -11,7 +11,7 @@ import type {
 import type {
   MeasuredChapterLayout,
   VisibleBlockRange,
-} from '../utils/readerLayout';
+} from '../utils/layout/readerLayout';
 
 export interface ScrollReaderControllerPreferences {
   fontSize: number;

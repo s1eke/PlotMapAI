@@ -4,6 +4,7 @@ import type { ReaderLocator } from './layout';
 
 export type PageTarget = 'start' | 'end';
 export type ReaderMode = 'scroll' | 'paged' | 'summary';
+export type ReaderViewMode = 'original' | 'summary';
 export type RestoreStatus =
   | 'hydrating'
   | 'loading-chapters'
@@ -55,11 +56,18 @@ export interface ReaderStateHints {
   chapterProgress?: number;
   pageIndex?: number;
   contentMode?: 'scroll' | 'paged';
+  viewMode?: ReaderViewMode;
 }
 
 export interface StoredReaderState {
   canonical?: CanonicalPosition;
   hints?: ReaderStateHints;
+}
+
+export interface PersistedReadingProgress {
+  state: StoredReaderState;
+  revision: number;
+  updatedAt: string;
 }
 
 export interface ReaderRestoreTarget {
@@ -146,6 +154,7 @@ export type ReaderSessionSnapshot = ReaderSessionState;
 
 export interface ReaderSessionCommands {
   setChapterIndex: Dispatch<SetStateAction<number>>;
+  setLastContentMode: (mode: 'scroll' | 'paged') => void;
   setMode: Dispatch<SetStateAction<ReaderMode>>;
   latestReaderStateRef: MutableRefObject<StoredReaderState>;
   hasUserInteractedRef: MutableRefObject<boolean>;

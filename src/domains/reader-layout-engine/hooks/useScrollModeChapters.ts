@@ -17,6 +17,7 @@ export function useScrollModeChapters(
   setScrollModeChapters: React.Dispatch<React.SetStateAction<number[]>>,
   chapterDataRevision: number,
   onReadingAnchorChange?: (anchor: ScrollModeAnchor) => void,
+  onHandledUserScroll?: () => void,
 ): {
     scrollChapterElementsRef: React.MutableRefObject<Map<number, HTMLDivElement>>;
     handleScroll: () => void;
@@ -171,6 +172,7 @@ export function useScrollModeChapters(
     const now = Date.now();
     if (now - scrollThrottleRef.current < 150) return;
     scrollThrottleRef.current = now;
+    onHandledUserScroll?.();
 
     const el = contentRef.current;
     const { scrollTop } = el;
@@ -204,6 +206,7 @@ export function useScrollModeChapters(
     prependPrevChapter,
     scrollModeChapters,
     syncViewportState,
+    onHandledUserScroll,
     enabled,
   ]);
 

@@ -10,8 +10,8 @@ import type {
   ReaderMeasuredLine,
   ReaderTextPageItem,
   VirtualBlockMetrics,
-} from '../../utils/readerLayout';
-import { getOffsetForLocator } from '../../utils/readerLayout';
+} from '../../utils/layout/readerLayout';
+import { getOffsetForLocator } from '../../utils/layout/readerLayout';
 import {
   resolveCurrentPagedLocator,
   resolveCurrentScrollLocator,

@@ -1,16 +1,16 @@
 import type { CSSProperties } from 'react';
 
-import { READER_CONTENT_CLASS_NAMES } from '@shared/reader-content';
+import { READER_CONTENT_CLASS_NAMES } from '@shared/reader-rendering';
 import { cn } from '@shared/utils/cn';
 
 import {
   getReaderContentBlockClassName,
   getReaderContentContextClassName,
-} from '../../utils/readerContentStyling';
+} from '../../utils/layout/readerContentStyling';
 import {
   formatRichScrollListMarker,
   resolveRichScrollBlockInsets,
-} from '../../utils/richScroll';
+} from '../../utils/layout/richScroll';
 import RichInlineRenderer from './RichInlineRenderer';
 import type { RenderTextItem } from './readerFlowBlockShared';
 import {

@@ -8,6 +8,7 @@ const SHOULD_REUSE_EXISTING_SERVER =
 
 export default defineConfig({
   testDir: './tests/playwright',
+  testIgnore: ['**/*.manual.spec.ts'],
   fullyParallel: false,
   workers: process.env.CI ? 1 : undefined,
   timeout: 60_000,
@@ -39,9 +40,17 @@ export default defineConfig({
         browserName: 'chromium',
       },
     },
+    {
+      name: 'mobile-chromium',
+      use: {
+        ...devices['Pixel 7'],
+        browserName: 'chromium',
+      },
+      testMatch: ['smoke/**/*.spec.ts', 'flow/**/*.spec.ts'],
+    },
   ],
   webServer: {
-    command: `npm run build && npm run preview -- --host ${HOST} --port ${PORT}`,
+    command: `npm run preview:trace -- --host ${HOST} --port ${PORT}`,
     url: BASE_URL,
     reuseExistingServer: SHOULD_REUSE_EXISTING_SERVER,
     timeout: 180_000,

@@ -14,7 +14,7 @@ import type { ReaderImageGalleryEntry } from '@shared/contracts/reader';
 
 import { useCallback } from 'react';
 import { flushSync } from 'react-dom';
-import { createReaderImageEntryId } from '@shared/reader-content';
+import { createReaderImageEntryId } from '@shared/reader-rendering';
 
 import {
   applyScaleAroundPoint,

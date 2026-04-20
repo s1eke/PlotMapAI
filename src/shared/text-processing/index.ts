@@ -1,4 +1,3 @@
-export { detectChapters, splitByChapters } from './chapterDetection';
 export {
   extractImageKeysFromChapter,
   extractImageKeysFromRichBlocks,
@@ -18,7 +17,6 @@ export type {
   ChapterBlockSource,
   ChapterTextSegment,
 } from './chapterBlocks';
-export { detectAndConvert } from './encoding';
 export { computeHash } from './hash';
 export {
   buildChapterImageGalleryEntries,
@@ -45,9 +43,7 @@ export {
   purifyChapters,
   purifyTitles,
 } from './purify';
-export { parseTxtDocument } from './txt';
 export {
-  runParseTxtTask,
   runPurifyChapterTask,
   runPurifyChaptersTask,
   runPurifyTitlesTask,
@@ -55,13 +51,10 @@ export {
 export type {
   ChapterDetectionRule,
   ChapterDetectionRuleSource,
-  DetectedChapter,
-  ParsedTextDocument,
   PurifiedChapter,
   PurifiedTitle,
   PurifyRule,
   PurificationExecutionStage,
   PurificationTargetScope,
-  SplitChapter,
 } from './types';
 export type { TextProcessingProgress } from './workerTypes';

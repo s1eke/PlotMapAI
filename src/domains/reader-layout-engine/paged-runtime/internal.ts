@@ -18,9 +18,9 @@ export { usePagedChapterTransition } from '../hooks/usePagedChapterTransition';
 export { usePagedReaderLayout } from '../hooks/usePagedReaderLayout';
 export {
   getPagedDragLayerOffsets,
-} from '../utils/pagedDrag';
+} from '../utils/restore/pagedDrag';
 export {
   getEffectivePagedRenderPageIndex,
   shouldClearPendingCommittedPageOverride,
-} from '../utils/pagedDragRenderState';
-export type { PendingCommittedPageOverride } from '../utils/pagedDragRenderState';
+} from '../utils/restore/pagedDragRenderState';
+export type { PendingCommittedPageOverride } from '../utils/restore/pagedDragRenderState';

@@ -6,8 +6,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { analyzeChapter } from '@application/use-cases/analysis';
-import { loadReaderSession } from '@application/use-cases/library';
-import { appPaths } from '@app/router/paths';
+import { loadReaderSession } from '@application/use-cases/reader';
+import { appPaths } from '@shared/routing/appPaths';
 import { ChapterAnalysisPanel, analysisService } from '@domains/analysis';
 import {
   useContentClick,
@@ -18,6 +18,7 @@ import {
 import { useReaderPageImageOverlay } from '@domains/reader-media';
 import { useReaderPreferences } from '@domains/reader-shell';
 import { AppErrorCode } from '@shared/errors';
+import { isReaderTraceEnabled, recordReaderTrace } from '@shared/reader-trace';
 import { useReaderViewportContext } from '@shared/reader-runtime';
 import { resolveContentModeFromPageTurnMode } from '@shared/utils/readerMode';
 import { useReaderReparseRecoveryController } from './useReaderReparseRecoveryController';
@@ -73,6 +74,7 @@ export function useReaderPageViewModel(novelId: number): ReaderPageViewModel {
   const {
     chapterData,
     lifecycle,
+    modeSwitchError,
     navigation,
     restore,
     sessionSnapshot,
@@ -168,23 +170,52 @@ export function useReaderPageViewModel(novelId: number): ReaderPageViewModel {
     wheelDeltaRef,
     pageTurnLockedRef,
   );
+  const readerError = modeSwitchError ?? lifecycle.readerError;
 
   const handleSetPageTurnMode = useCallback((nextMode: ReaderPageTurnMode): void => {
     if (nextMode === preferences.pageTurnMode) {
       return;
     }
 
+    const nextContentMode = resolveContentModeFromPageTurnMode(nextMode);
+    if (isReaderTraceEnabled()) {
+      recordReaderTrace('page_turn_mode_requested', {
+        chapterIndex,
+        mode,
+        pageTurnMode: nextMode,
+        restoreStatus: lifecycle.lifecycleStatus,
+        details: {
+          currentMode: mode,
+          currentPageTurnMode: preferences.pageTurnMode,
+          lastContentMode,
+          nextContentMode,
+          nextPageTurnMode: nextMode,
+          viewMode,
+        },
+      });
+    }
+
     preferences.setPageTurnMode(nextMode);
 
     if (mode === 'summary') {
+      if (lastContentMode !== nextContentMode) {
+        restore.setLastContentMode(nextContentMode);
+      }
       return;
     }
 
-    const nextContentMode = resolveContentModeFromPageTurnMode(nextMode);
     if (mode !== nextContentMode) {
       restore.switchMode(nextContentMode);
     }
-  }, [mode, preferences, restore]);
+  }, [
+    chapterIndex,
+    lastContentMode,
+    lifecycle.lifecycleStatus,
+    mode,
+    preferences,
+    restore,
+    viewMode,
+  ]);
 
   const handleSetViewMode = useCallback((nextViewMode: 'original' | 'summary'): void => {
     restore.switchMode(nextViewMode === 'summary' ? 'summary' : lastContentMode);
@@ -234,10 +265,10 @@ export function useReaderPageViewModel(novelId: number): ReaderPageViewModel {
     backHref: novelDetailHref,
     imageViewerProps: imageOverlay.imageViewerProps,
     pageBgClassName: preferences.currentTheme.bg,
-    readerError: lifecycle.readerError,
+    readerError,
     reparseRecovery: {
       ...reparseRecoveryController,
-      visible: lifecycle.readerError?.code === AppErrorCode.CHAPTER_STRUCTURED_CONTENT_MISSING,
+      visible: readerError?.code === AppErrorCode.CHAPTER_STRUCTURED_CONTENT_MISSING,
     },
     sidebarProps: {
       chapters: chapterData.chapters,
@@ -269,6 +300,7 @@ export function useReaderPageViewModel(novelId: number): ReaderPageViewModel {
       renderableChapter: viewport.renderableChapter,
       showLoadingOverlay: lifecycle.showLoadingOverlay,
       isRestoringPosition: lifecycle.isRestoringPosition,
+      restoreStatus: lifecycle.lifecycleStatus,
       loadingLabel: lifecycle.loadingLabel,
       onBlockedInteraction: dismissBlockedInteraction,
       onContentClick: handleViewportClick,

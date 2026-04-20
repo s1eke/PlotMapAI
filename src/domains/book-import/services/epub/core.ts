@@ -1,7 +1,7 @@
 import JSZip from 'jszip';
 import type { RichBlock } from '@shared/contracts';
 import type { PurifyRule } from '@shared/text-processing';
-import type { ParsedBook, ParsedChapter } from '../bookParser';
+import type { ParsedBook, ParsedChapter } from '../types';
 import type { BookImportProgress } from '../progress';
 import type { ManifestItem } from './types';
 

@@ -2,14 +2,13 @@ import { createWorkerTaskRunner } from '@infra/workers';
 import type { WorkerTaskOptions } from '@infra/workers';
 import { AppErrorCode } from '@shared/errors';
 import type {
-  ParseTxtPayload,
   PurifyChapterPayload,
   PurifyChaptersPayload,
   PurifyTitlesPayload,
   TextProcessingTaskMap,
   TextProcessingProgress,
 } from './workerTypes';
-import type { ParsedTextDocument, PurifiedChapter, PurifiedTitle } from './types';
+import type { PurifiedChapter, PurifiedTitle } from './types';
 
 type TextProcessingTaskName = keyof TextProcessingTaskMap & string;
 
@@ -30,11 +29,6 @@ function createTextProcessingTaskRunner<TTask extends TextProcessingTaskName>(
   });
 }
 
-const runParseTxtWorkerTask = createTextProcessingTaskRunner(
-  'parse-txt',
-  'TXT parsing worker is unavailable.',
-);
-
 const runPurifyTitlesWorkerTask = createTextProcessingTaskRunner(
   'purify-titles',
   'Title purification worker is unavailable.',
@@ -49,13 +43,6 @@ const runPurifyChaptersWorkerTask = createTextProcessingTaskRunner(
   'purify-chapters',
   'Batch chapter purification worker is unavailable.',
 );
-
-export function runParseTxtTask(
-  payload: ParseTxtPayload,
-  options: WorkerTaskOptions<TextProcessingProgress> = {},
-): Promise<ParsedTextDocument> {
-  return runParseTxtWorkerTask(payload, options);
-}
 
 export function runPurifyTitlesTask(
   payload: PurifyTitlesPayload,

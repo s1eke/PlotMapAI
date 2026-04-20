@@ -40,6 +40,28 @@ interface ReaderScopedProviderProps<T> {
   value: T;
 }
 
+function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
+  if ((typeof value !== 'object' && typeof value !== 'function') || value === null) {
+    return false;
+  }
+
+  return typeof (value as { then?: unknown }).then === 'function';
+}
+
+function assertSynchronousBeforeFlushHandler(result: unknown): void {
+  if (!(import.meta.env.DEV || import.meta.env.MODE === 'test')) {
+    return;
+  }
+
+  if (!isPromiseLike(result)) {
+    return;
+  }
+
+  throw new Error(
+    'registerBeforeFlush handlers must stay synchronous. Capture async state ahead of flush and read it synchronously during runBeforeFlush().',
+  );
+}
+
 export function ReaderViewportContextProvider({
   children,
   value,
@@ -106,6 +128,9 @@ export function ReaderRuntimeProvider({
   const currentAnchorResolverRef = useRef<() => ScrollModeAnchor | null>(() => null);
   const currentOriginalLocatorResolverRef = useRef<() => ReaderLocator | null>(() => null);
   const currentPagedLocatorResolverRef = useRef<() => ReaderLocator | null>(() => null);
+  const pagedLocatorPageIndexResolverRef = useRef<(locator: ReaderLocator) => number | null>(
+    () => null,
+  );
   const scrollLocatorOffsetResolverRef = useRef<(locator: ReaderLocator) => number | null>(
     () => null,
   );
@@ -181,6 +206,14 @@ export function ReaderRuntimeProvider({
         }
       };
     },
+    registerPagedLocatorPageIndexResolver: (resolver) => {
+      pagedLocatorPageIndexResolverRef.current = resolver;
+      return () => {
+        if (pagedLocatorPageIndexResolverRef.current === resolver) {
+          pagedLocatorPageIndexResolverRef.current = () => null;
+        }
+      };
+    },
     registerScrollChapterBodyElement: (index, element) => {
       if (element) {
         scrollChapterBodyElementsRef.current.set(index, element);
@@ -205,6 +238,7 @@ export function ReaderRuntimeProvider({
         }
       };
     },
+    resolvePagedLocatorPageIndex: (locator) => pagedLocatorPageIndexResolverRef.current(locator),
     resolveScrollLocatorOffset: (locator) => scrollLocatorOffsetResolverRef.current(locator),
   }), []);
 
@@ -247,7 +281,7 @@ export function ReaderRuntimeProvider({
     },
     runBeforeFlush: () => {
       for (const handler of beforeFlushHandlersRef.current) {
-        handler();
+        assertSynchronousBeforeFlushHandler(handler());
       }
     },
     suppressScrollSyncTemporarily,

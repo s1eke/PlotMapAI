@@ -1,5 +1,5 @@
 import type { MutableRefObject } from 'react';
-import type { TextProcessingProgress } from '@shared/text-processing';
+import type { TextProcessingProgress } from '@shared/text-processing/workerTypes';
 
 import type { BookChapter } from '../book';
 import type { Chapter, ChapterContent } from './content';
@@ -64,6 +64,9 @@ export interface ReaderLayoutQueriesValue {
   registerCurrentPagedLocatorResolver: (
     resolver: () => ReaderLocator | null,
   ) => () => void;
+  registerPagedLocatorPageIndexResolver: (
+    resolver: (locator: ReaderLocator) => number | null,
+  ) => () => void;
   registerScrollChapterBodyElement: (
     index: number,
     element: HTMLDivElement | null,
@@ -75,16 +78,24 @@ export interface ReaderLayoutQueriesValue {
   registerScrollLocatorOffsetResolver: (
     resolver: (locator: ReaderLocator) => number | null,
   ) => () => void;
+  resolvePagedLocatorPageIndex: (locator: ReaderLocator) => number | null;
   resolveScrollLocatorOffset: (locator: ReaderLocator) => number | null;
 }
 
 export interface ReaderPersistenceRuntimeValue {
   isScrollSyncSuppressed: () => boolean;
   notifyRestoreSettled: (result: RestoreSettledResult) => void;
+  /**
+   * Registers a synchronous capture hook that must finish before durable flush starts.
+   * Async preparation should happen earlier so flush-time capture can stay immediate.
+   */
   registerBeforeFlush: (handler: () => void) => () => void;
   registerRestoreSettledHandler: (
     handler: (result: RestoreSettledResult) => void,
   ) => () => void;
+  /**
+   * Runs all registered synchronous before-flush capture hooks immediately.
+   */
   runBeforeFlush: () => void;
   suppressScrollSyncTemporarily: () => void;
 }

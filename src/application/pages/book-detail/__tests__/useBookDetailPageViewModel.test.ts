@@ -7,7 +7,7 @@ import {
   deleteNovelAndCleanupArtifacts,
   loadBookDetailAnalysisStatus,
   loadBookDetailPageData,
-} from '@application/use-cases/library';
+} from '@application/use-cases/book-detail';
 import { useNovelCoverResource } from '@domains/library';
 
 import { useBookDetailPageViewModel } from '../useBookDetailPageViewModel';
@@ -32,7 +32,7 @@ vi.mock('@shared/debug', () => ({
   setDebugSnapshot: vi.fn(),
 }));
 
-vi.mock('@application/use-cases/library', () => ({
+vi.mock('@application/use-cases/book-detail', () => ({
   deleteNovelAndCleanupArtifacts: vi.fn(),
   loadBookDetailAnalysisStatus: vi.fn(),
   loadBookDetailPageData: vi.fn(),

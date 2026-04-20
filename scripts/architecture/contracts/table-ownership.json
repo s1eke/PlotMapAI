@@ -1,0 +1,227 @@
+{
+  "rules": [
+    "其他领域不能因为表在 @infra/db 中可见，就直接把该表当作自己的读模型或协调接口。",
+    "跨域读组合放在 application，例如 reader 内容净化读模型与整本书导入/删除生命周期。",
+    "book-import 是 parse-only 领域，不直接写 Dexie。",
+    "reader-content 不直接读 Dexie；它只消费 application 提供的 ReaderContentRuntimeValue。",
+    "预占位表不代表当前可访问，也不构成跨域直连许可；只有在 schema、owner API 和文档都落地后，才视为正式表能力。"
+  ],
+  "dataModelNotes": [
+    "当前版本要求每个章节都存在 chapterRichContents 行，并以结构化 richBlocks + plainText projection 作为唯一规范模型。",
+    "缺失 structured content 或仍携带已退场的 plain-only 数据，都应视为异常数据并引导 reparse / recovery，而不是继续按兼容状态读取。"
+  ],
+  "crossDomainExits": [
+    {
+      "label": "阅读器内容",
+      "api": "@application/services/readerContentRuntime"
+    },
+    {
+      "label": "章节分析与人物图谱输入",
+      "api": "loadPurifiedBookChapters"
+    },
+    {
+      "label": "整本书导入 / 删除",
+      "api": "@application/services/bookLifecycleService"
+    }
+  ],
+  "tables": [
+    {
+      "name": "novels",
+      "ownerDomain": "library",
+      "allowedDirectAccessSummary": "library, application orchestration",
+      "allowedDirectAccessPaths": [
+        "src/domains/library/**/*.ts",
+        "src/domains/library/**/*.tsx"
+      ],
+      "allowedApplicationPaths": ["src/application/services/bookLifecycleService.ts"],
+      "publicApi": [
+        "novelRepository.list/get/getNovelTitle/createImportedNovel/replaceImportedNovel/delete"
+      ]
+    },
+    {
+      "name": "coverImages",
+      "ownerDomain": "library",
+      "allowedDirectAccessSummary": "library, application orchestration",
+      "allowedDirectAccessPaths": [
+        "src/domains/library/**/*.ts",
+        "src/domains/library/**/*.tsx"
+      ],
+      "allowedApplicationPaths": ["src/application/services/bookLifecycleService.ts"],
+      "publicApi": [
+        "novelRepository.createImportedNovel/replaceImportedNovel/delete",
+        "acquireNovelCoverResource"
+      ]
+    },
+    {
+      "name": "chapters",
+      "ownerDomain": "book-content",
+      "allowedDirectAccessSummary": "book-content, application orchestration",
+      "allowedDirectAccessPaths": [
+        "src/domains/book-content/**/*.ts",
+        "src/domains/book-content/**/*.tsx"
+      ],
+      "allowedApplicationPaths": ["src/application/services/bookLifecycleService.ts"],
+      "publicApi": [
+        "bookContentRepository.listNovelChapters/getNovelChapter/countNovelChapters/replaceNovelContent/deleteNovelContent"
+      ]
+    },
+    {
+      "name": "chapterRichContents",
+      "ownerDomain": "book-content",
+      "allowedDirectAccessSummary": "book-content, application orchestration, app/debug diagnostics",
+      "allowedDirectAccessPaths": [
+        "src/domains/book-content/**/*.ts",
+        "src/domains/book-content/**/*.tsx",
+        "src/app/debug/useDebugPanelState.ts"
+      ],
+      "allowedApplicationPaths": ["src/application/services/bookLifecycleService.ts"],
+      "publicApi": [
+        "chapterRichContentRepository.replaceNovelChapterRichContents/listNovelChapterRichContents/getNovelChapterRichContent/deleteNovelChapterRichContents"
+      ]
+    },
+    {
+      "name": "chapterImages",
+      "ownerDomain": "book-content",
+      "allowedDirectAccessSummary": "book-content, application orchestration, app/debug diagnostics",
+      "allowedDirectAccessPaths": [
+        "src/domains/book-content/**/*.ts",
+        "src/domains/book-content/**/*.tsx",
+        "src/app/debug/useDebugPanelState.ts"
+      ],
+      "allowedApplicationPaths": ["src/application/services/bookLifecycleService.ts"],
+      "publicApi": [
+        "bookContentRepository.getChapterImageBlob/replaceNovelContent/deleteNovelContent"
+      ]
+    },
+    {
+      "name": "novelImageGalleryEntries",
+      "ownerDomain": "book-content",
+      "allowedDirectAccessSummary": "book-content, application orchestration",
+      "allowedDirectAccessPaths": [
+        "src/domains/book-content/**/*.ts",
+        "src/domains/book-content/**/*.tsx"
+      ],
+      "allowedApplicationPaths": ["src/application/services/bookLifecycleService.ts"],
+      "publicApi": [
+        "bookContentRepository.listNovelImageGalleryEntries/replaceNovelContent/deleteNovelContent"
+      ]
+    },
+    {
+      "name": "tocRules",
+      "ownerDomain": "settings",
+      "allowedDirectAccessSummary": "settings",
+      "allowedDirectAccessPaths": [
+        "src/domains/settings/**/*.ts",
+        "src/domains/settings/**/*.tsx"
+      ],
+      "allowedApplicationPaths": [],
+      "publicApi": ["tocRuleRepository.*"]
+    },
+    {
+      "name": "purificationRules",
+      "ownerDomain": "settings",
+      "allowedDirectAccessSummary": "settings",
+      "allowedDirectAccessPaths": [
+        "src/domains/settings/**/*.ts",
+        "src/domains/settings/**/*.tsx"
+      ],
+      "allowedApplicationPaths": [],
+      "publicApi": [
+        "purificationRuleRepository.getPurificationRules/getEnabledPurificationRules/*"
+      ]
+    },
+    {
+      "name": "appSettings",
+      "ownerDomain": "settings",
+      "allowedDirectAccessSummary": "settings, infra/storage",
+      "allowedDirectAccessPaths": [
+        "src/domains/settings/**/*.ts",
+        "src/domains/settings/**/*.tsx",
+        "src/infra/storage/primary.ts"
+      ],
+      "allowedApplicationPaths": [],
+      "publicApi": [
+        "settings repositories/services",
+        "primaryStorage.settings.*"
+      ]
+    },
+    {
+      "name": "analysisJobs",
+      "ownerDomain": "analysis",
+      "allowedDirectAccessSummary": "analysis, application orchestration",
+      "allowedDirectAccessPaths": [
+        "src/domains/analysis/**/*.ts",
+        "src/domains/analysis/**/*.tsx"
+      ],
+      "allowedApplicationPaths": ["src/application/services/bookLifecycleService.ts"],
+      "publicApi": [
+        "analysisService.getStatus/deleteArtifacts/start/pause/resume/restart/refreshOverview"
+      ]
+    },
+    {
+      "name": "analysisChunks",
+      "ownerDomain": "analysis",
+      "allowedDirectAccessSummary": "analysis, application orchestration",
+      "allowedDirectAccessPaths": [
+        "src/domains/analysis/**/*.ts",
+        "src/domains/analysis/**/*.tsx"
+      ],
+      "allowedApplicationPaths": ["src/application/services/bookLifecycleService.ts"],
+      "publicApi": ["analysisService.*"]
+    },
+    {
+      "name": "chapterAnalyses",
+      "ownerDomain": "analysis",
+      "allowedDirectAccessSummary": "analysis, application orchestration",
+      "allowedDirectAccessPaths": [
+        "src/domains/analysis/**/*.ts",
+        "src/domains/analysis/**/*.tsx"
+      ],
+      "allowedApplicationPaths": ["src/application/services/bookLifecycleService.ts"],
+      "publicApi": [
+        "analysisService.getChapterAnalysis/deleteArtifacts/*"
+      ]
+    },
+    {
+      "name": "analysisOverviews",
+      "ownerDomain": "analysis",
+      "allowedDirectAccessSummary": "analysis, application orchestration",
+      "allowedDirectAccessPaths": [
+        "src/domains/analysis/**/*.ts",
+        "src/domains/analysis/**/*.tsx"
+      ],
+      "allowedApplicationPaths": ["src/application/services/bookLifecycleService.ts"],
+      "publicApi": [
+        "analysisService.getOverview/deleteArtifacts/*"
+      ]
+    },
+    {
+      "name": "readingProgress",
+      "ownerDomain": "reader-session",
+      "allowedDirectAccessSummary": "reader-session, application orchestration",
+      "allowedDirectAccessPaths": [
+        "src/domains/reader-session/**/*.ts",
+        "src/domains/reader-session/**/*.tsx"
+      ],
+      "allowedApplicationPaths": ["src/application/services/bookLifecycleService.ts"],
+      "publicApi": [
+        "readReadingProgress/replaceReadingProgress/deleteReadingProgress"
+      ]
+    },
+    {
+      "name": "readerRenderCache",
+      "ownerDomain": "reader-layout-engine",
+      "allowedDirectAccessSummary": "reader-layout-engine, application orchestration, app/debug diagnostics",
+      "allowedDirectAccessPaths": [
+        "src/domains/reader-layout-engine/**/*.ts",
+        "src/domains/reader-layout-engine/**/*.tsx",
+        "src/app/debug/useDebugPanelState.ts"
+      ],
+      "allowedApplicationPaths": ["src/application/services/bookLifecycleService.ts"],
+      "publicApi": [
+        "render cache utils",
+        "deletePersistedReaderRenderCache"
+      ]
+    }
+  ]
+}

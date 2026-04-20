@@ -5,7 +5,7 @@ import type {
 } from '../utils/readerImageViewerTypes';
 
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { createReaderImageEntryId } from '@shared/reader-content';
+import { createReaderImageEntryId } from '@shared/reader-rendering';
 
 import {
   DOUBLE_TAP_MAX_DELAY_MS,

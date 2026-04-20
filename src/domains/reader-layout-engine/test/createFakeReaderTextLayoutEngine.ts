@@ -2,9 +2,9 @@ import type { RichInline } from '@shared/contracts';
 import type {
   ReaderMeasuredLine,
   ReaderTextLayoutEngine,
-} from '../utils/readerLayout';
+} from '../utils/layout/readerLayout';
 
-import { createRichLineFragments } from '../utils/richLineFragments';
+import { createRichLineFragments } from '../utils/typography/richLineFragments';
 
 interface CreateFakeReaderTextLayoutEngineOptions {
   maxCharsPerLine?: number;

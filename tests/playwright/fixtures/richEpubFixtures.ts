@@ -319,6 +319,40 @@ export const RICH_EPUB_FIXTURES = {
       },
     ],
   },
+  multiChapterRich: {
+    id: 'multi-chapter-rich',
+    fileName: 'multi-chapter-rich.epub',
+    title: 'Multi Chapter Compass',
+    chapters: [
+      {
+        id: 'chapter-1',
+        title: 'The Observatory',
+        bodyHtml: [
+          '<h1>The Observatory</h1>',
+          '<p>ANCHOR_OBSERVATORY: The telescope keeper adjusted the brass ring before the next meridian crossed.</p>',
+          createParagraphSeries('The observatory clock kept a second rhythm for every star', 14),
+        ].join('\n'),
+      },
+      {
+        id: 'chapter-2',
+        title: 'The Archive',
+        bodyHtml: [
+          '<h1>The Archive</h1>',
+          '<p>ANCHOR_ARCHIVE: The filing clerk turned the index wheel until the copper tabs aligned with the morning dispatch.</p>',
+          createParagraphSeries('The archive shelves remembered more than the clerks who tended them', 14),
+        ].join('\n'),
+      },
+      {
+        id: 'chapter-3',
+        title: 'The Signal',
+        bodyHtml: [
+          '<h1>The Signal</h1>',
+          '<p>ANCHOR_SIGNAL: The relay station hummed twice before the lantern grid acknowledged the eastern tower.</p>',
+          createParagraphSeries('The signal path bent around every hill the surveyors had forgotten', 14),
+        ].join('\n'),
+      },
+    ],
+  },
 } as const satisfies Record<string, RichEpubFixtureDefinition>;
 
 export type RichEpubFixtureId = keyof typeof RICH_EPUB_FIXTURES;

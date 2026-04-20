@@ -1,179 +1,96 @@
-import { readdirSync, readFileSync, statSync } from 'fs';
-import { extname, relative, resolve } from 'path';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
+import { resolve } from 'path';
 
-export const READER_FILE_LINE_LIMIT = 500;
+import { loadArchitectureContract } from './architecture/contracts.mjs';
+import {
+  collectConfiguredFiles,
+  evaluateModuleHealth,
+  findInvalidStableBarrelExports,
+  groupMetricViolations,
+  matchesAnyPattern,
+  MODULE_HEALTH_METRIC_KEYS,
+  MODULE_HEALTH_METRIC_TITLES,
+  isPassThroughModuleFile,
+} from './architecture/moduleHealth.mjs';
 
-const READER_SOURCE_DIRECTORIES = [
-  'src/application/pages/reader',
-  'src/domains',
-];
-const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx']);
-const RESTRICTED_READER_IMPORT = /from\s+['"](@domains\/reader-(?:content|session|shell)(?:\/[^'"]*)?)['"]/g;
-const READER_FAMILY_DEEP_IMPORT = /from\s+['"](@domains\/reader-[^/'"]+\/[^'"]+)['"]/g;
-const PASS_THROUGH_EXPORT_LINE = /^export\s+(type\s+)?\{[^}]+\}\s+from\s+['"][^'"]+['"];?$/;
-const PASS_THROUGH_EXPORT_STAR_LINE = /^export\s+\*\s+from\s+['"][^'"]+['"];?$/;
-const READER_LAYOUT_ENGINE_ROOT_BARREL_PATH = 'src/domains/reader-layout-engine/index.ts';
-const READER_CONTENT_ROOT_BARREL_PATH = 'src/domains/reader-content/index.ts';
-const ALLOWED_READER_LAYOUT_ENGINE_ROOT_EXPORT_LINES = new Set([
-  "export { PagedReaderContent } from './paged-runtime';",
-  "export { usePagedReaderController as usePagedReaderViewportController } from './paged-runtime';",
-  "export type { UsePagedReaderControllerResult as UsePagedReaderViewportControllerResult } from './paged-runtime';",
-  "export { ScrollReaderContent } from './scroll-runtime';",
-  "export { useScrollReaderController as useScrollReaderViewportController } from './scroll-runtime';",
-  "export type { UseScrollReaderControllerResult as UseScrollReaderViewportControllerResult } from './scroll-runtime';",
-  "export { SummaryReaderContent } from './layout-core';",
-  "export { resolveReaderContentRootProps } from './layout-core';",
-  "export type { ReaderContentRootProps, ReaderContentRootTheme } from './layout-core';",
-  "export { clearReaderRenderCacheMemoryForNovel, deletePersistedReaderRenderCache } from './render-cache';",
-]);
-const ALLOWED_READER_CONTENT_ROOT_EXPORT_LINES = new Set([
-  "export type { Chapter, ChapterContent, ReaderChapterCacheApi } from '@shared/contracts/reader';",
-  "export { useReaderChapterData } from './hooks/useReaderChapterData';",
-  'export type {',
-  'ReaderHydrateDataResult,',
-  'ReaderLoadActiveChapterParams,',
-  'ReaderLoadActiveChapterResult,',
-  'ReaderLoadActiveChapterRuntime,',
-  'UseReaderChapterDataResult,',
-  '} from \'./hooks/useReaderChapterData\';',
-]);
+const {
+  metricDefaults: METRIC_DEFAULTS,
+  readerArchitecture: READER_ARCHITECTURE,
+} = loadArchitectureContract();
+const READER_LAYOUT_ENGINE_ROOT_BARREL = READER_ARCHITECTURE.stableBarrels.find(
+  (entry) => entry.path === 'src/domains/reader-layout-engine/index.ts',
+);
+const READER_CONTENT_ROOT_BARREL = READER_ARCHITECTURE.stableBarrels.find(
+  (entry) => entry.path === 'src/domains/reader-content/index.ts',
+);
 
-function isReaderFamilyPath(filePath) {
-  return filePath.startsWith('src/domains/reader-')
-    || filePath.startsWith('src/application/pages/reader/');
+function findImportMatches(source, pattern) {
+  return [...source.matchAll(new RegExp(pattern, 'g'))].map((match) => match[1]);
 }
 
-function shouldIncludeFile(filePath) {
-  return (
-    isReaderFamilyPath(filePath)
-    && SOURCE_EXTENSIONS.has(extname(filePath))
-    && !filePath.includes('/__tests__/')
-  );
-}
-
-function walkDirectory(rootDirectory, currentDirectory = rootDirectory) {
-  const entries = readdirSync(currentDirectory).sort();
-  const results = [];
-
-  for (const entry of entries) {
-    const absolutePath = resolve(currentDirectory, entry);
-    const entryStats = statSync(absolutePath);
-    if (entryStats.isDirectory()) {
-      results.push(...walkDirectory(rootDirectory, absolutePath));
-      continue;
-    }
-
-    results.push(relative(rootDirectory, absolutePath));
-  }
-
-  return results;
-}
-
-function stripComments(source) {
-  return source
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/\/\/.*$/gm, '');
-}
-
-export function countFileLines(source) {
-  if (source.length === 0) {
-    return 0;
-  }
-
-  return source.split(/\r?\n/).length;
+function buildReaderModuleHealthConfig(options = {}) {
+  return {
+    metricAllowlist: READER_ARCHITECTURE.metricAllowlist,
+    metricBudgets: {
+      ...METRIC_DEFAULTS.metricBudgets,
+      ...READER_ARCHITECTURE.metricBudgets,
+      ...options.metricBudgets,
+    },
+    passThrough: {
+      ...READER_ARCHITECTURE.passThrough,
+      enabled: true,
+    },
+    stableBarrels: READER_ARCHITECTURE.stableBarrels,
+  };
 }
 
 export function findRestrictedReaderImports(filePath, source) {
-  if (!filePath.startsWith('src/domains/reader-layout-engine/')) {
+  if (!matchesAnyPattern(filePath, READER_ARCHITECTURE.restrictedImports.files)) {
     return [];
   }
 
-  const matches = [];
-  for (const match of source.matchAll(RESTRICTED_READER_IMPORT)) {
-    matches.push(match[1]);
-  }
-
-  return matches;
+  return findImportMatches(source, READER_ARCHITECTURE.restrictedImports.pattern);
 }
 
 export function findReaderFamilyDeepImports(filePath, source) {
-  if (!isReaderFamilyPath(filePath)) {
+  if (!matchesAnyPattern(filePath, READER_ARCHITECTURE.includeFiles)) {
     return [];
   }
 
-  const matches = [];
-  for (const match of source.matchAll(READER_FAMILY_DEEP_IMPORT)) {
-    matches.push(match[1]);
-  }
-
-  return matches;
+  return findImportMatches(source, READER_ARCHITECTURE.deepImports.pattern);
 }
 
 export function isPassThroughReaderFile(filePath, source) {
-  if (!filePath.startsWith('src/domains/reader-')) {
-    return false;
-  }
-  if (filePath.endsWith('/index.ts') || filePath.endsWith('/index.tsx')) {
-    return false;
-  }
-
-  const significantLines = stripComments(source)
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
-
-  if (significantLines.length === 0) {
-    return false;
-  }
-
-  return significantLines.every((line) => (
-    PASS_THROUGH_EXPORT_LINE.test(line) || PASS_THROUGH_EXPORT_STAR_LINE.test(line)
-  ));
+  return isPassThroughModuleFile(filePath, source, {
+    ...READER_ARCHITECTURE.passThrough,
+    enabled: true,
+  });
 }
 
 export function findInvalidReaderLayoutEngineRootExports(filePath, source) {
-  if (filePath !== READER_LAYOUT_ENGINE_ROOT_BARREL_PATH) {
+  if (!READER_LAYOUT_ENGINE_ROOT_BARREL) {
     return [];
   }
 
-  return stripComments(source)
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0)
-    .filter((line) => !ALLOWED_READER_LAYOUT_ENGINE_ROOT_EXPORT_LINES.has(line));
+  return findInvalidStableBarrelExports(filePath, source, [READER_LAYOUT_ENGINE_ROOT_BARREL])
+    .map((entry) => entry.line);
 }
 
 export function findInvalidReaderContentRootExports(filePath, source) {
-  if (filePath !== READER_CONTENT_ROOT_BARREL_PATH) {
+  if (!READER_CONTENT_ROOT_BARREL) {
     return [];
   }
 
-  return stripComments(source)
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0)
-    .filter((line) => !ALLOWED_READER_CONTENT_ROOT_EXPORT_LINES.has(line));
+  return findInvalidStableBarrelExports(filePath, source, [READER_CONTENT_ROOT_BARREL])
+    .map((entry) => entry.line);
 }
 
-export function evaluateReaderArchitecture(
-  files,
-  options = {},
-) {
-  const maxFileLines = options.maxFileLines ?? READER_FILE_LINE_LIMIT;
-  const oversizedFiles = [];
+export function evaluateReaderArchitecture(files, options = {}) {
+  const moduleHealthResult = evaluateModuleHealth(files, buildReaderModuleHealthConfig(options));
   const restrictedImports = [];
   const readerFamilyDeepImports = [];
-  const passThroughFiles = [];
-  const invalidReaderContentRootExports = [];
-  const invalidRootBarrelExports = [];
 
   Object.entries(files).forEach(([filePath, source]) => {
-    const lineCount = countFileLines(source);
-    if (lineCount > maxFileLines) {
-      oversizedFiles.push({ filePath, lineCount });
-    }
-
     findRestrictedReaderImports(filePath, source).forEach((specifier) => {
       restrictedImports.push({ filePath, specifier });
     });
@@ -181,29 +98,17 @@ export function evaluateReaderArchitecture(
     findReaderFamilyDeepImports(filePath, source).forEach((specifier) => {
       readerFamilyDeepImports.push({ filePath, specifier });
     });
-
-    if (isPassThroughReaderFile(filePath, source)) {
-      passThroughFiles.push(filePath);
-    }
-
-    findInvalidReaderContentRootExports(filePath, source).forEach((line) => {
-      invalidReaderContentRootExports.push({ filePath, line });
-    });
-
-    findInvalidReaderLayoutEngineRootExports(filePath, source).forEach((line) => {
-      invalidRootBarrelExports.push({ filePath, line });
-    });
   });
 
   return {
-    invalidReaderContentRootExports: invalidReaderContentRootExports.sort((left, right) => (
-      left.filePath.localeCompare(right.filePath) || left.line.localeCompare(right.line)
-    )),
-    invalidRootBarrelExports: invalidRootBarrelExports.sort((left, right) => (
-      left.filePath.localeCompare(right.filePath) || left.line.localeCompare(right.line)
-    )),
-    oversizedFiles: oversizedFiles.sort((left, right) => right.lineCount - left.lineCount),
-    passThroughFiles: passThroughFiles.sort(),
+    invalidReaderContentRootExports: moduleHealthResult.invalidStableBarrelExports
+      .filter((entry) => entry.filePath === READER_CONTENT_ROOT_BARREL?.path)
+      .map(({ filePath, line }) => ({ filePath, line })),
+    invalidRootBarrelExports: moduleHealthResult.invalidStableBarrelExports
+      .filter((entry) => entry.filePath === READER_LAYOUT_ENGINE_ROOT_BARREL?.path)
+      .map(({ filePath, line }) => ({ filePath, line })),
+    metricViolations: moduleHealthResult.metricViolations,
+    passThroughFiles: moduleHealthResult.passThroughFiles,
     readerFamilyDeepImports: readerFamilyDeepImports.sort((left, right) => (
       left.filePath.localeCompare(right.filePath)
       || left.specifier.localeCompare(right.specifier)
@@ -216,19 +121,13 @@ export function evaluateReaderArchitecture(
 }
 
 function collectReaderFiles(rootDirectory, requestedPaths = []) {
-  const requested = new Set(requestedPaths.filter((path) => shouldIncludeFile(path)));
-  const discoveredPaths = requested.size > 0
-    ? [...requested]
-    : READER_SOURCE_DIRECTORIES.flatMap((directory) => {
-      const absoluteDirectory = resolve(rootDirectory, directory);
-      return walkDirectory(rootDirectory, absoluteDirectory)
-        .filter((filePath) => shouldIncludeFile(filePath));
-    });
-
-  return Object.fromEntries(discoveredPaths.map((filePath) => [
-    filePath,
-    readFileSync(resolve(rootDirectory, filePath), 'utf8'),
-  ]));
+  return collectConfiguredFiles(rootDirectory, {
+    requestedPaths,
+    searchRoots: READER_ARCHITECTURE.sourceDirectories,
+    includePatterns: READER_ARCHITECTURE.includeFiles,
+    ignorePatterns: READER_ARCHITECTURE.ignoreFiles,
+    fileExtensions: READER_ARCHITECTURE.fileExtensions,
+  });
 }
 
 function printWarningSection(title, lines) {
@@ -240,6 +139,18 @@ function printWarningSection(title, lines) {
   lines.forEach((line) => {
     console.warn(`- ${line}`);
   });
+}
+
+function formatMetricViolation(metric, violation) {
+  if (metric === 'maxFunctionLines') {
+    return `${violation.filePath} -> ${violation.functionName} @ line ${violation.startLine} (${violation.actual} > ${violation.limit})`;
+  }
+
+  if (metric === 'crossLayerImports') {
+    return `${violation.filePath} -> ${violation.actual} imports [${violation.specifiers.join(', ')}]`;
+  }
+
+  return `${violation.filePath} (${violation.actual} > ${violation.limit})`;
 }
 
 export function runReaderArchitectureCheck(
@@ -254,33 +165,45 @@ export function runReaderArchitectureCheck(
   const warningCount =
     result.invalidReaderContentRootExports.length
     + result.invalidRootBarrelExports.length
-    + result.oversizedFiles.length
+    + result.metricViolations.length
     + result.readerFamilyDeepImports.length
     + result.restrictedImports.length
     + result.passThroughFiles.length;
 
+  const metricViolationsByType = groupMetricViolations(result.metricViolations);
+  const metricBudgets = {
+    ...METRIC_DEFAULTS.metricBudgets,
+    ...READER_ARCHITECTURE.metricBudgets,
+  };
+  MODULE_HEALTH_METRIC_KEYS.forEach((metric) => {
+    const metricBudget = metricBudgets[metric];
+    if (!metricBudget) {
+      return;
+    }
+    printWarningSection(
+      MODULE_HEALTH_METRIC_TITLES[metric](metricBudget),
+      (metricViolationsByType.get(metric) ?? [])
+        .map((violation) => formatMetricViolation(metric, violation)),
+    );
+  });
   printWarningSection(
-    `files over ${READER_FILE_LINE_LIMIT} lines`,
-    result.oversizedFiles.map(({ filePath, lineCount }) => `${filePath} (${lineCount} lines)`),
-  );
-  printWarningSection(
-    'reader-layout-engine importing reader-shell / reader-content / reader-session',
+    READER_ARCHITECTURE.restrictedImports.message,
     result.restrictedImports.map(({ filePath, specifier }) => `${filePath} -> ${specifier}`),
   );
   printWarningSection(
-    'reader-family code importing reader-domain internals instead of barrels/relative paths',
+    READER_ARCHITECTURE.deepImports.message,
     result.readerFamilyDeepImports.map(({ filePath, specifier }) => `${filePath} -> ${specifier}`),
   );
   printWarningSection(
-    'pass-through re-export files in the Reader family',
+    READER_ARCHITECTURE.passThrough.message,
     result.passThroughFiles,
   );
   printWarningSection(
-    'reader-content root barrel exporting non-stable symbols',
+    READER_CONTENT_ROOT_BARREL?.message ?? 'reader-content root barrel exporting non-stable symbols',
     result.invalidReaderContentRootExports.map(({ filePath, line }) => `${filePath} -> ${line}`),
   );
   printWarningSection(
-    'reader-layout-engine root barrel exporting non-stable symbols',
+    READER_LAYOUT_ENGINE_ROOT_BARREL?.message ?? 'reader-layout-engine root barrel exporting non-stable symbols',
     result.invalidRootBarrelExports.map(({ filePath, line }) => `${filePath} -> ${line}`),
   );
 
@@ -297,6 +220,6 @@ export function runReaderArchitectureCheck(
   return result;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   runReaderArchitectureCheck();
 }

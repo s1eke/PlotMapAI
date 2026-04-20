@@ -6,7 +6,7 @@ import type {
 import type { ReaderImageViewerSessionState } from '../utils/readerImageViewerTypes';
 
 import { startTransition, useCallback, useEffect, useRef, useState } from 'react';
-import { createReaderImageEntryId } from '@shared/reader-content';
+import { createReaderImageEntryId } from '@shared/reader-rendering';
 
 interface UseReaderPageImageViewerSessionParams {
   dismissBlockedInteraction: () => void;

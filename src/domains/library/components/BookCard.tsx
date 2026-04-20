@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
-import type { NovelView } from '../novelRepository';
+import type { NovelView } from '../types';
 import { useNovelCoverResource } from '../hooks/useNovelCoverResource';
 import TxtCover from './TxtCover';
 

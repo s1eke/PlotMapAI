@@ -1,20 +1,17 @@
-import type { Dispatch, MutableRefObject, RefObject, SetStateAction } from 'react';
 import type {
-  ChapterContent,
   ReaderLocator,
   ReaderRestoreResult,
   ReaderRestoreTarget,
-  StoredReaderState,
 } from '@shared/contracts/reader';
-import type { ScrollReaderLayout } from './scrollReaderControllerTypes';
+import type { UseScrollReaderRestoreParams } from './scrollReaderRestoreTypes';
 
-import { useCallback, useEffect } from 'react';
+import { useEffect } from 'react';
 
-import { getChapterBoundaryLocator } from '../layout-core/internal';
 import { debugLog, setDebugSnapshot } from '@shared/debug';
 import {
   canSkipReaderRestore,
-  SCROLL_READING_ANCHOR_RATIO,
+  clampContainerScrollTop,
+  getContainerMaxScrollTop,
 } from '@shared/utils/readerPosition';
 import {
   restoreStepFailure,
@@ -23,65 +20,20 @@ import {
   runRestoreSolver,
 } from '@shared/utils/readerRestoreSolver';
 import { toCanonicalPositionFromLocator } from '@shared/utils/readerStoredState';
-import { buildFocusedScrollWindow } from '../scroll-runtime/internal';
+import {
+  areRestoreLocatorsEquivalent,
+  areRestoreLocatorsInSameBlock,
+  buildSkippedNoTargetResult,
+  ensureScrollRestoreWindow,
+  resolvePendingScrollTarget,
+} from './scrollReaderRestoreHelpers';
 
-function setStableRestoreWindow(
-  setScrollModeChapters: Dispatch<SetStateAction<number[]>>,
-  nextWindow: number[],
-): void {
-  setScrollModeChapters((previousWindow) => (
-    previousWindow.length === nextWindow.length
-    && previousWindow.every((index, position) => index === nextWindow[position])
-      ? previousWindow
-      : nextWindow
-  ));
-}
+const SCROLL_RESTORE_LOCATOR_SETTLE_FRAMES = 6;
+const SCROLL_RESTORE_LOCATOR_SETTLE_OFFSET_TOLERANCE_PX = 2;
+const SCROLL_RESTORE_SAME_BLOCK_SETTLE_OFFSET_TOLERANCE_PX = 64;
+const SCROLL_RESTORE_SCROLL_TOP_SETTLE_TOLERANCE_PX = 2;
 
-function buildSkippedNoTargetResult(
-  chapterIndex: number,
-  attempts: number,
-): ReaderRestoreResult {
-  return {
-    status: 'skipped',
-    reason: 'no_target',
-    retryable: false,
-    attempts,
-    mode: 'scroll',
-    chapterIndex,
-  };
-}
-
-export function useScrollReaderRestore(params: {
-  chapterIndex: number;
-  chaptersLength: number;
-  clearPendingRestoreTarget: () => void;
-  currentChapter: ChapterContent | null;
-  enabled: boolean;
-  layoutQueries: {
-    resolveScrollLocatorOffset: (locator: ReaderLocator) => number | null;
-  };
-  navigation: {
-    setChapterChangeSource: (source: 'navigation' | 'restore' | 'scroll' | null) => void;
-  };
-  pendingRestoreTarget: ReaderRestoreTarget | null;
-  pendingRestoreTargetRef: MutableRefObject<ReaderRestoreTarget | null>;
-  getRestoreAttempt: (target: ReaderRestoreTarget | null | undefined) => number;
-  recordRestoreResult: (
-    result: ReaderRestoreResult,
-    target: ReaderRestoreTarget | null | undefined,
-  ) => { scheduledRetry: boolean };
-  persistReaderState: (state: StoredReaderState) => void;
-  persistence: {
-    notifyRestoreSettled: (status: 'completed' | 'failed' | 'skipped') => void;
-    suppressScrollSyncTemporarily: () => void;
-  };
-  scrollChapterBodyElementsRef: MutableRefObject<Map<number, HTMLDivElement>>;
-  scrollChapterElementsRef: MutableRefObject<Map<number, HTMLDivElement>>;
-  scrollLayouts: ReadonlyMap<number, ScrollReaderLayout>;
-  setScrollModeChapters: Dispatch<SetStateAction<number[]>>;
-  stopRestoreMask: () => void;
-  viewportContentRef: RefObject<HTMLDivElement | null>;
-}): void {
+export function useScrollReaderRestore(params: UseScrollReaderRestoreParams): void {
   const {
     chapterIndex,
     chaptersLength,
@@ -94,6 +46,7 @@ export function useScrollReaderRestore(params: {
     pendingRestoreTargetRef,
     getRestoreAttempt,
     recordRestoreResult,
+    retainFocusedWindowAfterRestore,
     persistReaderState,
     persistence,
     scrollChapterBodyElementsRef,
@@ -103,93 +56,6 @@ export function useScrollReaderRestore(params: {
     stopRestoreMask,
     viewportContentRef,
   } = params;
-
-  const ensureScrollRestoreWindow = useCallback((target: ReaderRestoreTarget) => {
-    const targetChapterIndex = target.locator?.chapterIndex ?? target.chapterIndex;
-    if (targetChapterIndex < 0 || targetChapterIndex >= chaptersLength) {
-      return;
-    }
-
-    setStableRestoreWindow(
-      setScrollModeChapters,
-      buildFocusedScrollWindow(targetChapterIndex, chaptersLength),
-    );
-  }, [chaptersLength, setScrollModeChapters]);
-
-  const resolvePendingRestoreLocator = useCallback((target: ReaderRestoreTarget) => {
-    if (target.locator) {
-      return target.locator;
-    }
-
-    if (target.locatorBoundary === undefined) {
-      return null;
-    }
-
-    const chapterLayout = scrollLayouts.get(target.chapterIndex) ?? null;
-    return getChapterBoundaryLocator(chapterLayout, target.locatorBoundary);
-  }, [scrollLayouts]);
-
-  const resolvePendingScrollTarget = useCallback((
-    target: ReaderRestoreTarget,
-    container: HTMLDivElement,
-  ) => {
-    const targetChapterIndex = target.locator?.chapterIndex ?? target.chapterIndex;
-    const targetElement = scrollChapterElementsRef.current.get(targetChapterIndex) ?? null;
-    const resolvedLocator = resolvePendingRestoreLocator(target);
-
-    if (target.locatorBoundary !== undefined && resolvedLocator === null) {
-      const hasResolvedBoundaryLayout = scrollLayouts.has(target.chapterIndex)
-        && scrollChapterBodyElementsRef.current.has(target.chapterIndex);
-      if (!hasResolvedBoundaryLayout) {
-        return restoreStepPending<{
-          locator: ReaderLocator;
-          scrollTop: number;
-        }>('layout_missing');
-      }
-    }
-
-    if (resolvedLocator) {
-      if (target.locatorBoundary === 'start' && targetElement) {
-        return restoreStepSuccess({
-          locator: resolvedLocator,
-          scrollTop: Math.max(0, Math.round(targetElement.offsetTop)),
-        });
-      }
-
-      const nextScrollTop = layoutQueries.resolveScrollLocatorOffset(resolvedLocator);
-      if (nextScrollTop !== null) {
-        return restoreStepSuccess({
-          locator: resolvedLocator,
-          scrollTop: Math.max(
-            0,
-            Math.round(nextScrollTop - container.clientHeight * SCROLL_READING_ANCHOR_RATIO),
-          ),
-        });
-      }
-
-      const hasResolvedChapterLayout = scrollLayouts.has(resolvedLocator.chapterIndex)
-        && scrollChapterBodyElementsRef.current.has(resolvedLocator.chapterIndex);
-      if (!hasResolvedChapterLayout) {
-        return restoreStepPending<{
-          locator: ReaderLocator;
-          scrollTop: number;
-        }>('layout_missing');
-      }
-    }
-
-    return restoreStepFailure<{
-      locator: ReaderLocator;
-      scrollTop: number;
-    }>('target_unresolvable', {
-      retryable: false,
-    });
-  }, [
-    layoutQueries,
-    resolvePendingRestoreLocator,
-    scrollChapterBodyElementsRef,
-    scrollChapterElementsRef,
-    scrollLayouts,
-  ]);
 
   useEffect(() => {
     if (!enabled || currentChapter?.index !== chapterIndex) {
@@ -226,6 +92,194 @@ export function useScrollReaderRestore(params: {
 
     let frameId = 0;
     let cancelled = false;
+    let restoreSettledFrameCount = 0;
+
+    const finalizeSuccessfulRestore = (
+      activeTarget: ReaderRestoreTarget | null,
+      completedResult: ReaderRestoreResult,
+      resolvedLocator: ReaderLocator | null | undefined,
+    ) => {
+      recordRestoreResult(completedResult, activeTarget);
+      const completedSnapshot = {
+        source: 'scrollReaderRestore',
+        mode: 'scroll',
+        status: completedResult.status,
+        chapterIndex,
+        resolvedLocator: resolvedLocator ?? null,
+        target: activeTarget ?? null,
+      };
+      setDebugSnapshot('reader-position-restore', completedSnapshot);
+      if (resolvedLocator) {
+        persistReaderState({
+          canonical: toCanonicalPositionFromLocator(resolvedLocator),
+          hints: {
+            pageIndex: undefined,
+            contentMode: 'scroll',
+          },
+        });
+      }
+      retainFocusedWindowAfterRestore(chapterIndex);
+      clearPendingRestoreTarget();
+      stopRestoreMask();
+      persistence.notifyRestoreSettled(completedResult.status);
+    };
+
+    const failSettledScrollRestore = (
+      activeTarget: ReaderRestoreTarget | null,
+      currentLocator: ReaderLocator | null,
+      expectedOffset: number | null,
+      actualOffset: number | null,
+      tolerance: number,
+    ) => {
+      const measuredError = (
+        typeof expectedOffset === 'number'
+        && typeof actualOffset === 'number'
+      )
+        ? {
+          metric: 'scroll_px' as const,
+          delta: Math.abs(actualOffset - expectedOffset),
+          tolerance,
+          expected: expectedOffset,
+          actual: actualOffset,
+        }
+        : undefined;
+      const failedResult: ReaderRestoreResult = {
+        attempts: getRestoreAttempt(activeTarget) + 1,
+        chapterIndex,
+        measuredError,
+        mode: 'scroll',
+        reason: 'validation_exceeded_tolerance',
+        retryable: true,
+        status: 'failed',
+      };
+      const failureRecord = recordRestoreResult(failedResult, activeTarget);
+      if (failureRecord.scheduledRetry) {
+        if (activeTarget) {
+          ensureScrollRestoreWindow({
+            chaptersLength,
+            setScrollModeChapters,
+            target: activeTarget,
+          });
+        }
+        restoreSettledFrameCount = 0;
+        frameId = requestAnimationFrame(restoreScrollPosition);
+        return;
+      }
+
+      const failedSnapshot = {
+        source: 'scrollReaderRestore',
+        mode: 'scroll',
+        status: 'failed',
+        chapterIndex,
+        reason: failedResult.reason,
+        retryable: failedResult.retryable,
+        attempts: failedResult.attempts,
+        currentLocator,
+        expectedOffset,
+        actualOffset,
+        tolerance,
+        target: activeTarget ?? null,
+      };
+      setDebugSnapshot('reader-position-restore', failedSnapshot);
+      debugLog('Reader', 'scroll restore failed', failedSnapshot);
+      clearPendingRestoreTarget();
+      stopRestoreMask();
+      persistence.notifyRestoreSettled('failed');
+    };
+
+    const verifySettledScrollRestore = (
+      activeTarget: ReaderRestoreTarget | null,
+      expectedLocator: ReaderLocator | null | undefined,
+      completedResult: ReaderRestoreResult,
+      expectedScrollTop: number,
+    ) => {
+      if (cancelled) {
+        return;
+      }
+
+      const currentLocator = layoutQueries.getCurrentOriginalLocator();
+      const container = viewportContentRef.current;
+      const shouldPreferProgressStability = Boolean(
+        activeTarget
+        && typeof activeTarget.chapterProgress === 'number',
+      );
+      const progressExpectedScrollTop = (
+        container
+        && activeTarget
+        && typeof activeTarget.chapterProgress === 'number'
+      )
+        ? clampContainerScrollTop(
+          container,
+          getContainerMaxScrollTop(container) * activeTarget.chapterProgress,
+        )
+        : expectedScrollTop;
+      if (
+        !shouldPreferProgressStability
+        && expectedLocator
+        && areRestoreLocatorsEquivalent(currentLocator, expectedLocator)
+      ) {
+        finalizeSuccessfulRestore(activeTarget, completedResult, expectedLocator);
+        return;
+      }
+      const scrollTopIsStable = container !== null
+        && Math.abs(container.scrollTop - progressExpectedScrollTop)
+          <= SCROLL_RESTORE_SCROLL_TOP_SETTLE_TOLERANCE_PX;
+      if (scrollTopIsStable) {
+        finalizeSuccessfulRestore(activeTarget, completedResult, expectedLocator ?? currentLocator);
+        return;
+      }
+
+      if (
+        container
+        && activeTarget
+        && typeof activeTarget.chapterProgress === 'number'
+        && typeof activeTarget.locator?.pageIndex === 'number'
+      ) {
+        navigation.setChapterChangeSource('restore');
+        persistence.suppressScrollSyncTemporarily();
+        container.scrollTop = progressExpectedScrollTop;
+      }
+
+      const expectedOffset = expectedLocator
+        ? layoutQueries.resolveScrollLocatorOffset(expectedLocator)
+        : null;
+      const actualOffset = currentLocator
+        ? layoutQueries.resolveScrollLocatorOffset(currentLocator)
+        : null;
+      const offsetTolerance = areRestoreLocatorsInSameBlock(currentLocator, expectedLocator)
+        ? SCROLL_RESTORE_SAME_BLOCK_SETTLE_OFFSET_TOLERANCE_PX
+        : SCROLL_RESTORE_LOCATOR_SETTLE_OFFSET_TOLERANCE_PX;
+      const offsetsAreStable = (
+        typeof expectedOffset === 'number'
+        && typeof actualOffset === 'number'
+        && Math.abs(actualOffset - expectedOffset) <= offsetTolerance
+      );
+      if (offsetsAreStable) {
+        finalizeSuccessfulRestore(activeTarget, completedResult, expectedLocator ?? currentLocator);
+        return;
+      }
+
+      restoreSettledFrameCount += 1;
+      if (restoreSettledFrameCount < SCROLL_RESTORE_LOCATOR_SETTLE_FRAMES) {
+        frameId = requestAnimationFrame(() => {
+          verifySettledScrollRestore(
+            activeTarget,
+            expectedLocator,
+            completedResult,
+            expectedScrollTop,
+          );
+        });
+        return;
+      }
+
+      failSettledScrollRestore(
+        activeTarget,
+        currentLocator,
+        expectedOffset,
+        actualOffset,
+        offsetTolerance,
+      );
+    };
 
     const restoreScrollPosition = () => {
       if (cancelled) {
@@ -255,7 +309,14 @@ export function useScrollReaderRestore(params: {
           });
         },
         project: ({ target, container }) => {
-          const projected = resolvePendingScrollTarget(target, container);
+          const projected = resolvePendingScrollTarget({
+            container,
+            layoutQueries,
+            scrollChapterBodyElementsRef,
+            scrollChapterElementsRef,
+            scrollLayouts,
+            target,
+          });
           if (projected.state !== 'success') {
             return projected;
           }
@@ -293,13 +354,18 @@ export function useScrollReaderRestore(params: {
           return restoreStepSuccess(measuredError);
         },
         buildContext: ({ executed }) => ({
+          expectedScrollTop: executed.expectedScrollTop,
           locator: executed.locator,
         }),
       });
 
       if (solverOutcome.kind === 'pending') {
         if (activeTarget) {
-          ensureScrollRestoreWindow(activeTarget);
+          ensureScrollRestoreWindow({
+            chaptersLength,
+            setScrollModeChapters,
+            target: activeTarget,
+          });
         }
         frameId = requestAnimationFrame(restoreScrollPosition);
         return;
@@ -310,7 +376,11 @@ export function useScrollReaderRestore(params: {
         const failureRecord = recordRestoreResult(solverOutcome.result, activeTarget);
         if (failureRecord.scheduledRetry) {
           if (activeTarget) {
-            ensureScrollRestoreWindow(activeTarget);
+            ensureScrollRestoreWindow({
+              chaptersLength,
+              setScrollModeChapters,
+              target: activeTarget,
+            });
           }
           frameId = requestAnimationFrame(restoreScrollPosition);
           return;
@@ -334,28 +404,15 @@ export function useScrollReaderRestore(params: {
         return;
       }
 
-      recordRestoreResult(solverOutcome.result, activeTarget);
-      const completedSnapshot = {
-        source: 'scrollReaderRestore',
-        mode: 'scroll',
-        status: solverOutcome.result.status,
-        chapterIndex,
-        resolvedLocator: solverOutcome.context?.locator ?? null,
-        target: activeTarget ?? null,
-      };
-      setDebugSnapshot('reader-position-restore', completedSnapshot);
-      if (solverOutcome.context?.locator) {
-        persistReaderState({
-          canonical: toCanonicalPositionFromLocator(solverOutcome.context.locator),
-          hints: {
-            pageIndex: undefined,
-            contentMode: 'scroll',
-          },
-        });
-      }
-      clearPendingRestoreTarget();
-      stopRestoreMask();
-      persistence.notifyRestoreSettled(solverOutcome.result.status);
+      restoreSettledFrameCount = 0;
+      frameId = requestAnimationFrame(() => {
+        verifySettledScrollRestore(
+          activeTarget,
+          solverOutcome.context?.locator,
+          solverOutcome.result,
+          solverOutcome.context?.expectedScrollTop ?? 0,
+        );
+      });
     };
 
     frameId = requestAnimationFrame(restoreScrollPosition);
@@ -366,18 +423,23 @@ export function useScrollReaderRestore(params: {
     };
   }, [
     chapterIndex,
+    chaptersLength,
     clearPendingRestoreTarget,
     currentChapter,
     enabled,
-    ensureScrollRestoreWindow,
+    layoutQueries,
     navigation,
     pendingRestoreTarget,
     pendingRestoreTargetRef,
     getRestoreAttempt,
     recordRestoreResult,
+    retainFocusedWindowAfterRestore,
     persistReaderState,
     persistence,
-    resolvePendingScrollTarget,
+    scrollChapterBodyElementsRef,
+    scrollChapterElementsRef,
+    scrollLayouts,
+    setScrollModeChapters,
     stopRestoreMask,
     viewportContentRef,
   ]);

@@ -12,6 +12,7 @@ import {
   toCanonicalPositionFromLocator,
   toReaderLocatorFromCanonical,
 } from './readerStoredState';
+import { resolvePersistedReaderMode } from './readerMode';
 
 export interface ChapterRenderData {
   paragraphs: string[];
@@ -19,6 +20,23 @@ export interface ChapterRenderData {
 }
 
 export const SCROLL_READING_ANCHOR_RATIO = 0.3;
+
+export function getContainerMaxScrollTop(element: HTMLDivElement | null): number {
+  if (!element) return 0;
+  return Math.max(0, element.scrollHeight - element.clientHeight);
+}
+
+export function clampContainerScrollTop(
+  element: HTMLDivElement | null,
+  scrollTop: number,
+): number {
+  const nextScrollTop = Math.round(scrollTop);
+  if (!element) {
+    return Math.max(0, nextScrollTop);
+  }
+
+  return Math.max(0, Math.min(getContainerMaxScrollTop(element), nextScrollTop));
+}
 
 export function clampProgress(value: number | undefined): number {
   if (typeof value !== 'number' || Number.isNaN(value)) return 0;
@@ -28,7 +46,7 @@ export function clampProgress(value: number | undefined): number {
 export function getContainerProgress(element: HTMLDivElement | null): number {
   if (!element) return 0;
 
-  const maxScroll = element.scrollHeight - element.clientHeight;
+  const maxScroll = getContainerMaxScrollTop(element);
   if (maxScroll <= 0) return 0;
 
   return clampProgress(element.scrollTop / maxScroll);
@@ -40,6 +58,35 @@ export function getPageIndexFromProgress(progress: number | undefined, totalPage
     0,
     Math.min(totalPages - 1, Math.round(clampProgress(progress) * (totalPages - 1))),
   );
+}
+
+export function resolvePagedRestoreTargetPageIndex(params: {
+  chapterProgress?: number;
+  locatorPageIndex?: number;
+  resolvedLocatorPageIndex?: number | null;
+  totalPages: number;
+}): number | null {
+  const progressPageIndex = typeof params.chapterProgress === 'number'
+    ? getPageIndexFromProgress(params.chapterProgress, params.totalPages)
+    : null;
+
+  if (typeof params.locatorPageIndex === 'number') {
+    return Math.max(0, Math.min(params.totalPages - 1, params.locatorPageIndex));
+  }
+
+  if (typeof params.resolvedLocatorPageIndex === 'number') {
+    if (
+      params.resolvedLocatorPageIndex === 0
+      && progressPageIndex !== null
+      && progressPageIndex > 0
+    ) {
+      return progressPageIndex;
+    }
+
+    return Math.max(0, Math.min(params.totalPages - 1, params.resolvedLocatorPageIndex));
+  }
+
+  return progressPageIndex;
 }
 
 export function resolvePagedTargetPage(
@@ -105,10 +152,9 @@ export function createRestoreTargetFromPersistedState(
   }
 
   const normalizedState = buildStoredReaderState(state);
-  const legacy = state as Record<string, unknown>;
-  const targetMode = legacy.mode === 'scroll' || legacy.mode === 'paged' || legacy.mode === 'summary'
-    ? legacy.mode
-    : mode;
+  const targetMode = resolvePersistedReaderMode(normalizedState, {
+    fallbackContentMode: mode === 'paged' ? 'paged' : 'scroll',
+  }).mode;
   const locator = toReaderLocatorFromCanonical(
     normalizedState.canonical,
     normalizedState.hints?.pageIndex,
@@ -127,7 +173,7 @@ export function createRestoreTargetFromPersistedState(
     locatorBoundary,
   };
 
-  if (target.mode === 'summary') {
+  if (typeof normalizedState.hints?.chapterProgress === 'number') {
     target.chapterProgress = typeof normalizedState.hints?.chapterProgress === 'number'
       ? clampProgress(normalizedState.hints.chapterProgress)
       : undefined;

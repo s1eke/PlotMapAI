@@ -22,6 +22,8 @@ import { AppErrorCode, createAppError } from '@shared/errors';
 import { db } from '@infra/db';
 import { clearReaderBootstrapSnapshot } from '@infra/storage/readerStateCache';
 
+import { invalidateNovelTextProjectionCache } from '@application/read-models/novel-text-projection';
+
 function getRequiredTransaction(): Transaction {
   const transaction = Dexie.currentTransaction;
   if (!transaction) {
@@ -81,6 +83,7 @@ export const bookLifecycleService = {
 
     clearReaderRenderCacheMemoryForNovel(novelId);
     clearReaderBootstrapSnapshot(novelId);
+    invalidateNovelTextProjectionCache(novelId);
     return novelRepository.get(novelId);
   },
 
@@ -159,6 +162,7 @@ export const bookLifecycleService = {
     clearReaderRenderCacheMemoryForNovel(novelId);
     clearReaderImageResourcesForNovel(novelId);
     clearReaderBootstrapSnapshot(novelId);
+    invalidateNovelTextProjectionCache(novelId);
 
     return novelRepository.get(novelId);
   },
@@ -198,6 +202,7 @@ export const bookLifecycleService = {
     clearReaderRenderCacheMemoryForNovel(novelId);
     clearReaderImageResourcesForNovel(novelId);
     clearReaderBootstrapSnapshot(novelId);
+    invalidateNovelTextProjectionCache(novelId);
 
     return { message: 'Novel deleted' };
   },

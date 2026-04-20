@@ -3,7 +3,7 @@ import type { ChapterContent } from '@shared/contracts/reader';
 import type { ReaderAnalysisBridgeController, UseReaderPreferencesResult } from '@domains/reader-shell';
 import type { UseReaderSessionResult } from '@domains/reader-session';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
   PagedReaderContent,
@@ -19,7 +19,7 @@ import {
   useReaderRestoreController,
   useReaderSession,
 } from '@domains/reader-session';
-import { DEBUG_RETRY_READER_RESTORE_EVENT } from '@app/debug/pwaDebugTools';
+import { DEBUG_RETRY_READER_RESTORE_EVENT } from '@shared/pwa/pwaDebugTools';
 import { useReaderPersistenceRuntime } from '@shared/reader-runtime';
 
 import type {
@@ -163,12 +163,13 @@ export function useReaderReadingSurfaceController({
   const { snapshot: sessionSnapshot, commands: sessionCommands } = session;
   const { chapterIndex, isPagedMode, lastContentMode, mode, viewMode } = sessionSnapshot;
   const [chapterDataRevision, setChapterDataRevision] = useState(0);
+  const handleChapterContentResolved = useCallback(() => {
+    setChapterDataRevision((previousVersion) => previousVersion + 1);
+  }, []);
 
   const chapterData = useReaderChapterData({
     novelId,
-    onChapterContentResolved: () => {
-      setChapterDataRevision((previousVersion) => previousVersion + 1);
-    },
+    onChapterContentResolved: handleChapterContentResolved,
     resetInteractionState,
     sessionCommands,
     sessionSnapshot,
@@ -241,10 +242,25 @@ export function useReaderReadingSurfaceController({
     novelId,
     restoreFlow,
   });
+  const handleLifecycleRestoreSettledRef = useRef(lifecycle.handleRestoreSettled);
+  const handleRestoreFlowSettledRef = useRef(restoreFlow.handleRestoreSettled);
 
   useEffect(() => {
-    return persistence.registerRestoreSettledHandler(lifecycle.handleRestoreSettled);
-  }, [lifecycle.handleRestoreSettled, persistence]);
+    handleLifecycleRestoreSettledRef.current = lifecycle.handleRestoreSettled;
+  }, [lifecycle.handleRestoreSettled]);
+
+  useEffect(() => {
+    handleRestoreFlowSettledRef.current = restoreFlow.handleRestoreSettled;
+  }, [restoreFlow.handleRestoreSettled]);
+
+  useEffect(() => {
+    return persistence.registerRestoreSettledHandler((result) => {
+      if (handleRestoreFlowSettledRef.current(result)) {
+        return;
+      }
+      handleLifecycleRestoreSettledRef.current(result);
+    });
+  }, [persistence]);
 
   useEffect(() => {
     const handleDebugRetryReaderRestore = () => {
@@ -297,8 +313,10 @@ export function useReaderReadingSurfaceController({
       ...lifecycle,
       renderableChapter,
     },
+    modeSwitchError: restoreFlow.modeSwitchError,
     navigation,
     restore: {
+      setLastContentMode: sessionCommands.setLastContentMode,
       switchMode: restoreFlow.switchMode,
     },
     sessionSnapshot: {

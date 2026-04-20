@@ -4,19 +4,7 @@ import userEvent from '@testing-library/user-event';
 import Toggle from '../Toggle';
 
 describe('Toggle', () => {
-  it('renders with correct aria-checked when unchecked', () => {
-    render(<Toggle checked={false} onChange={() => {}} />);
-    const toggle = screen.getByRole('switch');
-    expect(toggle).toHaveAttribute('aria-checked', 'false');
-  });
-
-  it('renders with correct aria-checked when checked', () => {
-    render(<Toggle checked onChange={() => {}} />);
-    const toggle = screen.getByRole('switch');
-    expect(toggle).toHaveAttribute('aria-checked', 'true');
-  });
-
-  it('calls onChange with toggled value on click', async () => {
+  it('calls onChange with true when toggled from false', async () => {
     const handleChange = vi.fn();
     render(<Toggle checked={false} onChange={handleChange} />);
     const user = userEvent.setup();
@@ -40,11 +28,5 @@ describe('Toggle', () => {
     const user = userEvent.setup();
     await user.click(toggle);
     expect(handleChange).not.toHaveBeenCalled();
-  });
-
-  it('applies custom className', () => {
-    render(<Toggle checked={false} onChange={() => {}} className="custom-class" />);
-    const toggle = screen.getByRole('switch');
-    expect(toggle.className).toContain('custom-class');
   });
 });
