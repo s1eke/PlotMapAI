@@ -45,7 +45,7 @@ interface ModalProps {
 export default function Modal({ isOpen, onClose, title, children, className }: ModalProps) {
   const titleId = useId();
 
-  // Prevent body scroll when open
+  // 开启时防止页面滚动
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';

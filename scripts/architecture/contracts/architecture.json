@@ -57,42 +57,42 @@
       {
         "path": "src/application/pages/reader/useReaderLifecycleController.ts",
         "metrics": ["maxFunctionLines"],
-        "reason": "Reader page lifecycle orchestration still spans restore, hydration, and surface handoff."
+        "reason": "阅读器页面生命周期编排仍跨越恢复、水合及界面交接。"
       },
       {
         "path": "src/application/pages/reader/useReaderPageViewModel.tsx",
         "metrics": ["importCount", "crossLayerImports"],
-        "reason": "The page view-model still composes multiple reader subdomains while the shell remains centralized."
+        "reason": "页面视图模型仍组合了多个阅读器子领域，而外壳仍保持中心化。"
       },
       {
         "path": "src/domains/reader-layout-engine/hooks/scrollReaderRestore.ts",
         "metrics": ["maxFunctionLines"],
-        "reason": "Scroll restore remains consolidated while scroll and paged restore flows still share recovery semantics."
+        "reason": "滚动恢复仍保持整合状态，滚动与分页恢复流程仍共享恢复语义。"
       },
       {
         "path": "src/domains/reader-layout-engine/hooks/usePagedReaderController.ts",
         "metrics": ["maxFunctionLines"],
-        "reason": "Paged controller orchestration still coordinates layout, restore, and visibility in one hook."
+        "reason": "分页控制器编排仍在一个 Hook 中协调布局、恢复及可见性。"
       },
       {
         "path": "src/domains/reader-layout-engine/hooks/usePagedReaderLayout.ts",
         "metrics": ["maxFunctionLines"],
-        "reason": "Paged layout measurement and viewport planning are still co-located during layout engine stabilization."
+        "reason": "在排版引擎稳定化期间，分页布局测量与视口规划仍处于同一位置。"
       },
       {
         "path": "src/domains/reader-media/hooks/useReaderImageViewerPointerHandlers.ts",
         "metrics": ["maxFunctionLines"],
-        "reason": "Image viewer pointer gesture handling remains centralized while the reader media surface stabilizes."
+        "reason": "在阅读器媒体界面趋于稳定期间，图像查看器指针手势处理仍保持中心化。"
       },
       {
         "path": "src/domains/reader-session/restore/useReaderRestoreController.ts",
         "metrics": ["maxFunctionLines", "importCount"],
-        "reason": "Restore orchestration still centralizes session resume branching while the reader session split settles."
+        "reason": "在阅读器会话拆分期间，恢复编排仍集中处理会话恢复分支。"
       },
       {
         "path": "src/domains/reader-shell/components/ReaderToolbar.tsx",
         "metrics": ["maxFunctionLines"],
-        "reason": "Toolbar rendering still keeps action wiring and mode branching together while the surface evolves."
+        "reason": "在界面演进期间，工具栏渲染仍将动作绑定与模式分支放在一起。"
       }
     ],
     "restrictedImports": {
@@ -100,11 +100,11 @@
         "src/domains/reader-layout-engine/**/*.{ts,tsx}"
       ],
       "pattern": "from\\s+['\\\"](@domains\\/reader-(?:content|session|shell)(?:\\/[^'\\\"]*)?)['\\\"]",
-      "message": "reader-layout-engine importing reader-shell / reader-content / reader-session"
+      "message": "reader-layout-engine 正在引入 reader-shell / reader-content / reader-session"
     },
     "deepImports": {
       "pattern": "from\\s+['\\\"](@domains\\/reader-[^/'\\\"]+\\/[^'\\\"]+)['\\\"]",
-      "message": "reader-family code importing reader-domain internals instead of barrels/relative paths"
+      "message": "阅读器家族代码引入了阅读器领域内部实现，而非通过导出桶/相对路径"
     },
     "passThrough": {
       "files": [
@@ -113,12 +113,12 @@
       "ignoreIndexFiles": true,
       "exportLinePattern": "^export\\s+(type\\s+)?\\{[^}]+\\}\\s+from\\s+['\\\"][^'\\\"]+['\\\"];?$",
       "exportStarLinePattern": "^export\\s+\\*\\s+from\\s+['\\\"][^'\\\"]+['\\\"];?$",
-      "message": "pass-through re-export files in the Reader family"
+      "message": "阅读器家族中的透传重新导出文件"
     },
     "stableBarrels": [
       {
         "path": "src/domains/reader-layout-engine/index.ts",
-        "message": "reader-layout-engine root barrel exporting non-stable symbols",
+        "message": "reader-layout-engine 根导出桶导出了非稳定符号",
         "allowedLines": [
           "export { PagedReaderContent } from './paged-runtime';",
           "export { usePagedReaderController as usePagedReaderViewportController } from './paged-runtime';",
@@ -134,7 +134,7 @@
       },
       {
         "path": "src/domains/reader-content/index.ts",
-        "message": "reader-content root barrel exporting non-stable symbols",
+        "message": "reader-content 根导出桶导出了非稳定符号",
         "allowedLines": [
           "export type { Chapter, ChapterContent, ReaderChapterCacheApi } from '@shared/contracts/reader';",
           "export { useReaderChapterData } from './hooks/useReaderChapterData';",
@@ -180,22 +180,22 @@
           {
             "path": "src/domains/book-import/bookImportService.ts",
             "metrics": ["crossLayerImports"],
-            "reason": "Import orchestration still centralizes parse result shaping and progress coordination."
+            "reason": "导入编排仍集中处理解析结果整形与进度协调。"
           },
           {
             "path": "src/domains/book-import/services/epub/core.ts",
             "metrics": ["maxFunctionLines", "importCount"],
-            "reason": "EPUB archive loading and manifest traversal remain co-located during parser stabilization."
+            "reason": "在解析器稳定化期间，EPUB 归档加载与清单遍历仍处于同一位置。"
           },
           {
             "path": "src/domains/book-import/services/epub/epubDomToRichBlocks.ts",
             "metrics": ["effectiveLines"],
-            "reason": "Rich-content block conversion is still one state machine until the capability registry lands."
+            "reason": "在能力注册中心落地前，富文本内容块转换仍为一个状态机。"
           },
           {
             "path": "src/domains/book-import/services/txt/chapterDetection.ts",
             "metrics": ["effectiveLines"],
-            "reason": "TXT chapter heuristics remain consolidated until rule decomposition is planned."
+            "reason": "在规划规则分解前，TXT 章节启发式算法仍保持整合。"
           }
         ]
       },
@@ -220,7 +220,7 @@
           {
             "path": "src/application/services/bookLifecycleService.ts",
             "metrics": ["importCount", "crossLayerImports"],
-            "reason": "Import transaction orchestration and asset persistence are still coordinated in one service."
+            "reason": "导入事务编排与资产持久化仍在一个服务中协调。"
           }
         ]
       },
@@ -243,7 +243,7 @@
           {
             "path": "src/shared/text-processing/richPagination.ts",
             "metrics": ["maxFunctionLines"],
-            "reason": "Pagination projection logic stays consolidated until renderer-specific splits are introduced."
+            "reason": "在引入特定渲染器的拆分前，分页投影逻辑保持整合。"
           }
         ]
       },
@@ -268,7 +268,7 @@
           {
             "path": "src/app/debug/DebugWorkspaceSections.tsx",
             "metrics": ["effectiveLines", "importCount", "crossLayerImports"],
-            "reason": "The debug workspace keeps page sections together until the tools surface stabilizes."
+            "reason": "在工具界面稳定化之前，调试工作区保持各页面部分处于一起。"
           }
         ]
       }
@@ -317,7 +317,7 @@
     "domainEntryConsumers": {
       "files": ["src/app/**/*.{ts,tsx}", "src/application/**/*.{ts,tsx}"],
       "restrictedSubpathPattern": "@domains/*/*",
-      "message": "Import domains only via @domains/<domain>."
+      "message": "仅允许通过 @domains/<domain> 导出桶引入领域代码。"
     },
     "specialInfraDbRestrictions": [
       {
@@ -325,14 +325,14 @@
         "files": ["src/domains/book-import/**/*.{ts,tsx}"],
         "ignores": ["src/domains/book-import/**/__tests__/**"],
         "restrictedImports": ["@infra/db", "@infra/db/*"],
-        "message": "book-import is parse-only and must not access Dexie directly."
+        "message": "book-import 仅作为解析器，不得直接访问 Dexie。"
       },
       {
         "domain": "reader-content",
         "files": ["src/domains/reader-content/**/*.{ts,tsx}"],
         "ignores": ["src/domains/reader-content/**/__tests__/**"],
         "restrictedImports": ["@infra/db", "@infra/db/*"],
-        "message": "reader-content must consume application-registered read models instead of Dexie directly."
+        "message": "reader-content 必须使用应用层注册的读模型，而非直接操作 Dexie。"
       }
     ],
     "readerFamily": {
@@ -340,23 +340,23 @@
       "restrictedImports": [
         {
           "group": ["@app/*", "@app/*/*"],
-          "message": "domain code must not depend on app code."
+          "message": "领域层代码不能依赖应用层代码。"
         },
         {
           "group": ["@application/*", "@application/*/*"],
-          "message": "domain code must not depend on application code."
+          "message": "领域层代码不能依赖业务逻辑层代码。"
         },
         {
           "group": ["@domains/*", "!@domains/reader-*", "!@domains/reader-*/*"],
-          "message": "reader-family domain code must not depend on unrelated domains."
+          "message": "阅读器相关领域不能依赖与之无关的领域。"
         },
         {
           "group": ["@domains/reader-*/*"],
-          "message": "reader-family code must import sibling reader domains via barrels and same-domain modules via relative paths."
+          "message": "阅读器相关代码必须通过导出桶（barrel）引入同级领域，通过相对路径引入同领域模块。"
         },
         {
           "group": ["@domains/*/*", "!@domains/reader-*/*"],
-          "message": "reader-family domain code must not depend on unrelated domain internals."
+          "message": "领域层代码不能依赖其他领域的内部实现。"
         }
       ]
     }

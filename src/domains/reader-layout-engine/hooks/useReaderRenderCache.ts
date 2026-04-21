@@ -129,7 +129,7 @@ export function useReaderRenderCache({
     scrollChapters,
     variantSignatures,
     viewMode,
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh keys after image preload
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- 图片预加载后刷新索引键
   }), [
     currentChapter,
     imageRevision,

@@ -20,7 +20,7 @@ export interface PurifyRule {
   target_scope?: PurificationTargetScope;
   execution_stage?: PurificationExecutionStage;
   rule_version?: number;
-  // Legacy YAML compatibility fields.
+  // 旧版本 YAML 兼容性字段。
   scope_title?: boolean;
   scope_content?: boolean;
   book_scope?: string;

@@ -34,8 +34,8 @@ export function countEffectiveLines(source) {
     return 0;
   }
 
-  // Preserve the historical 500-line hard cap semantics, but count logical lines
-  // so comments and whitespace do not trigger structural alarms on their own.
+  // 保留历史上的 500 行硬上限语义，但计算逻辑行数，
+  // 这样注释和空格本身就不会触发结构性警报。
   return stripComments(source)
     .split(/\r?\n/)
     .map((line) => line.trim())

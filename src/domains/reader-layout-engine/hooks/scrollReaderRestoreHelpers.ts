@@ -179,9 +179,9 @@ export function resolvePendingScrollTarget(params: {
       return restoreStepPending<ScrollRestoreStepValue>('layout_missing');
     }
 
-    // Layout is ready but produced no boundary locator (e.g. metrics not yet computed).
-    // Fall back to chapter-progress scroll position once the container has a non-zero
-    // scroll range; return pending if the DOM layout is not fully settled yet.
+    // 布局已就绪但未生成边界定位项（例如指标尚未计算）。
+    // 一旦容器具有非零滚动范围，则回退到章节进度滚动位置；
+    // 如果 DOM 布局尚未完全稳定，则返回等待状态。
     if (progressScrollTop !== null) {
       if (containerMaxScrollTop > 0) {
         return restoreStepSuccess<ScrollRestoreStepValue>({
@@ -204,9 +204,8 @@ export function resolvePendingScrollTarget(params: {
 
     const nextScrollTop = layoutQueries.resolveScrollLocatorOffset(resolvedLocator);
     if (nextScrollTop !== null) {
-      // Guard: if the scroll container has no scrollable range yet the DOM layout
-      // has not settled.  Returning success with scrollTop=0 here would complete
-      // the restore prematurely; retry on the next frame instead.
+      // 防护：如果滚动容器尚无滚动范围，则说明 DOM 布局尚未稳定。
+      // 此时若返回 scrollTop=0 的成功状态会导致恢复过早完成；请在下一帧重试。
       if (containerMaxScrollTop === 0) {
         return restoreStepPending<ScrollRestoreStepValue>('layout_not_ready');
       }
@@ -227,9 +226,9 @@ export function resolvePendingScrollTarget(params: {
     }
   }
 
-  // Last resort: use chapter progress if locator-based resolution is unavailable.
-  // Guard against returning a stale progress=0 when the container scroll range has
-  // not been computed yet (DOM layout incomplete); retry on the next frame instead.
+  // 最后手段：如果基于定位项的解析不可用，则使用章节进度。
+  // 防止在容器滚动范围尚未计算（DOM 布局不完整）时返回过时的进度 0；
+  // 请在下一帧重试。
   if (progressScrollTop !== null) {
     if (containerMaxScrollTop > 0) {
       return restoreStepSuccess<ScrollRestoreStepValue>({

@@ -15,7 +15,7 @@ let shortHash = 'unknown';
 try {
   shortHash = execSync('git rev-parse --short HEAD').toString().trim();
 } catch {
-  // git not available (e.g. shallow clone, npm publish, Docker build)
+  // git 不可用（例如浅克隆、npm 发布、Docker 构建）
 }
 
 const base = process.env.VITE_BASE || '/';
@@ -208,35 +208,35 @@ export default defineConfig({
             sizes: '800x1734',
             type: 'image/png',
             form_factor: 'narrow',
-            label: 'Bookshelf page',
+            label: '书架页面',
           },
           {
             src: 'pwa-screenshots/book-detail-mobile.png',
             sizes: '800x1734',
             type: 'image/png',
             form_factor: 'narrow',
-            label: 'Book detail page',
+            label: '书籍详情页',
           },
           {
             src: 'pwa-screenshots/reader-mobile.png',
             sizes: '800x1734',
             type: 'image/png',
             form_factor: 'narrow',
-            label: 'Reader page',
+            label: '阅读器页面',
           },
           {
             src: 'pwa-screenshots/character-graph-mobile.png',
             sizes: '800x1734',
             type: 'image/png',
             form_factor: 'narrow',
-            label: 'Character graph page',
+            label: '人物关系图页',
           },
           {
             src: 'pwa-screenshots/settings-mobile.png',
             sizes: '800x1734',
             type: 'image/png',
             form_factor: 'narrow',
-            label: 'Settings page',
+            label: '设置页面',
           },
         ],
       },

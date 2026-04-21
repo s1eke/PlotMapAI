@@ -82,7 +82,7 @@ export function FileHandlingProvider({ children }: { children: ReactNode }) {
     launchQueue.setConsumer((launchParams) => {
       handleLaunch(launchParams);
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- handleLaunch comes from useEffectEvent
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- handleLaunch 源自 useEffectEvent
   }, []);
 
   const value = useMemo<FileHandlingContextValue>(() => ({

@@ -710,28 +710,25 @@ export async function importEpubToDetailPage(
 }
 
 /**
- * Reveal the reader chrome (top bar + bottom toolbar) by clicking in the center of
- * the reader viewport. Chrome starts hidden (isChromeVisible = false) so the first
- * click in the center area (25–75 % x) always transitions it to visible.
+ * 通过点击阅读器视口的中心区域显现阅读器界面（顶部栏 + 底部工具栏）。
+ * 界面初始状态为隐藏（isChromeVisible = false），因此第一次在中心区域（25%–75% x 轴）的点击总会将其切换为可见状态。
  *
- * Waits for the "Exit Reader" link in the top bar to come into the viewport so
- * callers can immediately interact with chrome elements after this call returns.
+ * 等待顶部栏中的“退出阅读”链接进入视口，以便调用者在此函数返回后立即与界面元素交互。
  */
 export async function revealReaderChrome(page: Page): Promise<void> {
-  // Click in the horizontal center of the viewport — safe for both scroll and
-  // paged mode (paged: left<25% prev, right>75% next, center shows chrome).
+  // 在视口的水平中心点击 —— 对滚动和分页模式都安全
+  // （分页模式：左侧 < 25% 翻上页，右侧 > 75% 翻下页，中心显示/隐藏界面）。
   await page.getByTestId('reader-viewport').click({ position: { x: 400, y: 200 } });
-  // Wait for the top bar to animate into the viewport (framer-motion spring).
+  // 等待顶部栏动画进入视口（framer-motion 弹性动画）。
   await expect(
     page.getByRole('link', { name: 'Exit Reader' }),
   ).toBeInViewport({ timeout: 8_000 });
 }
 
 /**
- * Exit the reader by navigating directly to the novel-detail URL. This is a full
- * SPA-top-level navigation (via hash routing) so:
- *  • avoids the chrome-visibility problem with the "Exit Reader" link, and
- *  • causes the app to re-read localStorage preferences on the next page.goto.
+ * 通过直接导航到书籍详情 URL 退出阅读器。这是一个完整的 SPA 顶层导航（通过哈希路由），因此：
+ *  • 避免了“退出阅读”链接可能存在的界面可见性问题，并且
+ *  • 促使应用在下一次加载页面时重新读取 localStorage 中的偏好设置。
  */
 export async function exitReaderToDetailPage(page: Page): Promise<void> {
   const match = page.url().match(/\/novel\/(\d+)/u);
@@ -744,22 +741,20 @@ export async function exitReaderToDetailPage(page: Page): Promise<void> {
 }
 
 /**
- * Navigate directly to the reader page via a full-page load (page.goto). This
- * ensures the app re-reads localStorage preferences, which is required when you
- * have set a preference (e.g. pageTurnMode) without a reload before this call.
+ * 通过完整页面加载（page.goto）直接导航到阅读器页面。
+ * 这确保了应用会重新读取 localStorage 中的偏好设置，当你修改了设置（例如阅读翻页模式）
+ * 且在调用此功能前未刷新页面时，这是必需的。
  */
 export async function openReaderDirect(page: Page, novelId: number): Promise<void> {
-  // page.goto with a hash URL is a same-document navigation — the SPA app is NOT
-  // reloaded and the in-memory preference store is NOT re-read from localStorage.
-  // Call page.reload() immediately after so the app starts fresh and picks up the
-  // latest preferences (e.g. pageTurnMode: 'slide' just written by setReaderPreferences).
+  // 带哈希 URL 的 page.goto 是同文档导航 —— SPA 应用并未重新加载，
+  // 内存中的偏好设置存储也不会从 localStorage 中重新读取。
+  // 立即调用 page.reload()，以便应用重新启动并获取最新的偏好设置
+  // （例如刚通过 setReaderPreferences 写入的 pageTurnMode: 'slide'）。
   await page.goto(`/#/novel/${novelId}/read`);
   await page.reload();
   await disableAnimations(page);
-  // Both reader branches (scroll and paged) use the reader-viewport testid as a
-  // container element; wait for whichever appears first.
-  // Use .first() to avoid strict-mode errors: in paged mode BOTH testids are
-  // present in the DOM at the same time.
+  // 阅读器的分支（滚动和分页）都使用 reader-viewport 作为容器元素的测试 ID；等待其中任何一个出现即可。
+  // 使用 .first() 以避免严格模式错误：在分页模式下，两个测试 ID 可能会同时出现在 DOM 中。
   await expect(
     page.locator('[data-testid="reader-viewport"], [data-testid="paged-reader-interactive"]').first(),
   ).toBeVisible({ timeout: 30_000 });
@@ -767,49 +762,45 @@ export async function openReaderDirect(page: Page, novelId: number): Promise<voi
 
 export async function exitAndReopenReader(page: Page): Promise<void> {
   await exitReaderToDetailPage(page);
-  // Re-enter via SPA navigation so the reader hydrates from persisted state.
+  // 通过 SPA 导航重新进入，以便阅读器从持久化状态中进行水合。
   await page.getByRole('link', { name: 'Start Reading' }).click();
   await expect(page.getByTestId('reader-viewport')).toBeVisible({ timeout: 30_000 });
   await disableAnimations(page);
 }
 
 /**
- * Advance one page in the paged reader by clicking the right navigation zone
- * (> 75 % of the viewport width). This avoids relying on the chrome toolbar,
- * which uses a framer-motion spring animation that can interfere with Playwright's
- * click-action actionability checks in paged mode.
+ * 在分页模式阅读器中，通过点击右侧导航区域（视口宽度的 75% 以上）前进一页。
+ * 这避免了依赖界面工具栏，因为工具栏使用了 framer-motion 的弹性动画，
+ * 可能会干扰 Playwright 在分页模式下的点击可操作性检查。
  *
- * IMPORTANT: call this only when the reader chrome is hidden (initial state or
- * after a previous right-zone click). If chrome IS visible, any click on
- * reader-viewport will hide chrome instead of navigating.
+ * 重要提示：仅在阅读器界面隐藏时（初始状态或前一次点击右侧区域后）调用此方法。
+ * 如果界面当前可见，点击阅读器视口将隐藏界面而非进行翻页导航。
  */
 export async function clickNextPage(page: Page): Promise<void> {
-  // x = 1300 px on a 1440 px viewport ≈ 90 % — well inside the right zone (> 75 %).
+  // 在 1440 像素的视口上 x = 1300 像素 ≈ 90% —— 处于右侧区域内（> 75%）。
   await page.getByTestId('reader-viewport').click({ position: { x: 1300, y: 480 } });
 }
 
 /**
- * Open the TOC sidebar and click a chapter by its title.
- * Reveals the reader chrome first since the top bar starts hidden.
+ * 打开目录侧边栏并根据标题点击章节。
+ * 显现阅读器界面，因为顶部栏初始时是隐藏的。
  */
 export async function navigateToChapterByTitle(page: Page, chapterTitle: string): Promise<void> {
   await revealReaderChrome(page);
-  // Two "Contents" buttons exist in the DOM (desktop top-bar + mobile toolbar).
-  // Use .first() to reliably pick the desktop top-bar button (first in DOM order).
-  // Wait explicitly for the button to enter the viewport so framer-motion spring
-  // has fully settled before we try to click.
+  // DOM 中存在两个“目录”按钮（桌面版顶部栏 + 移动版工具栏）。
+  // 使用 .first() 以可靠地选取桌面版顶部栏按钮（DOM 顺序中的第一个）。
+  // 显式等待按钮进入视口，以便在尝试点击前让 framer-motion 弹性动画完全稳定。
   const contentsButton = page.getByTitle('Contents').first();
   await expect(contentsButton).toBeInViewport({ timeout: 8_000 });
-  // Use force: true to bypass Playwright's scroll-into-view step.  In paged mode
-  // with chrome visible, a scroll event on reader-viewport triggers onBlockedInteraction
-  // which hides chrome before the click can land on the toolbar button.
+  // 使用 force: true 绕过 Playwright 的滚动至可视区域步骤。在分页模式且界面可见的情况下，
+  // 对 reader-viewport 的滚动事件会触发 onBlockedInteraction，
+  // 这会在点击落在工具栏按钮上之前隐藏界面。
   await contentsButton.click({ force: true });
   await page.getByRole('button', { name: chapterTitle }).click();
-  // Wait for the viewport to remain stable after chapter navigation.
+  // 等待导航到章节后视口保持稳定。
   await expect(page.getByTestId('reader-viewport')).toBeVisible({ timeout: 15_000 });
-  // revealReaderChrome() set isChromeVisible=true earlier and it stays true after
-  // chapter selection.  Click the viewport center once to toggle chrome OFF
-  // (handleContentClick: isChromeVisible=true → setIsChromeVisible(false)) so
-  // subsequent waitForReaderBranch('scroll') checks can detect overflowY='auto'.
+  // revealReaderChrome() 之前将 isChromeVisible 设置为 true，且在章节选择后保持为 true。
+  // 点击视口中心一次以关闭界面（handleContentClick: isChromeVisible=true → setIsChromeVisible(false)），
+  // 以便随后的 waitForReaderBranch('scroll') 检查能够检测到 overflowY='auto'。
   await page.getByTestId('reader-viewport').click({ position: { x: 400, y: 200 } });
 }

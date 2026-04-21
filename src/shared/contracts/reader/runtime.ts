@@ -86,15 +86,15 @@ export interface ReaderPersistenceRuntimeValue {
   isScrollSyncSuppressed: () => boolean;
   notifyRestoreSettled: (result: RestoreSettledResult) => void;
   /**
-   * Registers a synchronous capture hook that must finish before durable flush starts.
-   * Async preparation should happen earlier so flush-time capture can stay immediate.
+   * 注册一个同步捕获钩子，该钩子必须在持久化刷新开始前完成。
+   * 异步准备工作应提前完成，以便刷新时的捕获能保持同步即时执行。
    */
   registerBeforeFlush: (handler: () => void) => () => void;
   registerRestoreSettledHandler: (
     handler: (result: RestoreSettledResult) => void,
   ) => () => void;
   /**
-   * Runs all registered synchronous before-flush capture hooks immediately.
+   * 立即运行所有注册的同步“刷新前”捕获钩子。
    */
   runBeforeFlush: () => void;
   suppressScrollSyncTemporarily: () => void;

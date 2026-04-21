@@ -51,7 +51,7 @@ describe('moduleHealth', () => {
   it('flags files that exceed the global effective-line hard cap', () => {
     const result = evaluateModuleHealth({
       'src/domains/example/oversized.ts': [
-        '// keep the old 500-line baseline semantics, but count only logical lines',
+        '// 保留旧的 500 行基准语义，但仅计算逻辑行数',
         '',
         'const first = 1;',
         'const second = 2;',

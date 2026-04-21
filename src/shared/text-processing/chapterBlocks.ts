@@ -77,7 +77,7 @@ export function buildChapterBlockSequence(
 ): ChapterBlockSequenceEntry[] {
   const lines = chapter.content.split('\n');
   const firstNonEmptyIndex = lines.findIndex((line) => line.trim().length > 0);
-  // Older imports may still have duplicated titles at the start of chapter.content.
+  // 旧版本的导入可能在 chapter.content 的开头仍包含重复的标题。
   const skipLineIndex =
     firstNonEmptyIndex !== -1 && lines[firstNonEmptyIndex].trim() === chapter.title.trim()
       ? firstNonEmptyIndex

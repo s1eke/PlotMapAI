@@ -237,7 +237,7 @@ export interface ReadingProgressRecord {
   contentMode?: 'scroll' | 'paged';
   viewMode?: 'original' | 'summary';
   revision?: number;
-  // Legacy mixed-model fields retained only for read/drop compatibility.
+  // 为读取/丢弃兼容性而保留的旧版混合模型字段。
   chapterIndex?: number;
   mode?: string;
   locator?: ReaderLocatorRecord;

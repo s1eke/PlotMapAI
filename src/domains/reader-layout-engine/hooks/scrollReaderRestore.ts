@@ -204,9 +204,9 @@ export function useScrollReaderRestore(params: UseScrollReaderRestoreParams): vo
         && typeof activeTarget.chapterProgress === 'number',
       );
       const containerMaxScrollTop = container ? getContainerMaxScrollTop(container) : 0;
-      // If the DOM layout is not ready yet (no scrollable range), the progress-based
-      // expectedScrollTop would be 0, which would incorrectly mark the restore as stable.
-      // Re-run the full restore on the next frame instead.
+      // 如果 DOM 布局尚未就绪（无滚动范围），基于进度的 expectedScrollTop 将为 0，
+      // 这会错误地将恢复标记为已稳定。
+      // 在下一帧重新运行完整的恢复逻辑。
       if (shouldPreferProgressStability && containerMaxScrollTop === 0) {
         restoreSettledFrameCount = 0;
         frameId = requestAnimationFrame(restoreScrollPosition);

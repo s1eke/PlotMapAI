@@ -130,7 +130,7 @@ export function useCharacterGraphPageViewModel(novelId: number): CharacterGraphP
         await fullscreenRef.current.requestFullscreen();
       }
     } catch {
-      // Ignore fullscreen request errors.
+      // 忽略全屏请求错误。
     }
   }, []);
 

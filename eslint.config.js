@@ -56,7 +56,7 @@ export default defineConfig([
         'error',
         {
           name: 'localStorage',
-          message: 'Use infra/storage instead of direct localStorage access.',
+          message: '请使用 infra/storage 而非直接访问 localStorage。',
         },
       ],
       'no-restricted-properties': [
@@ -64,7 +64,7 @@ export default defineConfig([
         {
           object: 'window',
           property: 'localStorage',
-          message: 'Use infra/storage instead of direct localStorage access.',
+          message: '请使用 infra/storage 而非直接访问 localStorage。',
         },
       ],
     },

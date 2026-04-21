@@ -439,7 +439,7 @@ export function usePagedReaderLayout({
     setPageIndex,
   ]);
 
-  // Reset pageIndex to 0 when chapter changes to prevent using old chapter's pageIndex
+  // 当章节切换时重置 pageIndex 为 0，以防止沿用旧章节的 pageIndex
   useLayoutEffect(() => {
     if (prevChapterIndexRef.current !== chapterIndex) {
       prevChapterIndexRef.current = chapterIndex;

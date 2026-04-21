@@ -94,7 +94,7 @@ export function createPersistedRuntime<TState, THydrateOptions = void>({
     try {
       onPersistSuccess?.(state);
     } catch {
-      // Callbacks are best-effort and should never break the persist queue.
+      // 回调是尽力而为的，绝不应破坏持久化队列。
     }
   }
 
@@ -102,7 +102,7 @@ export function createPersistedRuntime<TState, THydrateOptions = void>({
     try {
       onPersistError?.(error, state);
     } catch {
-      // Error callbacks are best-effort and should never break the persist queue.
+      // 错误回调是尽力而为的，绝不应破坏持久化队列。
     }
   }
 

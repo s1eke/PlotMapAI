@@ -294,7 +294,7 @@ export function createWorkerTaskRunner<Payload, Result, Progress>({
             requestId,
           } satisfies WorkerTaskMessage<Payload>);
         } catch {
-          // ignore cancellation transport errors
+          // 忽略取消请求时的传输错误
         }
         reject(createAbortError());
       };

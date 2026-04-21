@@ -104,7 +104,7 @@ export function buildReaderBlocks(
   chapter: ChapterContent,
   paragraphSpacing: number,
 ): ReaderBlock[] {
-  // The chapter title is the single source of truth for every rendered heading.
+  // 章节标题是所有渲染标题的唯一事实来源。
   const blocks: ReaderBlock[] = [{
     chapterIndex: chapter.index,
     blockIndex: 0,

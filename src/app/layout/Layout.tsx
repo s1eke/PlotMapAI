@@ -93,7 +93,7 @@ export default function Layout({ children }: LayoutProps) {
       className="flex h-[100dvh] min-h-[100dvh] flex-col overflow-hidden bg-bg-primary"
       style={layoutStyle}
     >
-      {/* Header - hide in reader mode for immersion */}
+      {/* 顶部导航栏 - 在阅读器模式下隐藏以增强沉浸感 */}
       {!isReader && (
         <header
           className="sticky top-0 z-50 border-b border-border-color/70 bg-bg-primary shadow-[0_10px_30px_rgba(15,23,42,0.06)]"
@@ -120,7 +120,7 @@ export default function Layout({ children }: LayoutProps) {
         </header>
       )}
 
-      {/* Main Content */}
+      {/* 主要内容区域 */}
       <main
         data-scroll-container={isReader ? undefined : 'true'}
         className={cn(

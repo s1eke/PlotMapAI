@@ -67,7 +67,7 @@ export async function buildTocMap(opfPackage: OpfPackage): Promise<Map<string, s
         const ncxXml = await ncxFile.async('text');
         addTocEntries(tocMap, parseNcxEntries(ncxXml));
       } catch {
-        // ignore invalid ncx
+        // 忽略无效的 ncx
       }
     }
   }
@@ -84,7 +84,7 @@ export async function buildTocMap(opfPackage: OpfPackage): Promise<Map<string, s
           const navXml = await navFile.async('text');
           addTocEntries(tocMap, parseNavEntries(navXml));
         } catch {
-          // ignore invalid nav document
+          // 忽略无效的 nav 文档
         }
       }
     }

@@ -1,5 +1,5 @@
-/* eslint-disable no-param-reassign -- raster generation mutates RGBA buffers in place */
-/* eslint-disable no-bitwise -- CRC32 computation relies on bitwise operations */
+/* eslint-disable no-param-reassign -- 光栅生成会就地修改 RGBA 缓冲区 */
+/* eslint-disable no-bitwise -- CRC32 计算依赖于位运算 */
 
 import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -359,8 +359,8 @@ function renderBrandIcon(size, variant) {
 function createBrandSvg() {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
-  <title>PlotMapAI Symbol</title>
-  <desc>Minimal symbol for PlotMapAI built as a page beam with a single highlighted narrative point.</desc>
+  <title>PlotMapAI 标识</title>
+  <desc>PlotMapAI 的极简标识，由一个页面光束和单个突出的叙事点构成。</desc>
   <rect width="512" height="512" fill="#F8F1E8"/>
   <path fill="#2C5D67" d="M118 114h118c50 0 88 34 88 84v192H118V114Z"/>
   <path fill="#3B7480" d="M394 114H276c-50 0-88 34-88 84v192h206V114Z"/>

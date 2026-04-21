@@ -28,7 +28,7 @@
     {
       "name": "novels",
       "ownerDomain": "library",
-      "allowedDirectAccessSummary": "library, application orchestration",
+      "allowedDirectAccessSummary": "图书库，应用层编排",
       "allowedDirectAccessPaths": [
         "src/domains/library/**/*.ts",
         "src/domains/library/**/*.tsx"
@@ -55,7 +55,7 @@
     {
       "name": "chapters",
       "ownerDomain": "book-content",
-      "allowedDirectAccessSummary": "book-content, application orchestration",
+      "allowedDirectAccessSummary": "书籍内容，应用层编排",
       "allowedDirectAccessPaths": [
         "src/domains/book-content/**/*.ts",
         "src/domains/book-content/**/*.tsx"
@@ -82,7 +82,7 @@
     {
       "name": "chapterImages",
       "ownerDomain": "book-content",
-      "allowedDirectAccessSummary": "book-content, application orchestration, app/debug diagnostics",
+      "allowedDirectAccessSummary": "书籍内容，应用层编排，调试面板诊断",
       "allowedDirectAccessPaths": [
         "src/domains/book-content/**/*.ts",
         "src/domains/book-content/**/*.tsx",
@@ -109,7 +109,7 @@
     {
       "name": "tocRules",
       "ownerDomain": "settings",
-      "allowedDirectAccessSummary": "settings",
+      "allowedDirectAccessSummary": "设置",
       "allowedDirectAccessPaths": [
         "src/domains/settings/**/*.ts",
         "src/domains/settings/**/*.tsx"
@@ -133,7 +133,7 @@
     {
       "name": "appSettings",
       "ownerDomain": "settings",
-      "allowedDirectAccessSummary": "settings, infra/storage",
+      "allowedDirectAccessSummary": "设置，基础设施/存储",
       "allowedDirectAccessPaths": [
         "src/domains/settings/**/*.ts",
         "src/domains/settings/**/*.tsx",
@@ -141,14 +141,14 @@
       ],
       "allowedApplicationPaths": [],
       "publicApi": [
-        "settings repositories/services",
+        "设置仓库/服务",
         "primaryStorage.settings.*"
       ]
     },
     {
       "name": "analysisJobs",
       "ownerDomain": "analysis",
-      "allowedDirectAccessSummary": "analysis, application orchestration",
+      "allowedDirectAccessSummary": "人工智能分析，应用层编排",
       "allowedDirectAccessPaths": [
         "src/domains/analysis/**/*.ts",
         "src/domains/analysis/**/*.tsx"
@@ -198,7 +198,7 @@
     {
       "name": "readingProgress",
       "ownerDomain": "reader-session",
-      "allowedDirectAccessSummary": "reader-session, application orchestration",
+      "allowedDirectAccessSummary": "阅读器会话，应用层编排",
       "allowedDirectAccessPaths": [
         "src/domains/reader-session/**/*.ts",
         "src/domains/reader-session/**/*.tsx"
@@ -211,7 +211,7 @@
     {
       "name": "readerRenderCache",
       "ownerDomain": "reader-layout-engine",
-      "allowedDirectAccessSummary": "reader-layout-engine, application orchestration, app/debug diagnostics",
+      "allowedDirectAccessSummary": "阅读器排版引擎，应用层编排，调试面板诊断",
       "allowedDirectAccessPaths": [
         "src/domains/reader-layout-engine/**/*.ts",
         "src/domains/reader-layout-engine/**/*.tsx",
@@ -219,7 +219,7 @@
       ],
       "allowedApplicationPaths": ["src/application/services/bookLifecycleService.ts"],
       "publicApi": [
-        "render cache utils",
+        "排版缓存工具",
         "deletePersistedReaderRenderCache"
       ]
     }

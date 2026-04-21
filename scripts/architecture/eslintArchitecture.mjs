@@ -25,25 +25,25 @@ function buildDefaultDomainPatterns(contract) {
   if (!domainLayer.canDependOn.includes('app')) {
     patterns.push({
       group: ['@app/*', '@app/*/*'],
-      message: 'domain code must not depend on app code.',
+      message: '领域层代码不能依赖应用层代码。',
     });
   }
 
   if (!domainLayer.canDependOn.includes('application')) {
     patterns.push({
       group: ['@application/*', '@application/*/*'],
-      message: 'domain code must not depend on application code.',
+      message: '领域层代码不能依赖业务逻辑层代码。',
     });
   }
 
   if (!domainLayer.canDependOn.includes('domains')) {
     patterns.push({
       group: ['@domains/*'],
-      message: 'domain code must not depend on other domains.',
+      message: '领域内部不能相互依赖。',
     });
     patterns.push({
       group: ['@domains/*/*'],
-      message: 'domain code must not depend on other domain internals.',
+      message: '领域层代码不能依赖其他领域的内部实现。',
     });
   }
 
@@ -68,7 +68,7 @@ function buildSharedInfraPatterns(contract) {
       '../../../domains/*',
       '../../../domains/*/*',
     ],
-    message: 'shared and infra must not depend on domain code.',
+    message: '共享层和基础设施层不能依赖领域层代码。',
   }];
 }
 

@@ -117,13 +117,13 @@ async function buildEpub(
     `<itemref idref="${ch.id}"/>`
   )).join('\n');
 
-  // Build a toc.ncx so the reader can display human-readable chapter titles in
-  // the Contents sidebar rather than falling back to XHTML file names.
+  // 构建 toc.ncx，以便阅读器能在“目录”侧边栏显示易读的章节标题，
+  // 而非回退到显示 XHTML 文件名。
   const navPoints = chapters.map((ch, index) => [
     `  <navPoint id="nav-${index + 1}" playOrder="${index + 1}">`,
     `    <navLabel><text>${escapeXml(ch.title)}</text></navLabel>`,
     `    <content src="${ch.id}.xhtml"/>`,
-    `  </navPoint>`,
+    '  </navPoint>',
   ].join('\n')).join('\n');
 
   zip.file('toc.ncx', [
@@ -150,7 +150,7 @@ async function buildEpub(
     '<dc:language>en</dc:language>',
     '</metadata>',
     '<manifest>',
-    `<item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>`,
+    '<item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>',
     chapterItems,
     '</manifest>',
     '<spine toc="ncx">',
