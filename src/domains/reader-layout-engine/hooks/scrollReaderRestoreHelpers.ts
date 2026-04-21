@@ -147,19 +147,16 @@ export function resolvePendingScrollTarget(params: {
   const targetChapterIndex = target.locator?.chapterIndex ?? target.chapterIndex;
   const targetElement = scrollChapterElementsRef.current.get(targetChapterIndex) ?? null;
   const resolvedLocator = resolvePendingRestoreLocator(target, scrollLayouts);
+  const containerMaxScrollTop = getContainerMaxScrollTop(container);
   const progressScrollTop = typeof target.chapterProgress === 'number'
-    ? clampContainerScrollTop(
-      container,
-      getContainerMaxScrollTop(container) * target.chapterProgress,
-    )
+    ? clampContainerScrollTop(container, containerMaxScrollTop * target.chapterProgress)
     : null;
   const resolvePreferredScrollTop = (candidateScrollTop: number): number => {
     if (progressScrollTop === null || typeof target.chapterProgress !== 'number') {
       return candidateScrollTop;
     }
 
-    const maxScrollTop = getContainerMaxScrollTop(container);
-    const candidateProgress = maxScrollTop > 0 ? candidateScrollTop / maxScrollTop : 0;
+    const candidateProgress = containerMaxScrollTop > 0 ? candidateScrollTop / containerMaxScrollTop : 0;
     if (
       Math.abs(candidateProgress - target.chapterProgress)
       > SCROLL_RESTORE_PROGRESS_FALLBACK_TOLERANCE
@@ -170,21 +167,36 @@ export function resolvePendingScrollTarget(params: {
     return candidateScrollTop;
   };
 
+  type ScrollRestoreStepValue = {
+    locator: ReaderLocator | null;
+    scrollTop: number;
+  };
+
   if (target.locatorBoundary !== undefined && resolvedLocator === null) {
     const hasResolvedBoundaryLayout = scrollLayouts.has(target.chapterIndex)
       && scrollChapterBodyElementsRef.current.has(target.chapterIndex);
     if (!hasResolvedBoundaryLayout) {
-      return restoreStepPending<{
-        locator: ReaderLocator;
-        scrollTop: number;
-      }>('layout_missing');
+      return restoreStepPending<ScrollRestoreStepValue>('layout_missing');
+    }
+
+    // Layout is ready but produced no boundary locator (e.g. metrics not yet computed).
+    // Fall back to chapter-progress scroll position once the container has a non-zero
+    // scroll range; return pending if the DOM layout is not fully settled yet.
+    if (progressScrollTop !== null) {
+      if (containerMaxScrollTop > 0) {
+        return restoreStepSuccess<ScrollRestoreStepValue>({
+          locator: null,
+          scrollTop: progressScrollTop,
+        });
+      }
+      return restoreStepPending<ScrollRestoreStepValue>('layout_not_ready');
     }
   }
 
   if (resolvedLocator) {
     if (target.locatorBoundary === 'start' && targetElement) {
       const resolvedScrollTop = clampContainerScrollTop(container, targetElement.offsetTop);
-      return restoreStepSuccess({
+      return restoreStepSuccess<ScrollRestoreStepValue>({
         locator: resolvedLocator,
         scrollTop: resolvePreferredScrollTop(resolvedScrollTop),
       });
@@ -192,11 +204,17 @@ export function resolvePendingScrollTarget(params: {
 
     const nextScrollTop = layoutQueries.resolveScrollLocatorOffset(resolvedLocator);
     if (nextScrollTop !== null) {
+      // Guard: if the scroll container has no scrollable range yet the DOM layout
+      // has not settled.  Returning success with scrollTop=0 here would complete
+      // the restore prematurely; retry on the next frame instead.
+      if (containerMaxScrollTop === 0) {
+        return restoreStepPending<ScrollRestoreStepValue>('layout_not_ready');
+      }
       const resolvedScrollTop = clampContainerScrollTop(
         container,
         nextScrollTop - container.clientHeight * SCROLL_READING_ANCHOR_RATIO,
       );
-      return restoreStepSuccess({
+      return restoreStepSuccess<ScrollRestoreStepValue>({
         locator: resolvedLocator,
         scrollTop: resolvePreferredScrollTop(resolvedScrollTop),
       });
@@ -205,17 +223,24 @@ export function resolvePendingScrollTarget(params: {
     const hasResolvedChapterLayout = scrollLayouts.has(resolvedLocator.chapterIndex)
       && scrollChapterBodyElementsRef.current.has(resolvedLocator.chapterIndex);
     if (!hasResolvedChapterLayout) {
-      return restoreStepPending<{
-        locator: ReaderLocator;
-        scrollTop: number;
-      }>('layout_missing');
+      return restoreStepPending<ScrollRestoreStepValue>('layout_missing');
     }
   }
 
-  return restoreStepFailure<{
-    locator: ReaderLocator;
-    scrollTop: number;
-  }>('target_unresolvable', {
+  // Last resort: use chapter progress if locator-based resolution is unavailable.
+  // Guard against returning a stale progress=0 when the container scroll range has
+  // not been computed yet (DOM layout incomplete); retry on the next frame instead.
+  if (progressScrollTop !== null) {
+    if (containerMaxScrollTop > 0) {
+      return restoreStepSuccess<ScrollRestoreStepValue>({
+        locator: null,
+        scrollTop: progressScrollTop,
+      });
+    }
+    return restoreStepPending<ScrollRestoreStepValue>('layout_not_ready');
+  }
+
+  return restoreStepFailure<ScrollRestoreStepValue>('target_unresolvable', {
     retryable: false,
   });
 }

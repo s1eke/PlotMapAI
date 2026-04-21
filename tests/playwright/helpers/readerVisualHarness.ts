@@ -683,3 +683,133 @@ export async function seedChapterAnalysis(page: Page, params: {
     db.close();
   }, params);
 }
+
+interface TestFilePayload {
+  buffer: Buffer;
+  mimeType: string;
+  name: string;
+}
+
+export async function importEpubToDetailPage(
+  page: Page,
+  file: TestFilePayload,
+  title: string,
+): Promise<{ novelId: number; title: string }> {
+  await page.goto('/');
+  await disableAnimations(page);
+  await page.getByRole('button', { name: 'Upload' }).first().click();
+  await page.locator('input[type="file"][accept=".txt,.epub"]').setInputFiles(file);
+  await expect(page.getByRole('link', { name: title })).toBeVisible({ timeout: 30_000 });
+  await page.getByRole('link', { name: title }).click();
+  await expect(page.getByRole('heading', { name: title, level: 1 })).toBeVisible();
+
+  return {
+    novelId: readNovelIdFromUrl(page.url()),
+    title,
+  };
+}
+
+/**
+ * Reveal the reader chrome (top bar + bottom toolbar) by clicking in the center of
+ * the reader viewport. Chrome starts hidden (isChromeVisible = false) so the first
+ * click in the center area (25–75 % x) always transitions it to visible.
+ *
+ * Waits for the "Exit Reader" link in the top bar to come into the viewport so
+ * callers can immediately interact with chrome elements after this call returns.
+ */
+export async function revealReaderChrome(page: Page): Promise<void> {
+  // Click in the horizontal center of the viewport — safe for both scroll and
+  // paged mode (paged: left<25% prev, right>75% next, center shows chrome).
+  await page.getByTestId('reader-viewport').click({ position: { x: 400, y: 200 } });
+  // Wait for the top bar to animate into the viewport (framer-motion spring).
+  await expect(
+    page.getByRole('link', { name: 'Exit Reader' }),
+  ).toBeInViewport({ timeout: 8_000 });
+}
+
+/**
+ * Exit the reader by navigating directly to the novel-detail URL. This is a full
+ * SPA-top-level navigation (via hash routing) so:
+ *  • avoids the chrome-visibility problem with the "Exit Reader" link, and
+ *  • causes the app to re-read localStorage preferences on the next page.goto.
+ */
+export async function exitReaderToDetailPage(page: Page): Promise<void> {
+  const match = page.url().match(/\/novel\/(\d+)/u);
+  if (!match) {
+    throw new Error(`Cannot determine novel ID from current URL: ${page.url()}`);
+  }
+  await page.goto(`/#/novel/${match[1]}`);
+  await disableAnimations(page);
+  await expect(page.getByRole('link', { name: 'Start Reading' })).toBeVisible({ timeout: 15_000 });
+}
+
+/**
+ * Navigate directly to the reader page via a full-page load (page.goto). This
+ * ensures the app re-reads localStorage preferences, which is required when you
+ * have set a preference (e.g. pageTurnMode) without a reload before this call.
+ */
+export async function openReaderDirect(page: Page, novelId: number): Promise<void> {
+  // page.goto with a hash URL is a same-document navigation — the SPA app is NOT
+  // reloaded and the in-memory preference store is NOT re-read from localStorage.
+  // Call page.reload() immediately after so the app starts fresh and picks up the
+  // latest preferences (e.g. pageTurnMode: 'slide' just written by setReaderPreferences).
+  await page.goto(`/#/novel/${novelId}/read`);
+  await page.reload();
+  await disableAnimations(page);
+  // Both reader branches (scroll and paged) use the reader-viewport testid as a
+  // container element; wait for whichever appears first.
+  // Use .first() to avoid strict-mode errors: in paged mode BOTH testids are
+  // present in the DOM at the same time.
+  await expect(
+    page.locator('[data-testid="reader-viewport"], [data-testid="paged-reader-interactive"]').first(),
+  ).toBeVisible({ timeout: 30_000 });
+}
+
+export async function exitAndReopenReader(page: Page): Promise<void> {
+  await exitReaderToDetailPage(page);
+  // Re-enter via SPA navigation so the reader hydrates from persisted state.
+  await page.getByRole('link', { name: 'Start Reading' }).click();
+  await expect(page.getByTestId('reader-viewport')).toBeVisible({ timeout: 30_000 });
+  await disableAnimations(page);
+}
+
+/**
+ * Advance one page in the paged reader by clicking the right navigation zone
+ * (> 75 % of the viewport width). This avoids relying on the chrome toolbar,
+ * which uses a framer-motion spring animation that can interfere with Playwright's
+ * click-action actionability checks in paged mode.
+ *
+ * IMPORTANT: call this only when the reader chrome is hidden (initial state or
+ * after a previous right-zone click). If chrome IS visible, any click on
+ * reader-viewport will hide chrome instead of navigating.
+ */
+export async function clickNextPage(page: Page): Promise<void> {
+  // x = 1300 px on a 1440 px viewport ≈ 90 % — well inside the right zone (> 75 %).
+  await page.getByTestId('reader-viewport').click({ position: { x: 1300, y: 480 } });
+}
+
+/**
+ * Open the TOC sidebar and click a chapter by its title.
+ * Reveals the reader chrome first since the top bar starts hidden.
+ */
+export async function navigateToChapterByTitle(page: Page, chapterTitle: string): Promise<void> {
+  await revealReaderChrome(page);
+  // Two "Contents" buttons exist in the DOM (desktop top-bar + mobile toolbar).
+  // Use .first() to reliably pick the desktop top-bar button (first in DOM order).
+  // Wait explicitly for the button to enter the viewport so framer-motion spring
+  // has fully settled before we try to click.
+  const contentsButton = page.getByTitle('Contents').first();
+  await expect(contentsButton).toBeInViewport({ timeout: 8_000 });
+  // Use force: true to bypass Playwright's scroll-into-view step.  In paged mode
+  // with chrome visible, a scroll event on reader-viewport triggers onBlockedInteraction
+  // which hides chrome before the click can land on the toolbar button.
+  await contentsButton.click({ force: true });
+  await page.getByRole('button', { name: chapterTitle }).click();
+  // Wait for the viewport to remain stable after chapter navigation.
+  await expect(page.getByTestId('reader-viewport')).toBeVisible({ timeout: 15_000 });
+  // revealReaderChrome() set isChromeVisible=true earlier and it stays true after
+  // chapter selection.  Click the viewport center once to toggle chrome OFF
+  // (handleContentClick: isChromeVisible=true → setIsChromeVisible(false)) so
+  // subsequent waitForReaderBranch('scroll') checks can detect overflowY='auto'.
+  await page.getByTestId('reader-viewport').click({ position: { x: 400, y: 200 } });
+}

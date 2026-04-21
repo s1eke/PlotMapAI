@@ -27,6 +27,13 @@ export const TEST_BOOK_CHAPTER_TITLE = 'Chapter One';
 export const LONG_BOOK_TITLE = 'Long Scroll Register';
 export const LONG_BOOK_CHAPTER_TITLE = 'Endless Corridor';
 
+export const MULTI_CHAPTER_BOOK_TITLE = 'Multi Chapter Voyage';
+export const MULTI_CHAPTER_BOOK_CHAPTER_TITLES = [
+  'First Passage',
+  'Second Passage',
+  'Third Passage',
+] as const;
+
 export async function buildTestEpubFile(): Promise<TestFilePayload> {
   const title = TEST_BOOK_TITLE;
   const chapterTitle = TEST_BOOK_CHAPTER_TITLE;
@@ -49,6 +56,20 @@ export async function buildLongTestEpubFile(): Promise<TestFilePayload> {
   ].join('\n');
 
   return buildEpub(title, [{ id: 'chapter-1', title: chapterTitle, bodyHtml }], 'long-scroll.epub');
+}
+
+export async function buildMultiChapterTestEpubFile(): Promise<TestFilePayload> {
+  const title = MULTI_CHAPTER_BOOK_TITLE;
+  const chapters = MULTI_CHAPTER_BOOK_CHAPTER_TITLES.map((chapterTitle, index) => ({
+    id: `chapter-${index + 1}`,
+    title: chapterTitle,
+    bodyHtml: [
+      `<h1>${chapterTitle}</h1>`,
+      createParagraphSeries(`Passage ${index + 1} unfolded across the landscape`, 30),
+    ].join('\n'),
+  }));
+
+  return buildEpub(title, chapters, 'multi-chapter.epub');
 }
 
 export function buildTestTxtFile(): TestFilePayload {
@@ -96,6 +117,31 @@ async function buildEpub(
     `<itemref idref="${ch.id}"/>`
   )).join('\n');
 
+  // Build a toc.ncx so the reader can display human-readable chapter titles in
+  // the Contents sidebar rather than falling back to XHTML file names.
+  const navPoints = chapters.map((ch, index) => [
+    `  <navPoint id="nav-${index + 1}" playOrder="${index + 1}">`,
+    `    <navLabel><text>${escapeXml(ch.title)}</text></navLabel>`,
+    `    <content src="${ch.id}.xhtml"/>`,
+    `  </navPoint>`,
+  ].join('\n')).join('\n');
+
+  zip.file('toc.ncx', [
+    '<?xml version="1.0" encoding="utf-8"?>',
+    '<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1">',
+    '<head>',
+    '  <meta name="dtb:uid" content="bookid"/>',
+    '  <meta name="dtb:depth" content="1"/>',
+    '  <meta name="dtb:totalPageCount" content="0"/>',
+    '  <meta name="dtb:maxPageNumber" content="0"/>',
+    '</head>',
+    `<docTitle><text>${escapeXml(title)}</text></docTitle>`,
+    '<navMap>',
+    navPoints,
+    '</navMap>',
+    '</ncx>',
+  ].join('\n'));
+
   zip.file('content.opf', [
     '<?xml version="1.0"?>',
     '<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="bookid">',
@@ -104,9 +150,10 @@ async function buildEpub(
     '<dc:language>en</dc:language>',
     '</metadata>',
     '<manifest>',
+    `<item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>`,
     chapterItems,
     '</manifest>',
-    '<spine>',
+    '<spine toc="ncx">',
     spine,
     '</spine>',
     '</package>',

@@ -203,6 +203,15 @@ export function useScrollReaderRestore(params: UseScrollReaderRestoreParams): vo
         activeTarget
         && typeof activeTarget.chapterProgress === 'number',
       );
+      const containerMaxScrollTop = container ? getContainerMaxScrollTop(container) : 0;
+      // If the DOM layout is not ready yet (no scrollable range), the progress-based
+      // expectedScrollTop would be 0, which would incorrectly mark the restore as stable.
+      // Re-run the full restore on the next frame instead.
+      if (shouldPreferProgressStability && containerMaxScrollTop === 0) {
+        restoreSettledFrameCount = 0;
+        frameId = requestAnimationFrame(restoreScrollPosition);
+        return;
+      }
       const progressExpectedScrollTop = (
         container
         && activeTarget
@@ -210,7 +219,7 @@ export function useScrollReaderRestore(params: UseScrollReaderRestoreParams): vo
       )
         ? clampContainerScrollTop(
           container,
-          getContainerMaxScrollTop(container) * activeTarget.chapterProgress,
+          containerMaxScrollTop * activeTarget.chapterProgress,
         )
         : expectedScrollTop;
       if (

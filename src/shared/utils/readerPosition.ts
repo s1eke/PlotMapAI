@@ -118,9 +118,14 @@ export function hasReaderRestoreTarget(
     && typeof target.chapterProgress === 'number'
     && Number.isFinite(target.chapterProgress);
 
+  const usesContentProgress = (target.mode === 'scroll' || target.mode === 'paged')
+    && typeof target.chapterProgress === 'number'
+    && target.chapterProgress > 0;
+
   return target.locator !== undefined
     || target.locatorBoundary !== undefined
-    || usesSummaryProgress;
+    || usesSummaryProgress
+    || usesContentProgress;
 }
 
 export function shouldKeepReaderRestoreMask(
@@ -132,9 +137,14 @@ export function shouldKeepReaderRestoreMask(
     && typeof target.chapterProgress === 'number'
     && target.chapterProgress > 0;
 
+  const usesContentProgress = (target.mode === 'scroll' || target.mode === 'paged')
+    && typeof target.chapterProgress === 'number'
+    && target.chapterProgress > 0;
+
   return target.locator !== undefined
     || target.locatorBoundary !== undefined
-    || usesSummaryProgress;
+    || usesSummaryProgress
+    || usesContentProgress;
 }
 
 export function canSkipReaderRestore(

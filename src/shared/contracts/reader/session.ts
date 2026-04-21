@@ -22,6 +22,7 @@ export type ReaderRestoreReason =
   | 'mode_mismatch'
   | 'container_missing'
   | 'layout_missing'
+  | 'layout_not_ready'
   | 'target_unresolvable'
   | 'validation_exceeded_tolerance'
   | 'execution_exception';
