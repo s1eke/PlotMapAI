@@ -1084,6 +1084,7 @@ describe('useScrollReaderController', () => {
 
       expect(clearPendingRestoreTarget).toHaveBeenCalled();
       expect(stopRestoreMask).toHaveBeenCalled();
+      expect(contextValue.chapterChangeSourceRef.current).toBeNull();
     } finally {
       animationFrames.restore();
     }
@@ -1168,6 +1169,7 @@ describe('useScrollReaderController', () => {
       expect(onRestoreSettled).toHaveBeenCalledWith('completed');
       expect(clearPendingRestoreTarget).toHaveBeenCalled();
       expect(stopRestoreMask).toHaveBeenCalled();
+      expect(contextValue.chapterChangeSourceRef.current).toBeNull();
     } finally {
       animationFrames.restore();
     }

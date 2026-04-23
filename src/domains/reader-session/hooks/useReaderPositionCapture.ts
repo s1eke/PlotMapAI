@@ -14,6 +14,7 @@ import {
   useReaderPersistenceRuntime,
 } from '@shared/reader-runtime';
 
+import { getContainerProgress } from '@shared/utils/readerPosition';
 import { mergeStoredReaderState } from '@shared/utils/readerStoredState';
 import {
   captureReaderStateSnapshot,
@@ -46,10 +47,43 @@ export function useReaderPositionCapture({
 }: UseReaderPositionCaptureParams): (options?: { flush?: boolean }) => StoredReaderState {
   const captureCurrentReaderPositionRef =
     useRef<(options?: { flush?: boolean }) => StoredReaderState>(() => ({}));
+  const latestObservedScrollProgressRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (mode !== 'scroll') {
+      latestObservedScrollProgressRef.current = null;
+      return;
+    }
+
+    const updateLatestObservedProgress = (element: HTMLElement | null) => {
+      if (!element) {
+        return;
+      }
+      latestObservedScrollProgressRef.current = getContainerProgress(element as HTMLDivElement);
+    };
+
+    updateLatestObservedProgress(viewportContentRef.current);
+    const handleScroll = (event: Event) => {
+      const { target } = event;
+      if (!(target instanceof HTMLElement)) {
+        return;
+      }
+      if (target !== viewportContentRef.current) {
+        return;
+      }
+      updateLatestObservedProgress(target);
+    };
+
+    window.addEventListener('scroll', handleScroll, true);
+    return () => {
+      window.removeEventListener('scroll', handleScroll, true);
+    };
+  }, [mode, viewportContentRef]);
 
   const captureCurrentReaderPosition = useCallback(
     (options?: { flush?: boolean }): StoredReaderState => {
-      const nextState = captureReaderStateSnapshot({
+      const viewportContentElement = viewportContentRef.current;
+      let nextState = captureReaderStateSnapshot({
         chapterIndex,
         currentAnchor: layoutQueries.getCurrentAnchor(),
         currentOriginalLocator: layoutQueries.getCurrentOriginalLocator(),
@@ -58,8 +92,22 @@ export function useReaderPositionCapture({
         mode,
         navigationSource: navigation.getChapterChangeSource(),
         storedReaderState: getStoredReaderStateSnapshot(),
-        viewportContentElement: viewportContentRef.current,
+        viewportContentElement,
       });
+      if (
+        mode === 'scroll'
+        && !viewportContentElement
+        && typeof latestObservedScrollProgressRef.current === 'number'
+      ) {
+        nextState = mergeStoredReaderState(nextState, {
+          hints: {
+            ...nextState.hints,
+            chapterProgress: latestObservedScrollProgressRef.current,
+            contentMode: 'scroll',
+            pageIndex: undefined,
+          },
+        });
+      }
       rememberModeState(toRestoreTargetFromState({
         chapterIndex,
         mode,
@@ -77,6 +125,7 @@ export function useReaderPositionCapture({
       persistReaderState,
       rememberModeState,
       viewportContentRef,
+      latestObservedScrollProgressRef,
     ],
   );
 

@@ -118,6 +118,7 @@ export function useScrollReaderRestore(params: UseScrollReaderRestoreParams): vo
           },
         });
       }
+      navigation.setChapterChangeSource(null);
       retainFocusedWindowAfterRestore(chapterIndex);
       clearPendingRestoreTarget();
       stopRestoreMask();
@@ -182,6 +183,7 @@ export function useScrollReaderRestore(params: UseScrollReaderRestoreParams): vo
       };
       setDebugSnapshot('reader-position-restore', failedSnapshot);
       debugLog('Reader', 'scroll restore failed', failedSnapshot);
+      navigation.setChapterChangeSource(null);
       clearPendingRestoreTarget();
       stopRestoreMask();
       persistence.notifyRestoreSettled('failed');
