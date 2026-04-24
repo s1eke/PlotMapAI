@@ -55,6 +55,13 @@ function ReaderPersistenceBoundary({ children }: ReaderPersistenceBoundaryProps)
   const persistence = useReaderPersistenceRuntime();
 
   useEffect(() => {
+    const shouldGuardStrictModeProbe = import.meta.env.DEV || import.meta.env.MODE === 'test';
+    let reachedStableFrame = !shouldGuardStrictModeProbe;
+    const stableFrameId = shouldGuardStrictModeProbe
+      ? window.requestAnimationFrame(() => {
+        reachedStableFrame = true;
+      })
+      : null;
     const flushReaderPersistence = async (): Promise<void> => {
       await Promise.all([
         flushReaderStateWithCapture(persistence),
@@ -78,6 +85,17 @@ function ReaderPersistenceBoundary({ children }: ReaderPersistenceBoundaryProps)
     return () => {
       window.removeEventListener('pagehide', handlePageHide);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (
+        stableFrameId !== null
+        && typeof window.cancelAnimationFrame === 'function'
+      ) {
+        window.cancelAnimationFrame(stableFrameId);
+      }
+      // React StrictMode 在开发环境会在首帧前执行一次探测性卸载；
+      // 这里跳过这次 cleanup，避免把章节开头误写成真实阅读进度。
+      if (!reachedStableFrame) {
+        return;
+      }
       flushReaderPersistence().catch(() => undefined);
     };
   }, [persistence]);

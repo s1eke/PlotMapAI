@@ -112,9 +112,12 @@ export function captureReaderStateSnapshot(params: {
   const currentOriginalCanonical = params.currentOriginalLocator
     ? toCanonicalPositionFromLocator(params.currentOriginalLocator)
     : undefined;
-  const resolvedScrollProgress = params.viewportContentElement
-    ? getContainerProgress(params.viewportContentElement)
-    : undefined;
+  let resolvedScrollProgress: number | undefined;
+  if (typeof params.currentAnchor?.chapterProgress === 'number') {
+    resolvedScrollProgress = clampProgress(params.currentAnchor.chapterProgress);
+  } else if (params.viewportContentElement) {
+    resolvedScrollProgress = getContainerProgress(params.viewportContentElement);
+  }
   const shouldPreservePreviousProgress = resolvedScrollProgress === 0
     && typeof nextState.hints?.chapterProgress === 'number'
     && nextState.hints.chapterProgress > 0

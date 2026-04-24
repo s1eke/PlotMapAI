@@ -59,7 +59,10 @@ export function useReaderPositionCapture({
       if (!element) {
         return;
       }
-      latestObservedScrollProgressRef.current = getContainerProgress(element as HTMLDivElement);
+      const anchor = layoutQueries.getCurrentAnchor();
+      latestObservedScrollProgressRef.current = typeof anchor?.chapterProgress === 'number'
+        ? anchor.chapterProgress
+        : getContainerProgress(element as HTMLDivElement);
     };
 
     updateLatestObservedProgress(viewportContentRef.current);
@@ -78,7 +81,7 @@ export function useReaderPositionCapture({
     return () => {
       window.removeEventListener('scroll', handleScroll, true);
     };
-  }, [mode, viewportContentRef]);
+  }, [layoutQueries, mode, viewportContentRef]);
 
   const captureCurrentReaderPosition = useCallback(
     (options?: { flush?: boolean }): StoredReaderState => {
@@ -140,7 +143,23 @@ export function useReaderPositionCapture({
   }, [persistence]);
 
   useEffect(() => {
+    const shouldGuardStrictModeProbe = import.meta.env.DEV || import.meta.env.MODE === 'test';
+    let reachedStableFrame = !shouldGuardStrictModeProbe;
+    const stableFrameId = shouldGuardStrictModeProbe
+      ? window.requestAnimationFrame(() => {
+        reachedStableFrame = true;
+      })
+      : null;
     return () => {
+      if (
+        stableFrameId !== null
+        && typeof window.cancelAnimationFrame === 'function'
+      ) {
+        window.cancelAnimationFrame(stableFrameId);
+      }
+      if (!reachedStableFrame) {
+        return;
+      }
       captureCurrentReaderPositionRef.current();
     };
   }, []);

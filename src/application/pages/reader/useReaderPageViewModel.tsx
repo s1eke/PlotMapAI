@@ -4,6 +4,7 @@ import type { ReaderAnalysisBridgeController, ReaderPageTurnMode } from '@domain
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 
 import { analyzeChapter } from '@application/use-cases/analysis';
 import { loadReaderSession } from '@application/use-cases/reader';
@@ -50,6 +51,7 @@ const readerAnalysisController: ReaderAnalysisBridgeController = {
 
 export function useReaderPageViewModel(novelId: number): ReaderPageViewModel {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const novelDetailHref = appPaths.novel(novelId);
   const { contentRef } = useReaderViewportContext();
   const pageTurnLockedRef = useRef(false);
@@ -73,6 +75,7 @@ export function useReaderPageViewModel(novelId: number): ReaderPageViewModel {
   });
   const {
     chapterData,
+    flushReaderState,
     lifecycle,
     modeSwitchError,
     navigation,
@@ -137,12 +140,30 @@ export function useReaderPageViewModel(novelId: number): ReaderPageViewModel {
     isEnabled: viewMode === 'original',
     novelId,
   });
+
+  const flushReaderStateBeforeExit = useCallback(async (): Promise<void> => {
+    try {
+      await flushReaderState?.();
+    } catch {
+      // 退出动作不能因为刷新失败而阻塞。
+    }
+  }, [flushReaderState]);
+
+  const handleExitReader = useCallback((): void => {
+    flushReaderStateBeforeExit()
+      .catch(() => undefined)
+      .finally(() => {
+        navigate(novelDetailHref, { replace: true });
+      });
+  }, [flushReaderStateBeforeExit, navigate, novelDetailHref]);
+
   const { handleMobileBack } = useReaderMobileBack({
     closeImageViewer: imageOverlay.closeImageViewer,
     fallbackHref: novelDetailHref,
     isImageViewerOpen: imageOverlay.isImageViewerOpen,
     isSidebarOpen: sidebar.isSidebarOpen,
     closeSidebar,
+    onBeforeNavigate: flushReaderStateBeforeExit,
   });
   const isContentInteractionLocked =
     isChromeVisible || sidebar.isSidebarOpen || imageOverlay.isImageViewerOpen;
@@ -288,6 +309,7 @@ export function useReaderPageViewModel(novelId: number): ReaderPageViewModel {
       isSidebarOpen: sidebar.isSidebarOpen,
       exitHref: novelDetailHref,
       viewMode,
+      onExit: handleExitReader,
       onMobileBack: handleMobileBack,
       onToggleSidebar: sidebar.toggleSidebar,
       onSetViewMode: handleSetViewMode,

@@ -1,7 +1,21 @@
 import type { ReactNode } from 'react';
 
-import { act, renderHook } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { StrictMode } from 'react';
+import { act, renderHook, waitFor } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const persistenceMocks = vi.hoisted(() => ({
+  flushReaderPreferencesPersistence: vi.fn(async () => undefined),
+  flushReaderStateWithCapture: vi.fn(async () => undefined),
+}));
+
+vi.mock('@domains/reader-session', () => ({
+  flushReaderStateWithCapture: persistenceMocks.flushReaderStateWithCapture,
+}));
+
+vi.mock('../../../hooks/readerPreferencesStore', () => ({
+  flushReaderPreferencesPersistence: persistenceMocks.flushReaderPreferencesPersistence,
+}));
 
 import { ReaderProvider, useReaderContext } from '../ReaderContext';
 
@@ -28,6 +42,49 @@ function createWrapper(novelId = 1) {
     );
   };
 }
+
+function createAnimationFrameController() {
+  const frameCallbacks: Array<FrameRequestCallback | null> = [];
+  const requestAnimationFrameSpy = vi
+    .spyOn(window, 'requestAnimationFrame')
+    .mockImplementation((callback: FrameRequestCallback) => {
+      frameCallbacks.push(callback);
+      return frameCallbacks.length;
+    });
+  const cancelAnimationFrameSpy = vi
+    .spyOn(window, 'cancelAnimationFrame')
+    .mockImplementation((id: number) => {
+      const callbackIndex = id - 1;
+      if (callbackIndex >= 0 && callbackIndex < frameCallbacks.length) {
+        frameCallbacks[callbackIndex] = null;
+      }
+    });
+
+  async function flushNextAnimationFrame() {
+    if (frameCallbacks.length === 0) {
+      return;
+    }
+
+    const queuedCallbacks = frameCallbacks.splice(0, frameCallbacks.length);
+    await act(async () => {
+      queuedCallbacks.forEach((callback) => callback?.(0));
+      await Promise.resolve();
+    });
+  }
+
+  return {
+    flushNextAnimationFrame,
+    restore() {
+      requestAnimationFrameSpy.mockRestore();
+      cancelAnimationFrameSpy.mockRestore();
+    },
+  };
+}
+
+beforeEach(() => {
+  persistenceMocks.flushReaderStateWithCapture.mockClear();
+  persistenceMocks.flushReaderPreferencesPersistence.mockClear();
+});
 
 describe('ReaderProvider', () => {
   it('provides stable reader runtime bindings across rerenders', () => {
@@ -98,6 +155,36 @@ describe('ReaderProvider', () => {
 
     expect(secondRender.result.current.getPendingPageTarget()).toBeNull();
     expect(secondRender.result.current.getPagedState()).toEqual({ pageCount: 1, pageIndex: 0 });
+  });
+
+  it('skips the StrictMode probe cleanup before the first animation frame', async () => {
+    const animationFrames = createAnimationFrameController();
+    const contentRuntime = createContentRuntime();
+
+    try {
+      const { unmount } = renderHook(() => useReaderContext(), {
+        wrapper: ({ children }: { children: ReactNode }) => (
+          <StrictMode>
+            <ReaderProvider contentRuntime={contentRuntime} novelId={1}>
+              {children}
+            </ReaderProvider>
+          </StrictMode>
+        ),
+      });
+
+      expect(persistenceMocks.flushReaderStateWithCapture).not.toHaveBeenCalled();
+      expect(persistenceMocks.flushReaderPreferencesPersistence).not.toHaveBeenCalled();
+
+      await animationFrames.flushNextAnimationFrame();
+      unmount();
+
+      await waitFor(() => {
+        expect(persistenceMocks.flushReaderStateWithCapture).toHaveBeenCalledTimes(1);
+        expect(persistenceMocks.flushReaderPreferencesPersistence).toHaveBeenCalledTimes(1);
+      });
+    } finally {
+      animationFrames.restore();
+    }
   });
 });
 

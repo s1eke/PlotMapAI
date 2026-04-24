@@ -50,6 +50,7 @@ const topBarProps: ReaderPageLayoutProps['topBarProps'] = {
   isChromeVisible: true,
   isSidebarOpen: false,
   viewMode: 'original',
+  onExit: () => undefined,
   onMobileBack: () => undefined,
   onToggleSidebar: () => undefined,
   onSetViewMode: () => undefined,

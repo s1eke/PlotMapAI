@@ -10,8 +10,7 @@ import { useEffect } from 'react';
 import { debugLog, setDebugSnapshot } from '@shared/debug';
 import {
   canSkipReaderRestore,
-  clampContainerScrollTop,
-  getContainerMaxScrollTop,
+  getScrollTopForChapterProgress,
 } from '@shared/utils/readerPosition';
 import {
   restoreStepFailure,
@@ -205,11 +204,13 @@ export function useScrollReaderRestore(params: UseScrollReaderRestoreParams): vo
         activeTarget
         && typeof activeTarget.chapterProgress === 'number',
       );
-      const containerMaxScrollTop = container ? getContainerMaxScrollTop(container) : 0;
-      // 如果 DOM 布局尚未就绪（无滚动范围），基于进度的 expectedScrollTop 将为 0，
-      // 这会错误地将恢复标记为已稳定。
+      const targetChapterIndex = activeTarget?.locator?.chapterIndex ?? activeTarget?.chapterIndex;
+      const targetElement = targetChapterIndex === undefined
+        ? null
+        : scrollChapterElementsRef.current.get(targetChapterIndex) ?? null;
+      // 如果章节容器尚未挂载，就还无法用章节局部进度校验恢复结果；
       // 在下一帧重新运行完整的恢复逻辑。
-      if (shouldPreferProgressStability && containerMaxScrollTop === 0) {
+      if (shouldPreferProgressStability && !targetElement) {
         restoreSettledFrameCount = 0;
         frameId = requestAnimationFrame(restoreScrollPosition);
         return;
@@ -219,10 +220,11 @@ export function useScrollReaderRestore(params: UseScrollReaderRestoreParams): vo
         && activeTarget
         && typeof activeTarget.chapterProgress === 'number'
       )
-        ? clampContainerScrollTop(
+        ? getScrollTopForChapterProgress(
           container,
-          containerMaxScrollTop * activeTarget.chapterProgress,
-        )
+          targetElement,
+          activeTarget.chapterProgress,
+        ) ?? expectedScrollTop
         : expectedScrollTop;
       if (
         expectedLocator

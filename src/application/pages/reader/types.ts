@@ -57,6 +57,7 @@ export interface ReaderReadingSurfaceViewportContentProps {
 
 export interface ReaderReadingSurfaceController {
   chapterData: Pick<UseReaderChapterDataResult, 'chapters' | 'currentChapter'>;
+  flushReaderState?: UseReaderSessionResult['commands']['flushReaderState'];
   lifecycle: ReaderLifecycleControllerResult;
   modeSwitchError: AppError | null;
   navigation: ReaderNavigationControllerResult;

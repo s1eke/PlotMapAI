@@ -91,4 +91,37 @@ describe('useReaderMobileBack', () => {
     expect(navigateMock).toHaveBeenCalledTimes(1);
     expect(navigateMock).toHaveBeenCalledWith('/novel/1', { replace: true });
   });
+
+  it('awaits onBeforeNavigate before leaving the reader', async () => {
+    window.history.replaceState({ idx: 1 }, '', '#/novel/1/read');
+
+    let resolveBeforeNavigate: (() => void) | null = null;
+    const onBeforeNavigate = vi.fn(() => new Promise<void>((resolve) => {
+      resolveBeforeNavigate = resolve;
+    }));
+
+    const { result } = renderHook(() => useReaderMobileBack({
+      closeImageViewer: vi.fn(),
+      fallbackHref: '/novel/1',
+      isImageViewerOpen: false,
+      isSidebarOpen: false,
+      closeSidebar: vi.fn(),
+      onBeforeNavigate,
+    }));
+
+    act(() => {
+      result.current.handleMobileBack();
+    });
+
+    expect(onBeforeNavigate).toHaveBeenCalledTimes(1);
+    expect(navigateMock).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolveBeforeNavigate?.();
+      await Promise.resolve();
+    });
+
+    expect(navigateMock).toHaveBeenCalledTimes(1);
+    expect(navigateMock).toHaveBeenCalledWith(-1);
+  });
 });

@@ -1,5 +1,7 @@
 import { ArrowLeft, AlignLeft, Bot, Menu, X } from 'lucide-react';
 import { motion } from 'motion/react';
+import type { MouseEvent } from 'react';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
@@ -36,6 +38,7 @@ interface ReaderTopBarProps {
   isChromeVisible: boolean;
   isSidebarOpen: boolean;
   viewMode: 'original' | 'summary';
+  onExit: () => void;
   onMobileBack: () => void;
   onToggleSidebar: () => void;
   onSetViewMode: (viewMode: 'original' | 'summary') => void;
@@ -49,6 +52,7 @@ export default function ReaderTopBar({
   isChromeVisible,
   isSidebarOpen,
   viewMode,
+  onExit,
   onMobileBack,
   onToggleSidebar,
   onSetViewMode,
@@ -59,6 +63,11 @@ export default function ReaderTopBar({
     hoverClassName,
     segmentedControlClassName,
   } = getReaderChromeThemeClasses(readerTheme);
+
+  const handleExitLinkClick = useCallback((event: MouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault();
+    onExit();
+  }, [onExit]);
 
   return (
     <motion.header
@@ -92,6 +101,7 @@ export default function ReaderTopBar({
         </button>
         <Link
           to={exitHref}
+          onClick={handleExitLinkClick}
           className={cn('hidden text-sm font-medium transition-colors hover:text-accent md:block', textClassName)}
         >
           {t('reader.exit')}

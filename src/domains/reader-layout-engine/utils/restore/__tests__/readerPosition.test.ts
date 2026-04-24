@@ -5,8 +5,11 @@ import {
   clampProgress,
   createRestoreTargetFromNavigationIntent,
   createRestoreTargetFromPersistedState,
+  getChapterLocalProgress,
+  getChapterScrollableRange,
   getContainerProgress,
   getPageIndexFromProgress,
+  getScrollTopForChapterProgress,
   hasReaderRestoreTarget,
   resolvePagedRestoreTargetPageIndex,
   resolvePagedTargetPage,
@@ -30,6 +33,46 @@ describe('readerPosition', () => {
 
     expect(getContainerProgress(element)).toBe(0.5);
     expect(getContainerProgress(null)).toBe(0);
+  });
+
+  it('computes chapter-local progress from the chapter scrollable range', () => {
+    const container = document.createElement('div');
+    Object.defineProperty(container, 'clientHeight', { configurable: true, value: 600 });
+    Object.defineProperty(container, 'scrollTop', { configurable: true, value: 1110 });
+
+    const chapterElement = document.createElement('div');
+    Object.defineProperty(chapterElement, 'offsetTop', { configurable: true, value: 120 });
+    Object.defineProperty(chapterElement, 'offsetHeight', { configurable: true, value: 1800 });
+
+    expect(getChapterScrollableRange(container, chapterElement)).toBe(1200);
+    expect(getChapterLocalProgress(container, chapterElement)).toBe(0.825);
+  });
+
+  it('caps chapter-local progress at 1 when the viewport is at the chapter tail', () => {
+    const container = document.createElement('div');
+    Object.defineProperty(container, 'clientHeight', { configurable: true, value: 600 });
+    Object.defineProperty(container, 'scrollTop', { configurable: true, value: 1600 });
+
+    const chapterElement = document.createElement('div');
+    Object.defineProperty(chapterElement, 'offsetTop', { configurable: true, value: 200 });
+    Object.defineProperty(chapterElement, 'offsetHeight', { configurable: true, value: 1400 });
+
+    expect(getChapterScrollableRange(container, chapterElement)).toBe(800);
+    expect(getChapterLocalProgress(container, chapterElement)).toBe(1);
+  });
+
+  it('restores scrollTop from chapter-local progress using the same scrollable range', () => {
+    const container = document.createElement('div');
+    Object.defineProperty(container, 'clientHeight', { configurable: true, value: 600 });
+    Object.defineProperty(container, 'scrollHeight', { configurable: true, value: 3600 });
+
+    const chapterElement = document.createElement('div');
+    Object.defineProperty(chapterElement, 'offsetTop', { configurable: true, value: 900 });
+    Object.defineProperty(chapterElement, 'offsetHeight', { configurable: true, value: 1800 });
+
+    expect(getScrollTopForChapterProgress(container, chapterElement, 0.9)).toBe(1980);
+    expect(getScrollTopForChapterProgress(container, chapterElement, 1.2)).toBe(2100);
+    expect(getScrollTopForChapterProgress(container, chapterElement, undefined)).toBeNull();
   });
 
   it('maps chapter progress to a page index', () => {

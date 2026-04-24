@@ -1927,44 +1927,50 @@ describe('useReaderRestoreFlow', () => {
     });
   });
 
-  it('captures the current reading position when the hook unmounts', () => {
+  it('captures the current reading position when the hook unmounts', async () => {
     const persistReaderState = vi.fn();
     const locator = createLocator();
+    const animationFrames = createAnimationFrameController();
 
-    const { hookProps, runtime } = createHookHarness({
-      sessionCommands: {
-        latestReaderStateRef: { current: createStoredState() },
-        markUserInteracted: vi.fn(),
-        persistReaderState,
-        setChapterIndex: vi.fn(),
-        setMode: vi.fn(),
-      },
-      runtime: {
-        contentRef: { current: makeContainer() },
-        getCurrentAnchorRef: {
-          current: () => ({ chapterIndex: 5, chapterProgress: 0.55 } satisfies ScrollModeAnchor),
+    try {
+      const { hookProps, runtime } = createHookHarness({
+        sessionCommands: {
+          latestReaderStateRef: { current: createStoredState() },
+          markUserInteracted: vi.fn(),
+          persistReaderState,
+          setChapterIndex: vi.fn(),
+          setMode: vi.fn(),
         },
-        getCurrentOriginalLocatorRef: {
-          current: () => locator,
+        runtime: {
+          contentRef: { current: makeContainer() },
+          getCurrentAnchorRef: {
+            current: () => ({ chapterIndex: 5, chapterProgress: 0.55 } satisfies ScrollModeAnchor),
+          },
+          getCurrentOriginalLocatorRef: {
+            current: () => locator,
+          },
         },
-      },
-    });
-    const { unmount } = renderHook(() => useReaderRestoreFlow(hookProps), {
-      wrapper: runtime.Wrapper,
-    });
+      });
+      const { unmount } = renderHook(() => useReaderRestoreFlow(hookProps), {
+        wrapper: runtime.Wrapper,
+      });
 
-    unmount();
+      await animationFrames.flushAnimationFrames({ maxPasses: 1 });
+      unmount();
 
-    expect(persistReaderState).toHaveBeenCalledWith(expect.objectContaining({
-      canonical: {
-        chapterIndex: 5,
-        blockIndex: 2,
-        kind: 'text',
-        lineIndex: 0,
-      },
-    }), {
-      flush: undefined,
-    });
+      expect(persistReaderState).toHaveBeenCalledWith(expect.objectContaining({
+        canonical: {
+          chapterIndex: 5,
+          blockIndex: 2,
+          kind: 'text',
+          lineIndex: 0,
+        },
+      }), {
+        flush: undefined,
+      });
+    } finally {
+      animationFrames.restore();
+    }
   });
 
   it('reports restore settle results when forced summary restore targets are skipped or completed', async () => {

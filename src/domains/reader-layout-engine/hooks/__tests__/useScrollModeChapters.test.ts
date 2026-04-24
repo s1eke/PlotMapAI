@@ -45,7 +45,7 @@ function populateElements(
   indices: number[],
 ) {
   for (const idx of indices) {
-    ref.current.set(idx, makeMockElement({ offsetTop: idx * 300, offsetHeight: 300 }));
+    ref.current.set(idx, makeMockElement({ offsetTop: idx * 900, offsetHeight: 900 }));
   }
 }
 
@@ -286,6 +286,31 @@ describe('useScrollModeChapters', () => {
       expect(result.current.getCurrentAnchor()).toEqual({ chapterIndex: 0, chapterProgress: 0.5 });
     });
 
+    it('reports near-tail progress from the chapter scrollable range', () => {
+      const onReadingAnchorChange = vi.fn();
+      const { result, contentRef } = setupHook({
+        scrollModeChapters: [0],
+        onReadingAnchorChange,
+      });
+
+      result.current.scrollChapterElementsRef.current.set(0, makeMockElement({
+        offsetTop: 0,
+        offsetHeight: 1200,
+      }));
+      contentRef.current.scrollTop = 570;
+
+      act(() => { result.current.handleScroll(); });
+
+      expect(onReadingAnchorChange).toHaveBeenCalledWith({
+        chapterIndex: 0,
+        chapterProgress: 0.95,
+      });
+      expect(result.current.getCurrentAnchor()).toEqual({
+        chapterIndex: 0,
+        chapterProgress: 0.95,
+      });
+    });
+
     it('fetches next chapter when scroll progress >= 50%', async () => {
       const fetchFn = vi.fn().mockResolvedValue(makeChapterContent(1));
       const { result, contentRef } = setupHook({
@@ -294,7 +319,7 @@ describe('useScrollModeChapters', () => {
       });
 
       populateElements(result.current.scrollChapterElementsRef, [0]);
-      // scrollTop at 200, element height 300 => progress = 200/300 = 0.67 >= 0.5
+      // scrollTop at 200, scrollable range = 900 - 600 = 300 => progress = 200 / 300 = 0.67 >= 0.5
       contentRef.current.scrollTop = 200;
 
       act(() => { result.current.handleScroll(); });
@@ -313,7 +338,7 @@ describe('useScrollModeChapters', () => {
       });
 
       populateElements(result.current.scrollChapterElementsRef, [0]);
-      // scrollTop at 100 => progress = 100/300 = 0.33 < 0.5
+      // scrollTop at 100, scrollable range = 300 => progress = 100 / 300 = 0.33 < 0.5
       contentRef.current.scrollTop = 100;
 
       act(() => { result.current.handleScroll(); });

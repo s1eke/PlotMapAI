@@ -726,7 +726,7 @@ describe('useScrollReaderController', () => {
       current: makeContainer({
         clientHeight: 600,
         scrollHeight: 4000,
-        scrollTop: 2040,
+        scrollTop: 1700,
       }),
     };
     const contextValue = createReaderContextValue({
@@ -1133,7 +1133,7 @@ describe('useScrollReaderController', () => {
     });
 
     try {
-      renderHook(
+      const { result } = renderHook(
         () => useScrollReaderController(props),
         {
           wrapper: ({ children }: { children: ReactNode }) => ReaderContextProvider({
@@ -1142,9 +1142,15 @@ describe('useScrollReaderController', () => {
           }),
         },
       );
+      act(() => {
+        result.current.handleScrollChapterElement(1, makeChapterElement({
+          offsetHeight: 1200,
+          offsetTop: 1100,
+        }));
+      });
 
       const expectedScrollTop = Math.round(
-        (contentRef.current.scrollHeight - contentRef.current.clientHeight) * 0.5,
+        1100 + (1200 - contentRef.current.clientHeight) * 0.5,
       );
 
       await animationFrames.flushNextAnimationFrame();

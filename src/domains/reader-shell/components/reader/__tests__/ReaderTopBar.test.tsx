@@ -13,6 +13,7 @@ vi.mock('react-i18next', () => ({
 
 function renderTopBar(overrides: Partial<React.ComponentProps<typeof ReaderTopBar>> = {}) {
   const onMobileBack = vi.fn();
+  const onExit = vi.fn();
 
   const renderResult = render(
     <MemoryRouter>
@@ -24,6 +25,7 @@ function renderTopBar(overrides: Partial<React.ComponentProps<typeof ReaderTopBa
         isChromeVisible
         isSidebarOpen={false}
         viewMode="original"
+        onExit={onExit}
         onMobileBack={onMobileBack}
         onToggleSidebar={vi.fn()}
         onSetViewMode={vi.fn()}
@@ -32,7 +34,7 @@ function renderTopBar(overrides: Partial<React.ComponentProps<typeof ReaderTopBa
     </MemoryRouter>,
   );
 
-  return { onMobileBack, ...renderResult };
+  return { onExit, onMobileBack, ...renderResult };
 }
 
 describe('ReaderTopBar', () => {
@@ -49,6 +51,15 @@ describe('ReaderTopBar', () => {
     renderTopBar();
 
     expect(screen.getByRole('link', { name: 'reader.exit' })).toHaveAttribute('href', '/novel/1');
+  });
+
+  it('calls onExit from the desktop exit link', async () => {
+    const user = userEvent.setup();
+    const { onExit } = renderTopBar();
+
+    await user.click(screen.getByRole('link', { name: 'reader.exit' }));
+
+    expect(onExit).toHaveBeenCalledTimes(1);
   });
 
   it('disables pointer interaction when chrome is hidden', () => {

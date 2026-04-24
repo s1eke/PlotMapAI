@@ -10,6 +10,8 @@ import { getChapterBoundaryLocator } from '../layout-core/internal';
 import {
   clampContainerScrollTop,
   getContainerMaxScrollTop,
+  getChapterLocalProgress,
+  getScrollTopForChapterProgress,
   SCROLL_READING_ANCHOR_RATIO,
 } from '@shared/utils/readerPosition';
 import {
@@ -148,17 +150,23 @@ export function resolvePendingScrollTarget(params: {
   const targetElement = scrollChapterElementsRef.current.get(targetChapterIndex) ?? null;
   const resolvedLocator = resolvePendingRestoreLocator(target, scrollLayouts);
   const containerMaxScrollTop = getContainerMaxScrollTop(container);
-  const progressScrollTop = typeof target.chapterProgress === 'number'
-    ? clampContainerScrollTop(container, containerMaxScrollTop * target.chapterProgress)
-    : null;
+  const progressScrollTop = getScrollTopForChapterProgress(
+    container,
+    targetElement,
+    target.chapterProgress,
+  );
   const resolvePreferredScrollTop = (candidateScrollTop: number): number => {
-    if (progressScrollTop === null || typeof target.chapterProgress !== 'number') {
+    if (progressScrollTop === null || typeof target.chapterProgress !== 'number' || !targetElement) {
       return candidateScrollTop;
     }
 
-    const candidateProgress = containerMaxScrollTop > 0
-      ? candidateScrollTop / containerMaxScrollTop
-      : 0;
+    const candidateProgress = getChapterLocalProgress(
+      {
+        clientHeight: container.clientHeight,
+        scrollTop: candidateScrollTop,
+      },
+      targetElement,
+    );
     if (
       Math.abs(candidateProgress - target.chapterProgress)
       > SCROLL_RESTORE_PROGRESS_FALLBACK_TOLERANCE

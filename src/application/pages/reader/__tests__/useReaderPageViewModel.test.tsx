@@ -4,6 +4,16 @@ import { act, render, renderHook, screen, waitFor } from '@testing-library/react
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const navigateMock = vi.hoisted(() => vi.fn());
+
+vi.mock('react-router-dom', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-router-dom')>();
+  return {
+    ...actual,
+    useNavigate: () => navigateMock,
+  };
+});
+
 import { analyzeChapter } from '@application/use-cases/analysis';
 import { loadReaderSession } from '@application/use-cases/reader';
 import { analysisService } from '@domains/analysis';
@@ -428,6 +438,7 @@ vi.mock('../useReaderReadingSurfaceController', () => ({
 describe('useReaderPageViewModel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    navigateMock.mockReset();
     resetReaderSurfaceMocks();
     vi.mocked(analyzeChapter).mockResolvedValue({ analysis: null });
     vi.mocked(loadReaderSession).mockResolvedValue(createNovelSummary('epub'));

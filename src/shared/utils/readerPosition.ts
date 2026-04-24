@@ -21,6 +21,11 @@ export interface ChapterRenderData {
 
 export const SCROLL_READING_ANCHOR_RATIO = 0.3;
 
+type ChapterRangeContainer = Pick<HTMLDivElement, 'clientHeight'> | null | undefined;
+type ChapterRangeElement = Pick<HTMLElement, 'offsetHeight'> | null | undefined;
+type ChapterProgressContainer = Pick<HTMLDivElement, 'clientHeight' | 'scrollTop'> | null | undefined;
+type ChapterProgressElement = Pick<HTMLElement, 'offsetTop' | 'offsetHeight'> | null | undefined;
+
 export function getContainerMaxScrollTop(element: HTMLDivElement | null): number {
   if (!element) return 0;
   return Math.max(0, element.scrollHeight - element.clientHeight);
@@ -41,6 +46,51 @@ export function clampContainerScrollTop(
 export function clampProgress(value: number | undefined): number {
   if (typeof value !== 'number' || Number.isNaN(value)) return 0;
   return Math.max(0, Math.min(1, value));
+}
+
+export function getChapterScrollableRange(
+  container: ChapterRangeContainer,
+  chapterElement: ChapterRangeElement,
+): number {
+  if (!container || !chapterElement) {
+    return 0;
+  }
+
+  return Math.max(chapterElement.offsetHeight - container.clientHeight, 0);
+}
+
+export function getChapterLocalProgress(
+  container: ChapterProgressContainer,
+  chapterElement: ChapterProgressElement,
+): number {
+  if (!container || !chapterElement) {
+    return 0;
+  }
+
+  const chapterScrollableRange = getChapterScrollableRange(container, chapterElement);
+  if (chapterScrollableRange <= 0) {
+    return 0;
+  }
+
+  return clampProgress(
+    (container.scrollTop - chapterElement.offsetTop) / chapterScrollableRange,
+  );
+}
+
+export function getScrollTopForChapterProgress(
+  container: HTMLDivElement | null,
+  chapterElement: ChapterProgressElement,
+  chapterProgress: number | undefined,
+): number | null {
+  if (!container || !chapterElement || typeof chapterProgress !== 'number') {
+    return null;
+  }
+
+  const chapterScrollableRange = getChapterScrollableRange(container, chapterElement);
+  return clampContainerScrollTop(
+    container,
+    chapterElement.offsetTop + chapterScrollableRange * clampProgress(chapterProgress),
+  );
 }
 
 export function getContainerProgress(element: HTMLDivElement | null): number {

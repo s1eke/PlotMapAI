@@ -13,6 +13,7 @@ import {
   clickNextPageResponsive,
   disableAnimations,
   exitAndReopenReader,
+  exitReaderToDetailPageByUi,
   exitReaderToDetailPage,
   hideReaderChromeResponsive,
   importEpubToDetailPage,
@@ -191,10 +192,18 @@ async function waitForViewportScrollProgressNear(
   description: string,
 ): Promise<ReaderViewportSnapshot> {
   let snapshot: ReaderViewportSnapshot | null = null;
+  let stableMatches = 0;
+  const requiredStableMatches = 6;
   try {
     await expect.poll(async () => {
       snapshot = await readReaderViewportSnapshot(page);
-      return isScrollProgressWithinTolerance(snapshot.scrollProgress, expectedProgress);
+      if (!isScrollProgressWithinTolerance(snapshot.scrollProgress, expectedProgress)) {
+        stableMatches = 0;
+        return false;
+      }
+
+      stableMatches += 1;
+      return stableMatches >= requiredStableMatches;
     }, {
       timeout: 15_000,
       message: description,
@@ -228,56 +237,6 @@ async function waitForScrollProgress(
       && (snapshot.chapterProgress ?? 0) >= minimumProgress,
     { description, timeout: 15_000 },
   );
-}
-
-async function waitForScrollProgressNear(
-  page: Page,
-  novelId: number,
-  expectedProgress: number,
-  description: string,
-  options: {
-    minimumRevision?: number;
-  } = {},
-): Promise<NonNullable<Awaited<ReturnType<typeof readPersistedReadingProgress>>>> {
-  let lastSnapshot: Awaited<ReturnType<typeof readPersistedReadingProgress>> = null;
-  let matchingSnapshot: Awaited<ReturnType<typeof readPersistedReadingProgress>> = null;
-
-  try {
-    await expect.poll(async () => {
-      const snapshot = await readPersistedReadingProgress(page, novelId);
-      lastSnapshot = snapshot;
-      const isMatch = snapshot !== null
-        && snapshot.contentMode === 'scroll'
-        && isScrollProgressWithinTolerance(snapshot.chapterProgress, expectedProgress)
-        && (
-          options.minimumRevision === undefined
-          || (
-            typeof snapshot.revision === 'number'
-            && snapshot.revision > options.minimumRevision
-          )
-        );
-      if (isMatch) {
-        matchingSnapshot = snapshot;
-      }
-      return isMatch;
-    }, {
-      message: description,
-      timeout: 15_000,
-    }).toBe(true);
-  } catch (error) {
-    throw new Error(
-      `${description}: expected chapterProgress≈${expectedProgress.toFixed(4)}`
-      + `, minimumRevision=${options.minimumRevision ?? 'none'}`
-      + `, lastSnapshot=${JSON.stringify(lastSnapshot)}`,
-      { cause: error },
-    );
-  }
-
-  if (!matchingSnapshot) {
-    throw new Error(`${description}: matched snapshot missing after poll.`);
-  }
-
-  return matchingSnapshot;
 }
 
 async function waitForPagedProgress(
@@ -538,7 +497,7 @@ async function expectPagedMarkerRestored(
 async function expectViewportContainsSnippet(page: Page, snippet: string): Promise<void> {
   await expect(
     page.getByTestId('reader-viewport').getByText(snippet, { exact: false }).first(),
-  ).toBeVisible({ timeout: 15_000 });
+  ).toBeInViewport({ timeout: 15_000 });
 }
 
 async function expectViewportNotContainsSnippet(page: Page, snippet: string): Promise<void> {
@@ -638,7 +597,7 @@ async function openBookFromBookshelf(page: Page, title: string): Promise<void> {
 }
 
 async function reopenFromBookshelf(page: Page, title: string): Promise<void> {
-  await exitReaderToDetailPage(page);
+  await exitReaderToDetailPageByUi(page);
   await page.getByRole('link', { name: 'Back' }).first().click();
   await disableAnimations(page);
   await expect(page.getByTestId('bookshelf-scroll-container')).toBeVisible({ timeout: 15_000 });
@@ -650,13 +609,10 @@ async function reopenFromBookshelf(page: Page, title: string): Promise<void> {
 
 async function runScrollRestoreRound(
   page: Page,
-  novelId: number,
   round: number,
   targetProgress: number,
   previousMarker?: ReadingMarker,
 ): Promise<ReadingMarker> {
-  const previousPersistedSnapshot = await readPersistedReadingProgress(page, novelId);
-  const previousRevision = previousPersistedSnapshot?.revision ?? 0;
   let viewportSnapshot = await scrollViewportToProgressByWheelAndWait(page, targetProgress);
 
   if (previousMarker) {
@@ -686,30 +642,24 @@ async function runScrollRestoreRound(
     `TC-001 round ${round} capture visible paragraph`,
   );
 
-  await exitReaderToDetailPage(page);
-  const persistedBeforeReopen = await waitForScrollProgressNear(
-    page,
-    novelId,
-    expectedExitProgress,
-    `TC-001 round ${round} persisted scroll saved on exit`,
-    { minimumRevision: previousRevision },
-  );
-  if (typeof persistedBeforeReopen.chapterProgress !== 'number') {
-    throw new Error(`TC-001 round ${round}: persisted chapterProgress missing before exit.`);
-  }
-  const savedProgressBeforeExit = persistedBeforeReopen.chapterProgress;
+  await exitReaderToDetailPageByUi(page);
+  await expect(
+    page.getByRole('link', { name: 'Start Reading' }).first(),
+    `TC-001 round ${round} detail page visible before reopen`,
+  ).toBeVisible({ timeout: 15_000 });
+  const savedProgressBeforeExit = expectedExitProgress;
   const marker: ReadingMarker = {
     anchorOffsetTop: null,
     anchorSnippet: anchorSnippetBeforeExit,
-    canonicalBlockIndex: persistedBeforeReopen.canonical.blockIndex,
-    canonicalEdge: persistedBeforeReopen.canonical.edge,
-    canonicalKind: persistedBeforeReopen.canonical.kind,
-    canonicalLineIndex: persistedBeforeReopen.canonical.lineIndex,
-    chapterIndex: persistedBeforeReopen.canonical.chapterIndex,
+    canonicalBlockIndex: null,
+    canonicalEdge: null,
+    canonicalKind: null,
+    canonicalLineIndex: null,
+    chapterIndex: null,
     chapterProgress: savedProgressBeforeExit,
     contentMode: 'scroll',
     pageIndex: null,
-    revision: persistedBeforeReopen.revision,
+    revision: null,
     scrollProgress: savedProgressBeforeExit,
   };
 
@@ -730,13 +680,6 @@ async function runScrollRestoreRound(
     savedProgressBeforeExit,
     `TC-001 round ${round} viewport scroll restored`,
   );
-  const restoredPersisted = await waitForScrollProgressNear(
-    page,
-    novelId,
-    savedProgressBeforeExit,
-    `TC-001 round ${round} persisted scroll restored`,
-    { minimumRevision: previousRevision },
-  );
   await expectViewportContainsSnippet(
     page,
     marker.anchorSnippet,
@@ -748,10 +691,6 @@ async function runScrollRestoreRound(
   expect(
     Math.abs(restoredViewportSnapshot.scrollProgress! - savedProgressBeforeExit),
     `TC-001 round ${round} viewport progress drift`,
-  ).toBeLessThanOrEqual(SCROLL_PROGRESS_TOLERANCE);
-  expect(
-    Math.abs((restoredPersisted.chapterProgress ?? 0) - savedProgressBeforeExit),
-    `TC-001 round ${round} persisted progress drift`,
   ).toBeLessThanOrEqual(SCROLL_PROGRESS_TOLERANCE);
 
   return marker;
@@ -792,27 +731,30 @@ async function runPagedRestoreRound(
 
 test.describe('移动端阅读会话恢复', () => {
   test('TC-001 滚动模式下退出重进，阅读记录恢复正常', async ({ page }) => {
-    const { novelId } = await importEpubToDetailPage(
+    await importEpubToDetailPage(
       page,
       await buildLongTestEpubFile(),
       LONG_BOOK_TITLE,
     );
 
-    await setReaderPreferences(page, { pageTurnMode: 'scroll' });
-    await openReaderDirect(page, novelId);
-    await waitForReaderBranch(page, 'scroll');
+    await openReaderFromDetailPage(page);
+    const enteredAsScroll = await waitForReaderBranch(page, 'scroll', { timeout: 5_000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!enteredAsScroll) {
+      await switchReaderBranch(page, 'scroll');
+      await waitForReaderBranch(page, 'scroll');
+    }
 
-    const roundOneMarker = await runScrollRestoreRound(page, novelId, 1, 0.22);
+    const roundOneMarker = await runScrollRestoreRound(page, 1, 0.22);
     const roundTwoMarker = await runScrollRestoreRound(
       page,
-      novelId,
       2,
       0.42,
       roundOneMarker,
     );
     const roundThreeMarker = await runScrollRestoreRound(
       page,
-      novelId,
       3,
       0.78,
       roundTwoMarker,

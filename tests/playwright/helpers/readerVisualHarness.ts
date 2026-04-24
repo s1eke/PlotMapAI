@@ -919,6 +919,62 @@ export async function revealReaderChrome(page: Page): Promise<void> {
 }
 
 /**
+ * 通过真实的阅读器退出控件（移动端返回按钮 / 桌面端退出链接）退出到书籍详情页。
+ * 该路径会触发阅读器页面中的退出前刷新逻辑，行为更接近真实用户操作。
+ */
+export async function exitReaderToDetailPageByUi(page: Page): Promise<void> {
+  const exitControlSelectors = [
+    'button[title="Exit Reader"]:visible',
+    '[aria-label="Exit Reader"]:visible',
+    'a:has-text("Exit Reader"):visible',
+  ];
+
+  await revealReaderChromeResponsive(page);
+
+  let didNavigate = false;
+  for (const selector of exitControlSelectors) {
+    const control = page.locator(selector).first();
+    const isVisible = await control.isVisible().catch(() => false);
+    if (!isVisible) {
+      continue;
+    }
+
+    const isInViewport = await isLocatorInViewport(control);
+    if (!isInViewport) {
+      // 某些移动端动画帧下控件会短暂处于视口外；先重试显现 chrome，再触发同一控件点击链路。
+      await revealReaderChromeResponsive(page);
+    }
+    await control.evaluate((element) => {
+      (element as HTMLElement).click();
+    });
+
+    didNavigate = await page.getByRole('link', { name: 'Start Reading' }).first()
+      .isVisible()
+      .catch(() => false);
+    if (!didNavigate) {
+      didNavigate = await expect(
+        page.getByRole('link', { name: 'Start Reading' }).first(),
+      ).toBeVisible({ timeout: 4_000 }).then(() => true).catch(() => false);
+    }
+    if (didNavigate) {
+      break;
+    }
+
+    const readerViewportVisible = await page.getByTestId('reader-viewport').isVisible().catch(() => false);
+    if (readerViewportVisible) {
+      await revealReaderChromeResponsive(page);
+    }
+  }
+
+  if (!didNavigate) {
+    throw new Error('Failed to exit reader via visible Exit Reader control.');
+  }
+
+  await disableAnimations(page);
+  await expect(page.getByRole('link', { name: 'Start Reading' })).toBeVisible({ timeout: 15_000 });
+}
+
+/**
  * 通过直接导航到书籍详情 URL 退出阅读器。这是一个完整的 SPA 顶层导航（通过哈希路由），因此：
  *  • 避免了“退出阅读”链接可能存在的界面可见性问题，并且
  *  • 促使应用在下一次加载页面时重新读取 localStorage 中的偏好设置。

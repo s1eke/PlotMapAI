@@ -7,6 +7,7 @@ interface UseReaderMobileBackParams {
   isImageViewerOpen?: boolean;
   isSidebarOpen: boolean;
   closeSidebar: () => void;
+  onBeforeNavigate?: () => void | Promise<void>;
 }
 
 interface UseReaderMobileBackResult {
@@ -28,8 +29,22 @@ export function useReaderMobileBack({
   isImageViewerOpen = false,
   isSidebarOpen,
   closeSidebar,
+  onBeforeNavigate,
 }: UseReaderMobileBackParams): UseReaderMobileBackResult {
   const navigate = useNavigate();
+
+  const navigateWithExitFlush = useCallback((runNavigation: () => void) => {
+    if (!onBeforeNavigate) {
+      runNavigation();
+      return;
+    }
+
+    Promise.resolve(onBeforeNavigate())
+      .catch(() => undefined)
+      .finally(() => {
+        runNavigation();
+      });
+  }, [onBeforeNavigate]);
 
   const handleMobileBack = useCallback(() => {
     if (isImageViewerOpen) {
@@ -43,12 +58,24 @@ export function useReaderMobileBack({
     }
 
     if (getHistoryIndex() > 0) {
-      navigate(-1);
+      navigateWithExitFlush(() => {
+        navigate(-1);
+      });
       return;
     }
 
-    navigate(fallbackHref, { replace: true });
-  }, [closeImageViewer, closeSidebar, fallbackHref, isImageViewerOpen, isSidebarOpen, navigate]);
+    navigateWithExitFlush(() => {
+      navigate(fallbackHref, { replace: true });
+    });
+  }, [
+    closeImageViewer,
+    closeSidebar,
+    fallbackHref,
+    isImageViewerOpen,
+    isSidebarOpen,
+    navigate,
+    navigateWithExitFlush,
+  ]);
 
   return {
     handleMobileBack,

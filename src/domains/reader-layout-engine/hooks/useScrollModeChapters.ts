@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Chapter, ChapterContent } from '@shared/contracts/reader';
-import { SCROLL_READING_ANCHOR_RATIO } from '@shared/utils/readerPosition';
+import {
+  getChapterLocalProgress,
+  SCROLL_READING_ANCHOR_RATIO,
+} from '@shared/utils/readerPosition';
 
 export interface ScrollModeAnchor {
   chapterIndex: number;
@@ -155,12 +158,9 @@ export function useScrollModeChapters(
       return null;
     }
 
-    const chapterHeight = Math.max(chapterElement.offsetHeight, 1);
-    const rawProgress = (container.scrollTop - chapterElement.offsetTop) / chapterHeight;
-
     return {
       chapterIndex: currentReadIdx,
-      chapterProgress: Math.max(0, Math.min(1, rawProgress)),
+      chapterProgress: getChapterLocalProgress(container, chapterElement),
     };
   }, [contentRef, enabled, scrollModeChapters]);
 

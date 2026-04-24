@@ -309,6 +309,7 @@ export function useReaderReadingSurfaceController({
       chapters: chapterData.chapters,
       currentChapter: chapterData.currentChapter,
     },
+    flushReaderState: sessionCommands.flushReaderState,
     lifecycle: {
       ...lifecycle,
       renderableChapter,
