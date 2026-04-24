@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Chapter, ChapterContent } from '@shared/contracts/reader';
+import type { NovelFlowIndex } from '../layout-core/internal';
 import {
   getChapterLocalProgress,
   SCROLL_READING_ANCHOR_RATIO,
 } from '@shared/utils/readerPosition';
+import { resolveGlobalOffsetPosition } from '../layout-core/internal';
 
 export interface ScrollModeAnchor {
   chapterIndex: number;
@@ -19,6 +21,7 @@ export function useScrollModeChapters(
   scrollModeChapters: number[],
   setScrollModeChapters: React.Dispatch<React.SetStateAction<number[]>>,
   chapterDataRevision: number,
+  getNovelFlowIndex?: () => NovelFlowIndex | null,
   onReadingAnchorChange?: (anchor: ScrollModeAnchor) => void,
   onHandledUserScroll?: () => void,
 ): {
@@ -100,16 +103,11 @@ export function useScrollModeChapters(
     pendingScrollFetchesRef.current.add(prevIdx);
     fetchChapterContent(prevIdx)
       .then(() => {
-        const container = contentRef.current;
-        const prevHeight = container?.scrollHeight ?? 0;
         setScrollModeChapters((prev) => {
           if (prev.includes(prevIdx)) return prev;
-          return [prevIdx, ...prev];
+          return [...prev, prevIdx].sort((left, right) => left - right);
         });
         requestAnimationFrame(() => {
-          if (container) {
-            container.scrollTop += container.scrollHeight - prevHeight;
-          }
           syncViewportState({ force: true });
           preloadAdjacent(prevIdx, false);
         });
@@ -118,7 +116,6 @@ export function useScrollModeChapters(
         pendingScrollFetchesRef.current.delete(prevIdx);
       });
   }, [
-    contentRef,
     fetchChapterContent,
     preloadAdjacent,
     scrollModeChapters,
@@ -134,6 +131,18 @@ export function useScrollModeChapters(
     const container = contentRef.current;
     const visibleMarker =
       container.scrollTop + container.clientHeight * SCROLL_READING_ANCHOR_RATIO;
+
+    const novelFlowIndex = getNovelFlowIndex?.() ?? null;
+    if (novelFlowIndex && novelFlowIndex.totalScrollHeight > 0) {
+      const globalPosition = resolveGlobalOffsetPosition(novelFlowIndex, visibleMarker);
+      if (globalPosition) {
+        return {
+          chapterIndex: globalPosition.chapterIndex,
+          chapterProgress: globalPosition.chapterProgress,
+        };
+      }
+    }
+
     let currentReadIdx: number | null = null;
     let currentReadOffsetTop = Number.NEGATIVE_INFINITY;
 
@@ -162,7 +171,7 @@ export function useScrollModeChapters(
       chapterIndex: currentReadIdx,
       chapterProgress: getChapterLocalProgress(container, chapterElement),
     };
-  }, [contentRef, enabled, scrollModeChapters]);
+  }, [contentRef, enabled, getNovelFlowIndex, scrollModeChapters]);
 
   const handleScroll = useCallback(() => {
     if (!enabled || !contentRef.current) return;
@@ -182,18 +191,32 @@ export function useScrollModeChapters(
     }
 
     if (scrollModeChapters.length > 0 && anchor) {
-      const lastIdx = scrollModeChapters[scrollModeChapters.length - 1];
+      const novelFlowIndex = getNovelFlowIndex?.() ?? null;
+      const loadedEntries = novelFlowIndex?.chapters.filter((entry) => (
+        entry.manifestStatus !== 'missing'
+      ));
+      const lastIdx = loadedEntries && loadedEntries.length > 0
+        ? loadedEntries[loadedEntries.length - 1].chapterIndex
+        : scrollModeChapters[scrollModeChapters.length - 1];
       const nextIdx = lastIdx + 1;
       if (nextIdx < chapters.length) {
-        const chEl = scrollChapterElementsRef.current.get(anchor.chapterIndex);
-        if (chEl && anchor.chapterProgress >= 0.5) {
+        const shouldPreloadNext =
+          (anchor.chapterIndex >= lastIdx && anchor.chapterProgress >= 0.5)
+          || (anchor.chapterIndex >= lastIdx - 1 && anchor.chapterProgress >= 0.75);
+        if (shouldPreloadNext) {
           appendNextChapter(nextIdx);
         }
       }
     }
 
     if (scrollTop < 50 && scrollModeChapters.length > 0) {
-      const firstIdx = scrollModeChapters[0];
+      const novelFlowIndex = getNovelFlowIndex?.() ?? null;
+      const loadedEntries = novelFlowIndex?.chapters.filter((entry) => (
+        entry.manifestStatus !== 'missing'
+      ));
+      const firstIdx = loadedEntries && loadedEntries.length > 0
+        ? loadedEntries[0].chapterIndex
+        : scrollModeChapters[0];
       const prevIdx = firstIdx - 1;
       prependPrevChapter(prevIdx);
     }
@@ -208,6 +231,7 @@ export function useScrollModeChapters(
     syncViewportState,
     onHandledUserScroll,
     enabled,
+    getNovelFlowIndex,
   ]);
 
   useEffect(() => {
@@ -221,9 +245,16 @@ export function useScrollModeChapters(
 
       const container = contentRef.current;
       if (!container || container.clientHeight <= 0) return;
-      if (container.scrollHeight > container.clientHeight + 1) return;
+      const novelFlowIndex = getNovelFlowIndex?.() ?? null;
+      const flowHeight = novelFlowIndex?.totalScrollHeight ?? container.scrollHeight;
+      if (flowHeight > container.clientHeight + 1) return;
 
-      const lastIdx = scrollModeChapters[scrollModeChapters.length - 1];
+      const loadedEntries = novelFlowIndex?.chapters.filter((entry) => (
+        entry.manifestStatus !== 'missing'
+      ));
+      const lastIdx = loadedEntries && loadedEntries.length > 0
+        ? loadedEntries[loadedEntries.length - 1].chapterIndex
+        : scrollModeChapters[scrollModeChapters.length - 1];
       appendNextChapter(lastIdx + 1);
     };
 
@@ -232,7 +263,14 @@ export function useScrollModeChapters(
       cancelled = true;
       cancelAnimationFrame(frameId);
     };
-  }, [appendNextChapter, chapterDataRevision, contentRef, enabled, scrollModeChapters]);
+  }, [
+    appendNextChapter,
+    chapterDataRevision,
+    contentRef,
+    enabled,
+    getNovelFlowIndex,
+    scrollModeChapters,
+  ]);
 
   useEffect(() => {
     if (!enabled) {

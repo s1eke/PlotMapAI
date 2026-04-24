@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react';
 import type { ChapterContent } from '@shared/contracts/reader';
 import type {
+  NovelFlowChapterEntry,
   StaticScrollChapterTree,
   VisibleBlockRange,
 } from '../../layout-core/internal';
@@ -18,6 +19,7 @@ import {
 
 interface ScrollReaderChapter {
   chapter: ChapterContent;
+  flowEntry?: NovelFlowChapterEntry | null;
   index: number;
   layout: StaticScrollChapterTree;
 }
@@ -36,6 +38,7 @@ interface ScrollReaderContentProps {
   readerTheme: string;
   rootClassName: string;
   rootStyle: CSSProperties;
+  scrollFlowTotalHeight?: number;
   textClassName: string;
   visibleBlockRangeByChapter?: ReadonlyMap<number, VisibleBlockRange>;
 }
@@ -51,16 +54,25 @@ export default function ScrollReaderContent({
   readerTheme,
   rootClassName,
   rootStyle,
+  scrollFlowTotalHeight,
   textClassName,
   visibleBlockRangeByChapter,
 }: ScrollReaderContentProps) {
+  const contentHeight = Math.max(
+    scrollFlowTotalHeight ?? 0,
+    ...chapters.map(({ flowEntry, layout }) => (
+      (flowEntry?.scrollStart ?? 0) + layout.totalHeight
+    )),
+    0,
+  );
+
   return (
     <div
       className={cn(rootClassName, 'relative mx-auto w-full max-w-[1200px] px-4 sm:px-8 md:px-12')}
       style={rootStyle}
     >
-      <div className="pt-6">
-        {chapters.map(({ chapter, index, layout }) => {
+      <div className="relative pt-6" style={{ height: contentHeight }}>
+        {chapters.map(({ chapter, flowEntry, index, layout }) => {
           const visibleRange = visibleBlockRangeByChapter?.get(index);
           let visibleMetrics = layout.metrics;
           if (visibleRange) {
@@ -73,12 +85,15 @@ export default function ScrollReaderContent({
             <div
               key={index}
               ref={(element) => onChapterElement(index, element)}
-              className={cn(READER_CONTENT_CLASS_NAMES.chapter, 'mb-12')}
+              className={cn(READER_CONTENT_CLASS_NAMES.chapter, 'absolute left-0 right-0')}
+              style={{
+                top: flowEntry?.scrollStart ?? 0,
+              }}
             >
               <div
                 className={cn(
                   READER_CONTENT_CLASS_NAMES.chapterHeader,
-                  'sticky top-0 z-10 -mx-4 border-b border-border-color/20 px-4 py-3 backdrop-blur-sm sm:-mx-8 sm:px-8 md:-mx-12 md:px-12',
+                  'pointer-events-none absolute left-0 right-0 top-0 z-10 -mx-4 border-b border-border-color/20 px-4 py-3 backdrop-blur-sm sm:-mx-8 sm:px-8 md:-mx-12 md:px-12',
                   headerBgClassName,
                 )}
               >

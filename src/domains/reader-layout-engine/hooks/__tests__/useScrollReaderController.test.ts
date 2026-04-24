@@ -67,6 +67,7 @@ vi.mock('../useScrollModeChapters', () => ({
     _scrollModeChapters: number[],
     _setScrollModeChapters: Dispatch<SetStateAction<number[]>>,
     _chapterDataRevision: number,
+    _getNovelFlowIndex?: () => unknown,
     onReadingAnchorChange?: (anchor: { chapterIndex: number; chapterProgress: number }) => void,
     onHandledUserScroll?: () => void,
   ) => {
@@ -84,44 +85,80 @@ vi.mock('../useScrollModeChapters', () => ({
 
 vi.mock('../useReaderRenderCache', async () => {
   const renderCacheStub = await import('../../test/deterministicRenderCacheStub');
+  const {
+    createChapterContentHash,
+    createReaderLayoutSignature,
+    serializeReaderLayoutSignature,
+  } = await import('../../utils/layout/readerLayout');
+  const { createChapterFlowManifestFromScrollTree } = await import('../../utils/flow-index/chapterFlowManifest');
 
   return {
     useReaderRenderCache: (params: {
       currentChapter: ChapterContent | null;
       scrollChapters: Array<{ chapter: ChapterContent; index: number }>;
-    }) => ({
-      pagedLayouts: new Map(),
-      scrollLayouts: new Map(
+    }) => {
+      const scrollLayoutSignature = createReaderLayoutSignature({
+        columnCount: 1,
+        columnGap: 0,
+        fontSize: 18,
+        lineSpacing: 1.6,
+        pageHeight: 800,
+        paragraphSpacing: 16,
+        textWidth: 560,
+      });
+      const scrollLayouts = new Map(
         params.scrollChapters.map(({ chapter, index }) => [
           index,
           renderCacheStub.createDeterministicScrollLayout(chapter),
         ]),
-      ),
-      summaryShells: new Map(),
-      typography: {
-        bodyFont: 'Stub Sans',
-        bodyFontSize: 18,
-        bodyLineHeightPx: 28,
-        headingFont: 'Stub Sans',
-        headingFontSize: 18,
-        headingLineHeightPx: 28,
-        paragraphSpacing: 16,
-      },
-      viewportMetrics: {
-        scrollViewportHeight: 800,
-        scrollViewportWidth: 600,
-        scrollTextWidth: 560,
-        pagedViewportHeight: 800,
-        pagedViewportWidth: 600,
-        pagedColumnCount: 1,
-        pagedColumnWidth: 600,
-        pagedColumnGap: 0,
-        pagedFitsTwoColumns: false,
-      },
-      cacheSourceByKey: new Map(),
-      isPreheating: false,
-      pendingPreheatCount: 0,
-    }),
+      );
+
+      return {
+        pagedLayouts: new Map(),
+        scrollLayouts,
+        scrollManifests: new Map(
+          params.scrollChapters.flatMap(({ chapter, index }) => {
+            const tree = scrollLayouts.get(index);
+            return tree ? [[
+              index,
+              createChapterFlowManifestFromScrollTree({
+                contentHash: createChapterContentHash(chapter),
+                contentVersion: chapter.contentVersion,
+                layoutKey: serializeReaderLayoutSignature(scrollLayoutSignature),
+                layoutSignature: scrollLayoutSignature,
+                rendererVersion: 7,
+                tree,
+              }),
+            ]] : [];
+          }),
+        ),
+        scrollLayoutSignature,
+        summaryShells: new Map(),
+        typography: {
+          bodyFont: 'Stub Sans',
+          bodyFontSize: 18,
+          bodyLineHeightPx: 28,
+          headingFont: 'Stub Sans',
+          headingFontSize: 18,
+          headingLineHeightPx: 28,
+          paragraphSpacing: 16,
+        },
+        viewportMetrics: {
+          scrollViewportHeight: 800,
+          scrollViewportWidth: 600,
+          scrollTextWidth: 560,
+          pagedViewportHeight: 800,
+          pagedViewportWidth: 600,
+          pagedColumnCount: 1,
+          pagedColumnWidth: 600,
+          pagedColumnGap: 0,
+          pagedFitsTwoColumns: false,
+        },
+        cacheSourceByKey: new Map(),
+        isPreheating: false,
+        pendingPreheatCount: 0,
+      };
+    },
   };
 });
 
@@ -895,7 +932,7 @@ describe('useScrollReaderController', () => {
     }
   });
 
-  it('restores locator targets against the scroll anchor instead of snapping to the chapter top', async () => {
+  it('restores locator targets against the continuous flow anchor instead of snapping to the chapter top', async () => {
     const animationFrames = createAnimationFrameController();
     const contentRef = {
       current: makeContainer({
@@ -971,8 +1008,7 @@ describe('useScrollReaderController', () => {
         Math.max(
           0,
           Math.round(
-            chapterBodyOffsetTop
-            + targetMetric.top
+            targetMetric.top
             + targetMetric.marginBefore
             - contentRef.current.clientHeight * SCROLL_READING_ANCHOR_RATIO,
           ),

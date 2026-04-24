@@ -6,6 +6,7 @@ import {
   calculateVisibleScrollBlockRanges,
   resolveCurrentScrollLocator,
   resolveCurrentScrollLocatorOffset,
+  resolveLocatorGlobalOffset,
 } from '../layout-core/internal';
 import type { ChapterContent } from '@shared/contracts/reader';
 import type {
@@ -14,6 +15,7 @@ import type {
   ScrollReaderLayout,
   VisibleScrollBlockRange,
 } from './scrollReaderControllerTypes';
+import type { NovelFlowIndex } from '../layout-core/internal';
 
 function areVisibleScrollBlockRangesEqual(
   previousRanges: ReadonlyMap<number, VisibleScrollBlockRange>,
@@ -56,6 +58,7 @@ export function useScrollReaderViewportSync(params: {
     suppressScrollSyncTemporarily: () => void;
   };
   renderableScrollLayouts: RenderableScrollLayout[];
+  novelFlowIndex: NovelFlowIndex | null;
   scrollChapterBodyElementsRef: MutableRefObject<Map<number, HTMLDivElement>>;
   scrollChapterElementsRef: MutableRefObject<Map<number, HTMLDivElement>>;
   scrollLayouts: ReadonlyMap<number, ScrollReaderLayout>;
@@ -77,6 +80,7 @@ export function useScrollReaderViewportSync(params: {
     layoutQueries,
     persistence,
     renderableScrollLayouts,
+    novelFlowIndex,
     scrollChapterBodyElementsRef,
     scrollChapterElementsRef,
     scrollLayouts,
@@ -146,17 +150,25 @@ export function useScrollReaderViewportSync(params: {
   ]);
 
   const getCurrentScrollLocator = useCallback(() => {
+    const scrollChapterGlobalOffsets = new Map(
+      renderableScrollLayouts
+        .filter((chapter) => chapter.flowEntry)
+        .map((chapter) => [chapter.index, chapter.flowEntry?.scrollStart ?? 0]),
+    );
+
     return resolveCurrentScrollLocator({
       chapterIndex,
       contentElement: viewportContentRef.current,
       isPagedMode: false,
       scrollLayouts,
       scrollChapterBodyElements: scrollChapterBodyElementsRef.current,
+      scrollChapterGlobalOffsets,
       scrollReaderChapters,
       viewMode: 'original',
     });
   }, [
     chapterIndex,
+    renderableScrollLayouts,
     scrollChapterBodyElementsRef,
     scrollLayouts,
     scrollReaderChapters,
@@ -165,13 +177,27 @@ export function useScrollReaderViewportSync(params: {
 
   const resolveScrollLocatorOffset = useCallback(
     (locator: Parameters<typeof resolveCurrentScrollLocatorOffset>[0]['locator']) => {
+      if (novelFlowIndex) {
+        const globalOffset = resolveLocatorGlobalOffset(novelFlowIndex, locator);
+        if (globalOffset !== null) {
+          return globalOffset;
+        }
+      }
+
+      const scrollChapterGlobalOffsets = new Map(
+        renderableScrollLayouts
+          .filter((chapter) => chapter.flowEntry)
+          .map((chapter) => [chapter.index, chapter.flowEntry?.scrollStart ?? 0]),
+      );
+
       return resolveCurrentScrollLocatorOffset({
         locator,
         scrollChapterBodyElements: scrollChapterBodyElementsRef.current,
+        scrollChapterGlobalOffsets,
         scrollLayouts,
       });
     },
-    [scrollChapterBodyElementsRef, scrollLayouts],
+    [novelFlowIndex, renderableScrollLayouts, scrollChapterBodyElementsRef, scrollLayouts],
   );
 
   useEffect(() => {

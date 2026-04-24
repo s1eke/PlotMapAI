@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Mock } from 'vitest';
 import { useScrollModeChapters } from '../useScrollModeChapters';
 import type { Chapter, ChapterContent } from '@shared/contracts/reader';
+import type { NovelFlowIndex } from '../../utils/flow-index/novelFlowIndex';
 
 const chapters: Chapter[] = [
   { index: 0, title: 'Ch 1', wordCount: 100 },
@@ -56,6 +57,7 @@ function setupHook(opts: {
   preloadAdjacent?: Mock;
   chapterDataRevision?: number;
   contentElement?: HTMLDivElement;
+  getNovelFlowIndex?: () => NovelFlowIndex | null;
   onReadingAnchorChange?: Mock;
 } = {}) {
   const contentRef = { current: opts.contentElement ?? makeMockElement() };
@@ -76,6 +78,7 @@ function setupHook(opts: {
       scrollModeChapters,
       setScrollModeChapters,
       opts.chapterDataRevision ?? 0,
+      opts.getNovelFlowIndex,
       onReadingAnchorChange,
     ));
 
@@ -284,6 +287,64 @@ describe('useScrollModeChapters', () => {
 
       expect(onReadingAnchorChange).toHaveBeenCalledWith({ chapterIndex: 0, chapterProgress: 0.5 });
       expect(result.current.getCurrentAnchor()).toEqual({ chapterIndex: 0, chapterProgress: 0.5 });
+    });
+
+    it('uses NovelFlowIndex global offsets before DOM chapter offsets when available', () => {
+      const onReadingAnchorChange = vi.fn();
+      const { result, contentRef } = setupHook({
+        scrollModeChapters: [0, 1],
+        getNovelFlowIndex: () => ({
+          chapters: [{
+            blockSummaries: [],
+            chapterIndex: 0,
+            endLocator: null,
+            manifestStatus: 'materialized',
+            pageEnd: 0,
+            pageStart: 0,
+            scrollEnd: 1000,
+            scrollStart: 0,
+            startLocator: null,
+          }, {
+            blockSummaries: [],
+            chapterIndex: 1,
+            endLocator: null,
+            manifestStatus: 'materialized',
+            pageEnd: 0,
+            pageStart: 0,
+            scrollEnd: 1500,
+            scrollStart: 1000,
+            startLocator: null,
+          }],
+          layoutKey: 'scroll',
+          layoutSignature: {
+            columnCount: 1,
+            columnGap: 0,
+            fontSize: 18,
+            lineSpacing: 1.6,
+            pageHeight: 600,
+            paragraphSpacing: 16,
+            textWidth: 560,
+          },
+          novelId: 1,
+          totalPageCount: 0,
+          totalScrollHeight: 1500,
+        }),
+        onReadingAnchorChange,
+      });
+
+      populateElements(result.current.scrollChapterElementsRef, [0, 1]);
+      contentRef.current.scrollTop = 850;
+
+      act(() => { result.current.handleScroll(); });
+
+      expect(onReadingAnchorChange).toHaveBeenCalledWith({
+        chapterIndex: 1,
+        chapterProgress: 0.06,
+      });
+      expect(result.current.getCurrentAnchor()).toEqual({
+        chapterIndex: 1,
+        chapterProgress: 0.06,
+      });
     });
 
     it('reports near-tail progress from the chapter scrollable range', () => {

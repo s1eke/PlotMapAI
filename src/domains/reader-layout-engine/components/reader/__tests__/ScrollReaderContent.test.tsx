@@ -326,6 +326,72 @@ describe('ScrollReaderContent', () => {
     expect(screen.queryByRole('heading', { name: 'Wrong Heading', level: 2 })).not.toBeInTheDocument();
   });
 
+  it('positions rendered chapters inside the continuous novel flow', () => {
+    const first = createScrollChapterLayout('First text');
+    const second = createScrollChapterLayout('Second text');
+    const secondChapter = {
+      ...second.chapter,
+      index: 1,
+      title: 'Chapter 2',
+    };
+
+    const { container } = render(
+      <ScrollReaderContent
+        chapters={[{
+          index: 0,
+          chapter: first.chapter,
+          flowEntry: {
+            blockSummaries: [],
+            chapterIndex: 0,
+            endLocator: null,
+            manifestStatus: 'materialized',
+            pageEnd: 0,
+            pageStart: 0,
+            scrollEnd: 400,
+            scrollStart: 0,
+            startLocator: null,
+          },
+          layout: first.layout,
+        }, {
+          index: 1,
+          chapter: secondChapter,
+          flowEntry: {
+            blockSummaries: [],
+            chapterIndex: 1,
+            endLocator: null,
+            manifestStatus: 'materialized',
+            pageEnd: 0,
+            pageStart: 0,
+            scrollEnd: 900,
+            scrollStart: 400,
+            startLocator: null,
+          },
+          layout: {
+            ...second.layout,
+            chapterIndex: 1,
+          },
+        }]}
+        novelId={1}
+        readerTheme="auto"
+        rootClassName="pm-reader pm-reader--scroll pm-reader--theme-auto"
+        rootStyle={{}}
+        scrollFlowTotalHeight={900}
+        textClassName=""
+        headerBgClassName=""
+        onChapterElement={() => {}}
+      />,
+    );
+
+    const flowRoot = container.querySelector('.pm-reader > .relative');
+    const chapterElements = container.querySelectorAll(`.${READER_CONTENT_CLASS_NAMES.chapter}`);
+
+    expect(flowRoot).toHaveStyle({ height: '900px' });
+    expect(chapterElements[0]).toHaveStyle({ top: '0px' });
+    expect(chapterElements[1]).toHaveStyle({ top: '400px' });
+    expect(screen.getByText('First text')).toBeInTheDocument();
+    expect(screen.getByText('Second text')).toBeInTheDocument();
+  });
+
   it('lets the scroll reader text body inherit the global sans font stack', () => {
     const { chapter, layout } = createScrollChapterLayout('Text');
 

@@ -9,6 +9,7 @@ import type {
   StaticScrollChapterTree,
   StaticSummaryShellTree,
 } from '../layout-core/internal';
+import type { ChapterFlowManifest } from '../layout-core/internal';
 import type {
   ReaderLayoutFeatureSet,
   ReaderRenderCacheSource,
@@ -39,6 +40,8 @@ export interface UseReaderRenderCacheParams {
 export interface UseReaderRenderCacheResult {
   pagedLayouts: Map<number, StaticPagedChapterTree>;
   scrollLayouts: Map<number, StaticScrollChapterTree>;
+  scrollManifests: Map<number, ChapterFlowManifest>;
+  scrollLayoutSignature: ReaderLayoutSignature;
   summaryShells: Map<number, StaticSummaryShellTree>;
   typography: ReaderTypographyMetrics;
   viewportMetrics: ReaderViewportMetrics;
@@ -85,6 +88,7 @@ export interface ReaderVisibleRenderResultsResult {
   layoutSnapshot: ReaderVisibleLayoutSnapshot;
   pagedLayouts: Map<number, StaticPagedChapterTree>;
   scrollLayouts: Map<number, StaticScrollChapterTree>;
+  scrollManifests: Map<number, ChapterFlowManifest>;
   summaryShells: Map<number, StaticSummaryShellTree>;
 }
 

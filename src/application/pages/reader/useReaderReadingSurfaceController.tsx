@@ -128,6 +128,7 @@ function buildScrollContentProps(
     onImageActivate: imageHandlers.onImageActivate,
     onRegisterImageElement: imageHandlers.onRegisterImageElement,
     readerTheme: preferences.readerTheme,
+    scrollFlowTotalHeight: scrollController.scrollFlowTotalHeight,
     textClassName: preferences.currentTheme.text,
     visibleBlockRangeByChapter: scrollController.visibleScrollBlockRangeByChapter,
   };

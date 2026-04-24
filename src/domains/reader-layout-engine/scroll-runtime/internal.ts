@@ -17,3 +17,7 @@ export {
   buildFocusedScrollWindow,
   useScrollReaderWindowing,
 } from '../hooks/scrollReaderWindowing';
+export {
+  buildNovelFlowIndex,
+  resolveLocatorGlobalOffset,
+} from '../utils/flow-index/novelFlowIndex';

@@ -6,6 +6,7 @@ import type {
   StaticScrollChapterTree,
   StaticSummaryShellTree,
 } from '../layout-core/internal';
+import { createChapterFlowManifestFromScrollTree } from '../layout-core/internal';
 import type { ReaderRenderCacheSource } from '../utils/render-cache/readerRenderCache';
 import type { ReaderVisibleRenderTarget } from '../utils/render-cache/readerRenderCachePlanning';
 import type { ReaderVisibleRenderResultsResult } from './readerRenderCacheTypes';
@@ -33,6 +34,7 @@ interface VisibleRenderResult {
   entry: ReturnType<typeof buildStaticRenderTree>;
   exactKey: string;
   source: ReaderRenderCacheSource;
+  target: ReaderVisibleRenderTarget;
   variantFamily: ReaderRenderVariant;
 }
 
@@ -116,6 +118,7 @@ export function useReaderVisibleRenderResults({
           entry: memoryEntry,
           exactKey: target.exactKey,
           source: 'memory',
+          target,
           variantFamily: target.variantFamily,
         };
       }
@@ -133,6 +136,7 @@ export function useReaderVisibleRenderResults({
         }),
         exactKey: target.exactKey,
         source: 'built',
+        target,
         variantFamily: target.variantFamily,
       };
     });
@@ -221,6 +225,33 @@ export function useReaderVisibleRenderResults({
     return layouts;
   }, [visibleResults]);
 
+  const scrollManifests = useMemo(() => {
+    const manifests = new Map<number, ReturnType<typeof createChapterFlowManifestFromScrollTree>>();
+
+    for (const result of visibleResults) {
+      if (result.variantFamily !== 'original-scroll') {
+        continue;
+      }
+
+      const tree = coerceScrollTree(result.entry);
+      if (!tree) {
+        continue;
+      }
+
+      manifests.set(result.entry.chapterIndex, createChapterFlowManifestFromScrollTree({
+        contentHash: result.target.contentHash,
+        contentVersion: result.target.contentVersion,
+        layoutFeatureSet: result.target.layoutFeatureSet,
+        layoutKey: result.target.layoutKey,
+        layoutSignature: variantSignatures['original-scroll'],
+        rendererVersion: result.target.rendererVersion,
+        tree,
+      }));
+    }
+
+    return manifests;
+  }, [variantSignatures, visibleResults]);
+
   const summaryShells = useMemo(() => {
     const shells = new Map<number, StaticSummaryShellTree>();
 
@@ -303,6 +334,7 @@ export function useReaderVisibleRenderResults({
     layoutSnapshot,
     pagedLayouts,
     scrollLayouts,
+    scrollManifests,
     summaryShells,
   };
 }

@@ -185,6 +185,7 @@ export function useReaderRenderCache({
     layoutSnapshot,
     pagedLayouts,
     scrollLayouts,
+    scrollManifests,
     summaryShells,
   } = useReaderVisibleRenderResults({
     activeVariant,
@@ -222,6 +223,8 @@ export function useReaderRenderCache({
     pagedLayouts,
     pendingPreheatCount,
     scrollLayouts,
+    scrollManifests,
+    scrollLayoutSignature: variantSignatures['original-scroll'],
     summaryShells,
     typography,
     viewportMetrics,

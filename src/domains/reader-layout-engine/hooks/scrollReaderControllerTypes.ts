@@ -12,6 +12,10 @@ import type {
   MeasuredChapterLayout,
   VisibleBlockRange,
 } from '../utils/layout/readerLayout';
+import type {
+  NovelFlowChapterEntry,
+  NovelFlowIndex,
+} from '../utils/flow-index/novelFlowIndex';
 
 export interface ScrollReaderControllerPreferences {
   fontSize: number;
@@ -65,6 +69,7 @@ export type ScrollReaderLayout = MeasuredChapterLayout;
 export type VisibleScrollBlockRange = VisibleBlockRange;
 export interface RenderableScrollLayout {
   chapter: ChapterContent;
+  flowEntry: NovelFlowChapterEntry | null;
   index: number;
   layout: ScrollReaderLayout;
 }
@@ -77,8 +82,10 @@ export interface UseScrollReaderControllerResult {
   ) => void;
   handleScrollChapterElement: (index: number, element: HTMLDivElement | null) => void;
   renderableScrollLayouts: RenderableScrollLayout[];
+  scrollFlowTotalHeight: number;
   syncViewportState: (options?: { force?: boolean }) => void;
   visibleScrollBlockRangeByChapter: Map<number, VisibleScrollBlockRange>;
+  novelFlowIndex: NovelFlowIndex | null;
 }
 
 export const EMPTY_PAGED_CHAPTERS: ChapterContent[] = [];
