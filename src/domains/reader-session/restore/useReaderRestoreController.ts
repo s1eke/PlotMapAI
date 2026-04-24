@@ -42,7 +42,14 @@ import {
   traceModeSwitchTargetResolved,
 } from '../mode-switch/readerModeSwitchTrace';
 import { useReaderPositionCapture } from '../hooks/useReaderPositionCapture';
+import {
+  createScrollPagedContinuitySnapshot,
+  resolveNextChapterProgress,
+  resolveScrollContinuityTarget,
+  type ScrollPagedContinuitySnapshot,
+} from './readerModeContinuity';
 export type { UseReaderRestoreControllerResult } from './readerRestoreControllerTypes';
+
 export function useReaderRestoreController({
   sessionSnapshot,
   sessionCommands,
@@ -62,6 +69,7 @@ export function useReaderRestoreController({
     scroll: null,
     summary: null,
   });
+  const scrollPagedContinuityRef = useRef<ScrollPagedContinuitySnapshot | null>(null);
   const isActiveChapterResolved = currentChapter?.index === chapterIndex;
   const {
     clearPendingRestoreTarget,
@@ -184,7 +192,7 @@ export function useReaderRestoreController({
         }),
         mode,
       };
-      const targetRestoreTarget = solveModeRestoreTarget({
+      let targetRestoreTarget = solveModeRestoreTarget({
         baseTarget: {
           ...toRestoreTargetFromState({
             chapterIndex,
@@ -199,15 +207,23 @@ export function useReaderRestoreController({
         modeSnapshots: modeSnapshotRef.current,
         targetMode,
       });
+      if (isStrictModeSwitch && strictSourceMode === 'paged' && strictTargetMode === 'scroll') {
+        targetRestoreTarget = resolveScrollContinuityTarget({
+          continuitySnapshot: scrollPagedContinuityRef.current,
+          sourceTarget: sourceRestoreTarget,
+        }) ?? targetRestoreTarget;
+      }
       const nextLastContentMode = currentReaderState.hints?.contentMode
         ?? (mode === 'paged' ? 'paged' : 'scroll');
       const nextPersistedState = mergeStoredReaderState(currentReaderState, {
         hints: {
           ...currentReaderState.hints,
           ...createReaderStateModeHints(targetMode, nextLastContentMode),
-          chapterProgress: targetMode === 'summary'
-            ? targetRestoreTarget.chapterProgress ?? 0
-            : currentReaderState.hints?.chapterProgress,
+          chapterProgress: resolveNextChapterProgress({
+            currentReaderState,
+            targetMode,
+            targetRestoreTarget,
+          }),
         },
       });
       traceModeSwitchTargetResolved({
@@ -296,6 +312,19 @@ export function useReaderRestoreController({
           stopRestoreMask();
           throw error;
         }
+        if (strictSourceMode === 'scroll' && strictTargetMode === 'paged') {
+          const { pageIndex } = navigation.getPagedState();
+          Object.assign(scrollPagedContinuityRef, {
+            current: createScrollPagedContinuitySnapshot({
+              pagedPageIndex: pageIndex,
+              sourceTarget: sourceRestoreTarget,
+            }),
+          });
+        } else if (strictSourceMode === 'paged' && strictTargetMode === 'scroll') {
+          Object.assign(scrollPagedContinuityRef, {
+            current: null,
+          });
+        }
         const modeSwitchSnapshot = buildReaderModeSwitchDebugSnapshot({
           nextPersistedState,
           previousMode: mode,
@@ -375,6 +404,7 @@ export function useReaderRestoreController({
     chapterIndex,
     latestReaderStateRef,
     layoutQueries,
+    navigation,
   ]);
   const handleRestoreSettled = useCallback((result: RestoreSettledResult): boolean => {
     const strictTransaction = getStrictModeSwitchTransaction();

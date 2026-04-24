@@ -156,7 +156,10 @@ export function resolvePendingScrollTarget(params: {
     target.chapterProgress,
   );
   const resolvePreferredScrollTop = (candidateScrollTop: number): number => {
-    if (typeof target.locator?.pageIndex === 'number') {
+    if (
+      typeof target.locator?.pageIndex === 'number'
+      && typeof target.chapterProgress !== 'number'
+    ) {
       return candidateScrollTop;
     }
 

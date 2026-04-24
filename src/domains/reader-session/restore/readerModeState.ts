@@ -34,6 +34,32 @@ function areCanonicalPositionsEquivalent(
     && left.endCursor?.graphemeIndex === right.endCursor?.graphemeIndex;
 }
 
+function resolvePagedScrollProgressProjection(
+  state: StoredReaderState,
+  currentPagedLocator: ReturnType<typeof toReaderLocatorFromCanonical> | null,
+): number | undefined {
+  if (
+    state.hints?.contentMode !== 'paged'
+    || typeof state.hints.chapterProgress !== 'number'
+  ) {
+    return undefined;
+  }
+
+  const currentPageIndex = currentPagedLocator?.pageIndex;
+  const previousPageIndex = state.hints.pageIndex;
+  if (
+    typeof currentPageIndex === 'number'
+    && (
+      previousPageIndex === undefined
+      || previousPageIndex === currentPageIndex
+    )
+  ) {
+    return state.hints.chapterProgress;
+  }
+
+  return undefined;
+}
+
 export function toRestoreTargetFromState(params: {
   chapterIndex: number;
   mode: ReaderMode;
@@ -86,11 +112,15 @@ export function captureReaderStateSnapshot(params: {
 
   if (params.mode === 'paged') {
     if (params.currentPagedLocator) {
+      const nextChapterProgress = resolvePagedScrollProgressProjection(
+        nextState,
+        params.currentPagedLocator,
+      );
       nextState = mergeStoredReaderState(nextState, {
         canonical: toCanonicalPositionFromLocator(params.currentPagedLocator),
         hints: {
           ...nextState.hints,
-          chapterProgress: undefined,
+          chapterProgress: nextChapterProgress,
           contentMode: 'paged',
           pageIndex: params.currentPagedLocator.pageIndex,
         },

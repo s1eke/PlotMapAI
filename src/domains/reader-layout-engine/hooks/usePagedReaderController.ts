@@ -54,7 +54,7 @@ export function usePagedReaderController({
   const navigation = useReaderNavigationRuntime();
   const persistence = useReaderPersistenceRuntime();
   const layoutQueries = useReaderLayoutQueries();
-  const { chapterIndex } = sessionSnapshot;
+  const { chapterIndex, locator: sessionLocator } = sessionSnapshot;
   const {
     hasUserInteractedRef,
     persistReaderState,
@@ -62,6 +62,7 @@ export function usePagedReaderController({
   } = sessionCommands;
   const userInteractedRef = hasUserInteractedRef;
   const pagedContentRef = useRef<HTMLDivElement | null>(null);
+  const lastPersistedPagedPageIndexRef = useRef<number | null>(null);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageCount, setPageCount] = useState(1);
   const [pendingPageTarget, setPendingPageTarget] = useState<PageTarget | null>(null);
@@ -86,6 +87,7 @@ export function usePagedReaderController({
     navigation.setPagedState({ pageCount: 1, pageIndex: 0 });
     viewport.pagedViewportRef.current = null;
     pagedContentRef.current = null;
+    lastPersistedPagedPageIndexRef.current = null;
     setPagedContentElement(null);
     setPagedViewportElement(null);
   }, [enabled, navigation, viewport.pagedViewportRef]);
@@ -381,6 +383,13 @@ export function usePagedReaderController({
     }
 
     const locator = layoutQueries.getCurrentPagedLocator();
+    const previousPagedPageIndex =
+      lastPersistedPagedPageIndexRef.current ?? sessionLocator?.pageIndex;
+    const nextPageIndex = locator?.pageIndex ?? pageIndex;
+    const shouldClearScrollProgress =
+      previousPagedPageIndex !== undefined
+      && previousPagedPageIndex !== null
+      && previousPagedPageIndex !== nextPageIndex;
     if (!locator) {
       const persistFallbackSnapshot = {
         source: 'usePagedReaderController.persistCurrentPage',
@@ -398,11 +407,12 @@ export function usePagedReaderController({
         edge: 'start',
       },
       hints: {
-        chapterProgress: undefined,
-        pageIndex: locator?.pageIndex ?? pageIndex,
+        ...(shouldClearScrollProgress ? { chapterProgress: undefined } : {}),
+        pageIndex: nextPageIndex,
         contentMode: 'paged',
       },
     });
+    lastPersistedPagedPageIndexRef.current = nextPageIndex;
   }, [
     chapterIndex,
     currentChapter,
@@ -412,6 +422,7 @@ export function usePagedReaderController({
     pendingRestoreTarget,
     pendingRestoreTargetRef,
     persistReaderState,
+    sessionLocator?.pageIndex,
   ]);
 
   useEffect(() => {

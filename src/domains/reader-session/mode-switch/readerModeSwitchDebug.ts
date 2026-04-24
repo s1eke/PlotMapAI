@@ -47,6 +47,32 @@ function buildStrictModeLocatorUnavailableMessage(mode: 'paged' | 'scroll'): str
   return `live_${mode}_locator_missing`;
 }
 
+function resolvePagedScrollProgressProjection(params: {
+  activeLocator: ReaderLocator;
+  latestReaderState: StoredReaderState;
+}): number | undefined {
+  const { activeLocator, latestReaderState } = params;
+  if (
+    latestReaderState.hints?.contentMode !== 'paged'
+    || typeof latestReaderState.hints.chapterProgress !== 'number'
+  ) {
+    return undefined;
+  }
+
+  const previousPageIndex = latestReaderState.hints.pageIndex;
+  if (
+    typeof activeLocator.pageIndex === 'number'
+    && (
+      previousPageIndex === undefined
+      || previousPageIndex === activeLocator.pageIndex
+    )
+  ) {
+    return latestReaderState.hints.chapterProgress;
+  }
+
+  return undefined;
+}
+
 function areLayoutCursorsEquivalent(
   left: ReaderLocator['startCursor'],
   right: ReaderLocator['startCursor'],
@@ -103,7 +129,10 @@ export function captureStrictModeSwitchState(params: {
       canonical: toCanonicalPositionFromLocator(activeLocator),
       hints: {
         chapterProgress: params.mode === 'paged'
-          ? undefined
+          ? resolvePagedScrollProgressProjection({
+            activeLocator,
+            latestReaderState: params.latestReaderState,
+          })
           : params.latestReaderState.hints?.chapterProgress,
         contentMode: params.mode,
         pageIndex: params.mode === 'scroll' ? undefined : activeLocator.pageIndex,

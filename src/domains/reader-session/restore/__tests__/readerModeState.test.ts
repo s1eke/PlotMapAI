@@ -205,4 +205,43 @@ describe('captureReaderStateSnapshot', () => {
     });
     expect(nextState.hints?.chapterProgress).toBeUndefined();
   });
+
+  it('preserves paged scroll projection while the page index is unchanged', () => {
+    const currentPagedLocator: ReaderLocator = {
+      chapterIndex: 0,
+      blockIndex: 34,
+      kind: 'text',
+      lineIndex: 0,
+      pageIndex: 5,
+    };
+    const previousState: StoredReaderState = {
+      canonical: {
+        chapterIndex: 0,
+        blockIndex: 34,
+        kind: 'text',
+        lineIndex: 0,
+      },
+      hints: {
+        chapterProgress: 0.72,
+        contentMode: 'paged',
+        pageIndex: 5,
+        viewMode: 'original',
+      },
+    };
+
+    const nextState = captureReaderStateSnapshot({
+      chapterIndex: 0,
+      currentAnchor: null,
+      currentOriginalLocator: null,
+      currentPagedLocator,
+      latestReaderState: previousState,
+      mode: 'paged',
+      navigationSource: null,
+      storedReaderState: previousState,
+      viewportContentElement: null,
+    });
+
+    expect(nextState.hints?.chapterProgress).toBe(0.72);
+    expect(nextState.hints?.pageIndex).toBe(5);
+  });
 });

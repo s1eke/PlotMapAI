@@ -127,7 +127,7 @@ describe('resolvePendingScrollTarget', () => {
     });
   });
 
-  it('keeps a paged locator-derived scroll top even when stale scroll progress differs', () => {
+  it('uses preserved scroll progress to unfold a paged locator back to its scroll position', () => {
     const container = makeContainer();
     const chapterElement = makeChapterElement({
       offsetHeight: 1000,
@@ -156,6 +156,48 @@ describe('resolvePendingScrollTarget', () => {
       target: {
         chapterIndex: 2,
         chapterProgress: 0.6,
+        locator: targetLocator,
+        mode: 'scroll',
+      },
+    });
+
+    expect(result).toEqual({
+      state: 'success',
+      value: {
+        locator: targetLocator,
+        scrollTop: 2440,
+      },
+    });
+  });
+
+  it('keeps a paged locator-derived scroll top when no scroll progress is available', () => {
+    const container = makeContainer();
+    const chapterElement = makeChapterElement({
+      offsetHeight: 1000,
+      offsetTop: 2200,
+    });
+    const targetLocator = {
+      chapterIndex: 2,
+      blockIndex: 0,
+      kind: 'text' as const,
+      lineIndex: 0,
+      pageIndex: 4,
+    };
+
+    const result = resolvePendingScrollTarget({
+      container,
+      layoutQueries: {
+        resolveScrollLocatorOffset: () => 2500,
+      },
+      scrollChapterBodyElementsRef: {
+        current: new Map(),
+      },
+      scrollChapterElementsRef: {
+        current: new Map([[2, chapterElement]]),
+      },
+      scrollLayouts: new Map(),
+      target: {
+        chapterIndex: 2,
         locator: targetLocator,
         mode: 'scroll',
       },

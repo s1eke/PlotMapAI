@@ -1181,7 +1181,7 @@ describe('useScrollReaderController', () => {
     }
   });
 
-  it('persists actual scroll progress after restoring from a paged locator', async () => {
+  it('uses preserved scroll progress when restoring from a paged locator projection', async () => {
     const animationFrames = createAnimationFrameController();
     const contentRef = {
       current: makeContainer({
@@ -1255,10 +1255,8 @@ describe('useScrollReaderController', () => {
         await animationFrames.flushNextAnimationFrame();
       }
 
-      const expectedScrollTop = Math.round(
-        1700 - contentRef.current.clientHeight * SCROLL_READING_ANCHOR_RATIO,
-      );
-      const expectedChapterProgress = (expectedScrollTop - 1000) / (2000 - 600);
+      const expectedScrollTop = Math.round(1000 + (2000 - 600) * 0.12);
+      const expectedChapterProgress = 0.12;
       const persistedState = contextValue.persistReaderState.mock.calls.at(-1)?.[0];
 
       expect(contentRef.current.scrollTop).toBe(expectedScrollTop);

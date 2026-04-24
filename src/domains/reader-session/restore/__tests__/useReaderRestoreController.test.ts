@@ -565,6 +565,242 @@ describe('useReaderRestoreFlow', () => {
     await expect(switchModePromise).resolves.toBeUndefined();
   });
 
+  it('restores the paired scroll target when returning from the same paged page', async () => {
+    vi.spyOn(readerSessionStore, 'flushPersistence').mockResolvedValue(undefined);
+    vi.spyOn(readerSessionStore, 'getReaderSessionSnapshot').mockImplementation(() => {
+      return createSessionStoreSnapshotMock({
+        lastPersistenceFailure: null,
+        persistenceStatus: 'healthy',
+      });
+    });
+
+    const scrollLocator = createLocator({
+      blockIndex: 18,
+      chapterIndex: 7,
+      lineIndex: 1,
+    });
+    const pagedLocator = createLocator({
+      blockIndex: 28,
+      chapterIndex: 7,
+      lineIndex: 0,
+      pageIndex: 2,
+    });
+    const latestReaderStateRef = {
+      current: createStoredState({
+        canonical: scrollLocator,
+        hints: {
+          chapterProgress: 0.42,
+          contentMode: 'scroll',
+          viewMode: 'original',
+        },
+      }),
+    };
+    const sessionCommands = {
+      latestReaderStateRef,
+      markUserInteracted: vi.fn(),
+      persistReaderState: vi.fn(),
+      setChapterIndex: vi.fn(),
+      setMode: vi.fn(),
+    };
+    const { hookProps: initialHookProps, runtime } = createHookHarness({
+      sessionCommands,
+      sessionSnapshot: {
+        chapterIndex: 7,
+        mode: 'scroll',
+        pendingRestoreTarget: null,
+      },
+      runtime: {
+        getCurrentOriginalLocatorRef: {
+          current: () => scrollLocator,
+        },
+        pagedStateRef: {
+          current: { pageCount: 8, pageIndex: 2 },
+        },
+        resolvePagedLocatorPageIndexRef: {
+          current: () => 2,
+        },
+      },
+    });
+    let hookProps = initialHookProps;
+    const { result, rerender } = renderHook(
+      (props: Parameters<typeof useReaderRestoreFlow>[0]) => useReaderRestoreFlow(props),
+      {
+        initialProps: hookProps,
+        wrapper: runtime.Wrapper,
+      },
+    );
+
+    let switchModePromise: Promise<void> | null = null;
+    await act(async () => {
+      switchModePromise = result.current.switchMode('paged');
+      await Promise.resolve();
+    });
+    act(() => {
+      expect(result.current.handleRestoreSettled('completed')).toBe(false);
+    });
+    await expect(switchModePromise).resolves.toBeUndefined();
+
+    latestReaderStateRef.current = createStoredState({
+      canonical: pagedLocator,
+      hints: {
+        contentMode: 'paged',
+        pageIndex: 2,
+        viewMode: 'original',
+      },
+    });
+    runtime.getCurrentPagedLocatorRef.current = () => pagedLocator;
+    hookProps = {
+      ...hookProps,
+      sessionSnapshot: {
+        ...hookProps.sessionSnapshot,
+        chapterIndex: 7,
+        mode: 'paged',
+        pendingRestoreTarget: null,
+      },
+    };
+    rerender(hookProps);
+
+    await act(async () => {
+      switchModePromise = result.current.switchMode('scroll');
+      await Promise.resolve();
+    });
+
+    expect(result.current.pendingRestoreTargetRef.current).toMatchObject({
+      chapterIndex: 7,
+      chapterProgress: 0.42,
+      locator: expect.objectContaining({
+        blockIndex: 18,
+        chapterIndex: 7,
+        lineIndex: 1,
+      }),
+      mode: 'scroll',
+    });
+    expect(result.current.pendingRestoreTargetRef.current?.locator?.pageIndex).toBeUndefined();
+
+    act(() => {
+      expect(result.current.handleRestoreSettled('completed')).toBe(false);
+    });
+    await expect(switchModePromise).resolves.toBeUndefined();
+  });
+
+  it('uses the current paged target when returning after paging forward', async () => {
+    vi.spyOn(readerSessionStore, 'flushPersistence').mockResolvedValue(undefined);
+    vi.spyOn(readerSessionStore, 'getReaderSessionSnapshot').mockImplementation(() => {
+      return createSessionStoreSnapshotMock({
+        lastPersistenceFailure: null,
+        persistenceStatus: 'healthy',
+      });
+    });
+
+    const scrollLocator = createLocator({
+      blockIndex: 18,
+      chapterIndex: 7,
+      lineIndex: 1,
+    });
+    const advancedPagedLocator = createLocator({
+      blockIndex: 44,
+      chapterIndex: 7,
+      lineIndex: 0,
+      pageIndex: 5,
+    });
+    const latestReaderStateRef = {
+      current: createStoredState({
+        canonical: scrollLocator,
+        hints: {
+          chapterProgress: 0.42,
+          contentMode: 'scroll',
+          viewMode: 'original',
+        },
+      }),
+    };
+    const sessionCommands = {
+      latestReaderStateRef,
+      markUserInteracted: vi.fn(),
+      persistReaderState: vi.fn(),
+      setChapterIndex: vi.fn(),
+      setMode: vi.fn(),
+    };
+    const { hookProps: initialHookProps, runtime } = createHookHarness({
+      sessionCommands,
+      sessionSnapshot: {
+        chapterIndex: 7,
+        mode: 'scroll',
+        pendingRestoreTarget: null,
+      },
+      runtime: {
+        getCurrentOriginalLocatorRef: {
+          current: () => scrollLocator,
+        },
+        pagedStateRef: {
+          current: { pageCount: 8, pageIndex: 2 },
+        },
+        resolvePagedLocatorPageIndexRef: {
+          current: () => 2,
+        },
+      },
+    });
+    let hookProps = initialHookProps;
+    const { result, rerender } = renderHook(
+      (props: Parameters<typeof useReaderRestoreFlow>[0]) => useReaderRestoreFlow(props),
+      {
+        initialProps: hookProps,
+        wrapper: runtime.Wrapper,
+      },
+    );
+
+    let switchModePromise: Promise<void> | null = null;
+    await act(async () => {
+      switchModePromise = result.current.switchMode('paged');
+      await Promise.resolve();
+    });
+    act(() => {
+      expect(result.current.handleRestoreSettled('completed')).toBe(false);
+    });
+    await expect(switchModePromise).resolves.toBeUndefined();
+
+    latestReaderStateRef.current = createStoredState({
+      canonical: advancedPagedLocator,
+      hints: {
+        contentMode: 'paged',
+        pageIndex: 5,
+        viewMode: 'original',
+      },
+    });
+    runtime.getCurrentPagedLocatorRef.current = () => advancedPagedLocator;
+    runtime.pagedStateRef.current = { pageCount: 8, pageIndex: 5 };
+    hookProps = {
+      ...hookProps,
+      sessionSnapshot: {
+        ...hookProps.sessionSnapshot,
+        chapterIndex: 7,
+        mode: 'paged',
+        pendingRestoreTarget: null,
+      },
+    };
+    rerender(hookProps);
+
+    await act(async () => {
+      switchModePromise = result.current.switchMode('scroll');
+      await Promise.resolve();
+    });
+
+    expect(result.current.pendingRestoreTargetRef.current).toMatchObject({
+      chapterIndex: 7,
+      locator: expect.objectContaining({
+        blockIndex: 44,
+        chapterIndex: 7,
+        pageIndex: 5,
+      }),
+      mode: 'scroll',
+    });
+    expect(result.current.pendingRestoreTargetRef.current?.chapterProgress).toBeUndefined();
+
+    act(() => {
+      expect(result.current.handleRestoreSettled('completed')).toBe(false);
+    });
+    await expect(switchModePromise).resolves.toBeUndefined();
+  });
+
   it('enters restoring-position immediately for strict content-mode switches', async () => {
     vi.spyOn(readerSessionStore, 'flushPersistence').mockResolvedValue(undefined);
     vi.spyOn(readerSessionStore, 'getReaderSessionSnapshot').mockImplementation(() => {

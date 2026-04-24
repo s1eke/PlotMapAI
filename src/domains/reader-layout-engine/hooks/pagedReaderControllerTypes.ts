@@ -33,7 +33,7 @@ export interface UsePagedReaderControllerParams {
   chapters: Chapter[];
   currentChapter: ChapterContent | null;
   chapterDataRevision: number;
-  sessionSnapshot: Pick<ReaderSessionSnapshot, 'chapterIndex'>;
+  sessionSnapshot: Pick<ReaderSessionSnapshot, 'chapterIndex' | 'locator'>;
   sessionCommands: Pick<
     ReaderSessionCommands,
     'hasUserInteractedRef' | 'persistReaderState' | 'setChapterIndex'
