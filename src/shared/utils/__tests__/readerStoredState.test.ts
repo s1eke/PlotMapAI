@@ -3,9 +3,14 @@ import { describe, expect, it } from 'vitest';
 import {
   buildStoredReaderState,
   createCanonicalPositionFingerprint,
+  getReaderRestoreTargetBoundary,
+  getReaderRestoreTargetLocator,
   isReaderProjectionFreshForCanonical,
   mergeStoredReaderState,
+  sanitizeCanonicalPositionV2,
   toCanonicalPositionFromLocator,
+  toCanonicalPositionV2FromCanonical,
+  toReaderLocatorFromCanonicalV2,
   toReaderLocatorFromCanonical,
 } from '../readerStoredState';
 
@@ -56,6 +61,69 @@ describe('readerStoredState canonical metadata', () => {
         exact: 'quoted text',
       },
     });
+  });
+
+  it('normalizes legacy canonical positions into CanonicalPositionV2', () => {
+    const position = toCanonicalPositionV2FromCanonical({
+      chapterIndex: 2,
+      chapterKey: 'epub:item:chapter.xhtml',
+      blockIndex: 5,
+      blockKey: 'text:5:hash',
+      kind: 'text',
+      lineIndex: 1,
+      textQuote: {
+        exact: 'quoted text',
+      },
+      contentHash: 'content-hash',
+    });
+
+    expect(position).toEqual({
+      type: 'block-anchor',
+      chapterIndex: 2,
+      chapterKey: 'epub:item:chapter.xhtml',
+      blockIndex: 5,
+      blockKey: 'text:5:hash',
+      kind: 'text',
+      lineIndex: 1,
+      textQuote: {
+        exact: 'quoted text',
+      },
+      contentHash: 'content-hash',
+    });
+    expect(toReaderLocatorFromCanonicalV2(position, 3)).toMatchObject({
+      chapterIndex: 2,
+      blockIndex: 5,
+      kind: 'text',
+      pageIndex: 3,
+    });
+  });
+
+  it('sanitizes V2 chapter boundary positions and exposes target accessors', () => {
+    const position = sanitizeCanonicalPositionV2({
+      type: 'chapter-boundary',
+      chapterIndex: 4,
+      chapterKey: 'txt:4:title:prefix',
+      edge: 'end',
+      contentVersion: 2,
+    });
+
+    expect(position).toEqual({
+      type: 'chapter-boundary',
+      chapterIndex: 4,
+      chapterKey: 'txt:4:title:prefix',
+      edge: 'end',
+      contentVersion: 2,
+    });
+    expect(getReaderRestoreTargetBoundary({
+      chapterIndex: 4,
+      mode: 'scroll',
+      position,
+    })).toBe('end');
+    expect(getReaderRestoreTargetLocator({
+      chapterIndex: 4,
+      mode: 'scroll',
+      position,
+    })).toBeUndefined();
   });
 
   it('keeps legacy hints while preserving projection metadata', () => {

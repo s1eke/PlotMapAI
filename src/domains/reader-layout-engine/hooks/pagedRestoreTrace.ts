@@ -7,6 +7,10 @@ import type { PaginatedChapterLayout } from '../layout-core/internal';
 
 import { resolvePagedTargetPage } from '@shared/utils/readerPosition';
 import {
+  getReaderRestoreTargetBoundary,
+  getReaderRestoreTargetLocator,
+} from '@shared/utils/readerStoredState';
+import {
   findPageIndexForLocator,
   getChapterBoundaryLocator,
 } from '../layout-core/internal';
@@ -26,31 +30,33 @@ export function resolveTracePagedRestoreTargetPage(params: {
     pendingRestoreTarget,
   } = params;
   let resolvedTargetPage: number | null = null;
+  const targetLocator = getReaderRestoreTargetLocator(pendingRestoreTarget);
+  const targetBoundary = getReaderRestoreTargetBoundary(pendingRestoreTarget);
 
-  if (pendingRestoreTarget.locator) {
+  if (targetLocator) {
     resolvedTargetPage = currentPagedLayout
-      ? findPageIndexForLocator(currentPagedLayout, pendingRestoreTarget.locator)
+      ? findPageIndexForLocator(currentPagedLayout, targetLocator)
       : null;
 
     if (
       resolvedTargetPage === null
-      && typeof pendingRestoreTarget.locator.pageIndex === 'number'
+      && typeof targetLocator.pageIndex === 'number'
     ) {
       resolvedTargetPage = Math.max(
         0,
-        Math.min(nextPageCount - 1, pendingRestoreTarget.locator.pageIndex),
+        Math.min(nextPageCount - 1, targetLocator.pageIndex),
       );
     }
   }
 
-  if (resolvedTargetPage === null && pendingRestoreTarget.locatorBoundary !== undefined) {
+  if (resolvedTargetPage === null && targetBoundary !== undefined) {
     if (!currentPagedLayout) {
       return null;
     }
 
     const boundaryLocator = getChapterBoundaryLocator(
       currentPagedLayout,
-      pendingRestoreTarget.locatorBoundary,
+      targetBoundary,
     );
     if (!boundaryLocator) {
       return null;
@@ -74,7 +80,8 @@ export function canAttemptPagedRestoreWithoutViewportMeasurement(
   pendingRestoreTarget: ReaderRestoreTarget,
   nextPageCount?: number,
 ): boolean {
-  const targetPageIndex = pendingRestoreTarget.locator?.pageIndex;
+  const targetLocator = getReaderRestoreTargetLocator(pendingRestoreTarget);
+  const targetPageIndex = targetLocator?.pageIndex;
   if (typeof targetPageIndex !== 'number') {
     return false;
   }

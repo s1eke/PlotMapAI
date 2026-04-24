@@ -62,6 +62,36 @@ export interface CanonicalPosition {
   contentHash?: string;
 }
 
+export type CanonicalPositionV2 =
+  | {
+    type: 'chapter-boundary';
+    chapterIndex: number;
+    chapterKey?: string;
+    edge: PageTarget;
+    contentVersion?: number;
+    importFormatVersion?: number;
+    contentHash?: string;
+  }
+  | {
+    type: 'block-anchor';
+    chapterIndex: number;
+    chapterKey?: string;
+    blockIndex?: number;
+    blockKey?: string;
+    anchorId?: string;
+    imageKey?: string;
+    kind: ReaderLocator['kind'];
+    lineIndex?: number;
+    startCursor?: ReaderLocator['startCursor'];
+    endCursor?: ReaderLocator['endCursor'];
+    edge?: ReaderLocator['edge'];
+    textQuote?: ReaderLocator['textQuote'];
+    blockTextHash?: string;
+    contentVersion?: number;
+    importFormatVersion?: number;
+    contentHash?: string;
+  };
+
 export interface ReaderProjectionMetadata {
   basisCanonicalFingerprint?: string;
   capturedAt?: string;
@@ -87,6 +117,7 @@ export interface ReaderPositionMetadata {
 
 export interface StoredReaderState {
   canonical?: CanonicalPosition;
+  canonicalV2?: CanonicalPositionV2;
   hints?: ReaderStateHints;
   metadata?: ReaderPositionMetadata;
 }
@@ -100,6 +131,7 @@ export interface PersistedReadingProgress {
 export interface ReaderRestoreTarget {
   chapterIndex: number;
   mode: ReaderMode;
+  position?: CanonicalPositionV2;
   locatorBoundary?: ReaderLocatorBoundary;
   chapterProgress?: number;
   locator?: ReaderLocator;

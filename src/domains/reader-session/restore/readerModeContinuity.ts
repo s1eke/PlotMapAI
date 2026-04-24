@@ -3,6 +3,10 @@ import type {
   ReaderRestoreTarget,
   StoredReaderState,
 } from '@shared/contracts/reader';
+import {
+  getReaderRestoreTargetChapterIndex,
+  getReaderRestoreTargetLocator,
+} from '@shared/utils/readerStoredState';
 
 export interface ScrollPagedContinuitySnapshot {
   chapterIndex: number;
@@ -13,6 +17,9 @@ export interface ScrollPagedContinuitySnapshot {
 export function cloneReaderRestoreTarget(target: ReaderRestoreTarget): ReaderRestoreTarget {
   return {
     ...target,
+    position: target.position
+      ? { ...target.position }
+      : undefined,
     locator: target.locator
       ? {
         ...target.locator,
@@ -32,7 +39,8 @@ export function createScrollPagedContinuitySnapshot(params: {
   sourceTarget: ReaderRestoreTarget;
 }): ScrollPagedContinuitySnapshot {
   return {
-    chapterIndex: params.sourceTarget.chapterIndex,
+    chapterIndex: getReaderRestoreTargetChapterIndex(params.sourceTarget)
+      ?? params.sourceTarget.chapterIndex,
     pagedPageIndex: params.pagedPageIndex,
     scrollTarget: cloneReaderRestoreTarget(params.sourceTarget),
   };
@@ -43,11 +51,13 @@ export function resolveScrollContinuityTarget(params: {
   sourceTarget: ReaderRestoreTarget;
 }): ReaderRestoreTarget | null {
   const { continuitySnapshot, sourceTarget } = params;
-  const sourcePageIndex = sourceTarget.locator?.pageIndex;
+  const sourcePageIndex = getReaderRestoreTargetLocator(sourceTarget)?.pageIndex;
+  const sourceChapterIndex = getReaderRestoreTargetChapterIndex(sourceTarget)
+    ?? sourceTarget.chapterIndex;
   if (
     !continuitySnapshot
     || typeof sourcePageIndex !== 'number'
-    || continuitySnapshot.chapterIndex !== sourceTarget.chapterIndex
+    || continuitySnapshot.chapterIndex !== sourceChapterIndex
     || continuitySnapshot.pagedPageIndex !== sourcePageIndex
   ) {
     return null;

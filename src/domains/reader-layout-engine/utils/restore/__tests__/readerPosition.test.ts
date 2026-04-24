@@ -182,6 +182,11 @@ describe('readerPosition', () => {
     })).toEqual({
       chapterIndex: 2,
       mode: 'scroll',
+      position: {
+        type: 'chapter-boundary',
+        chapterIndex: 2,
+        edge: 'start',
+      },
       locatorBoundary: 'start',
       locator: undefined,
     });
@@ -193,6 +198,11 @@ describe('readerPosition', () => {
       chapterIndex: 2,
       chapterProgress: 0,
       mode: 'scroll',
+      position: {
+        type: 'chapter-boundary',
+        chapterIndex: 2,
+        edge: 'start',
+      },
       locatorBoundary: 'start',
       locator: undefined,
     });
@@ -204,6 +214,11 @@ describe('readerPosition', () => {
       chapterIndex: 2,
       chapterProgress: 0.4,
       mode: 'scroll',
+      position: {
+        type: 'chapter-boundary',
+        chapterIndex: 2,
+        edge: 'start',
+      },
       locatorBoundary: 'start',
       locator: undefined,
     });
@@ -215,6 +230,11 @@ describe('readerPosition', () => {
       chapterIndex: 2,
       chapterProgress: 1,
       mode: 'paged',
+      position: {
+        type: 'chapter-boundary',
+        chapterIndex: 2,
+        edge: 'start',
+      },
       locatorBoundary: 'start',
       locator: undefined,
     });
@@ -226,6 +246,11 @@ describe('readerPosition', () => {
       chapterIndex: 2,
       mode: 'summary',
       chapterProgress: 1,
+      position: {
+        type: 'chapter-boundary',
+        chapterIndex: 2,
+        edge: 'start',
+      },
       locatorBoundary: 'start',
       locator: undefined,
     });
@@ -238,6 +263,11 @@ describe('readerPosition', () => {
     }, 'scroll')).toEqual({
       chapterIndex: 3,
       mode: 'scroll',
+      position: {
+        type: 'chapter-boundary',
+        chapterIndex: 3,
+        edge: 'start',
+      },
       locatorBoundary: 'start',
       locator: undefined,
     });
@@ -248,6 +278,11 @@ describe('readerPosition', () => {
     }, 'paged')).toEqual({
       chapterIndex: 3,
       mode: 'paged',
+      position: {
+        type: 'chapter-boundary',
+        chapterIndex: 3,
+        edge: 'end',
+      },
       locatorBoundary: 'end',
       locator: undefined,
     });

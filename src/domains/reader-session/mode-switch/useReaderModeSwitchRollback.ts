@@ -32,6 +32,9 @@ interface UseReaderModeSwitchRollbackParams {
 function cloneReaderRestoreTarget(target: ReaderRestoreTarget): ReaderRestoreTarget {
   return {
     ...target,
+    position: target.position
+      ? { ...target.position }
+      : undefined,
     locator: target.locator
       ? {
         ...target.locator,

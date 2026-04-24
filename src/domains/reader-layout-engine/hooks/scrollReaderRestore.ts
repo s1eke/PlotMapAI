@@ -20,7 +20,12 @@ import {
   restoreStepSuccess,
   runRestoreSolver,
 } from '@shared/utils/readerRestoreSolver';
-import { toCanonicalPositionFromLocator } from '@shared/utils/readerStoredState';
+import {
+  getReaderRestoreTargetBoundary,
+  getReaderRestoreTargetChapterIndex,
+  getReaderRestoreTargetLocator,
+  toCanonicalPositionFromLocator,
+} from '@shared/utils/readerStoredState';
 import {
   areRestoreLocatorsEquivalent,
   areRestoreLocatorsInSameBlock,
@@ -104,8 +109,7 @@ export function useScrollReaderRestore(params: UseScrollReaderRestoreParams): vo
       const container = viewportContentRef.current;
       const restoredChapterIndex =
         resolvedLocator?.chapterIndex
-        ?? activeTarget?.locator?.chapterIndex
-        ?? activeTarget?.chapterIndex
+        ?? getReaderRestoreTargetChapterIndex(activeTarget)
         ?? chapterIndex;
       const restoredChapterElement = scrollChapterElementsRef.current.get(restoredChapterIndex)
         ?? null;
@@ -130,10 +134,10 @@ export function useScrollReaderRestore(params: UseScrollReaderRestoreParams): vo
       };
       if (resolvedLocator) {
         restoredState.canonical = toCanonicalPositionFromLocator(resolvedLocator);
-      } else if (activeTarget?.locatorBoundary) {
+      } else if (getReaderRestoreTargetBoundary(activeTarget)) {
         restoredState.canonical = {
           chapterIndex: restoredChapterIndex,
-          edge: activeTarget.locatorBoundary,
+          edge: getReaderRestoreTargetBoundary(activeTarget),
         };
       }
       persistReaderState(restoredState);
@@ -220,13 +224,14 @@ export function useScrollReaderRestore(params: UseScrollReaderRestoreParams): vo
 
       const currentLocator = layoutQueries.getCurrentOriginalLocator();
       const container = viewportContentRef.current;
-      const hasPagedLocatorTarget = typeof activeTarget?.locator?.pageIndex === 'number';
+      const activeTargetLocator = getReaderRestoreTargetLocator(activeTarget);
+      const hasPagedLocatorTarget = typeof activeTargetLocator?.pageIndex === 'number';
       const shouldPreferProgressStability = Boolean(
         activeTarget
         && !hasPagedLocatorTarget
         && typeof activeTarget.chapterProgress === 'number',
       );
-      const targetChapterIndex = activeTarget?.locator?.chapterIndex ?? activeTarget?.chapterIndex;
+      const targetChapterIndex = getReaderRestoreTargetChapterIndex(activeTarget);
       const targetElement = targetChapterIndex === undefined
         ? null
         : scrollChapterElementsRef.current.get(targetChapterIndex) ?? null;

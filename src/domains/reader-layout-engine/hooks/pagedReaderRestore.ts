@@ -6,6 +6,10 @@ import {
   resolvePagedTargetPage,
 } from '@shared/utils/readerPosition';
 import {
+  getReaderRestoreTargetBoundary,
+  getReaderRestoreTargetLocator,
+} from '@shared/utils/readerStoredState';
+import {
   restoreStepFailure,
   restoreStepPending,
   restoreStepSuccess,
@@ -127,13 +131,15 @@ export function attemptPagedRestore({
       nextPageCount: totalPages,
     }) => {
       let resolvedTargetPage: number | null = null;
-      if (target.locator) {
+      const targetLocator = getReaderRestoreTargetLocator(target);
+      const targetBoundary = getReaderRestoreTargetBoundary(target);
+      if (targetLocator) {
         const resolvedLocatorPageIndex = layout
-          ? findPageIndexForLocator(layout, target.locator)
+          ? findPageIndexForLocator(layout, targetLocator)
           : null;
         resolvedTargetPage = resolvePagedRestoreTargetPageIndex({
           chapterProgress: target.chapterProgress,
-          locatorPageIndex: target.locator.pageIndex,
+          locatorPageIndex: targetLocator.pageIndex,
           resolvedLocatorPageIndex,
           totalPages,
         });
@@ -141,13 +147,13 @@ export function attemptPagedRestore({
           return restoreStepPending('layout_missing');
         }
       }
-      if (resolvedTargetPage === null && target.locatorBoundary !== undefined) {
+      if (resolvedTargetPage === null && targetBoundary !== undefined) {
         if (!layout) {
           return restoreStepPending('layout_missing');
         }
         const boundaryLocator = getChapterBoundaryLocator(
           layout,
-          target.locatorBoundary,
+          targetBoundary,
         );
         if (!boundaryLocator) {
           return restoreStepFailure('target_unresolvable', {

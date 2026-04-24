@@ -9,10 +9,12 @@ import { clampProgress, getContainerProgress } from '@shared/utils/readerPositio
 
 import {
   buildStoredReaderState,
+  getReaderRestoreTargetChapterIndex,
   getStoredChapterIndex,
   isReaderProjectionFreshForCanonical,
   mergeStoredReaderState,
   toCanonicalPositionFromLocator,
+  toCanonicalPositionV2FromCanonical,
   toReaderLocatorFromCanonical,
 } from '@shared/utils/readerStoredState';
 
@@ -83,6 +85,7 @@ export function toRestoreTargetFromState(params: {
   const target: ReaderRestoreTarget = {
     chapterIndex: getStoredChapterIndex(normalizedState) || params.chapterIndex,
     mode: params.mode,
+    position: toCanonicalPositionV2FromCanonical(normalizedState.canonical),
     locator,
     locatorBoundary: !locator && hasCanonicalBoundary ? canonicalEdge : undefined,
   };
@@ -225,7 +228,9 @@ export function solveModeRestoreTarget(params: {
   targetMode: ReaderMode;
 }): ReaderRestoreTarget {
   const currentChapterIndex =
-    params.currentReaderState.canonical?.chapterIndex ?? params.chapterIndex;
+    params.currentReaderState.canonicalV2?.chapterIndex
+    ?? params.currentReaderState.canonical?.chapterIndex
+    ?? params.chapterIndex;
 
   if (params.targetMode === 'summary') {
     return {
@@ -233,6 +238,11 @@ export function solveModeRestoreTarget(params: {
       chapterProgress: 0,
       locatorBoundary: undefined,
       locator: undefined,
+      position: {
+        type: 'chapter-boundary',
+        chapterIndex: params.baseTarget.chapterIndex,
+        edge: 'start',
+      },
     };
   }
 
@@ -242,7 +252,9 @@ export function solveModeRestoreTarget(params: {
 
   const matchingSnapshot = params.modeSnapshots[params.targetMode];
   const canReuseSnapshot =
-    matchingSnapshot && matchingSnapshot.chapterIndex === currentChapterIndex;
+    matchingSnapshot
+    && (getReaderRestoreTargetChapterIndex(matchingSnapshot) ?? matchingSnapshot.chapterIndex)
+      === currentChapterIndex;
   if (canReuseSnapshot) {
     return {
       ...params.baseTarget,
@@ -254,6 +266,11 @@ export function solveModeRestoreTarget(params: {
   return {
     chapterIndex: currentChapterIndex || params.chapterIndex,
     mode: params.targetMode,
+    position: {
+      type: 'chapter-boundary',
+      chapterIndex: currentChapterIndex || params.chapterIndex,
+      edge: 'start',
+    },
     locatorBoundary: 'start',
   };
 }

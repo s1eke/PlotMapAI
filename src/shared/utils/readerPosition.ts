@@ -8,9 +8,14 @@ import type {
 } from '@shared/contracts/reader';
 import {
   buildStoredReaderState,
+  getReaderRestoreTargetBoundary,
+  getReaderRestoreTargetLocator,
+  getReaderRestoreTargetPosition,
   getStoredChapterIndex,
   isReaderProjectionFreshForCanonical,
   toCanonicalPositionFromLocator,
+  toCanonicalPositionV2FromCanonical,
+  toCanonicalPositionV2FromLocator,
   toReaderLocatorFromCanonical,
 } from './readerStoredState';
 import { resolvePersistedReaderMode } from './readerMode';
@@ -173,8 +178,9 @@ export function hasReaderRestoreTarget(
     && typeof target.chapterProgress === 'number'
     && target.chapterProgress > 0;
 
-  return target.locator !== undefined
-    || target.locatorBoundary !== undefined
+  return getReaderRestoreTargetPosition(target) !== undefined
+    || getReaderRestoreTargetLocator(target) !== undefined
+    || getReaderRestoreTargetBoundary(target) !== undefined
     || usesSummaryProgress
     || usesContentProgress;
 }
@@ -192,8 +198,9 @@ export function shouldKeepReaderRestoreMask(
     && typeof target.chapterProgress === 'number'
     && target.chapterProgress > 0;
 
-  return target.locator !== undefined
-    || target.locatorBoundary !== undefined
+  return getReaderRestoreTargetPosition(target) !== undefined
+    || getReaderRestoreTargetLocator(target) !== undefined
+    || getReaderRestoreTargetBoundary(target) !== undefined
     || usesSummaryProgress
     || usesContentProgress;
 }
@@ -235,6 +242,7 @@ export function createRestoreTargetFromPersistedState(
   const target: ReaderRestoreTarget = {
     chapterIndex: getStoredChapterIndex(normalizedState),
     mode: targetMode,
+    position: toCanonicalPositionV2FromCanonical(normalizedState.canonical),
     locator,
     locatorBoundary,
   };
@@ -263,6 +271,13 @@ export function createRestoreTargetFromNavigationIntent(
   return {
     chapterIndex: intent.locator?.chapterIndex ?? intent.chapterIndex,
     mode,
+    position: intent.locator
+      ? toCanonicalPositionV2FromLocator(intent.locator)
+      : {
+        type: 'chapter-boundary',
+        chapterIndex: intent.chapterIndex,
+        edge: locatorBoundary,
+      },
     locatorBoundary: intent.locator ? undefined : locatorBoundary,
     locator: intent.locator,
   };

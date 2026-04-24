@@ -14,6 +14,7 @@ import {
 
 import {
   createCanonicalPositionFingerprint,
+  getReaderRestoreTargetLocator,
   mergeStoredReaderState,
   toCanonicalPositionFromLocator,
 } from '@shared/utils/readerStoredState';
@@ -188,7 +189,8 @@ export function verifyStrictModeRestoreCompletion(params: {
   targetRestoreTarget: ReaderRestoreTarget;
 }) {
   const { targetRestoreTarget } = params;
-  if (!targetRestoreTarget.locator) {
+  const targetLocator = getReaderRestoreTargetLocator(targetRestoreTarget);
+  if (!targetLocator) {
     return {
       message: 'strict_target_locator_missing',
       restoreResult: buildStrictModeRestoreFailureResult({
@@ -202,8 +204,8 @@ export function verifyStrictModeRestoreCompletion(params: {
   if (params.targetMode === 'paged') {
     const expectedPageIndex = resolvePagedRestoreTargetPageIndex({
       chapterProgress: targetRestoreTarget.chapterProgress,
-      locatorPageIndex: targetRestoreTarget.locator.pageIndex,
-      resolvedLocatorPageIndex: params.resolvePagedLocatorPageIndex(targetRestoreTarget.locator),
+      locatorPageIndex: targetLocator.pageIndex,
+      resolvedLocatorPageIndex: params.resolvePagedLocatorPageIndex(targetLocator),
       totalPages: params.currentPageCount,
     });
     if (expectedPageIndex === null) {
@@ -220,7 +222,7 @@ export function verifyStrictModeRestoreCompletion(params: {
     if (
       areStrictModeLocatorsEquivalent(
         params.currentOriginalLocator,
-        targetRestoreTarget.locator,
+        targetLocator,
       )
     ) {
       return null;
@@ -258,7 +260,7 @@ export function verifyStrictModeRestoreCompletion(params: {
     };
   }
 
-  const resolvedOffset = params.resolveScrollLocatorOffset(targetRestoreTarget.locator);
+  const resolvedOffset = params.resolveScrollLocatorOffset(targetLocator);
   if (resolvedOffset === null) {
     return {
       message: 'strict_scroll_target_unresolvable',
@@ -270,7 +272,7 @@ export function verifyStrictModeRestoreCompletion(params: {
     };
   }
 
-  if (areStrictModeLocatorsEquivalent(params.currentOriginalLocator, targetRestoreTarget.locator)) {
+  if (areStrictModeLocatorsEquivalent(params.currentOriginalLocator, targetLocator)) {
     return null;
   }
 

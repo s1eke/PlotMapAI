@@ -15,6 +15,7 @@ import {
   debugLog,
   setDebugSnapshot,
 } from '@shared/debug';
+import { getReaderRestoreTargetPosition } from '@shared/utils/readerStoredState';
 
 import * as readerSessionStore from '../store/readerSessionStore';
 
@@ -51,6 +52,9 @@ interface StrictModeSwitchFailureParams {
 function cloneReaderRestoreTarget(target: ReaderRestoreTarget): ReaderRestoreTarget {
   return {
     ...target,
+    position: target.position
+      ? { ...target.position }
+      : undefined,
     locator: target.locator
       ? {
         ...target.locator,
@@ -73,10 +77,14 @@ function areReaderRestoreTargetsEqual(
     return left === right;
   }
 
+  const leftPosition = getReaderRestoreTargetPosition(left);
+  const rightPosition = getReaderRestoreTargetPosition(right);
+
   return left.chapterIndex === right.chapterIndex
     && left.mode === right.mode
     && left.locatorBoundary === right.locatorBoundary
     && left.chapterProgress === right.chapterProgress
+    && JSON.stringify(leftPosition ?? null) === JSON.stringify(rightPosition ?? null)
     && left.locator?.chapterIndex === right.locator?.chapterIndex
     && left.locator?.blockIndex === right.locator?.blockIndex
     && left.locator?.kind === right.locator?.kind

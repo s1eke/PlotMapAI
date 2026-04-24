@@ -20,6 +20,10 @@ import {
   resolvePagedTargetPage,
   SCROLL_READING_ANCHOR_RATIO,
 } from '@shared/utils/readerPosition';
+import {
+  getReaderRestoreTargetBoundary,
+  getReaderRestoreTargetLocator,
+} from '@shared/utils/readerStoredState';
 type ReaderPagedLayout = PaginatedChapterLayout;
 type ReaderScrollLayout = MeasuredChapterLayout;
 
@@ -450,19 +454,19 @@ export function resolvePagedViewportState(params: {
     targetPage: number;
   } {
   const pageCount = Math.max(1, params.currentPagedLayout.pageSlices.length);
-  const restoredLocator = params.pendingRestoreTarget?.locator
+  const restoredLocator = getReaderRestoreTargetLocator(params.pendingRestoreTarget)
     ?? (
-      params.pendingRestoreTarget?.locatorBoundary !== undefined
+      getReaderRestoreTargetBoundary(params.pendingRestoreTarget) !== undefined
         ? getChapterBoundaryLocator(
           params.currentPagedLayout,
-          params.pendingRestoreTarget.locatorBoundary,
+          getReaderRestoreTargetBoundary(params.pendingRestoreTarget) ?? 'start',
         )
         : null
     );
   const restoredPageIndex = restoredLocator
     ? findPageIndexForLocator(params.currentPagedLayout, restoredLocator)
     : null;
-  const locatorPageIndex = params.pendingRestoreTarget?.locator?.pageIndex;
+  const locatorPageIndex = getReaderRestoreTargetLocator(params.pendingRestoreTarget)?.pageIndex;
   let targetPage = resolvePagedTargetPage(params.pendingPageTarget, params.pageIndex, pageCount);
   if (restoredPageIndex !== null) {
     targetPage = restoredPageIndex;

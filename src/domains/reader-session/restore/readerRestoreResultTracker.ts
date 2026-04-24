@@ -11,6 +11,9 @@ const MAX_AUTO_RESTORE_RETRIES = 2;
 function cloneRestoreTarget(target: ReaderRestoreTarget): ReaderRestoreTarget {
   return {
     ...target,
+    position: target.position
+      ? { ...target.position }
+      : undefined,
     locator: target.locator
       ? {
         ...target.locator,
@@ -27,6 +30,7 @@ function cloneRestoreTarget(target: ReaderRestoreTarget): ReaderRestoreTarget {
 
 function buildRestoreAttemptKey(target: ReaderRestoreTarget): string {
   const { locator } = target;
+  const positionKey = target.position ? JSON.stringify(target.position) : '';
   const locatorKey = locator
     ? [
       locator.chapterIndex,
@@ -43,6 +47,7 @@ function buildRestoreAttemptKey(target: ReaderRestoreTarget): string {
     target.chapterIndex,
     target.locatorBoundary ?? '',
     target.chapterProgress ?? '',
+    positionKey,
     locatorKey,
   ].join('|');
 }

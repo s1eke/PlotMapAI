@@ -15,6 +15,11 @@ import {
   SCROLL_READING_ANCHOR_RATIO,
 } from '@shared/utils/readerPosition';
 import {
+  getReaderRestoreTargetBoundary,
+  getReaderRestoreTargetChapterIndex,
+  getReaderRestoreTargetLocator,
+} from '@shared/utils/readerStoredState';
+import {
   restoreStepFailure,
   restoreStepPending,
   restoreStepSuccess,
@@ -101,7 +106,7 @@ export function ensureScrollRestoreWindow(params: {
   target: ReaderRestoreTarget;
 }): void {
   const { chaptersLength, setScrollModeChapters, target } = params;
-  const targetChapterIndex = target.locator?.chapterIndex ?? target.chapterIndex;
+  const targetChapterIndex = getReaderRestoreTargetChapterIndex(target) ?? target.chapterIndex;
   if (targetChapterIndex < 0 || targetChapterIndex >= chaptersLength) {
     return;
   }
@@ -116,16 +121,19 @@ export function resolvePendingRestoreLocator(
   target: ReaderRestoreTarget,
   scrollLayouts: ReadonlyMap<number, ScrollReaderLayout>,
 ): ReaderLocator | null {
-  if (target.locator) {
-    return target.locator;
+  const targetLocator = getReaderRestoreTargetLocator(target);
+  if (targetLocator) {
+    return targetLocator;
   }
 
-  if (target.locatorBoundary === undefined) {
+  const targetBoundary = getReaderRestoreTargetBoundary(target);
+  if (targetBoundary === undefined) {
     return null;
   }
 
-  const chapterLayout = scrollLayouts.get(target.chapterIndex) ?? null;
-  return getChapterBoundaryLocator(chapterLayout, target.locatorBoundary);
+  const targetChapterIndex = getReaderRestoreTargetChapterIndex(target) ?? target.chapterIndex;
+  const chapterLayout = scrollLayouts.get(targetChapterIndex) ?? null;
+  return getChapterBoundaryLocator(chapterLayout, targetBoundary);
 }
 
 export function resolvePendingScrollTarget(params: {
@@ -146,7 +154,9 @@ export function resolvePendingScrollTarget(params: {
     scrollLayouts,
     target,
   } = params;
-  const targetChapterIndex = target.locator?.chapterIndex ?? target.chapterIndex;
+  const targetLocator = getReaderRestoreTargetLocator(target);
+  const targetBoundary = getReaderRestoreTargetBoundary(target);
+  const targetChapterIndex = getReaderRestoreTargetChapterIndex(target) ?? target.chapterIndex;
   const targetElement = scrollChapterElementsRef.current.get(targetChapterIndex) ?? null;
   const resolvedLocator = resolvePendingRestoreLocator(target, scrollLayouts);
   const containerMaxScrollTop = getContainerMaxScrollTop(container);
@@ -157,7 +167,7 @@ export function resolvePendingScrollTarget(params: {
   );
   const resolvePreferredScrollTop = (candidateScrollTop: number): number => {
     if (
-      typeof target.locator?.pageIndex === 'number'
+      typeof targetLocator?.pageIndex === 'number'
       && typeof target.chapterProgress !== 'number'
     ) {
       return candidateScrollTop;
@@ -189,9 +199,9 @@ export function resolvePendingScrollTarget(params: {
     scrollTop: number;
   }
 
-  if (target.locatorBoundary !== undefined && resolvedLocator === null) {
-    const hasResolvedBoundaryLayout = scrollLayouts.has(target.chapterIndex)
-      && scrollChapterBodyElementsRef.current.has(target.chapterIndex);
+  if (targetBoundary !== undefined && resolvedLocator === null) {
+    const hasResolvedBoundaryLayout = scrollLayouts.has(targetChapterIndex)
+      && scrollChapterBodyElementsRef.current.has(targetChapterIndex);
     if (!hasResolvedBoundaryLayout) {
       return restoreStepPending<ScrollRestoreStepValue>('layout_missing');
     }
@@ -211,7 +221,7 @@ export function resolvePendingScrollTarget(params: {
   }
 
   if (resolvedLocator) {
-    if (target.locatorBoundary === 'start' && targetElement) {
+    if (targetBoundary === 'start' && targetElement) {
       const resolvedScrollTop = clampContainerScrollTop(container, targetElement.offsetTop);
       return restoreStepSuccess<ScrollRestoreStepValue>({
         locator: resolvedLocator,

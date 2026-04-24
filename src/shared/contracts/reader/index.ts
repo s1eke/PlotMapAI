@@ -12,6 +12,7 @@ export type {
 } from './media';
 export type {
   CanonicalPosition,
+  CanonicalPositionV2,
   ChapterChangeSource,
   PageTarget,
   PersistedReadingProgress,
