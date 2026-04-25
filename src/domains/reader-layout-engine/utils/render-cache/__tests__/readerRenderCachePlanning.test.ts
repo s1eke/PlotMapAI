@@ -210,14 +210,29 @@ describe('readerRenderCachePlanning', () => {
         variantFamily: 'original-scroll',
       },
       {
+        chapterIndex: 0,
+        storageKind: 'manifest',
+        variantFamily: 'original-paged',
+      },
+      {
         chapterIndex: 2,
+        storageKind: 'manifest',
+        variantFamily: 'original-scroll',
+      },
+      {
+        chapterIndex: 2,
+        storageKind: 'manifest',
+        variantFamily: 'original-paged',
+      },
+      {
+        chapterIndex: 3,
         storageKind: 'manifest',
         variantFamily: 'original-scroll',
       },
       {
         chapterIndex: 3,
         storageKind: 'manifest',
-        variantFamily: 'original-scroll',
+        variantFamily: 'original-paged',
       },
     ]);
   });

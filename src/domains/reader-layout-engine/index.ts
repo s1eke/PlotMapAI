@@ -7,4 +7,4 @@ export type { UseScrollReaderControllerResult as UseScrollReaderViewportControll
 export { SummaryReaderContent } from './layout-core';
 export { resolveReaderContentRootProps } from './layout-core';
 export type { ReaderContentRootProps, ReaderContentRootTheme } from './layout-core';
-export { clearReaderRenderCacheMemoryForNovel, deletePersistedReaderRenderCache } from './render-cache';
+export { clearReaderRenderCacheMemoryForNovel, deletePersistedReaderPretextMetrics, deletePersistedReaderRenderCache } from './render-cache';

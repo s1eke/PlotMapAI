@@ -23,6 +23,7 @@ This file is generated from `scripts/architecture/contracts/table-ownership.json
 | `analysisOverviews` | `@domains/analysis` | analysis, application orchestration | `analysisService.getOverview/deleteArtifacts/*` |
 | `readerProgress` | `@domains/reader-session` | 阅读器会话新进度内核，schema 迁移，应用层编排 | `readReaderProgressSnapshot/replaceReaderProgressSnapshot/deleteReaderProgressSnapshot` |
 | `readerRenderCache` | `@domains/reader-layout-engine` | 阅读器排版引擎，应用层编排，调试面板诊断 | `排版缓存工具`, `deletePersistedReaderRenderCache` |
+| `readerPretextMetrics` | `@domains/reader-layout-engine` | 阅读器排版引擎，应用层编排 | `pretext metrics cache utilities`, `deletePersistedReaderPretextMetrics` |
 
 ## Data Model Notes
 

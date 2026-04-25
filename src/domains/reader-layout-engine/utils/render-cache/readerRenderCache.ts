@@ -9,6 +9,7 @@ import type {
 } from '../layout/readerLayout';
 
 import {
+  createChapterContentHash,
   buildStaticPagedChapterTree,
   buildStaticScrollChapterTree,
   buildStaticSummaryShellTree,
@@ -16,6 +17,12 @@ import {
   estimateReaderRenderQueryManifest,
 } from '../layout/readerLayout';
 import type { ReaderRenderCacheEntry, ReaderRenderCacheManifestEntry } from './readerRenderCacheCore';
+import {
+  createCachedPretextTextLayoutEngine,
+  createReaderTextMetricSignature,
+  loadPretextMetricsBundle,
+  persistPretextMetricsBundle,
+} from './readerPretextMetrics';
 
 export {
   buildReaderRenderCacheKey,
@@ -53,6 +60,20 @@ export {
   persistReaderRenderCacheEntry,
   primeReaderRenderCacheEntry,
 } from './readerRenderCacheStorage';
+export {
+  createCachedPretextTextLayoutEngine,
+  createReaderTextLineStatsKey,
+  createReaderTextMetricSignature,
+  deletePersistedReaderPretextMetrics,
+  loadPretextMetricsBundle,
+  persistPretextMetricsBundle,
+  READER_PRETEXT_METRICS_VERSION,
+  serializeReaderTextMetricSignature,
+} from './readerPretextMetrics';
+export type {
+  ReaderPretextMetricsBundle,
+  ReaderTextMetricSignature,
+} from './readerPretextMetrics';
 import {
   createReaderRenderCacheEntry,
   createReaderRenderCacheManifestEntry,
@@ -171,4 +192,48 @@ export function buildStaticRenderManifest(params: {
     }),
     variantFamily: params.variantFamily,
   });
+}
+
+export async function buildStaticRenderManifestWithPretextMetrics(params: {
+  chapter: ChapterContent;
+  imageDimensionsByKey: Map<string, ReaderImageDimensions | null | undefined>;
+  layoutKey?: string;
+  layoutSignature: ReaderLayoutSignature;
+  novelId: number;
+  preferRichScrollRendering?: boolean;
+  textLayoutEngine?: ReaderTextLayoutEngine;
+  typography: ReaderTypographyMetrics;
+  variantFamily: ReaderRenderVariant;
+}): Promise<ReaderRenderCacheManifestEntry> {
+  const contentHash = createChapterContentHash(params.chapter);
+  const signature = createReaderTextMetricSignature({
+    layoutSignature: params.layoutSignature,
+    typography: params.typography,
+  });
+  try {
+    const bundle = await loadPretextMetricsBundle({
+      chapterIndex: params.chapter.index,
+      contentFormat: params.chapter.contentFormat,
+      contentHash,
+      contentVersion: params.chapter.contentVersion,
+      novelId: params.novelId,
+      signature,
+    });
+    const cachedEngine = createCachedPretextTextLayoutEngine({
+      baseEngine: params.textLayoutEngine,
+      bundle,
+    });
+    const manifestEntry = buildStaticRenderManifest({
+      ...params,
+      textLayoutEngine: cachedEngine.textLayoutEngine,
+    });
+
+    if (cachedEngine.hasChanges()) {
+      await persistPretextMetricsBundle(cachedEngine.createBundle()).catch(() => undefined);
+    }
+
+    return manifestEntry;
+  } catch {
+    return buildStaticRenderManifest(params);
+  }
 }

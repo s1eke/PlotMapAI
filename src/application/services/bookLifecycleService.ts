@@ -13,6 +13,7 @@ import {
 } from '@domains/library';
 import {
   clearReaderRenderCacheMemoryForNovel,
+  deletePersistedReaderPretextMetrics,
   deletePersistedReaderRenderCache,
 } from '@domains/reader-layout-engine';
 import { clearReaderImageResourcesForNovel } from '@domains/reader-media';
@@ -41,6 +42,7 @@ async function clearPersistedReaderArtifacts(
 ): Promise<void> {
   await deleteReaderProgressSnapshot(novelId, transaction);
   await deletePersistedReaderRenderCache(novelId, transaction);
+  await deletePersistedReaderPretextMetrics(novelId, transaction);
 }
 
 export const bookLifecycleService = {
@@ -61,6 +63,7 @@ export const bookLifecycleService = {
         db.chapters,
         db.chapterImages,
         db.novelImageGalleryEntries,
+        db.readerPretextMetrics,
         db.readerRenderCache,
       ],
       async () => {
@@ -88,6 +91,7 @@ export const bookLifecycleService = {
           chapters: prepared.chapterRichContents,
         }, transaction);
         await deletePersistedReaderRenderCache(novelId, transaction);
+        await deletePersistedReaderPretextMetrics(novelId, transaction);
       },
     );
 
@@ -131,6 +135,7 @@ export const bookLifecycleService = {
         db.analysisOverviews,
         db.chapterAnalyses,
         db.readerProgress,
+        db.readerPretextMetrics,
         db.readerRenderCache,
         db.novels,
         db.coverImages,
@@ -185,6 +190,7 @@ export const bookLifecycleService = {
         db.analysisOverviews,
         db.chapterAnalyses,
         db.readerProgress,
+        db.readerPretextMetrics,
         db.readerRenderCache,
         db.novels,
         db.coverImages,

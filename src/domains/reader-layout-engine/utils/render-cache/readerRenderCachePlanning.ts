@@ -54,6 +54,10 @@ const RENDER_VARIANTS: ReaderRenderVariant[] = [
   'original-paged',
   'summary-shell',
 ];
+const ORIGINAL_MANIFEST_VARIANTS: ReaderRenderVariant[] = [
+  'original-scroll',
+  'original-paged',
+];
 
 export function getActiveVariant(
   isPagedMode: boolean,
@@ -313,11 +317,15 @@ export function buildPreheatTargets(params: {
     const nextIndex = params.currentChapterIndex + distance;
 
     if (previousIndex >= 0) {
-      pushTarget(previousIndex, params.activeVariant, 'manifest');
+      for (const variantFamily of ORIGINAL_MANIFEST_VARIANTS) {
+        pushTarget(previousIndex, variantFamily, 'manifest');
+      }
     }
 
     if (nextIndex < params.chaptersLength) {
-      pushTarget(nextIndex, params.activeVariant, 'manifest');
+      for (const variantFamily of ORIGINAL_MANIFEST_VARIANTS) {
+        pushTarget(nextIndex, variantFamily, 'manifest');
+      }
     }
   }
 

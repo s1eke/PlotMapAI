@@ -25,6 +25,7 @@ describe('db', () => {
       'novelImageGalleryEntries',
       'novels',
       'purificationRules',
+      'readerPretextMetrics',
       'readerProgress',
       'readerRenderCache',
       'tocRules',

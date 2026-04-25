@@ -35,6 +35,10 @@ import {
   useScrollFlowOffsetCompensation,
   type PendingScrollWindowAnchor,
 } from './useScrollFlowOffsetCompensation';
+import {
+  getCachedScrollReaderChapters,
+  getRenderableScrollLayouts,
+} from './scrollReaderControllerRenderables';
 
 export type {
   UseScrollReaderControllerResult,
@@ -141,10 +145,7 @@ export function useScrollReaderController({
   const layoutQueries = useReaderLayoutQueries();
   const persistence = useReaderPersistenceRuntime();
   const { chapterIndex } = sessionSnapshot;
-  const {
-    persistReaderState,
-    setChapterIndex,
-  } = sessionCommands;
+  const { persistReaderState, setChapterIndex } = sessionCommands;
   const scrollChapterBodyElementsRef = useRef<Map<number, HTMLDivElement>>(new Map());
   const [scrollModeChapters, setScrollModeChapters] = useState<number[]>([]);
   const [retainedFocusedWindowChapterIndex, setRetainedFocusedWindowChapterIndex] =
@@ -159,6 +160,7 @@ export function useScrollReaderController({
   });
   const novelFlowIndexRef = useRef<ReturnType<typeof buildNovelFlowIndex> | null>(null);
   const pendingScrollWindowAnchorRef = useRef<PendingScrollWindowAnchor | null>(null);
+  const latestStableScrollAnchorRef = useRef<ScrollModeAnchor | null>(null);
   const fetchScrollChapterContent = useCallback((index: number) => (
     fetchChapterContent(index)
   ), [fetchChapterContent]);
@@ -195,6 +197,9 @@ export function useScrollReaderController({
     if (!enabled || chapterIndex !== retainedFocusedWindowChapterIndex) {
       clearRetainedFocusedWindow();
     }
+    if (!enabled) {
+      latestStableScrollAnchorRef.current = null;
+    }
   }, [
     chapterIndex,
     clearRetainedFocusedWindow,
@@ -221,6 +226,7 @@ export function useScrollReaderController({
 
   const handleReadingAnchorChange = useCallback((anchor: ScrollModeAnchor) => {
     if (!enabled) return;
+    latestStableScrollAnchorRef.current = anchor;
     if (persistence.isScrollSyncSuppressed()) return;
     if (pendingRestoreTargetRef.current) return;
     if (pendingRestoreTarget && anchor.chapterProgress === 0) return;
@@ -238,9 +244,7 @@ export function useScrollReaderController({
       locator,
       novelFlowIndex: activeNovelFlowIndex,
     });
-    const persistedChapterProgress = resolvePersistedChapterProgress({
-      anchor,
-    });
+    const persistedChapterProgress = resolvePersistedChapterProgress({ anchor });
     if (!locator) {
       const persistFallbackSnapshot = {
         source: 'useScrollReaderController.handleReadingAnchorChange',
@@ -319,12 +323,10 @@ export function useScrollReaderController({
       return EMPTY_SCROLL_READER_CHAPTERS;
     }
 
-    return scrollModeChapters
-      .map((index) => {
-        const chapter = cache.getCachedChapter(index);
-        return chapter ? { index, chapter } : null;
-      })
-      .filter((item): item is { index: number; chapter: import('@shared/contracts/reader').ChapterContent } => Boolean(item));
+    return getCachedScrollReaderChapters({
+      cache,
+      chapterIndices: scrollModeChapters,
+    });
   }, [cache, chapterDataRevision, enabled, scrollModeChapters]);
 
   const renderCache = useReaderRenderCache({
@@ -365,6 +367,7 @@ export function useScrollReaderController({
   novelFlowIndexRef.current = novelFlowIndex;
 
   useScrollFlowOffsetCompensation({
+    anchorRef: latestStableScrollAnchorRef,
     enabled,
     layoutQueries,
     novelFlowIndex,
@@ -422,17 +425,24 @@ export function useScrollReaderController({
   ]);
 
   const renderableScrollLayouts = useMemo(
-    () => scrollReaderChapters.flatMap((renderableScrollChapter) => {
-      const layout = renderCache.scrollLayouts.get(renderableScrollChapter.index);
-      const flowEntry = novelFlowIndex?.chapters[renderableScrollChapter.index] ?? null;
-      const isVisibleFlowChapter = visibleFlowChapterIndices.includes(
-        renderableScrollChapter.index,
-      );
-      return layout && isVisibleFlowChapter
-        ? [{ ...renderableScrollChapter, flowEntry, layout }]
-        : [];
+    () => getRenderableScrollLayouts({
+      novelFlowIndex,
+      pendingRestoreTarget,
+      pendingRestoreTargetRef,
+      retainedFocusedWindowChapterIndex,
+      scrollLayouts: renderCache.scrollLayouts,
+      scrollReaderChapters,
+      visibleFlowChapterIndices,
     }),
-    [novelFlowIndex, renderCache.scrollLayouts, scrollReaderChapters, visibleFlowChapterIndices],
+    [
+      novelFlowIndex,
+      pendingRestoreTarget,
+      pendingRestoreTargetRef,
+      renderCache.scrollLayouts,
+      retainedFocusedWindowChapterIndex,
+      scrollReaderChapters,
+      visibleFlowChapterIndices,
+    ],
   );
 
   useScrollReaderRestore({

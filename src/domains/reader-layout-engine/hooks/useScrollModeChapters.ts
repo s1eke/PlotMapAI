@@ -218,7 +218,7 @@ export function useScrollModeChapters(
     if (scrollModeChapters.length > 0 && anchor) {
       const novelFlowIndex = getNovelFlowIndex?.() ?? null;
       const loadedEntries = novelFlowIndex?.chapters.filter((entry) => (
-        entry.manifestStatus !== 'missing'
+        entry.manifestStatus === 'materialized'
       ));
       const lastIdx = loadedEntries && loadedEntries.length > 0
         ? loadedEntries[loadedEntries.length - 1].chapterIndex
@@ -237,7 +237,7 @@ export function useScrollModeChapters(
     if (scrollTop < 50 && isScrollingTowardTop && scrollModeChapters.length > 0) {
       const novelFlowIndex = getNovelFlowIndex?.() ?? null;
       const loadedEntries = novelFlowIndex?.chapters.filter((entry) => (
-        entry.manifestStatus !== 'missing'
+        entry.manifestStatus === 'materialized'
       ));
       const firstIdx = loadedEntries && loadedEntries.length > 0
         ? loadedEntries[0].chapterIndex
@@ -275,7 +275,7 @@ export function useScrollModeChapters(
       if (flowHeight > container.clientHeight + 1) return;
 
       const loadedEntries = novelFlowIndex?.chapters.filter((entry) => (
-        entry.manifestStatus !== 'missing'
+        entry.manifestStatus === 'materialized'
       ));
       const lastIdx = loadedEntries && loadedEntries.length > 0
         ? loadedEntries[loadedEntries.length - 1].chapterIndex

@@ -20,7 +20,7 @@ import {
   serializeReaderLayoutSignature,
 } from '../layout-core/internal';
 import {
-  buildStaticRenderManifest,
+  buildStaticRenderManifestWithPretextMetrics,
   buildStaticRenderTree,
   getReaderRenderCacheEntryFromMemory,
   getReaderRenderCacheRecordFromDexie,
@@ -41,6 +41,10 @@ interface UseReaderRenderPreheaterParams {
   fetchChapterContent: UseReaderRenderCacheParams['fetchChapterContent'];
   loadedChaptersRef: MutableRefObject<Map<number, ChapterContent>>;
   novelId: number;
+  onManifestEntry?: (entry: {
+    chapterIndex: number;
+    variantFamily: ReaderRenderVariant;
+  }) => void;
   onMaterializedEntry: (entry: {
     chapterIndex: number;
     variantFamily: ReaderRenderVariant;
@@ -76,6 +80,7 @@ export function useReaderRenderPreheater({
   fetchChapterContent,
   loadedChaptersRef,
   novelId,
+  onManifestEntry,
   onMaterializedEntry,
   preheatTargets,
   preferRichScrollRendering,
@@ -87,12 +92,17 @@ export function useReaderRenderPreheater({
   const [pendingPreheatCount, setPendingPreheatCount] = useState(0);
   const [isPreheating, setIsPreheating] = useState(false);
   const fetchChapterContentRef = useRef(fetchChapterContent);
+  const onManifestEntryRef = useRef(onManifestEntry);
   const onMaterializedEntryRef = useRef(onMaterializedEntry);
   const readerTelemetryEnabledRef = useRef(readerTelemetryEnabled);
 
   useEffect(() => {
     fetchChapterContentRef.current = fetchChapterContent;
   }, [fetchChapterContent]);
+
+  useEffect(() => {
+    onManifestEntryRef.current = onManifestEntry;
+  }, [onManifestEntry]);
 
   useEffect(() => {
     onMaterializedEntryRef.current = onMaterializedEntry;
@@ -233,7 +243,7 @@ export function useReaderRenderPreheater({
           }
 
           if (target.storageKind === 'manifest') {
-            const manifestEntry = buildStaticRenderManifest({
+            const manifestEntry = await buildStaticRenderManifestWithPretextMetrics({
               chapter,
               imageDimensionsByKey: buildChapterImageDimensionsMap(novelId, chapter),
               layoutKey,
@@ -254,6 +264,12 @@ export function useReaderRenderPreheater({
             }
 
             await persistReaderRenderCacheEntry(manifestEntry);
+            if (!cancelled) {
+              onManifestEntryRef.current?.({
+                chapterIndex: chapter.index,
+                variantFamily: target.variantFamily,
+              });
+            }
             return;
           }
 

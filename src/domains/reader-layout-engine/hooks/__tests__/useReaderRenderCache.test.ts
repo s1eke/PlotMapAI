@@ -122,6 +122,48 @@ const renderCacheMock = vi.hoisted(() => {
   }) => (
     `${params.novelId}:${params.chapterIndex}:${params.variantFamily}:${params.contentFormat}:${params.contentVersion}:${params.rendererVersion}:${params.layoutFeatureSet}:${params.layoutKey}:${params.contentHash}`
   );
+  const buildStaticRenderManifestMock = vi.fn((params: {
+    chapter: {
+      contentFormat: 'plain' | 'rich';
+      contentVersion: number;
+      index: number;
+      plainText: string;
+      richBlocks: unknown[];
+      title: string;
+    };
+    layoutKey?: string;
+    layoutSignature: object;
+    novelId: number;
+    preferRichScrollRendering?: boolean;
+    variantFamily: 'original-paged' | 'original-scroll' | 'summary-shell';
+  }) => {
+    const contentHash = createContentHash(params.chapter);
+    const layoutFeatureSet = resolveLayoutFeatureSet({
+      chapter: params.chapter,
+      preferRichScrollRendering: params.preferRichScrollRendering,
+      variantFamily: params.variantFamily,
+    });
+
+    return {
+      chapterIndex: params.chapter.index,
+      contentFormat: params.chapter.contentFormat,
+      contentHash,
+      contentVersion: params.chapter.contentVersion,
+      layoutFeatureSet,
+      layoutKey: params.layoutKey ?? `${params.variantFamily}:${params.novelId}`,
+      layoutSignature: params.layoutSignature,
+      novelId: params.novelId,
+      queryManifest: {
+        blockCount: 2,
+        lineCount: 6,
+      },
+      rendererVersion: READER_RENDERER_VERSION,
+      storageKind: 'manifest',
+      tree: null,
+      updatedAt: '2026-03-31T00:00:00.000Z',
+      variantFamily: params.variantFamily,
+    };
+  });
 
   return {
     READER_RENDERER_VERSION,
@@ -194,48 +236,10 @@ const renderCacheMock = vi.hoisted(() => {
         variantFamily: params.variantFamily,
       };
     }),
-    buildStaticRenderManifest: vi.fn((params: {
-      chapter: {
-        contentFormat: 'plain' | 'rich';
-        contentVersion: number;
-        index: number;
-        plainText: string;
-        richBlocks: unknown[];
-        title: string;
-      };
-      layoutKey?: string;
-      layoutSignature: object;
-      novelId: number;
-      preferRichScrollRendering?: boolean;
-      variantFamily: 'original-paged' | 'original-scroll' | 'summary-shell';
-    }) => {
-      const contentHash = createContentHash(params.chapter);
-      const layoutFeatureSet = resolveLayoutFeatureSet({
-        chapter: params.chapter,
-        preferRichScrollRendering: params.preferRichScrollRendering,
-        variantFamily: params.variantFamily,
-      });
-
-      return {
-        chapterIndex: params.chapter.index,
-        contentFormat: params.chapter.contentFormat,
-        contentHash,
-        contentVersion: params.chapter.contentVersion,
-        layoutFeatureSet,
-        layoutKey: params.layoutKey ?? `${params.variantFamily}:${params.novelId}`,
-        layoutSignature: params.layoutSignature,
-        novelId: params.novelId,
-        queryManifest: {
-          blockCount: 2,
-          lineCount: 6,
-        },
-        rendererVersion: READER_RENDERER_VERSION,
-        storageKind: 'manifest',
-        tree: null,
-        updatedAt: '2026-03-31T00:00:00.000Z',
-        variantFamily: params.variantFamily,
-      };
-    }),
+    buildStaticRenderManifest: buildStaticRenderManifestMock,
+    buildStaticRenderManifestWithPretextMetrics: vi.fn(async (params: Parameters<
+      typeof buildStaticRenderManifestMock
+    >[0]) => buildStaticRenderManifestMock(params)),
     clearReaderRenderCacheMemoryForNovel: vi.fn((novelId: number) => {
       for (const key of Array.from(memory.keys())) {
         if (String(key).startsWith(`${novelId}:`)) {
@@ -304,6 +308,7 @@ import type { Chapter, ChapterContent } from '@shared/contracts/reader';
 import {
   createReaderLayoutSignature,
   createReaderViewportMetrics,
+  getPagedContentHeight,
   serializeReaderLayoutSignature,
 } from '../../utils/layout/readerLayout';
 import { useReaderRenderCache } from '../useReaderRenderCache';
@@ -374,6 +379,7 @@ function renderReaderRenderCacheHook(options?: {
     index: number,
     options?: { signal?: AbortSignal },
   ) => Promise<ChapterContent>;
+  fontSize?: number;
   isPagedMode?: boolean;
   novelId?: number;
   pagedChapters?: ChapterContent[];
@@ -396,7 +402,7 @@ function renderReaderRenderCacheHook(options?: {
     contentRef,
     currentChapter,
     fetchChapterContent,
-    fontSize: 18,
+    fontSize: options?.fontSize ?? 18,
     isPagedMode: options?.isPagedMode ?? false,
     lineSpacing: 1.8,
     novelId: options?.novelId ?? 1,
@@ -410,6 +416,88 @@ function renderReaderRenderCacheHook(options?: {
   });
 }
 
+function createScrollLayoutSignature(fontSize = 18) {
+  const viewportMetrics = createReaderViewportMetrics(600, 800, 600, 800, fontSize);
+  return createReaderLayoutSignature({
+    columnCount: 1,
+    columnGap: 0,
+    fontSize,
+    lineSpacing: 1.8,
+    pageHeight: viewportMetrics.scrollViewportHeight,
+    paragraphSpacing: 16,
+    textWidth: viewportMetrics.scrollTextWidth,
+  });
+}
+
+function createPersistedScrollManifestRecord(params: {
+  chapterIndex: number;
+  fontSize?: number;
+  totalHeight: number;
+}) {
+  const layoutSignature = createScrollLayoutSignature(params.fontSize ?? 18);
+  return {
+    chapterIndex: params.chapterIndex,
+    contentFormat: 'rich' as const,
+    contentHash: `persisted-${params.chapterIndex}`,
+    contentVersion: 1,
+    layoutFeatureSet: 'scroll-rich-inline' as const,
+    layoutKey: serializeReaderLayoutSignature(layoutSignature),
+    layoutSignature,
+    novelId: 1,
+    queryManifest: {
+      blockCount: 2,
+      lineCount: 6,
+      totalHeight: params.totalHeight,
+    },
+    rendererVersion: 2,
+    storageKind: 'manifest' as const,
+    tree: null,
+    updatedAt: '2026-03-31T00:00:00.000Z',
+    variantFamily: 'original-scroll' as const,
+  };
+}
+
+function createPagedLayoutSignature(fontSize = 18) {
+  const viewportMetrics = createReaderViewportMetrics(600, 800, 600, 800, fontSize);
+  return createReaderLayoutSignature({
+    columnCount: viewportMetrics.pagedColumnCount,
+    columnGap: viewportMetrics.pagedColumnGap,
+    fontSize,
+    lineSpacing: 1.8,
+    pageHeight: getPagedContentHeight(viewportMetrics.pagedViewportHeight),
+    paragraphSpacing: 16,
+    textWidth: viewportMetrics.pagedColumnWidth,
+  });
+}
+
+function createPersistedPagedManifestRecord(params: {
+  chapterIndex: number;
+  fontSize?: number;
+  pageCount: number;
+}) {
+  const layoutSignature = createPagedLayoutSignature(params.fontSize ?? 18);
+  return {
+    chapterIndex: params.chapterIndex,
+    contentFormat: 'rich' as const,
+    contentHash: `persisted-paged-${params.chapterIndex}`,
+    contentVersion: 1,
+    layoutFeatureSet: 'paged-pagination-block' as const,
+    layoutKey: serializeReaderLayoutSignature(layoutSignature),
+    layoutSignature,
+    novelId: 1,
+    queryManifest: {
+      blockCount: 2,
+      lineCount: 6,
+      pageCount: params.pageCount,
+    },
+    rendererVersion: 2,
+    storageKind: 'manifest' as const,
+    tree: null,
+    updatedAt: '2026-03-31T00:00:00.000Z',
+    variantFamily: 'original-paged' as const,
+  };
+}
+
 describe('useReaderRenderCache', () => {
   beforeEach(() => {
     vi.useRealTimers();
@@ -420,6 +508,7 @@ describe('useReaderRenderCache', () => {
     imageCacheMock.preloadReaderImageResources.mockResolvedValue(undefined);
     renderCacheMock.reset();
     renderCacheMock.getReaderRenderCacheRecordFromDexie.mockResolvedValue(null);
+    renderCacheMock.getReaderRenderCacheRecordsForNovelVariantFromDexie.mockResolvedValue([]);
     renderCacheMock.getReaderRenderCacheEntryFromDexie.mockResolvedValue(null);
     renderCacheMock.persistReaderRenderCacheEntry.mockResolvedValue(undefined);
     renderCacheMock.warmReaderRenderImages.mockResolvedValue(undefined);
@@ -427,6 +516,156 @@ describe('useReaderRenderCache', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it('returns fallback scroll manifests for chapters without cached layout data', async () => {
+    const { result } = renderReaderRenderCacheHook({
+      chapters: [
+        { index: 0, title: 'Chapter 1', wordCount: 120 },
+        { index: 1, title: 'Chapter 2', wordCount: 480 },
+        { index: 2, title: 'Chapter 3', wordCount: 120 },
+      ],
+      currentChapter: createChapter(0, 3),
+      scrollChapters: [{ chapter: createChapter(0, 3), index: 0 }],
+    });
+
+    await waitFor(() => {
+      expect(result.current.scrollManifests.size).toBe(3);
+    });
+
+    const fallbackManifest = result.current.scrollManifests.get(2);
+    expect(fallbackManifest).toMatchObject({
+      chapterIndex: 2,
+      layoutFeatureSet: 'scroll-plain',
+      status: 'estimated',
+    });
+    expect(fallbackManifest?.scrollHeight).toBeGreaterThanOrEqual(320);
+  });
+
+  it('returns fallback paged manifests for whole-book page indexing', async () => {
+    const { result } = renderReaderRenderCacheHook({
+      chapters: [
+        { index: 0, title: 'Chapter 1', wordCount: 120 },
+        { index: 1, title: 'Chapter 2', wordCount: 480 },
+        { index: 2, title: 'Chapter 3', wordCount: 120 },
+      ],
+      currentChapter: createChapter(0, 3),
+      isPagedMode: true,
+      pagedChapters: [createChapter(0, 3)],
+    });
+
+    await waitFor(() => {
+      expect(result.current.pagedManifests.size).toBe(3);
+    });
+
+    const fallbackManifest = result.current.pagedManifests.get(2);
+    expect(fallbackManifest).toMatchObject({
+      chapterIndex: 2,
+      layoutFeatureSet: 'paged-pagination-block',
+      status: 'estimated',
+    });
+    expect(fallbackManifest?.pageCount).toBeGreaterThan(0);
+  });
+
+  it('merges persisted scroll manifests and lets visible materialized layouts win', async () => {
+    renderCacheMock.getReaderRenderCacheRecordsForNovelVariantFromDexie.mockImplementation(
+      async (params: { variantFamily: string }) => (
+        params.variantFamily === 'original-scroll'
+          ? [
+            createPersistedScrollManifestRecord({ chapterIndex: 0, totalHeight: 999 }),
+            createPersistedScrollManifestRecord({ chapterIndex: 1, totalHeight: 777 }),
+          ]
+          : []
+      ),
+    );
+
+    const visibleChapter = createChapter(0, 2);
+    const { result } = renderReaderRenderCacheHook({
+      chapters: [
+        { index: 0, title: 'Chapter 1', wordCount: 120 },
+        { index: 1, title: 'Chapter 2', wordCount: 120 },
+      ],
+      currentChapter: visibleChapter,
+      scrollChapters: [{ chapter: visibleChapter, index: 0 }],
+    });
+
+    await waitFor(() => {
+      expect(result.current.scrollManifests.get(1)?.scrollHeight).toBe(777);
+    });
+
+    expect(result.current.scrollManifests.get(0)).toMatchObject({
+      chapterIndex: 0,
+      scrollHeight: 0,
+      status: 'materialized',
+    });
+  });
+
+  it('merges persisted paged manifests and lets visible materialized layouts win', async () => {
+    renderCacheMock.getReaderRenderCacheRecordsForNovelVariantFromDexie.mockImplementation(
+      async (params: { variantFamily: string }) => (
+        params.variantFamily === 'original-paged'
+          ? [
+            createPersistedPagedManifestRecord({ chapterIndex: 0, pageCount: 12 }),
+            createPersistedPagedManifestRecord({ chapterIndex: 1, pageCount: 9 }),
+          ]
+          : []
+      ),
+    );
+
+    const visibleChapter = createChapter(0, 2);
+    const { result } = renderReaderRenderCacheHook({
+      chapters: [
+        { index: 0, title: 'Chapter 1', wordCount: 120 },
+        { index: 1, title: 'Chapter 2', wordCount: 120 },
+      ],
+      currentChapter: visibleChapter,
+      isPagedMode: true,
+      pagedChapters: [visibleChapter],
+    });
+
+    await waitFor(() => {
+      expect(result.current.pagedManifests.get(1)?.pageCount).toBe(9);
+    });
+
+    expect(result.current.pagedManifests.get(0)).toMatchObject({
+      chapterIndex: 0,
+      pageCount: 0,
+      status: 'materialized',
+    });
+  });
+
+  it('drops stale persisted scroll manifests when the font layout signature changes', async () => {
+    renderCacheMock.getReaderRenderCacheRecordsForNovelVariantFromDexie.mockImplementation(
+      async (params: { variantFamily: string }) => (
+        params.variantFamily === 'original-scroll'
+          ? [createPersistedScrollManifestRecord({
+            chapterIndex: 1,
+            fontSize: 18,
+            totalHeight: 777,
+          })]
+          : []
+      ),
+    );
+
+    const { result } = renderReaderRenderCacheHook({
+      chapters: [
+        { index: 0, title: 'Chapter 1', wordCount: 120 },
+        { index: 1, title: 'Chapter 2', wordCount: 120 },
+      ],
+      currentChapter: createChapter(0, 2),
+      fontSize: 22,
+      scrollChapters: [{ chapter: createChapter(0, 2), index: 0 }],
+    });
+
+    await waitFor(() => {
+      expect(renderCacheMock.getReaderRenderCacheRecordsForNovelVariantFromDexie)
+        .toHaveBeenCalledWith(expect.objectContaining({ variantFamily: 'original-scroll' }));
+    });
+
+    expect(result.current.scrollManifests.get(1)).toMatchObject({
+      status: 'estimated',
+    });
+    expect(result.current.scrollManifests.get(1)?.scrollHeight).not.toBe(777);
   });
 
   it('continues preheating after image warming failures and clears the preheating state', async () => {
@@ -912,7 +1151,7 @@ describe('useReaderRenderCache', () => {
     });
   });
 
-  it('persists far preheat targets as manifest summaries for the active variant only', async () => {
+  it('persists far preheat targets as scroll and paged manifest summaries', async () => {
     renderReaderRenderCacheHook({
       chapters: [
         { index: 0, title: 'Chapter 1', wordCount: 120 },
@@ -934,9 +1173,11 @@ describe('useReaderRenderCache', () => {
       );
     });
 
-    expect(renderCacheMock.persistReaderRenderCacheEntry).not.toHaveBeenCalledWith(
+    expect(renderCacheMock.persistReaderRenderCacheEntry).toHaveBeenCalledWith(
       expect.objectContaining({
-        chapterIndex: 1,
+        chapterIndex: 2,
+        storageKind: 'manifest',
+        tree: null,
         variantFamily: 'original-paged',
       }),
     );

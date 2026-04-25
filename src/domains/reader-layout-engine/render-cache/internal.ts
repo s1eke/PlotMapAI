@@ -27,11 +27,13 @@ export type {
 } from '../utils/render-cache/readerRenderCachePlanning';
 export {
   buildStaticRenderManifest,
+  buildStaticRenderManifestWithPretextMetrics,
   buildStaticRenderTree,
   clearReaderRenderCacheMemoryForNovel,
   coercePagedTree,
   coerceScrollTree,
   coerceSummaryShellTree,
+  deletePersistedReaderPretextMetrics,
   deletePersistedReaderRenderCache,
   getReaderRenderCacheEntryFromMemory,
   getReaderRenderCacheRecordFromDexie,
@@ -44,5 +46,7 @@ export {
 } from '../utils/render-cache/readerRenderCache';
 export type {
   ReaderLayoutFeatureSet,
+  ReaderPretextMetricsBundle,
   ReaderRenderCacheSource,
+  ReaderTextMetricSignature,
 } from '../utils/render-cache/readerRenderCache';

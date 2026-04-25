@@ -11,7 +11,31 @@ export interface PendingScrollWindowAnchor {
   previousOffset: number;
 }
 
+interface ScrollFlowCompensationAnchor {
+  chapterIndex: number;
+  chapterProgress: number;
+}
+
+function resolveAnchorGlobalOffset(
+  novelFlowIndex: NovelFlowIndex,
+  anchor: ScrollFlowCompensationAnchor | null | undefined,
+): number | null {
+  if (!anchor) {
+    return null;
+  }
+
+  const entry = novelFlowIndex.chapters[anchor.chapterIndex];
+  if (!entry || entry.manifestStatus === 'missing') {
+    return null;
+  }
+
+  const chapterHeight = Math.max(0, entry.scrollEnd - entry.scrollStart);
+  const chapterProgress = Math.max(0, Math.min(1, anchor.chapterProgress));
+  return entry.scrollStart + chapterHeight * chapterProgress;
+}
+
 export function useScrollFlowOffsetCompensation(params: {
+  anchorRef?: MutableRefObject<ScrollFlowCompensationAnchor | null>;
   enabled: boolean;
   layoutQueries: {
     getCurrentOriginalLocator: () => ReaderLocator | null;
@@ -25,6 +49,7 @@ export function useScrollFlowOffsetCompensation(params: {
   viewportContentRef: RefObject<HTMLDivElement | null>;
 }): void {
   const {
+    anchorRef,
     enabled,
     layoutQueries,
     novelFlowIndex,
@@ -44,13 +69,14 @@ export function useScrollFlowOffsetCompensation(params: {
 
     const pendingScrollWindowAnchor = pendingScrollWindowAnchorRef.current;
     const locator = pendingScrollWindowAnchor?.locator ?? layoutQueries.getCurrentOriginalLocator();
-    if (!locator) {
-      return;
-    }
 
     const previousOffset = pendingScrollWindowAnchor?.previousOffset
-      ?? resolveLocatorGlobalOffset(previousIndex, locator);
-    const nextOffset = resolveLocatorGlobalOffset(novelFlowIndex, locator);
+      ?? (locator
+        ? resolveLocatorGlobalOffset(previousIndex, locator)
+        : resolveAnchorGlobalOffset(previousIndex, anchorRef?.current));
+    const nextOffset = locator
+      ? resolveLocatorGlobalOffset(novelFlowIndex, locator)
+      : resolveAnchorGlobalOffset(novelFlowIndex, anchorRef?.current);
     const container = viewportContentRef.current;
     if (previousOffset === null || nextOffset === null || !container) {
       return;
@@ -69,6 +95,7 @@ export function useScrollFlowOffsetCompensation(params: {
     pendingScrollWindowAnchorRef.current = null;
     syncViewportState({ force: true });
   }, [
+    anchorRef,
     enabled,
     layoutQueries,
     novelFlowIndex,
