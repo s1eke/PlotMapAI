@@ -18,6 +18,7 @@ export type {
   ReaderLocatorBoundary,
   ReaderLifecycleEvent,
   ReaderLifecycleEventType,
+  ReaderGlobalFlowProjection,
   ReaderMode,
   ReaderNavigationIntent,
   ReaderPersistenceFailure,

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { db } from '@infra/db';
 import { createReaderContextWrapper } from '@test/readerRuntimeTestUtils';
+import { createCanonicalPositionFingerprint } from '@shared/utils/readerStoredState';
 
 import {
   readReaderProgressSnapshot,
@@ -319,6 +320,64 @@ describe('useReaderStatePersistence', () => {
     const persisted = await readReaderProgressSnapshot(1);
     expect(persisted?.snapshot.projections?.scroll).toBeUndefined();
     expect(persisted?.snapshot.projections?.paged?.pageIndex).toBe(4);
+  });
+
+  it('refreshes scroll projection metadata when spread hints carry an old fingerprint', async () => {
+    const { result } = renderHook(() => useReaderStatePersistence(1), {
+      wrapper: Wrapper,
+    });
+    const firstCanonical = {
+      chapterIndex: 0,
+      blockIndex: 4,
+      kind: 'text' as const,
+    };
+    const nextCanonical = {
+      chapterIndex: 0,
+      blockIndex: 18,
+      kind: 'text' as const,
+    };
+
+    act(() => {
+      result.current.persistReaderState({
+        canonical: firstCanonical,
+        hints: {
+          chapterProgress: 0.2,
+          contentMode: 'scroll',
+        },
+      });
+    });
+    const staleHints = result.current.latestReaderStateRef.current.hints;
+
+    act(() => {
+      result.current.persistReaderState({
+        canonical: nextCanonical,
+        hints: {
+          ...staleHints,
+          chapterProgress: 0.55,
+          contentMode: 'scroll',
+        },
+      });
+    });
+
+    expect(
+      result.current.latestReaderStateRef.current.hints?.scrollProjection
+        ?.basisCanonicalFingerprint,
+    ).toBe(createCanonicalPositionFingerprint(nextCanonical));
+
+    await act(async () => {
+      await result.current.flushReaderState();
+    });
+
+    await expect(readReaderProgressSnapshot(1)).resolves.toMatchObject({
+      snapshot: {
+        projections: {
+          scroll: {
+            basisCanonicalFingerprint: createCanonicalPositionFingerprint(nextCanonical),
+            chapterProgress: 0.55,
+          },
+        },
+      },
+    });
   });
 
   it('marks user interaction', () => {

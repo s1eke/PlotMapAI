@@ -58,6 +58,7 @@ describe('readerPosition', () => {
   it('computes chapter-local progress from the chapter scrollable range', () => {
     const container = document.createElement('div');
     Object.defineProperty(container, 'clientHeight', { configurable: true, value: 600 });
+    Object.defineProperty(container, 'scrollHeight', { configurable: true, value: 2400 });
     Object.defineProperty(container, 'scrollTop', { configurable: true, value: 1110 });
 
     const chapterElement = document.createElement('div');
@@ -71,6 +72,7 @@ describe('readerPosition', () => {
   it('caps chapter-local progress at 1 when the viewport is at the chapter tail', () => {
     const container = document.createElement('div');
     Object.defineProperty(container, 'clientHeight', { configurable: true, value: 600 });
+    Object.defineProperty(container, 'scrollHeight', { configurable: true, value: 2000 });
     Object.defineProperty(container, 'scrollTop', { configurable: true, value: 1600 });
 
     const chapterElement = document.createElement('div');

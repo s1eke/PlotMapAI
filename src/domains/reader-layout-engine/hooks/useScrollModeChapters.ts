@@ -2,14 +2,41 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Chapter, ChapterContent } from '@shared/contracts/reader';
 import type { NovelFlowIndex } from '../layout-core/internal';
 import {
+  clampProgress,
   getChapterLocalProgress,
+  getContainerMaxScrollTop,
   SCROLL_READING_ANCHOR_RATIO,
 } from '@shared/utils/readerPosition';
-import { resolveGlobalOffsetPosition } from '../layout-core/internal';
 
 export interface ScrollModeAnchor {
   chapterIndex: number;
   chapterProgress: number;
+}
+
+function isFocusedSingleChapterContainer(params: {
+  container: HTMLDivElement;
+  chapterElement: HTMLDivElement;
+}): boolean {
+  const { container, chapterElement } = params;
+  return container.scrollHeight > 0
+    && chapterElement.offsetHeight > 0
+    && container.scrollHeight <= chapterElement.offsetHeight + 1;
+}
+
+function resolveReadingAnchorProgress(params: {
+  container: HTMLDivElement;
+  chapterElement: HTMLDivElement;
+  readingAnchorOffset: number;
+}): number {
+  const { container, chapterElement, readingAnchorOffset } = params;
+  if (isFocusedSingleChapterContainer({ container, chapterElement })) {
+    const maxScrollTop = getContainerMaxScrollTop(container);
+    return maxScrollTop > 0
+      ? clampProgress((container.scrollTop + readingAnchorOffset) / maxScrollTop)
+      : 0;
+  }
+
+  return getChapterLocalProgress(container, chapterElement, readingAnchorOffset);
 }
 
 export function useScrollModeChapters(
@@ -36,6 +63,7 @@ export function useScrollModeChapters(
   const pendingScrollFetchesRef = useRef<Set<number>>(new Set());
   const viewportSyncFrameRef = useRef<number | null>(null);
   const pendingViewportTopRef = useRef(0);
+  const lastHandledScrollTopRef = useRef(0);
   const [scrollViewportTop, setScrollViewportTop] = useState(0);
 
   const syncViewportState = useCallback((options?: { force?: boolean }) => {
@@ -132,17 +160,6 @@ export function useScrollModeChapters(
     const visibleMarker =
       container.scrollTop + container.clientHeight * SCROLL_READING_ANCHOR_RATIO;
 
-    const novelFlowIndex = getNovelFlowIndex?.() ?? null;
-    if (novelFlowIndex && novelFlowIndex.totalScrollHeight > 0) {
-      const globalPosition = resolveGlobalOffsetPosition(novelFlowIndex, visibleMarker);
-      if (globalPosition) {
-        return {
-          chapterIndex: globalPosition.chapterIndex,
-          chapterProgress: globalPosition.chapterProgress,
-        };
-      }
-    }
-
     let currentReadIdx: number | null = null;
     let currentReadOffsetTop = Number.NEGATIVE_INFINITY;
 
@@ -166,12 +183,17 @@ export function useScrollModeChapters(
     if (!chapterElement) {
       return null;
     }
+    const readingAnchorOffset = container.clientHeight * SCROLL_READING_ANCHOR_RATIO;
 
     return {
       chapterIndex: currentReadIdx,
-      chapterProgress: getChapterLocalProgress(container, chapterElement),
+      chapterProgress: resolveReadingAnchorProgress({
+        container,
+        chapterElement,
+        readingAnchorOffset,
+      }),
     };
-  }, [contentRef, enabled, getNovelFlowIndex, scrollModeChapters]);
+  }, [contentRef, enabled, scrollModeChapters]);
 
   const handleScroll = useCallback(() => {
     if (!enabled || !contentRef.current) return;
@@ -185,6 +207,9 @@ export function useScrollModeChapters(
 
     const el = contentRef.current;
     const { scrollTop } = el;
+    const previousHandledScrollTop = lastHandledScrollTopRef.current;
+    lastHandledScrollTopRef.current = scrollTop;
+    const isScrollingTowardTop = scrollTop < previousHandledScrollTop;
     const anchor = getCurrentAnchor();
     if (anchor) {
       onReadingAnchorChange?.(anchor);
@@ -209,7 +234,7 @@ export function useScrollModeChapters(
       }
     }
 
-    if (scrollTop < 50 && scrollModeChapters.length > 0) {
+    if (scrollTop < 50 && isScrollingTowardTop && scrollModeChapters.length > 0) {
       const novelFlowIndex = getNovelFlowIndex?.() ?? null;
       const loadedEntries = novelFlowIndex?.chapters.filter((entry) => (
         entry.manifestStatus !== 'missing'

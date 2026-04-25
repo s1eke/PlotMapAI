@@ -1,22 +1,34 @@
-import type { PreparedTextWithSegments } from '@chenglou/pretext';
+import type {
+  LayoutCursor as PretextLayoutCursor,
+  LayoutLineRange as PretextLayoutLineRange,
+} from '@chenglou/pretext';
 import type { RichInline } from '@shared/contracts';
-import type { ReaderMeasuredLine, ReaderTypographyMetrics } from '../layout/readerLayoutTypes';
+import type {
+  ReaderLineRange,
+  ReaderMeasuredLine,
+  ReaderTypographyMetrics,
+} from '../layout/readerLayoutTypes';
 import type { ReaderTextPrepareOptions } from '../layout/readerTextPolicy';
 
 import {
   layoutWithLines,
+  layoutNextLineRange as layoutNextPretextLineRange,
+  materializeLineRange as materializePretextLineRange,
   measureLineStats as measurePretextLineStats,
-  prepareWithSegments,
   setLocale as setPretextLocale,
+  walkLineRanges as walkPretextLineRanges,
 } from '@chenglou/pretext';
 
 import { getApproximateMaxCharsPerLine } from '../layout/readerLayoutShared';
 import {
   DEFAULT_READER_TEXT_PREPARE_OPTIONS,
   normalizeReaderTextPrepareOptions,
-  serializeReaderTextPrepareOptions,
-  toPretextPrepareOptions,
 } from '../layout/readerTextPolicy';
+import {
+  createPreparedTextBlock,
+  getPreparedTextCacheSizeForTests,
+  resetPreparedTextCache,
+} from './readerPreparedTextCache';
 import {
   getRichTextLayoutCacheSizeForTests,
   layoutRichTextWithPretext,
@@ -26,16 +38,6 @@ import {
   createReaderContentMeasuredTokenValues,
   READER_CONTENT_MEASURED_TOKEN_NAMES,
 } from '@shared/reader-rendering';
-
-const MAX_PRETEXT_CACHE_SIZE = 256;
-const PRETEXT_CACHE = new Map<string, PreparedTextWithSegments | null>();
-
-interface PreparedTextBlock {
-  font: string;
-  prepared: PreparedTextWithSegments | null;
-  prepareOptions: ReaderTextPrepareOptions;
-  text: string;
-}
 
 let browserTextMeasureRoot: HTMLDivElement | null = null;
 
@@ -65,6 +67,30 @@ export interface ReaderTextLayoutEngine {
     prepareOptions?: ReaderTextPrepareOptions;
     text: string;
   }) => ReaderTextLineStats | null;
+  walkLineRanges?: (params: {
+    font: string;
+    fontSizePx: number;
+    maxWidth: number;
+    prepareOptions?: ReaderTextPrepareOptions;
+    text: string;
+  }) => ReaderLineRange[] | null;
+  layoutNextLineRange?: (params: {
+    font: string;
+    fontSizePx: number;
+    maxWidth: number;
+    prepareOptions?: ReaderTextPrepareOptions;
+    start: ReaderLineRange['end'];
+    text: string;
+  }) => ReaderLineRange | null;
+  materializeLineRange?: (params: {
+    font: string;
+    fontSizePx: number;
+    lineHeightPx: number;
+    maxWidth: number;
+    prepareOptions?: ReaderTextPrepareOptions;
+    range: ReaderLineRange;
+    text: string;
+  }) => ReaderMeasuredLine | null;
   layoutRichLines?: (params: {
     font: string;
     fontSizePx: number;
@@ -80,65 +106,6 @@ export type {
   ReaderTextWhiteSpace,
   ReaderTextWordBreak,
 } from '../layout/readerTextPolicy';
-
-function getPreparedTextFromCache(key: string): PreparedTextWithSegments | null | undefined {
-  const prepared = PRETEXT_CACHE.get(key);
-  if (prepared === undefined) {
-    return undefined;
-  }
-
-  PRETEXT_CACHE.delete(key);
-  PRETEXT_CACHE.set(key, prepared);
-  return prepared;
-}
-
-function setPreparedTextInCache(key: string, prepared: PreparedTextWithSegments | null): void {
-  if (PRETEXT_CACHE.has(key)) {
-    PRETEXT_CACHE.delete(key);
-  }
-
-  PRETEXT_CACHE.set(key, prepared);
-  while (PRETEXT_CACHE.size > MAX_PRETEXT_CACHE_SIZE) {
-    const oldestKey = PRETEXT_CACHE.keys().next().value;
-    if (!oldestKey) {
-      return;
-    }
-    PRETEXT_CACHE.delete(oldestKey);
-  }
-}
-
-function createPreparedTextBlock(
-  text: string,
-  font: string,
-  prepareOptions?: ReaderTextPrepareOptions,
-): PreparedTextBlock {
-  const normalizedOptions = normalizeReaderTextPrepareOptions(prepareOptions);
-  const key = `${font}\u0000${serializeReaderTextPrepareOptions(normalizedOptions)}\u0000${text}`;
-  let prepared = getPreparedTextFromCache(key);
-  if (prepared === undefined) {
-    prepared = prepareText(text, font, normalizedOptions);
-    setPreparedTextInCache(key, prepared);
-  }
-
-  return {
-    font,
-    prepared,
-    prepareOptions: normalizedOptions,
-    text,
-  };
-}
-
-function prepareText(
-  text: string,
-  font: string,
-  prepareOptions: ReaderTextPrepareOptions,
-): PreparedTextWithSegments | null {
-  try {
-    return prepareWithSegments(text, font, toPretextPrepareOptions(prepareOptions));
-  } catch {
-    return null;
-  }
-}
 
 function createFallbackMeasuredLine(params: {
   fontSizePx: number;
@@ -159,6 +126,25 @@ function createFallbackMeasuredLine(params: {
     },
     text: params.text,
     width: Math.min(params.maxWidth, params.text.length * params.fontSizePx * 0.55),
+  };
+}
+
+function toReaderLineRange(
+  line: Pick<PretextLayoutLineRange, 'end' | 'start' | 'width'>,
+  lineIndex: number,
+): ReaderLineRange {
+  return {
+    end: { ...line.end },
+    lineIndex,
+    start: { ...line.start },
+    width: line.width,
+  };
+}
+
+function toPretextCursor(cursor: ReaderLineRange['end']): PretextLayoutCursor {
+  return {
+    graphemeIndex: cursor.graphemeIndex,
+    segmentIndex: cursor.segmentIndex,
   };
 }
 
@@ -276,6 +262,98 @@ function measurePreparedTextStats(params: {
   }
 }
 
+function walkPreparedLineRanges(params: {
+  font: string;
+  fontSizePx: number;
+  maxWidth: number;
+  prepareOptions?: ReaderTextPrepareOptions;
+  text: string;
+}): ReaderLineRange[] | null {
+  if (params.maxWidth <= 0 || params.text.length === 0) {
+    return [];
+  }
+
+  const prepareOptions = params.prepareOptions ?? DEFAULT_READER_TEXT_PREPARE_OPTIONS;
+  const prepared = createPreparedTextBlock(params.text, params.font, prepareOptions);
+  if (!prepared.prepared) {
+    return null;
+  }
+
+  try {
+    const ranges: ReaderLineRange[] = [];
+    walkPretextLineRanges(prepared.prepared, params.maxWidth, (line) => {
+      ranges.push(toReaderLineRange(line, ranges.length));
+    });
+    return ranges;
+  } catch {
+    return null;
+  }
+}
+
+function layoutNextPreparedLineRange(params: {
+  font: string;
+  fontSizePx: number;
+  maxWidth: number;
+  prepareOptions?: ReaderTextPrepareOptions;
+  start: ReaderLineRange['end'];
+  text: string;
+}): ReaderLineRange | null {
+  if (params.maxWidth <= 0 || params.text.length === 0) {
+    return null;
+  }
+
+  const prepareOptions = params.prepareOptions ?? DEFAULT_READER_TEXT_PREPARE_OPTIONS;
+  const prepared = createPreparedTextBlock(params.text, params.font, prepareOptions);
+  if (!prepared.prepared) {
+    return null;
+  }
+
+  try {
+    const range = layoutNextPretextLineRange(
+      prepared.prepared,
+      toPretextCursor(params.start),
+      params.maxWidth,
+    );
+    return range ? toReaderLineRange(range, 0) : null;
+  } catch {
+    return null;
+  }
+}
+
+function materializePreparedLineRange(params: {
+  font: string;
+  fontSizePx: number;
+  lineHeightPx: number;
+  maxWidth: number;
+  prepareOptions?: ReaderTextPrepareOptions;
+  range: ReaderLineRange;
+  text: string;
+}): ReaderMeasuredLine | null {
+  if (params.maxWidth <= 0 || params.text.length === 0) {
+    return null;
+  }
+
+  const prepareOptions = params.prepareOptions ?? DEFAULT_READER_TEXT_PREPARE_OPTIONS;
+  const prepared = createPreparedTextBlock(params.text, params.font, prepareOptions);
+  if (!prepared.prepared) {
+    return null;
+  }
+
+  try {
+    const line = materializePretextLineRange(prepared.prepared, {
+      end: params.range.end,
+      start: params.range.start,
+      width: params.range.width,
+    });
+    return {
+      ...line,
+      lineIndex: params.range.lineIndex,
+    };
+  } catch {
+    return null;
+  }
+}
+
 function getBrowserTextMeasureRoot(): HTMLDivElement | null {
   if (typeof window === 'undefined' || typeof document === 'undefined' || !document.body) {
     return null;
@@ -360,6 +438,15 @@ export const browserReaderTextLayoutEngine: ReaderTextLayoutEngine = {
   measureLineStats(params) {
     return measurePreparedTextStats(params);
   },
+  walkLineRanges(params) {
+    return walkPreparedLineRanges(params);
+  },
+  layoutNextLineRange(params) {
+    return layoutNextPreparedLineRange(params);
+  },
+  materializeLineRange(params) {
+    return materializePreparedLineRange(params);
+  },
   layoutRichLines(params) {
     return layoutRichTextWithPretext({
       baseFont: params.font,
@@ -414,11 +501,11 @@ export function createReaderTypographyMetrics(
 }
 
 export function getReaderLayoutPretextCacheSizeForTests(): number {
-  return PRETEXT_CACHE.size + getRichTextLayoutCacheSizeForTests();
+  return getPreparedTextCacheSizeForTests() + getRichTextLayoutCacheSizeForTests();
 }
 
 function resetReaderTextLayoutCaches(): void {
-  PRETEXT_CACHE.clear();
+  resetPreparedTextCache();
   resetRichTextLayoutCacheForTests();
 }
 

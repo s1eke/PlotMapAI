@@ -253,6 +253,7 @@ const renderCacheMock = vi.hoisted(() => {
       entry?.variantFamily === 'summary-shell' ? entry.tree : null
     )),
     getReaderRenderCacheRecordFromDexie: vi.fn().mockResolvedValue(null),
+    getReaderRenderCacheRecordsForNovelVariantFromDexie: vi.fn().mockResolvedValue([]),
     getReaderRenderCacheEntryFromDexie: vi.fn().mockResolvedValue(null),
     getReaderRenderCacheEntryFromMemory: vi.fn((params: {
       chapterIndex: number;

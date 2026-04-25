@@ -21,6 +21,7 @@ export {
   findPageIndexForLocator,
   findPageIndexForLocatorInStaticTree,
   findVisibleBlockRange,
+  findVisibleBlockRangeFromBlockSummaries,
   getChapterBoundaryLocator,
   getChapterEndLocator,
   getChapterStartLocator,
@@ -44,6 +45,7 @@ export type {
   ReaderImageLayoutConstraints,
   ReaderImagePageItem,
   ReaderLayoutSignature,
+  ReaderLineRange,
   ReaderLocator,
   ReaderMeasuredLine,
   ReaderPageColumn,
@@ -62,6 +64,7 @@ export type {
   StaticScrollChapterTree,
   StaticSummaryShellTree,
   StaticTextLine,
+  StaticTextLineRange,
   VirtualBlockMetrics,
   VisibleBlockRange,
 } from '../utils/layout/readerLayout';

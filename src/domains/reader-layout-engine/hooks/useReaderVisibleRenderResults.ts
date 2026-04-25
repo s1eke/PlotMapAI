@@ -6,7 +6,9 @@ import type {
   StaticScrollChapterTree,
   StaticSummaryShellTree,
 } from '../layout-core/internal';
+import type { ChapterFlowManifest } from '../layout-core/internal';
 import { createChapterFlowManifestFromScrollTree } from '../layout-core/internal';
+import { createChapterFlowManifestFromRenderCacheRecord } from '../layout-core/internal';
 import type { ReaderRenderCacheSource } from '../utils/render-cache/readerRenderCache';
 import type { ReaderVisibleRenderTarget } from '../utils/render-cache/readerRenderCachePlanning';
 import type { ReaderVisibleRenderResultsResult } from './readerRenderCacheTypes';
@@ -252,6 +254,25 @@ export function useReaderVisibleRenderResults({
     return manifests;
   }, [variantSignatures, visibleResults]);
 
+  const pagedManifests = useMemo(() => {
+    const manifests = new Map<number, ChapterFlowManifest>();
+
+    for (const result of visibleResults) {
+      if (result.variantFamily !== 'original-paged') {
+        continue;
+      }
+
+      const manifest = createChapterFlowManifestFromRenderCacheRecord(result.entry);
+      if (!manifest) {
+        continue;
+      }
+
+      manifests.set(result.entry.chapterIndex, manifest);
+    }
+
+    return manifests;
+  }, [visibleResults]);
+
   const summaryShells = useMemo(() => {
     const shells = new Map<number, StaticSummaryShellTree>();
 
@@ -333,6 +354,7 @@ export function useReaderVisibleRenderResults({
     cacheSourceByKey,
     layoutSnapshot,
     pagedLayouts,
+    pagedManifests,
     scrollLayouts,
     scrollManifests,
     summaryShells,

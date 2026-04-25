@@ -392,6 +392,34 @@ describe('ScrollReaderContent', () => {
     expect(screen.getByText('Second text')).toBeInTheDocument();
   });
 
+  it('falls back to layout height and zero top when flow entries are absent', () => {
+    const { chapter, layout } = createScrollChapterLayout('Fallback text');
+
+    const { container } = render(
+      <ScrollReaderContent
+        chapters={[{
+          index: 0,
+          chapter,
+          layout,
+        }]}
+        novelId={1}
+        readerTheme="auto"
+        rootClassName="pm-reader pm-reader--scroll pm-reader--theme-auto"
+        rootStyle={{}}
+        textClassName=""
+        headerBgClassName=""
+        onChapterElement={() => {}}
+      />,
+    );
+
+    const flowRoot = container.querySelector('.pm-reader > .relative');
+    const chapterElement = container.querySelector(`.${READER_CONTENT_CLASS_NAMES.chapter}`);
+
+    expect(flowRoot).toHaveStyle({ height: `${layout.totalHeight}px` });
+    expect(chapterElement).toHaveStyle({ top: '0px' });
+    expect(screen.getByText('Fallback text')).toBeInTheDocument();
+  });
+
   it('lets the scroll reader text body inherit the global sans font stack', () => {
     const { chapter, layout } = createScrollChapterLayout('Text');
 

@@ -39,6 +39,8 @@ export interface UseReaderRenderCacheParams {
 
 export interface UseReaderRenderCacheResult {
   pagedLayouts: Map<number, StaticPagedChapterTree>;
+  pagedManifests: Map<number, ChapterFlowManifest>;
+  pagedLayoutSignature: ReaderLayoutSignature;
   scrollLayouts: Map<number, StaticScrollChapterTree>;
   scrollManifests: Map<number, ChapterFlowManifest>;
   scrollLayoutSignature: ReaderLayoutSignature;
@@ -87,6 +89,7 @@ export interface ReaderVisibleRenderResultsResult {
   cacheSourceByKey: Map<string, ReaderRenderCacheSource>;
   layoutSnapshot: ReaderVisibleLayoutSnapshot;
   pagedLayouts: Map<number, StaticPagedChapterTree>;
+  pagedManifests: Map<number, ChapterFlowManifest>;
   scrollLayouts: Map<number, StaticScrollChapterTree>;
   scrollManifests: Map<number, ChapterFlowManifest>;
   summaryShells: Map<number, StaticSummaryShellTree>;

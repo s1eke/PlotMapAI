@@ -114,7 +114,9 @@ vi.mock('../useReaderRenderCache', async () => {
       );
 
       return {
+        pagedLayoutSignature: scrollLayoutSignature,
         pagedLayouts: new Map(),
+        pagedManifests: new Map(),
         scrollLayouts,
         scrollManifests: new Map(
           params.scrollChapters.flatMap(({ chapter, index }) => {
@@ -561,6 +563,103 @@ describe('useScrollReaderController', () => {
         result.current.renderableScrollLayouts.map(({ index }) => index),
       ).toEqual([0, 1, 2, 3]);
     });
+  });
+
+  it('filters renderable layouts by the visible NovelFlowIndex window', async () => {
+    const currentChapter = createChapter(1, 4);
+    const fetchChapterContent = vi.fn(async (index: number) => createChapter(index, 4));
+    const chapterCacheRef = {
+      current: new Map<number, ChapterContent>([[currentChapter.index, currentChapter]]),
+    };
+    const contextValue = createReaderContextValue({
+      chapterIndex: 1,
+      chapterCacheRef,
+    });
+    const props = createHookProps({
+      chapters: [
+        { index: 0, title: 'Chapter 1', wordCount: 100 },
+        { index: 1, title: 'Chapter 2', wordCount: 100 },
+        { index: 2, title: 'Chapter 3', wordCount: 100 },
+        { index: 3, title: 'Chapter 4', wordCount: 100 },
+      ],
+      currentChapter,
+      fetchChapterContent,
+      harness: contextValue,
+    });
+
+    const { result, rerender } = renderHook(
+      (hookProps: ReturnType<typeof createHookProps>) => useScrollReaderController(hookProps),
+      {
+        initialProps: props,
+        wrapper: ({ children }: { children: ReactNode }) => ReaderContextProvider({
+          value: contextValue.contextValue,
+          children,
+        }),
+      },
+    );
+
+    await waitFor(() => {
+      expect(fetchChapterContent).toHaveBeenCalledTimes(3);
+    });
+
+    rerender({
+      ...props,
+      chapterDataRevision: 1,
+    });
+
+    await waitFor(() => {
+      expect(result.current.renderableScrollLayouts.map(({ index }) => index)).toEqual([
+        0,
+        1,
+        2,
+        3,
+      ]);
+    });
+
+    scrollModeState.setScrollViewportTop(2500);
+    rerender({
+      ...props,
+      chapterDataRevision: 2,
+    });
+
+    await waitFor(() => {
+      expect(result.current.renderableScrollLayouts.map(({ index }) => index)).toEqual([
+        1,
+        2,
+        3,
+      ]);
+    });
+    expect(result.current.scrollFlowTotalHeight).toBe(3200);
+    expect(result.current.renderableScrollLayouts[0]?.flowEntry?.scrollStart).toBe(800);
+  });
+
+  it('does not expose a NovelFlowIndex when the scroll controller is disabled', () => {
+    const currentChapter = createChapter(1, 4);
+    const contextValue = createReaderContextValue({
+      chapterIndex: 1,
+      chapterCacheRef: {
+        current: new Map<number, ChapterContent>([[currentChapter.index, currentChapter]]),
+      },
+    });
+    const props = createHookProps({
+      currentChapter,
+      enabled: false,
+      harness: contextValue,
+    });
+
+    const { result } = renderHook(
+      () => useScrollReaderController(props),
+      {
+        wrapper: ({ children }: { children: ReactNode }) => ReaderContextProvider({
+          value: contextValue.contextValue,
+          children,
+        }),
+      },
+    );
+
+    expect(result.current.novelFlowIndex).toBeNull();
+    expect(result.current.scrollFlowTotalHeight).toBe(0);
+    expect(result.current.renderableScrollLayouts).toEqual([]);
   });
 
   it('preserves the current viewport when earlier scroll chapters are inserted above it later', async () => {
@@ -1186,7 +1285,9 @@ describe('useScrollReaderController', () => {
       });
 
       const expectedScrollTop = Math.round(
-        1100 + (1200 - contentRef.current.clientHeight) * 0.5,
+        1100
+          + (1200 - contentRef.current.clientHeight) * 0.5
+          - contentRef.current.clientHeight * SCROLL_READING_ANCHOR_RATIO,
       );
 
       await animationFrames.flushNextAnimationFrame();
@@ -1222,7 +1323,7 @@ describe('useScrollReaderController', () => {
     const contentRef = {
       current: makeContainer({
         clientHeight: 600,
-        scrollHeight: 5000,
+        scrollHeight: 2000,
       }),
     };
     const clearPendingRestoreTarget = vi.fn();
@@ -1235,14 +1336,20 @@ describe('useScrollReaderController', () => {
     );
     const targetLocator: ReaderLocator = {
       chapterIndex: 1,
+      blockIndex: 24,
+      kind: 'text',
+      lineIndex: 2,
+      pageIndex: 3,
+    };
+    const restoredLocator: ReaderLocator = {
+      chapterIndex: 1,
       blockIndex: 10,
       kind: 'text',
       lineIndex: 0,
-      pageIndex: 3,
     };
     const progressTarget: ReaderRestoreTarget = {
       chapterIndex: 1,
-      chapterProgress: 0.12,
+      chapterProgress: 0.5,
       locator: targetLocator,
       mode: 'scroll',
     };
@@ -1285,14 +1392,17 @@ describe('useScrollReaderController', () => {
         }));
       });
       contextValue.resolveScrollLocatorOffsetRef.current = () => 1700;
-      contextValue.getCurrentOriginalLocatorRef.current = () => targetLocator;
+      contextValue.getCurrentOriginalLocatorRef.current = () => restoredLocator;
 
       for (let index = 0; index < 8 && onRestoreSettled.mock.calls.length === 0; index += 1) {
         await animationFrames.flushNextAnimationFrame();
       }
 
-      const expectedScrollTop = Math.round(1000 + (2000 - 600) * 0.12);
-      const expectedChapterProgress = 0.12;
+      const expectedScrollTop = Math.round(
+        (2000 - 600) * 0.5
+          - contentRef.current.clientHeight * SCROLL_READING_ANCHOR_RATIO,
+      );
+      const expectedChapterProgress = 0.5;
       const persistedState = contextValue.persistReaderState.mock.calls.at(-1)?.[0];
 
       expect(contentRef.current.scrollTop).toBe(expectedScrollTop);

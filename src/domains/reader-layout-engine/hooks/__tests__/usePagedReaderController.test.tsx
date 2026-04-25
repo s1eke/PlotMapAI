@@ -37,15 +37,70 @@ vi.mock('../../paged-runtime/internal', async () => {
   };
 });
 
-vi.mock('../../render-cache/internal', () => ({
-  useReaderRenderCache: vi.fn(() => ({
-    pagedLayouts: pagedControllerTestState.pagedLayoutsByIndex,
-  })),
-}));
+vi.mock('../../render-cache/internal', async () => {
+  const {
+    createReaderLayoutSignature,
+    serializeReaderLayoutSignature,
+  } = await vi.importActual<typeof import('../../layout-core/internal')>(
+    '../../layout-core/internal',
+  );
+  const pagedLayoutSignature = createReaderLayoutSignature({
+    columnCount: 1,
+    columnGap: 0,
+    fontSize: 18,
+    lineSpacing: 1.6,
+    pageHeight: 800,
+    paragraphSpacing: 16,
+    textWidth: 560,
+  });
 
-vi.mock('../../layout-core/internal', () => ({
-  resolveCurrentPagedLocator: vi.fn(() => pagedControllerTestState.currentPagedLocator),
-}));
+  return {
+    useReaderRenderCache: vi.fn(() => ({
+      pagedLayoutSignature,
+      pagedLayouts: pagedControllerTestState.pagedLayoutsByIndex,
+      pagedManifests: new Map(
+        Array.from(
+          pagedControllerTestState.pagedLayoutsByIndex.entries(),
+        ).map(([chapterIndex, layout]) => {
+          const pagedLayout = layout as {
+            pageSlices: Array<{
+              endLocator: ReaderLocator | null;
+              startLocator: ReaderLocator | null;
+            }>;
+          };
+          const firstPage = pagedLayout.pageSlices[0];
+          const lastPage = pagedLayout.pageSlices[pagedLayout.pageSlices.length - 1];
+          return [chapterIndex, {
+            blockCount: 0,
+            blockSummaries: [],
+            chapterIndex,
+            contentHash: `chapter-${chapterIndex}`,
+            endLocator: lastPage?.endLocator ?? null,
+            layoutKey: serializeReaderLayoutSignature(pagedLayoutSignature),
+            layoutSignature: pagedLayoutSignature,
+            pageCount: pagedLayout.pageSlices.length,
+            rendererVersion: 7,
+            scrollHeight: 0,
+            sourceVariants: ['original-paged'] as const,
+            startLocator: firstPage?.startLocator ?? null,
+            status: 'materialized' as const,
+          }];
+        }),
+      ),
+    })),
+  };
+});
+
+vi.mock('../../layout-core/internal', async () => {
+  const actual = await vi.importActual<typeof import('../../layout-core/internal')>(
+    '../../layout-core/internal',
+  );
+
+  return {
+    ...actual,
+    resolveCurrentPagedLocator: vi.fn(() => pagedControllerTestState.currentPagedLocator),
+  };
+});
 
 vi.mock('@shared/reader-trace', () => ({
   isReaderTraceEnabled: () => readerTraceMocks.enabled,
@@ -335,6 +390,11 @@ describe('usePagedReaderController', () => {
       },
       hints: {
         chapterProgress: undefined,
+        globalFlow: expect.objectContaining({
+          globalPageIndex: 1,
+          sourceMode: 'paged',
+        }),
+        pageIndex: 0,
         contentMode: 'paged',
       },
     });

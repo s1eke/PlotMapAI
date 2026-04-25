@@ -27,9 +27,18 @@ export interface ChapterRenderData {
 
 export const SCROLL_READING_ANCHOR_RATIO = 0.3;
 
-type ChapterRangeContainer = Pick<HTMLDivElement, 'clientHeight'> | null | undefined;
-type ChapterRangeElement = Pick<HTMLElement, 'offsetHeight'> | null | undefined;
-type ChapterProgressContainer = Pick<HTMLDivElement, 'clientHeight' | 'scrollTop'> | null | undefined;
+type ChapterRangeContainer =
+  | (Pick<HTMLDivElement, 'clientHeight'> & Partial<Pick<HTMLDivElement, 'scrollHeight'>>)
+  | null
+  | undefined;
+type ChapterRangeElement =
+  | (Pick<HTMLElement, 'offsetHeight'> & Partial<Pick<HTMLElement, 'offsetTop'>>)
+  | null
+  | undefined;
+type ChapterProgressContainer =
+  | (Pick<HTMLDivElement, 'clientHeight' | 'scrollTop'> & Partial<Pick<HTMLDivElement, 'scrollHeight'>>)
+  | null
+  | undefined;
 type ChapterProgressElement = Pick<HTMLElement, 'offsetTop' | 'offsetHeight'> | null | undefined;
 
 export function getContainerMaxScrollTop(element: HTMLDivElement | null): number {
@@ -62,12 +71,25 @@ export function getChapterScrollableRange(
     return 0;
   }
 
-  return Math.max(chapterElement.offsetHeight - container.clientHeight, 0);
+  const rawRange = Math.max(chapterElement.offsetHeight - container.clientHeight, 0);
+  if (
+    typeof container.scrollHeight !== 'number'
+    || typeof chapterElement.offsetTop !== 'number'
+  ) {
+    return rawRange;
+  }
+
+  const availableContainerRange = Math.max(
+    0,
+    container.scrollHeight - container.clientHeight - chapterElement.offsetTop,
+  );
+  return Math.min(rawRange, availableContainerRange);
 }
 
 export function getChapterLocalProgress(
   container: ChapterProgressContainer,
   chapterElement: ChapterProgressElement,
+  viewportOffset = 0,
 ): number {
   if (!container || !chapterElement) {
     return 0;
@@ -79,7 +101,7 @@ export function getChapterLocalProgress(
   }
 
   return clampProgress(
-    (container.scrollTop - chapterElement.offsetTop) / chapterScrollableRange,
+    ((container.scrollTop + viewportOffset) - chapterElement.offsetTop) / chapterScrollableRange,
   );
 }
 
@@ -87,6 +109,7 @@ export function getScrollTopForChapterProgress(
   container: HTMLDivElement | null,
   chapterElement: ChapterProgressElement,
   chapterProgress: number | undefined,
+  viewportOffset = 0,
 ): number | null {
   if (!container || !chapterElement || typeof chapterProgress !== 'number') {
     return null;
@@ -95,7 +118,9 @@ export function getScrollTopForChapterProgress(
   const chapterScrollableRange = getChapterScrollableRange(container, chapterElement);
   return clampContainerScrollTop(
     container,
-    chapterElement.offsetTop + chapterScrollableRange * clampProgress(chapterProgress),
+    chapterElement.offsetTop
+      + chapterScrollableRange * clampProgress(chapterProgress)
+      - viewportOffset,
   );
 }
 
@@ -177,12 +202,24 @@ export function hasReaderRestoreTarget(
   const usesContentProgress = (target.mode === 'scroll' || target.mode === 'paged')
     && typeof target.chapterProgress === 'number'
     && target.chapterProgress > 0;
+  const usesPageIndex = target.mode === 'paged'
+    && typeof target.pageIndex === 'number'
+    && Number.isFinite(target.pageIndex);
+  const usesGlobalFlow = (
+    typeof target.globalFlow?.globalScrollOffset === 'number'
+    && Number.isFinite(target.globalFlow.globalScrollOffset)
+  ) || (
+    typeof target.globalFlow?.globalPageIndex === 'number'
+    && Number.isFinite(target.globalFlow.globalPageIndex)
+  );
 
   return getReaderRestoreTargetPosition(target) !== undefined
     || getReaderRestoreTargetLocator(target) !== undefined
     || getReaderRestoreTargetBoundary(target) !== undefined
     || usesSummaryProgress
-    || usesContentProgress;
+    || usesContentProgress
+    || usesPageIndex
+    || usesGlobalFlow;
 }
 
 export function shouldKeepReaderRestoreMask(
@@ -197,12 +234,24 @@ export function shouldKeepReaderRestoreMask(
   const usesContentProgress = (target.mode === 'scroll' || target.mode === 'paged')
     && typeof target.chapterProgress === 'number'
     && target.chapterProgress > 0;
+  const usesPageIndex = target.mode === 'paged'
+    && typeof target.pageIndex === 'number'
+    && Number.isFinite(target.pageIndex);
+  const usesGlobalFlow = (
+    typeof target.globalFlow?.globalScrollOffset === 'number'
+    && Number.isFinite(target.globalFlow.globalScrollOffset)
+  ) || (
+    typeof target.globalFlow?.globalPageIndex === 'number'
+    && Number.isFinite(target.globalFlow.globalPageIndex)
+  );
 
   return getReaderRestoreTargetPosition(target) !== undefined
     || getReaderRestoreTargetLocator(target) !== undefined
     || getReaderRestoreTargetBoundary(target) !== undefined
     || usesSummaryProgress
-    || usesContentProgress;
+    || usesContentProgress
+    || usesPageIndex
+    || usesGlobalFlow;
 }
 
 export function canSkipReaderRestore(
@@ -246,17 +295,39 @@ export function createRestoreTargetFromPersistedState(
     locator,
     locatorBoundary,
   };
-
   if (
-    typeof normalizedState.hints?.chapterProgress === 'number'
+    typeof normalizedState.hints?.pageIndex === 'number'
     && isReaderProjectionFreshForCanonical(
-      normalizedState.hints?.scrollProjection,
+      normalizedState.hints?.pagedProjection,
       normalizedState.canonical,
     )
   ) {
+    target.pageIndex = normalizedState.hints.pageIndex;
+  }
+
+  const hasFreshScrollProjection = isReaderProjectionFreshForCanonical(
+    normalizedState.hints?.scrollProjection,
+    normalizedState.canonical,
+  );
+  const canUseScrollProgress =
+    typeof normalizedState.hints?.chapterProgress === 'number'
+    && (
+      hasFreshScrollProjection
+      || normalizedState.hints?.contentMode === 'scroll'
+    );
+  if (canUseScrollProgress) {
     target.chapterProgress = typeof normalizedState.hints?.chapterProgress === 'number'
       ? clampProgress(normalizedState.hints.chapterProgress)
       : undefined;
+  }
+  if (
+    normalizedState.hints?.globalFlow
+    && isReaderProjectionFreshForCanonical(
+      normalizedState.hints.globalFlow,
+      normalizedState.canonical,
+    )
+  ) {
+    target.globalFlow = normalizedState.hints.globalFlow;
   }
 
   return shouldKeepReaderRestoreMask(target) ? target : null;
@@ -279,6 +350,7 @@ export function createRestoreTargetFromNavigationIntent(
         edge: locatorBoundary,
       },
     locatorBoundary: intent.locator ? undefined : locatorBoundary,
+    pageIndex: intent.pageIndex,
     locator: intent.locator,
   };
 }

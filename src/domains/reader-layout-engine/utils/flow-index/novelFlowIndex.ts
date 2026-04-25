@@ -285,12 +285,57 @@ function findBlockSummaryForLocator(
   return entry.blockSummaries.find((summary) => (
     areLocatorsEquivalent(summary.startLocator, locator)
     || areLocatorsEquivalent(summary.endLocator, locator)
+    || summaryLocatorIdentityMatches(summary.startLocator, locator)
+    || summaryLocatorIdentityMatches(summary.endLocator, locator)
     || (
       summary.kind === locator.kind
       && summary.blockIndex === locator.blockIndex
       && (!locator.blockKey || !summary.blockKey || locator.blockKey === summary.blockKey)
     )
   )) ?? null;
+}
+
+function summaryLocatorIdentityMatches(
+  summaryLocator: ReaderLocator | null | undefined,
+  locator: ReaderLocator,
+): boolean {
+  if (!summaryLocator || summaryLocator.chapterIndex !== locator.chapterIndex) {
+    return false;
+  }
+
+  if (
+    locator.chapterKey
+    && summaryLocator.chapterKey
+    && locator.chapterKey !== summaryLocator.chapterKey
+  ) {
+    return false;
+  }
+
+  if (locator.kind && summaryLocator.kind !== locator.kind) {
+    return false;
+  }
+
+  if (locator.anchorId && summaryLocator.anchorId === locator.anchorId) {
+    return true;
+  }
+
+  if (locator.imageKey && summaryLocator.imageKey === locator.imageKey) {
+    return true;
+  }
+
+  if (locator.blockKey && summaryLocator.blockKey === locator.blockKey) {
+    return true;
+  }
+
+  if (locator.blockTextHash && summaryLocator.blockTextHash === locator.blockTextHash) {
+    return true;
+  }
+
+  return Boolean(
+    locator.textQuote?.exact
+    && summaryLocator.textQuote?.exact
+    && locator.textQuote.exact === summaryLocator.textQuote.exact,
+  );
 }
 
 function normalizePageCount(pageCount: number | null | undefined): number {

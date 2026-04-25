@@ -6,11 +6,17 @@ import type {
 } from '@shared/contracts/reader';
 import type { ScrollReaderLayout } from './scrollReaderControllerTypes';
 
-import { getChapterBoundaryLocator } from '../layout-core/internal';
+import {
+  getChapterBoundaryLocator,
+  resolveLocatorGlobalOffset,
+  resolveGlobalOffsetPosition,
+  type NovelFlowIndex,
+} from '../layout-core/internal';
 import {
   clampContainerScrollTop,
-  getContainerMaxScrollTop,
+  clampProgress,
   getChapterLocalProgress,
+  getContainerMaxScrollTop,
   getScrollTopForChapterProgress,
   SCROLL_READING_ANCHOR_RATIO,
 } from '@shared/utils/readerPosition';
@@ -26,7 +32,91 @@ import {
 } from '@shared/utils/readerRestoreSolver';
 import { buildFocusedScrollWindow } from './scrollReaderWindowing';
 
-const SCROLL_RESTORE_PROGRESS_FALLBACK_TOLERANCE = 0.03;
+const SCROLL_RESTORE_PROGRESS_FALLBACK_TOLERANCE_PX = 32;
+
+function isFocusedSingleChapterContainer(params: {
+  container: HTMLDivElement;
+  targetElement: HTMLDivElement | null;
+}): boolean {
+  const { container, targetElement } = params;
+  return Boolean(
+    targetElement
+    && container.scrollHeight > 0
+    && targetElement.offsetHeight > 0
+    && container.scrollHeight <= targetElement.offsetHeight + 1,
+  );
+}
+
+export function resolveScrollTopForRestoreChapterProgress(params: {
+  chapterProgress: number | undefined;
+  container: HTMLDivElement;
+  targetElement: HTMLDivElement | null;
+}): number | null {
+  const { chapterProgress, container, targetElement } = params;
+  if (typeof chapterProgress !== 'number') {
+    return null;
+  }
+  const readingAnchorOffset = container.clientHeight * SCROLL_READING_ANCHOR_RATIO;
+
+  if (isFocusedSingleChapterContainer({ container, targetElement })) {
+    return clampContainerScrollTop(
+      container,
+      getContainerMaxScrollTop(container) * clampProgress(chapterProgress)
+        - readingAnchorOffset,
+    );
+  }
+
+  return getScrollTopForChapterProgress(
+    container,
+    targetElement,
+    chapterProgress,
+    readingAnchorOffset,
+  );
+}
+
+export function resolveRestoredScrollGlobalOffset(params: {
+  novelFlowIndex: NovelFlowIndex | null;
+  resolvedLocator: ReaderLocator | null | undefined;
+  restoredChapterIndex: number;
+  restoredChapterProgress: number | undefined;
+}): number | undefined {
+  const {
+    novelFlowIndex,
+    resolvedLocator,
+    restoredChapterIndex,
+    restoredChapterProgress,
+  } = params;
+  if (!novelFlowIndex) {
+    return undefined;
+  }
+
+  const locatorOffset = resolveLocatorGlobalOffset(novelFlowIndex, resolvedLocator);
+  if (locatorOffset !== null) {
+    return locatorOffset;
+  }
+
+  const flowEntry = novelFlowIndex.chapters[restoredChapterIndex];
+  if (!flowEntry || typeof restoredChapterProgress !== 'number') {
+    return undefined;
+  }
+
+  const chapterHeight = Math.max(0, flowEntry.scrollEnd - flowEntry.scrollStart);
+  return flowEntry.scrollStart + chapterHeight * restoredChapterProgress;
+}
+
+export function resolveRestoredChapterProgress(params: {
+  container: HTMLDivElement | null;
+  restoredChapterElement: HTMLDivElement | null;
+}): number | undefined {
+  const { container, restoredChapterElement } = params;
+  return container && restoredChapterElement
+    ? getChapterLocalProgress(
+      container,
+      restoredChapterElement,
+      container.clientHeight * SCROLL_READING_ANCHOR_RATIO,
+    )
+    : undefined;
+}
 
 export function setStableRestoreWindow(
   setScrollModeChapters: Dispatch<SetStateAction<number[]>>,
@@ -144,6 +234,7 @@ export function resolvePendingScrollTarget(params: {
   scrollChapterBodyElementsRef: MutableRefObject<Map<number, HTMLDivElement>>;
   scrollChapterElementsRef: MutableRefObject<Map<number, HTMLDivElement>>;
   scrollLayouts: ReadonlyMap<number, ScrollReaderLayout>;
+  novelFlowIndex: NovelFlowIndex | null;
   target: ReaderRestoreTarget;
 }) {
   const {
@@ -152,6 +243,7 @@ export function resolvePendingScrollTarget(params: {
     scrollChapterBodyElementsRef,
     scrollChapterElementsRef,
     scrollLayouts,
+    novelFlowIndex,
     target,
   } = params;
   const targetLocator = getReaderRestoreTargetLocator(target);
@@ -160,12 +252,29 @@ export function resolvePendingScrollTarget(params: {
   const targetElement = scrollChapterElementsRef.current.get(targetChapterIndex) ?? null;
   const resolvedLocator = resolvePendingRestoreLocator(target, scrollLayouts);
   const containerMaxScrollTop = getContainerMaxScrollTop(container);
-  const progressScrollTop = getScrollTopForChapterProgress(
+  const progressScrollTop = resolveScrollTopForRestoreChapterProgress({
+    chapterProgress: target.chapterProgress,
     container,
     targetElement,
-    target.chapterProgress,
-  );
+  });
   const resolvePreferredScrollTop = (candidateScrollTop: number): number => {
+    if (targetLocator && typeof targetLocator.pageIndex !== 'number') {
+      const locatorScrollTopHitBoundary =
+        candidateScrollTop <= 0
+        || candidateScrollTop >= containerMaxScrollTop;
+      if (
+        locatorScrollTopHitBoundary
+        && progressScrollTop !== null
+        && typeof target.chapterProgress === 'number'
+        && Math.abs(candidateScrollTop - progressScrollTop)
+          > SCROLL_RESTORE_PROGRESS_FALLBACK_TOLERANCE_PX
+      ) {
+        return progressScrollTop;
+      }
+
+      return candidateScrollTop;
+    }
+
     if (
       typeof targetLocator?.pageIndex === 'number'
       && typeof target.chapterProgress !== 'number'
@@ -177,21 +286,44 @@ export function resolvePendingScrollTarget(params: {
       return candidateScrollTop;
     }
 
-    const candidateProgress = getChapterLocalProgress(
-      {
-        clientHeight: container.clientHeight,
-        scrollTop: candidateScrollTop,
-      },
-      targetElement,
-    );
     if (
-      Math.abs(candidateProgress - target.chapterProgress)
-      > SCROLL_RESTORE_PROGRESS_FALLBACK_TOLERANCE
+      Math.abs(candidateScrollTop - progressScrollTop)
+      > SCROLL_RESTORE_PROGRESS_FALLBACK_TOLERANCE_PX
     ) {
       return progressScrollTop;
     }
 
     return candidateScrollTop;
+  };
+  const resolveGlobalFlowScrollTop = (): number | null => {
+    const { globalFlow } = target;
+    if (
+      typeof target.chapterProgress === 'number'
+      || !novelFlowIndex
+      || novelFlowIndex.totalScrollHeight <= 0
+      || typeof globalFlow?.globalScrollOffset !== 'number'
+      || !Number.isFinite(globalFlow.globalScrollOffset)
+    ) {
+      return null;
+    }
+
+    if (globalFlow.layoutKey && globalFlow.layoutKey !== novelFlowIndex.layoutKey) {
+      return null;
+    }
+
+    const resolvedGlobalPosition = resolveGlobalOffsetPosition(
+      novelFlowIndex,
+      globalFlow.globalScrollOffset,
+    );
+    if (!resolvedGlobalPosition) {
+      return null;
+    }
+
+    return clampContainerScrollTop(
+      container,
+      resolvedGlobalPosition.globalOffset
+        - container.clientHeight * SCROLL_READING_ANCHOR_RATIO,
+    );
   };
 
   interface ScrollRestoreStepValue {
@@ -249,11 +381,32 @@ export function resolvePendingScrollTarget(params: {
     const hasResolvedChapterLayout = scrollLayouts.has(resolvedLocator.chapterIndex)
       && scrollChapterBodyElementsRef.current.has(resolvedLocator.chapterIndex);
     if (!hasResolvedChapterLayout) {
+      const globalFlowScrollTop = resolveGlobalFlowScrollTop();
+      if (globalFlowScrollTop !== null) {
+        if (containerMaxScrollTop > 0) {
+          return restoreStepSuccess<ScrollRestoreStepValue>({
+            locator: null,
+            scrollTop: globalFlowScrollTop,
+          });
+        }
+        return restoreStepPending<ScrollRestoreStepValue>('layout_not_ready');
+      }
       return restoreStepPending<ScrollRestoreStepValue>('layout_missing');
     }
   }
 
-  // 最后手段：如果基于定位项的解析不可用，则使用章节进度。
+  const globalFlowScrollTop = resolveGlobalFlowScrollTop();
+  if (globalFlowScrollTop !== null) {
+    if (containerMaxScrollTop > 0) {
+      return restoreStepSuccess<ScrollRestoreStepValue>({
+        locator: null,
+        scrollTop: globalFlowScrollTop,
+      });
+    }
+    return restoreStepPending<ScrollRestoreStepValue>('layout_not_ready');
+  }
+
+  // 最后手段：如果基于定位项和全书 flow 的解析不可用，则使用章节进度。
   // 防止在容器滚动范围尚未计算（DOM 布局不完整）时返回过时的进度 0；
   // 请在下一帧重试。
   if (progressScrollTop !== null) {

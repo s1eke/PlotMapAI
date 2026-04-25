@@ -364,6 +364,28 @@ describe('novelFlowIndex', () => {
     expect(resolveLocatorGlobalPageIndex(index, secondBlockLocator)).toBe(1);
   });
 
+  it('resolves global offsets by locator text quote when block indices drift', () => {
+    const manifest = createScrollManifest(1, [40, 60, 30]);
+    const index = buildNovelFlowIndex({
+      chapterCount: 2,
+      layoutKey: 'scroll-layout',
+      layoutSignature: LAYOUT_SIGNATURE,
+      manifests: [createScrollManifest(0, [25]), manifest],
+      novelId: 1,
+    });
+    const thirdBlockLocator = manifest?.blockSummaries.find((summary) => (
+      summary.blockIndex === 2
+    ))?.startLocator;
+    if (!thirdBlockLocator) {
+      throw new Error('Expected third block locator in test manifest.');
+    }
+
+    expect(resolveLocatorGlobalOffset(index, {
+      ...thirdBlockLocator,
+      blockIndex: 0,
+    })).toBe(125);
+  });
+
   it('checks manifest compatibility against identity fields', () => {
     const manifest = createScrollManifest(0, [40]);
 

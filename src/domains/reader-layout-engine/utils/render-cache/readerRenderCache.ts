@@ -48,6 +48,7 @@ export {
   getReaderRenderCacheEntryFromDexie,
   getReaderRenderCacheEntryFromMemory,
   getReaderRenderCacheRecordFromDexie,
+  getReaderRenderCacheRecordsForNovelVariantFromDexie,
   isMaterializedReaderRenderCacheEntry,
   persistReaderRenderCacheEntry,
   primeReaderRenderCacheEntry,

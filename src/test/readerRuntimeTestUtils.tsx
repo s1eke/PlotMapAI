@@ -49,6 +49,7 @@ export function createReaderContextValue(
   const scrollChapterBodyElements = new Map<number, HTMLDivElement>();
   const beforeFlushHandlers = new Set<() => void>();
   let chapterChangeSource: ChapterChangeSource = null;
+  let pendingPageIndex: number | null = null;
   let pendingPageTarget: PageTarget | null = null;
   let pagedState = { pageCount: 1, pageIndex: 0 };
   let currentAnchorResolver: () => ScrollModeAnchor | null = () => null;
@@ -75,6 +76,12 @@ export function createReaderContextValue(
     getPendingPageTarget: overrides.getPendingPageTarget ?? (() => pendingPageTarget),
     setPendingPageTarget: overrides.setPendingPageTarget ?? ((nextTarget) => {
       pendingPageTarget = nextTarget;
+    }),
+    getPendingPageIndex: overrides.getPendingPageIndex ?? (() => pendingPageIndex),
+    setPendingPageIndex: overrides.setPendingPageIndex ?? ((nextPageIndex) => {
+      pendingPageIndex = typeof nextPageIndex === 'number'
+        ? Math.max(0, Math.floor(nextPageIndex))
+        : null;
     }),
     getPagedState: overrides.getPagedState ?? (() => pagedState),
     setPagedState: overrides.setPagedState ?? ((nextState) => {

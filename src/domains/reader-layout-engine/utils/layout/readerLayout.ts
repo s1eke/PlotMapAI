@@ -36,6 +36,7 @@ export {
   findPageIndexForLocator,
   findPageIndexForLocatorInStaticTree,
   findVisibleBlockRange,
+  findVisibleBlockRangeFromBlockSummaries,
   getOffsetForLocator,
   getOffsetForLocatorInStaticTree,
   getPageStartLocator,
@@ -53,6 +54,7 @@ export type {
   ReaderLayoutCursor,
   ReaderLayoutSignature,
   ReaderLocator,
+  ReaderLineRange,
   ReaderMeasuredLine,
   ReaderPageColumn,
   ReaderPageItem,
@@ -69,6 +71,7 @@ export type {
   StaticScrollChapterTree,
   StaticSummaryShellTree,
   StaticTextLine,
+  StaticTextLineRange,
   VirtualBlockMetrics,
   VisibleBlockRange,
 } from './readerLayoutTypes';

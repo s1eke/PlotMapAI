@@ -1,6 +1,7 @@
 import type {
   CanonicalPosition,
   CanonicalPositionV2,
+  ReaderGlobalFlowProjection,
   ReaderLocator,
   ReaderPositionMetadata,
   ReaderProjectionMetadata,
@@ -40,6 +41,7 @@ function buildHints(
   viewMode: ReaderViewMode | undefined,
   scrollProjection?: ReaderProjectionMetadata,
   pagedProjection?: ReaderProjectionMetadata,
+  globalFlow?: ReaderGlobalFlowProjection,
 ): StoredReaderState['hints'] {
   if (
     chapterProgress === undefined
@@ -48,6 +50,7 @@ function buildHints(
     && !viewMode
     && !scrollProjection
     && !pagedProjection
+    && !globalFlow
   ) {
     return undefined;
   }
@@ -59,6 +62,7 @@ function buildHints(
     viewMode,
     scrollProjection,
     pagedProjection,
+    globalFlow,
   });
 }
 
@@ -116,6 +120,38 @@ function sanitizeProjectionMetadata(raw: unknown): ReaderProjectionMetadata | un
 
   return Object.values(metadata).some((value) => value !== undefined)
     ? metadata
+    : undefined;
+}
+
+export function sanitizeGlobalFlowProjection(raw: unknown): ReaderGlobalFlowProjection | undefined {
+  if (!raw || typeof raw !== 'object') {
+    return undefined;
+  }
+
+  const parsed = raw as Record<string, unknown>;
+  const sourceMode: ReaderGlobalFlowProjection['sourceMode'] =
+    parsed.sourceMode === 'scroll' || parsed.sourceMode === 'paged'
+      ? parsed.sourceMode
+      : undefined;
+  const globalScrollOffset = typeof parsed.globalScrollOffset === 'number'
+    && Number.isFinite(parsed.globalScrollOffset)
+    ? Math.max(0, parsed.globalScrollOffset)
+    : undefined;
+  const globalPageIndex = typeof parsed.globalPageIndex === 'number'
+    && Number.isFinite(parsed.globalPageIndex)
+    ? Math.max(0, Math.floor(parsed.globalPageIndex))
+    : undefined;
+  const projection: ReaderGlobalFlowProjection = compactUndefined({
+    basisCanonicalFingerprint: sanitizeOptionalString(parsed.basisCanonicalFingerprint),
+    capturedAt: sanitizeOptionalString(parsed.capturedAt),
+    globalPageIndex,
+    globalScrollOffset,
+    layoutKey: sanitizeOptionalString(parsed.layoutKey),
+    sourceMode,
+  });
+
+  return Object.values(projection).some((value) => value !== undefined)
+    ? projection
     : undefined;
 }
 
@@ -687,6 +723,7 @@ function normalizeHints(raw: unknown): StoredReaderState['hints'] {
       : undefined;
   const scrollProjection = sanitizeProjectionMetadata(parsed.scrollProjection);
   const pagedProjection = sanitizeProjectionMetadata(parsed.pagedProjection);
+  const globalFlow = sanitizeGlobalFlowProjection(parsed.globalFlow);
 
   if (
     chapterProgress === undefined
@@ -695,6 +732,7 @@ function normalizeHints(raw: unknown): StoredReaderState['hints'] {
     && !viewMode
     && !scrollProjection
     && !pagedProjection
+    && !globalFlow
   ) {
     return undefined;
   }
@@ -706,6 +744,7 @@ function normalizeHints(raw: unknown): StoredReaderState['hints'] {
     viewMode,
     scrollProjection,
     pagedProjection,
+    globalFlow,
   });
 }
 
@@ -766,6 +805,8 @@ export function mergeStoredReaderState(
     && hasOwn(rawOverrideHints as Record<string, unknown>, 'scrollProjection');
   const hasPagedProjectionOverride = hasOverrideHints
     && hasOwn(rawOverrideHints as Record<string, unknown>, 'pagedProjection');
+  const hasGlobalFlowOverride = hasOverrideHints
+    && hasOwn(rawOverrideHints as Record<string, unknown>, 'globalFlow');
 
   let nextChapterProgress: number | undefined;
   if (hasChapterProgressOverride) {
@@ -804,6 +845,18 @@ export function mergeStoredReaderState(
   } else if (!chapterChanged) {
     nextPagedProjection = baseHints?.pagedProjection;
   }
+
+  let nextGlobalFlow: ReaderGlobalFlowProjection | undefined;
+  if (
+    (hasChapterProgressOverride && nextChapterProgress === undefined)
+    || (hasPageIndexOverride && nextPageIndex === undefined)
+  ) {
+    nextGlobalFlow = undefined;
+  } else if (hasGlobalFlowOverride) {
+    nextGlobalFlow = sanitizeGlobalFlowProjection(overrideHints?.globalFlow);
+  } else if (!chapterChanged) {
+    nextGlobalFlow = baseHints?.globalFlow;
+  }
   const nextHints = buildHints(
     nextChapterProgress,
     nextPageIndex,
@@ -811,6 +864,7 @@ export function mergeStoredReaderState(
     nextViewMode,
     nextScrollProjection,
     nextPagedProjection,
+    nextGlobalFlow,
   );
   const overrideMetadata = sanitizePositionMetadata(overrideState.metadata);
   const nextMetadata = overrideMetadata ?? (

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { ReaderLocator } from '@shared/contracts/reader';
 
 import {
   useReaderLayoutQueries,
@@ -30,6 +31,10 @@ import {
   useScrollReaderWindowing,
 } from '../scroll-runtime/internal';
 import { serializeReaderLayoutSignature } from '../layout-core/internal';
+import {
+  useScrollFlowOffsetCompensation,
+  type PendingScrollWindowAnchor,
+} from './useScrollFlowOffsetCompensation';
 
 export type {
   UseScrollReaderControllerResult,
@@ -67,6 +72,49 @@ function getVisibleFlowChapterIndices(params: {
     .map((entry) => entry.chapterIndex);
 
   return indices.length > 0 ? indices : [chapterIndex];
+}
+
+function resolveScrollGlobalOffset(params: {
+  anchor: ScrollModeAnchor;
+  locator: ReaderLocator | null;
+  novelFlowIndex: ReturnType<typeof buildNovelFlowIndex> | null;
+}): number | undefined {
+  const { anchor, locator, novelFlowIndex } = params;
+  if (!novelFlowIndex || novelFlowIndex.totalScrollHeight <= 0) {
+    return undefined;
+  }
+
+  if (locator) {
+    const locatorOffset = resolveLocatorGlobalOffset(novelFlowIndex, locator);
+    if (locatorOffset !== null) {
+      return locatorOffset;
+    }
+  }
+
+  const flowEntry = novelFlowIndex.chapters[anchor.chapterIndex];
+  if (!flowEntry || flowEntry.manifestStatus === 'missing') {
+    return undefined;
+  }
+
+  const chapterHeight = Math.max(0, flowEntry.scrollEnd - flowEntry.scrollStart);
+  return flowEntry.scrollStart + chapterHeight * Math.max(
+    0,
+    Math.min(1, anchor.chapterProgress),
+  );
+}
+
+function clampScrollProgress(value: number): number {
+  if (!Number.isFinite(value) || value <= 0) {
+    return 0;
+  }
+
+  return value >= 1 ? 1 : value;
+}
+
+function resolvePersistedChapterProgress(params: {
+  anchor: ScrollModeAnchor;
+}): number {
+  return clampScrollProgress(params.anchor.chapterProgress);
 }
 
 export function useScrollReaderController({
@@ -110,9 +158,10 @@ export function useScrollReaderController({
     scrollTop: 0,
   });
   const novelFlowIndexRef = useRef<ReturnType<typeof buildNovelFlowIndex> | null>(null);
-  const fetchScrollChapterContent = useCallback((index: number) => {
-    return fetchChapterContent(index);
-  }, [fetchChapterContent]);
+  const pendingScrollWindowAnchorRef = useRef<PendingScrollWindowAnchor | null>(null);
+  const fetchScrollChapterContent = useCallback((index: number) => (
+    fetchChapterContent(index)
+  ), [fetchChapterContent]);
   const retainFocusedWindowAfterRestore = useCallback((restoredChapterIndex: number) => {
     setRetainedFocusedWindowChapterIndex((previousChapterIndex) => (
       previousChapterIndex === restoredChapterIndex
@@ -121,10 +170,26 @@ export function useScrollReaderController({
     ));
   }, []);
   const clearRetainedFocusedWindow = useCallback(() => {
-    setRetainedFocusedWindowChapterIndex((previousChapterIndex) => (
-      previousChapterIndex === null ? previousChapterIndex : null
-    ));
-  }, []);
+    setRetainedFocusedWindowChapterIndex((previousChapterIndex) => {
+      if (previousChapterIndex !== null && previousChapterIndex === chapterIndex) {
+        const locator = layoutQueries.getCurrentOriginalLocator();
+        const activeNovelFlowIndex = novelFlowIndexRef.current;
+        const previousOffset = locator && activeNovelFlowIndex
+          ? resolveLocatorGlobalOffset(activeNovelFlowIndex, locator)
+          : null;
+        pendingScrollWindowAnchorRef.current = locator && previousOffset !== null
+          ? {
+            locator,
+            previousOffset,
+          }
+          : null;
+      } else if (previousChapterIndex !== null) {
+        pendingScrollWindowAnchorRef.current = null;
+      }
+
+      return null;
+    });
+  }, [chapterIndex, layoutQueries]);
 
   useEffect(() => {
     if (!enabled || chapterIndex !== retainedFocusedWindowChapterIndex) {
@@ -149,6 +214,7 @@ export function useScrollReaderController({
     retainedFocusedWindowChapterIndex,
     scrollAnchorSnapshotRef,
     scrollChapterBodyElementsRef,
+    scrollModeChapters,
     setScrollModeChapters,
     setVisibleScrollBlockRangeByChapter,
   });
@@ -166,6 +232,15 @@ export function useScrollReaderController({
     }
 
     const locator = layoutQueries.getCurrentOriginalLocator();
+    const activeNovelFlowIndex = novelFlowIndexRef.current;
+    const globalScrollOffset = resolveScrollGlobalOffset({
+      anchor,
+      locator,
+      novelFlowIndex: activeNovelFlowIndex,
+    });
+    const persistedChapterProgress = resolvePersistedChapterProgress({
+      anchor,
+    });
     if (!locator) {
       const persistFallbackSnapshot = {
         source: 'useScrollReaderController.handleReadingAnchorChange',
@@ -182,7 +257,14 @@ export function useScrollReaderController({
         edge: 'start',
       },
       hints: {
-        chapterProgress: anchor.chapterProgress,
+        chapterProgress: persistedChapterProgress,
+        globalFlow: globalScrollOffset === undefined || !activeNovelFlowIndex
+          ? undefined
+          : {
+            globalScrollOffset,
+            layoutKey: activeNovelFlowIndex.layoutKey,
+            sourceMode: 'scroll',
+          },
         pageIndex: undefined,
         contentMode: 'scroll',
       },
@@ -282,42 +364,15 @@ export function useScrollReaderController({
   ]);
   novelFlowIndexRef.current = novelFlowIndex;
 
-  const previousNovelFlowIndexRef = useRef<typeof novelFlowIndex>(null);
-  useEffect(() => {
-    const previousIndex = previousNovelFlowIndexRef.current;
-    previousNovelFlowIndexRef.current = novelFlowIndex;
-    if (!enabled || !previousIndex || !novelFlowIndex || previousIndex === novelFlowIndex) {
-      return;
-    }
-
-    const locator = layoutQueries.getCurrentOriginalLocator();
-    if (!locator) {
-      return;
-    }
-
-    const previousOffset = resolveLocatorGlobalOffset(previousIndex, locator);
-    const nextOffset = resolveLocatorGlobalOffset(novelFlowIndex, locator);
-    const container = viewport.contentRef.current;
-    if (previousOffset === null || nextOffset === null || !container) {
-      return;
-    }
-
-    const offsetDelta = nextOffset - previousOffset;
-    if (Math.abs(offsetDelta) <= 0.5) {
-      return;
-    }
-
-    persistence.suppressScrollSyncTemporarily();
-    container.scrollTop += offsetDelta;
-    syncViewportState({ force: true });
-  }, [
+  useScrollFlowOffsetCompensation({
     enabled,
     layoutQueries,
     novelFlowIndex,
+    pendingScrollWindowAnchorRef,
     persistence,
     syncViewportState,
-    viewport.contentRef,
-  ]);
+    viewportContentRef: viewport.contentRef,
+  });
 
   const visibleFlowChapterIndices = useMemo(() => getVisibleFlowChapterIndices({
     chapterIndex,
@@ -335,15 +390,36 @@ export function useScrollReaderController({
     if (!enabled) {
       return;
     }
+    if (retainedFocusedWindowChapterIndex === chapterIndex) {
+      return;
+    }
 
     setScrollModeChapters((previousIndices) => {
+      if (
+        previousIndices.length === 1
+        && !visibleFlowChapterIndices.includes(previousIndices[0])
+      ) {
+        return previousIndices;
+      }
+      if (
+        previousIndices.includes(chapterIndex)
+        && !visibleFlowChapterIndices.includes(chapterIndex)
+      ) {
+        return previousIndices;
+      }
+
       const merged = Array.from(new Set([
         ...previousIndices,
         ...visibleFlowChapterIndices,
       ])).sort((left, right) => left - right);
       return areNumberArraysEqual(previousIndices, merged) ? previousIndices : merged;
     });
-  }, [enabled, visibleFlowChapterIndices]);
+  }, [
+    chapterIndex,
+    enabled,
+    retainedFocusedWindowChapterIndex,
+    visibleFlowChapterIndices,
+  ]);
 
   const renderableScrollLayouts = useMemo(
     () => scrollReaderChapters.flatMap((renderableScrollChapter) => {
@@ -377,6 +453,7 @@ export function useScrollReaderController({
     scrollChapterBodyElementsRef,
     scrollChapterElementsRef,
     scrollLayouts: renderCache.scrollLayouts,
+    novelFlowIndex,
     setScrollModeChapters,
     stopRestoreMask,
     viewportContentRef: viewport.contentRef,

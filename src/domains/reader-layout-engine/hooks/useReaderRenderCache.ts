@@ -4,6 +4,7 @@ import type {
   UseReaderRenderCacheParams,
   UseReaderRenderCacheResult,
 } from './readerRenderCacheTypes';
+import type { ChapterFlowManifest } from '../layout-core/internal';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -14,14 +15,20 @@ import {
 } from '@shared/debug';
 import { useReaderContentRuntime } from '@shared/reader-runtime';
 
-import { clearReaderRenderCacheMemoryForNovel } from '../utils/render-cache/readerRenderCache';
+import {
+  clearReaderRenderCacheMemoryForNovel,
+  getReaderRenderCacheRecordsForNovelVariantFromDexie,
+} from '../utils/render-cache/readerRenderCache';
 import {
   buildPreheatTargets,
   buildVisibleRenderTargets,
   collectLoadedImageKeys,
   getActiveVariant,
 } from '../utils/render-cache/readerRenderCachePlanning';
-import { preloadReaderImageResources } from '../layout-core/internal';
+import {
+  createChapterFlowManifestFromRenderCacheRecord,
+  preloadReaderImageResources,
+} from '../layout-core/internal';
 import { useReaderRenderPreheater } from './useReaderRenderPreheater';
 import { useReaderRenderViewport } from './useReaderRenderViewport';
 import { useReaderVisibleRenderResults } from './useReaderVisibleRenderResults';
@@ -44,6 +51,8 @@ export function useReaderRenderCache({
   const readerContentRuntime = useReaderContentRuntime();
   const [imageRevision, setImageRevision] = useState(0);
   const [cacheRevision, setCacheRevision] = useState(0);
+  const [persistedPagedManifests, setPersistedPagedManifests] =
+    useState<Map<number, ChapterFlowManifest>>(new Map());
   const [readerTelemetryEnabled, setReaderTelemetryEnabled] = useState(() => isDebugFeatureEnabled('readerTelemetry'));
   const pendingPreheatCountRef = useRef(0);
   const loadedChaptersRef = useRef<Map<number, ChapterContent>>(new Map());
@@ -184,6 +193,7 @@ export function useReaderRenderCache({
     cacheSourceByKey,
     layoutSnapshot,
     pagedLayouts,
+    pagedManifests: visiblePagedManifests,
     scrollLayouts,
     scrollManifests,
     summaryShells,
@@ -198,6 +208,58 @@ export function useReaderRenderCache({
     variantSignatures,
     visibleTargets,
   });
+
+  useEffect(() => {
+    if (!novelId) {
+      setPersistedPagedManifests((previous) => (
+        previous.size === 0 ? previous : new Map()
+      ));
+      return;
+    }
+
+    let cancelled = false;
+    getReaderRenderCacheRecordsForNovelVariantFromDexie({
+      novelId,
+      variantFamily: 'original-paged',
+    })
+      .then((records) => {
+        if (cancelled) {
+          return;
+        }
+
+        const nextManifests = new Map<number, ChapterFlowManifest>();
+        const expectedSignature = JSON.stringify(variantSignatures['original-paged']);
+        for (const record of records) {
+          const manifest = createChapterFlowManifestFromRenderCacheRecord(record);
+          if (!manifest || JSON.stringify(manifest.layoutSignature) !== expectedSignature) {
+            continue;
+          }
+
+          nextManifests.set(manifest.chapterIndex, manifest);
+        }
+        setPersistedPagedManifests(nextManifests);
+      })
+      .catch((error) => {
+        debugLog('READER', 'Paged render cache manifest lookup failed', { novelId }, error);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    cacheRevision,
+    imageRevision,
+    novelId,
+    variantSignatures,
+  ]);
+
+  const pagedManifests = useMemo(() => {
+    const merged = new Map(persistedPagedManifests);
+    for (const [chapterIndex, manifest] of visiblePagedManifests) {
+      merged.set(chapterIndex, manifest);
+    }
+    return merged;
+  }, [persistedPagedManifests, visiblePagedManifests]);
 
   useEffect(() => {
     const snapshot: ReaderLayoutSnapshot = {
@@ -221,6 +283,8 @@ export function useReaderRenderCache({
     cacheSourceByKey,
     isPreheating,
     pagedLayouts,
+    pagedManifests,
+    pagedLayoutSignature: variantSignatures['original-paged'],
     pendingPreheatCount,
     scrollLayouts,
     scrollManifests,

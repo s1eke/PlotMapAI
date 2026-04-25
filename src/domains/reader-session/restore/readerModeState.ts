@@ -91,15 +91,38 @@ export function toRestoreTargetFromState(params: {
   };
 
   if (
-    typeof normalizedState.hints?.chapterProgress === 'number'
+    typeof normalizedState.hints?.pageIndex === 'number'
     && isReaderProjectionFreshForCanonical(
-      normalizedState.hints?.scrollProjection,
+      normalizedState.hints?.pagedProjection,
       normalizedState.canonical,
     )
   ) {
+    target.pageIndex = normalizedState.hints.pageIndex;
+  }
+
+  const hasFreshScrollProjection = isReaderProjectionFreshForCanonical(
+    normalizedState.hints?.scrollProjection,
+    normalizedState.canonical,
+  );
+  const canUseScrollProgress =
+    typeof normalizedState.hints?.chapterProgress === 'number'
+    && (
+      hasFreshScrollProjection
+      || normalizedState.hints?.contentMode === 'scroll'
+    );
+  if (canUseScrollProgress) {
     target.chapterProgress = typeof normalizedState.hints?.chapterProgress === 'number'
       ? clampProgress(normalizedState.hints.chapterProgress)
       : undefined;
+  }
+  if (
+    normalizedState.hints?.globalFlow
+    && isReaderProjectionFreshForCanonical(
+      normalizedState.hints.globalFlow,
+      normalizedState.canonical,
+    )
+  ) {
+    target.globalFlow = normalizedState.hints.globalFlow;
   }
 
   return target;
@@ -116,10 +139,17 @@ export function captureReaderStateSnapshot(params: {
   storedReaderState: StoredReaderState;
   viewportContentElement: HTMLDivElement | null;
 }): StoredReaderState {
-  const latestChapterIndex = getStoredChapterIndex(params.latestReaderState);
+  const currentCaptureChapterIndex =
+    params.currentOriginalLocator?.chapterIndex
+    ?? params.currentPagedLocator?.chapterIndex
+    ?? params.currentAnchor?.chapterIndex
+    ?? null;
   const shouldPreferLatestReaderState =
     params.navigationSource === 'navigation'
-    || latestChapterIndex !== params.chapterIndex;
+    && (
+      currentCaptureChapterIndex === null
+      || currentCaptureChapterIndex !== params.chapterIndex
+    );
   const preferredReaderState = shouldPreferLatestReaderState
     ? buildStoredReaderState(params.latestReaderState)
     : buildStoredReaderState(params.storedReaderState);

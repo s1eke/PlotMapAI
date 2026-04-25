@@ -192,6 +192,7 @@ export interface PersistedReadingProgressSnapshot {
     edge: 'start' | 'end' | null;
     kind: string | null;
     lineIndex: number | null;
+    textQuoteExact: string | null;
   };
   chapterProgress: number | null;
   contentMode: 'scroll' | 'paged' | null;
@@ -496,6 +497,13 @@ export async function readPersistedReadingProgress(
       } else if (typeof locator?.pageIndex === 'number') {
         persistedPageIndex = locator.pageIndex;
       }
+      const textQuote = (
+        locator?.textQuote
+        && typeof locator.textQuote === 'object'
+        && !Array.isArray(locator.textQuote)
+      )
+        ? locator.textQuote as Record<string, unknown>
+        : null;
 
       return {
         canonical: {
@@ -504,6 +512,7 @@ export async function readPersistedReadingProgress(
           edge: canonicalEdge,
           kind: typeof locator?.kind === 'string' ? locator.kind : null,
           lineIndex: typeof locator?.lineIndex === 'number' ? locator.lineIndex : null,
+          textQuoteExact: typeof textQuote?.exact === 'string' ? textQuote.exact : null,
         },
         chapterProgress: typeof projections?.scrollChapterProgress === 'number'
           ? projections.scrollChapterProgress
@@ -704,18 +713,24 @@ export async function readVisibleContentAnchor(page: Page): Promise<VisibleConte
 
     const isPaged = Boolean(document.querySelector('[data-testid="paged-reader-interactive"]'));
     const container = isPaged
-      ? document.querySelector('[data-testid="paged-reader-page-frame"]')
+      ? document.querySelector('[data-testid="paged-reader-content-body"]')
       : viewport;
 
     if (!(container instanceof HTMLElement)) {
       return null;
     }
 
-    const candidates = Array.from(container.querySelectorAll('p, h1, h2, h3, h4, h5, h6'));
+    const candidates = Array.from(container.querySelectorAll(
+      'p, h1, h2, h3, h4, h5, h6, [data-testid="reader-flow-text-fragment"]',
+    ));
     const viewportRect = viewport.getBoundingClientRect();
     const visibleTop = viewportRect.top;
     const visibleBottom = viewportRect.bottom;
+    const preferredCenter = visibleTop + viewportRect.height * 0.48;
 
+    let fallbackAnchor: VisibleContentAnchor | null = null;
+    let bestAnchor: VisibleContentAnchor | null = null;
+    let bestDistance = Number.POSITIVE_INFINITY;
     for (const element of candidates) {
       const rect = element.getBoundingClientRect();
       if (rect.top >= visibleTop && rect.top < visibleBottom && rect.height > 0) {
@@ -724,15 +739,25 @@ export async function readVisibleContentAnchor(page: Page): Promise<VisibleConte
           continue;
         }
 
-        return {
+        const anchor = {
           offsetTop: Math.round(rect.top - visibleTop),
           tagName: element.tagName.toLowerCase(),
           textSnippet: text.slice(0, 80),
         };
+        if (!fallbackAnchor) {
+          fallbackAnchor = anchor;
+        }
+        if (text.length >= 40) {
+          const centerDistance = Math.abs(rect.top + rect.height / 2 - preferredCenter);
+          if (!bestAnchor || centerDistance < bestDistance) {
+            bestAnchor = anchor;
+            bestDistance = centerDistance;
+          }
+        }
       }
     }
 
-    return null;
+    return bestAnchor ?? fallbackAnchor;
   });
 }
 

@@ -76,6 +76,40 @@ describe('readerMeasurement', () => {
     );
   });
 
+  it('stores project-owned line ranges for plain text metrics', () => {
+    const textLayoutEngine = createFakeReaderTextLayoutEngine({ maxCharsPerLine: 4 });
+    const typography = createReaderTypographyMetrics(16, 1.5, 12, 320);
+    const measuredLayout = measureReaderChapterLayout(
+      {
+        index: 0,
+        title: 'Title',
+        plainText: 'abcdefgh',
+        richBlocks: [],
+        contentFormat: 'plain',
+        contentVersion: 1,
+        wordCount: 8,
+        totalChapters: 1,
+        hasPrev: false,
+        hasNext: false,
+      },
+      240,
+      typography,
+      new Map(),
+      undefined,
+      textLayoutEngine,
+    );
+    const textMetric = measuredLayout.metrics.find((metric) => metric.block.kind === 'text');
+
+    expect(textMetric?.lineRanges?.map((range) => ({
+      end: range.end.graphemeIndex,
+      start: range.start.graphemeIndex,
+    }))).toEqual([
+      { start: 0, end: 4 },
+      { start: 4, end: 8 },
+    ]);
+    expect(textMetric?.lines.map((line) => line.text)).toEqual(['abcd', 'efgh']);
+  });
+
   it('caps scroll-mode image size to the viewport height while preserving aspect ratio', () => {
     const textLayoutEngine = createFakeReaderTextLayoutEngine();
     const typography = createReaderTypographyMetrics(18, 1.8, 16, 600);

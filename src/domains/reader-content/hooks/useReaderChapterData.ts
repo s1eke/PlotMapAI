@@ -46,6 +46,7 @@ export interface ReaderLoadActiveChapterResult {
 }
 export interface ReaderLoadActiveChapterRuntime {
   navigationSource?: ChapterChangeSource;
+  pendingPageIndex?: number | null;
   pendingPageTarget?: PageTarget | null;
 }
 
@@ -347,6 +348,7 @@ export function useReaderChapterData({
       const navigationRestoreTarget = shouldRestoreNavigatedChapter
         ? createRestoreTargetFromNavigationIntent({
           chapterIndex: params.chapterIndex,
+          pageIndex: runtime.pendingPageIndex ?? undefined,
           pageTarget: runtime.pendingPageTarget === 'end' ? 'end' : 'start',
         } satisfies ReaderNavigationIntent, params.mode)
         : null;

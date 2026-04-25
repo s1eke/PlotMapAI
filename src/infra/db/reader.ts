@@ -280,6 +280,12 @@ export interface ReaderProgressProjectionRecord {
   pagedSourceMode?: ReaderProgressModeRecord;
   pagedBasisCanonicalFingerprint?: string;
   pagedLayoutKey?: string;
+  globalScrollOffset?: number;
+  globalPageIndex?: number;
+  globalCapturedAt?: string;
+  globalSourceMode?: ReaderProgressModeRecord;
+  globalBasisCanonicalFingerprint?: string;
+  globalLayoutKey?: string;
 }
 
 export interface ReaderProgressRecord {

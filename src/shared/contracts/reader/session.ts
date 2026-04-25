@@ -99,6 +99,11 @@ export interface ReaderProjectionMetadata {
   sourceMode?: 'scroll' | 'paged';
 }
 
+export interface ReaderGlobalFlowProjection extends ReaderProjectionMetadata {
+  globalPageIndex?: number;
+  globalScrollOffset?: number;
+}
+
 export interface ReaderStateHints {
   chapterProgress?: number;
   pageIndex?: number;
@@ -106,6 +111,7 @@ export interface ReaderStateHints {
   viewMode?: ReaderViewMode;
   scrollProjection?: ReaderProjectionMetadata;
   pagedProjection?: ReaderProjectionMetadata;
+  globalFlow?: ReaderGlobalFlowProjection;
 }
 
 export interface ReaderPositionMetadata {
@@ -127,6 +133,8 @@ export interface ReaderRestoreTarget {
   position?: CanonicalPositionV2;
   locatorBoundary?: ReaderLocatorBoundary;
   chapterProgress?: number;
+  pageIndex?: number;
+  globalFlow?: ReaderGlobalFlowProjection;
   locator?: ReaderLocator;
 }
 
@@ -180,6 +188,7 @@ export type ReaderLifecycleEvent =
 export interface ReaderNavigationIntent {
   chapterIndex: number;
   pageTarget: PageTarget;
+  pageIndex?: number;
   locator?: ReaderLocator;
   locatorBoundary?: ReaderLocatorBoundary;
 }
@@ -190,6 +199,7 @@ export interface ReaderSessionState {
   mode: ReaderMode;
   chapterIndex: number;
   chapterProgress?: number;
+  globalFlow?: ReaderGlobalFlowProjection;
   locator?: ReaderLocator;
   positionMetadata?: ReaderPositionMetadata;
   restoreStatus: RestoreStatus;

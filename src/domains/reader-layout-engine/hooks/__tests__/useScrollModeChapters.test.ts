@@ -92,6 +92,42 @@ function setupHook(opts: {
   };
 }
 
+function createNovelFlowIndex(
+  entries: Array<{
+    chapterIndex: number;
+    manifestStatus?: NovelFlowIndex['chapters'][number]['manifestStatus'];
+    scrollEnd: number;
+    scrollStart: number;
+  }>,
+): NovelFlowIndex {
+  return {
+    chapters: entries.map((entry) => ({
+      blockSummaries: [],
+      chapterIndex: entry.chapterIndex,
+      endLocator: null,
+      manifestStatus: entry.manifestStatus ?? 'materialized',
+      pageEnd: 0,
+      pageStart: 0,
+      scrollEnd: entry.scrollEnd,
+      scrollStart: entry.scrollStart,
+      startLocator: null,
+    })),
+    layoutKey: 'scroll',
+    layoutSignature: {
+      columnCount: 1,
+      columnGap: 0,
+      fontSize: 18,
+      lineSpacing: 1.6,
+      pageHeight: 600,
+      paragraphSpacing: 16,
+      textWidth: 560,
+    },
+    novelId: 1,
+    totalPageCount: 0,
+    totalScrollHeight: Math.max(0, ...entries.map((entry) => entry.scrollEnd)),
+  };
+}
+
 describe('useScrollModeChapters', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -277,11 +313,18 @@ describe('useScrollModeChapters', () => {
       const onReadingAnchorChange = vi.fn();
       const { result, contentRef } = setupHook({
         scrollModeChapters: [0],
+        contentElement: makeMockElement({
+          clientHeight: 600,
+          scrollHeight: 2400,
+        }),
         onReadingAnchorChange,
       });
 
-      populateElements(result.current.scrollChapterElementsRef, [0]);
-      contentRef.current.scrollTop = 150;
+      result.current.scrollChapterElementsRef.current.set(0, makeMockElement({
+        offsetTop: 0,
+        offsetHeight: 1800,
+      }));
+      contentRef.current.scrollTop = 420;
 
       act(() => { result.current.handleScroll(); });
 
@@ -289,46 +332,48 @@ describe('useScrollModeChapters', () => {
       expect(result.current.getCurrentAnchor()).toEqual({ chapterIndex: 0, chapterProgress: 0.5 });
     });
 
-    it('uses NovelFlowIndex global offsets before DOM chapter offsets when available', () => {
+    it('maps focused single-chapter anchors over the scroll container range', () => {
+      const onReadingAnchorChange = vi.fn();
+      const { result, contentRef } = setupHook({
+        scrollModeChapters: [0],
+        contentElement: makeMockElement({
+          clientHeight: 600,
+          scrollHeight: 4200,
+        }),
+        onReadingAnchorChange,
+      });
+
+      result.current.scrollChapterElementsRef.current.set(0, makeMockElement({
+        offsetTop: 1000,
+        offsetHeight: 4200,
+      }));
+      contentRef.current.scrollTop = 2448;
+
+      act(() => { result.current.handleScroll(); });
+
+      expect(onReadingAnchorChange).toHaveBeenCalledWith({
+        chapterIndex: 0,
+        chapterProgress: 0.73,
+      });
+      expect(result.current.getCurrentAnchor()).toEqual({
+        chapterIndex: 0,
+        chapterProgress: 0.73,
+      });
+    });
+
+    it('uses NovelFlowIndex global offsets for chapter detection and DOM range for progress', () => {
       const onReadingAnchorChange = vi.fn();
       const { result, contentRef } = setupHook({
         scrollModeChapters: [0, 1],
-        getNovelFlowIndex: () => ({
-          chapters: [{
-            blockSummaries: [],
-            chapterIndex: 0,
-            endLocator: null,
-            manifestStatus: 'materialized',
-            pageEnd: 0,
-            pageStart: 0,
-            scrollEnd: 1000,
-            scrollStart: 0,
-            startLocator: null,
-          }, {
-            blockSummaries: [],
-            chapterIndex: 1,
-            endLocator: null,
-            manifestStatus: 'materialized',
-            pageEnd: 0,
-            pageStart: 0,
-            scrollEnd: 1500,
-            scrollStart: 1000,
-            startLocator: null,
-          }],
-          layoutKey: 'scroll',
-          layoutSignature: {
-            columnCount: 1,
-            columnGap: 0,
-            fontSize: 18,
-            lineSpacing: 1.6,
-            pageHeight: 600,
-            paragraphSpacing: 16,
-            textWidth: 560,
-          },
-          novelId: 1,
-          totalPageCount: 0,
-          totalScrollHeight: 1500,
-        }),
+        getNovelFlowIndex: () => createNovelFlowIndex([{
+          chapterIndex: 0,
+          scrollEnd: 1000,
+          scrollStart: 0,
+        }, {
+          chapterIndex: 1,
+          scrollEnd: 1500,
+          scrollStart: 1000,
+        }]),
         onReadingAnchorChange,
       });
 
@@ -339,11 +384,85 @@ describe('useScrollModeChapters', () => {
 
       expect(onReadingAnchorChange).toHaveBeenCalledWith({
         chapterIndex: 1,
-        chapterProgress: 0.06,
+        chapterProgress: 0,
       });
       expect(result.current.getCurrentAnchor()).toEqual({
         chapterIndex: 1,
-        chapterProgress: 0.06,
+        chapterProgress: 0,
+      });
+    });
+
+    it('does not clamp deep DOM scroll progress to the shorter flow estimate', () => {
+      const onReadingAnchorChange = vi.fn();
+      const { result, contentRef } = setupHook({
+        scrollModeChapters: [0],
+        contentElement: makeMockElement({
+          clientHeight: 600,
+          scrollHeight: 3000,
+        }),
+        getNovelFlowIndex: () => createNovelFlowIndex([{
+          chapterIndex: 0,
+          scrollEnd: 1000,
+          scrollStart: 0,
+        }]),
+        onReadingAnchorChange,
+      });
+
+      result.current.scrollChapterElementsRef.current.set(0, makeMockElement({
+        offsetTop: 0,
+        offsetHeight: 3000,
+      }));
+      contentRef.current.scrollTop = 1800;
+
+      act(() => { result.current.handleScroll(); });
+
+      expect(onReadingAnchorChange).toHaveBeenCalledWith({
+        chapterIndex: 0,
+        chapterProgress: 0.825,
+      });
+      expect(result.current.getCurrentAnchor()).toEqual({
+        chapterIndex: 0,
+        chapterProgress: 0.825,
+      });
+    });
+
+    it('uses NovelFlowIndex materialized tail when deciding the next chapter', async () => {
+      const fetchFn = vi.fn().mockResolvedValue(makeChapterContent(2));
+      const { result, contentRef } = setupHook({
+        scrollModeChapters: [0, 1, 3],
+        fetchChapterContent: fetchFn,
+        contentElement: makeMockElement({
+          clientHeight: 600,
+          scrollHeight: 2400,
+        }),
+        getNovelFlowIndex: () => createNovelFlowIndex([{
+          chapterIndex: 0,
+          scrollEnd: 1000,
+          scrollStart: 0,
+        }, {
+          chapterIndex: 1,
+          scrollEnd: 1800,
+          scrollStart: 1000,
+        }, {
+          chapterIndex: 2,
+          manifestStatus: 'missing',
+          scrollEnd: 1800,
+          scrollStart: 1800,
+        }, {
+          chapterIndex: 3,
+          manifestStatus: 'missing',
+          scrollEnd: 1800,
+          scrollStart: 1800,
+        }]),
+      });
+
+      populateElements(result.current.scrollChapterElementsRef, [0, 1, 3]);
+      contentRef.current.scrollTop = 1250;
+
+      act(() => { result.current.handleScroll(); });
+
+      await waitFor(() => {
+        expect(fetchFn).toHaveBeenCalledWith(2);
       });
     });
 
@@ -358,7 +477,7 @@ describe('useScrollModeChapters', () => {
         offsetTop: 0,
         offsetHeight: 1200,
       }));
-      contentRef.current.scrollTop = 570;
+      contentRef.current.scrollTop = 390;
 
       act(() => { result.current.handleScroll(); });
 
@@ -380,7 +499,7 @@ describe('useScrollModeChapters', () => {
       });
 
       populateElements(result.current.scrollChapterElementsRef, [0]);
-      // scrollTop at 200, scrollable range = 900 - 600 = 300 => progress = 200 / 300 = 0.67 >= 0.5
+      // 30% reading anchor pushes this short chapter beyond the 50% preload threshold.
       contentRef.current.scrollTop = 200;
 
       act(() => { result.current.handleScroll(); });
@@ -396,10 +515,17 @@ describe('useScrollModeChapters', () => {
       const { result, contentRef } = setupHook({
         scrollModeChapters: [0],
         fetchChapterContent: fetchFn,
+        contentElement: makeMockElement({
+          clientHeight: 600,
+          scrollHeight: 2400,
+        }),
       });
 
-      populateElements(result.current.scrollChapterElementsRef, [0]);
-      // scrollTop at 100, scrollable range = 300 => progress = 100 / 300 = 0.33 < 0.5
+      result.current.scrollChapterElementsRef.current.set(0, makeMockElement({
+        offsetTop: 0,
+        offsetHeight: 1800,
+      }));
+      // (scrollTop + 30% viewport anchor) / scrollable range = 280 / 1200 < 0.5
       contentRef.current.scrollTop = 100;
 
       act(() => { result.current.handleScroll(); });
@@ -443,10 +569,17 @@ describe('useScrollModeChapters', () => {
   describe('backward chapter loading', () => {
     it('fetches prev chapter when scrollTop < 50', async () => {
       const fetchFn = vi.fn().mockResolvedValue(makeChapterContent(0));
+      const now = Date.now();
+      vi.spyOn(Date, 'now')
+        .mockReturnValueOnce(now)
+        .mockReturnValueOnce(now + 200);
       const { result, contentRef } = setupHook({
         scrollModeChapters: [1],
         fetchChapterContent: fetchFn,
       });
+
+      contentRef.current.scrollTop = 120;
+      act(() => { result.current.handleScroll(); });
 
       contentRef.current.scrollTop = 10;
 
@@ -455,6 +588,69 @@ describe('useScrollModeChapters', () => {
       await waitFor(() => {
         expect(fetchFn).toHaveBeenCalledWith(0);
       });
+    });
+
+    it('uses NovelFlowIndex materialized head when deciding the previous chapter', async () => {
+      const fetchFn = vi.fn().mockResolvedValue(makeChapterContent(1));
+      const now = Date.now();
+      vi.spyOn(Date, 'now')
+        .mockReturnValueOnce(now)
+        .mockReturnValueOnce(now + 200);
+      const { result, contentRef } = setupHook({
+        scrollModeChapters: [0, 2],
+        fetchChapterContent: fetchFn,
+        getNovelFlowIndex: () => createNovelFlowIndex([{
+          chapterIndex: 0,
+          manifestStatus: 'missing',
+          scrollEnd: 0,
+          scrollStart: 0,
+        }, {
+          chapterIndex: 1,
+          manifestStatus: 'missing',
+          scrollEnd: 0,
+          scrollStart: 0,
+        }, {
+          chapterIndex: 2,
+          scrollEnd: 800,
+          scrollStart: 0,
+        }, {
+          chapterIndex: 3,
+          scrollEnd: 1600,
+          scrollStart: 800,
+        }]),
+      });
+
+      populateElements(result.current.scrollChapterElementsRef, [0, 2]);
+      contentRef.current.scrollTop = 120;
+      act(() => { result.current.handleScroll(); });
+
+      contentRef.current.scrollTop = 10;
+
+      act(() => { result.current.handleScroll(); });
+
+      await waitFor(() => {
+        expect(fetchFn).toHaveBeenCalledWith(1);
+      });
+    });
+
+    it('does not prepend a previous chapter while the first touch scroll moves down from the top', () => {
+      const fetchFn = vi.fn();
+      const now = Date.now();
+      vi.spyOn(Date, 'now')
+        .mockReturnValueOnce(now)
+        .mockReturnValueOnce(now + 200);
+      const { result, contentRef } = setupHook({
+        scrollModeChapters: [1],
+        fetchChapterContent: fetchFn,
+      });
+
+      contentRef.current.scrollTop = 0;
+      act(() => { result.current.handleScroll(); });
+
+      contentRef.current.scrollTop = 40;
+      act(() => { result.current.handleScroll(); });
+
+      expect(fetchFn).not.toHaveBeenCalled();
     });
 
     it('does not fetch prev when first chapter is already in list', () => {
@@ -515,7 +711,9 @@ describe('useScrollModeChapters', () => {
       });
 
       // Let .finally() clear the pending set
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      });
 
       // Now try again - pending should be cleared by .finally()
       vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 200);

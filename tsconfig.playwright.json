@@ -4,8 +4,17 @@
     "target": "ES2023",
     "lib": ["ES2023", "DOM"],
     "module": "ESNext",
+    "baseUrl": ".",
     "types": ["node", "@playwright/test"],
     "skipLibCheck": true,
+    "paths": {
+      "@application/*": ["src/application/*"],
+      "@app/*": ["src/app/*"],
+      "@domains/*": ["src/domains/*"],
+      "@shared/*": ["src/shared/*"],
+      "@infra/*": ["src/infra/*"],
+      "@test/*": ["src/test/*"]
+    },
 
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,

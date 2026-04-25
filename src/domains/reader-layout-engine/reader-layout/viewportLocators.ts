@@ -10,6 +10,7 @@ import type {
 } from '../utils/layout/readerLayout';
 import {
   findVisibleBlockRange,
+  findVisibleBlockRangeFromBlockSummaries,
   findLocatorForLayoutOffset,
   findPageIndexForLocator,
   getChapterBoundaryLocator,
@@ -24,6 +25,7 @@ import {
   getReaderRestoreTargetBoundary,
   getReaderRestoreTargetLocator,
 } from '@shared/utils/readerStoredState';
+import { clampAnchorRatio } from './viewportLocatorMath';
 type ReaderPagedLayout = PaginatedChapterLayout;
 type ReaderScrollLayout = MeasuredChapterLayout;
 
@@ -44,22 +46,6 @@ interface PagedCanonicalSamplingSource {
 type CanonicalSamplingSource =
   | { mode: 'scroll'; source: ScrollCanonicalSamplingSource }
   | { mode: 'paged'; source: PagedCanonicalSamplingSource };
-
-function clampAnchorRatio(anchorRatio: number): number {
-  if (!Number.isFinite(anchorRatio)) {
-    return SCROLL_READING_ANCHOR_RATIO;
-  }
-
-  if (anchorRatio <= 0) {
-    return 0;
-  }
-
-  if (anchorRatio >= 1) {
-    return 1;
-  }
-
-  return anchorRatio;
-}
 
 function compactLocatorMetadata(metadata: Partial<ReaderLocator>): Partial<ReaderLocator> {
   return Object.fromEntries(
@@ -496,7 +482,10 @@ export function calculateVisibleScrollBlockRanges(params: {
   isPagedMode: boolean;
   renderableScrollLayouts: Array<{
     chapter: ChapterContent;
-    flowEntry?: { scrollStart: number } | null;
+    flowEntry?: {
+      blockSummaries?: Array<{ height: number; startOffset: number }>;
+      scrollStart: number;
+    } | null;
     index: number;
     layout: ReaderScrollLayout;
   }>;
@@ -521,12 +510,26 @@ export function calculateVisibleScrollBlockRanges(params: {
   const overscanPx = Math.max(240, Math.round(viewportHeight * 0.75));
   for (const renderableChapter of params.renderableScrollLayouts) {
     const chapterBodyElement = params.scrollChapterBodyElements.get(renderableChapter.index);
+    const chapterGlobalOffset = renderableChapter.flowEntry?.scrollStart;
+    if (typeof chapterGlobalOffset === 'number' && renderableChapter.flowEntry?.blockSummaries) {
+      nextRanges.set(
+        renderableChapter.index,
+        findVisibleBlockRangeFromBlockSummaries(
+          renderableChapter.flowEntry.blockSummaries,
+          renderableChapter.layout.totalHeight,
+          params.scrollViewportTop - chapterGlobalOffset,
+          viewportHeight,
+          overscanPx,
+        ),
+      );
+      continue;
+    }
+
     if (!chapterBodyElement) {
       continue;
     }
 
     const chapterBodyRect = chapterBodyElement.getBoundingClientRect();
-    const chapterGlobalOffset = renderableChapter.flowEntry?.scrollStart;
     const offsetTop = Number.isFinite(viewportRect.top) && Number.isFinite(chapterBodyRect.top)
       ? viewportRect.top - chapterBodyRect.top
       : params.scrollViewportTop - (chapterGlobalOffset ?? chapterBodyElement.offsetTop);

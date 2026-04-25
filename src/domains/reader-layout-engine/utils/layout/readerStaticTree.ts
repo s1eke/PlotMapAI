@@ -416,6 +416,9 @@ export function composePaginatedChapterLayout(
         key: `${metric.block.key}:${lineIndex}`,
         kind: metric.block.kind,
         lineHeightPx: metric.lineHeightPx,
+        lineRanges: metric.lineRanges
+          ? metric.lineRanges.slice(lineIndex, lineIndex + lineCount)
+          : undefined,
         lineStartIndex: lineIndex,
         lines,
         listContext: metric.block.listContext,

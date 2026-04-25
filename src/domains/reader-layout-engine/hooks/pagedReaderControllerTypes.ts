@@ -8,7 +8,7 @@ import type {
   ReaderSessionCommands,
   ReaderSessionSnapshot,
 } from '@shared/contracts/reader';
-import type { PaginatedChapterLayout } from '../layout-core/internal';
+import type { NovelFlowIndex, PaginatedChapterLayout } from '../layout-core/internal';
 
 export type NavigationDirection = 'next' | 'prev';
 
@@ -68,6 +68,9 @@ export interface UsePagedReaderControllerResult {
   nextPagedLayout: PagedReaderLayout | null;
   pageCount: number;
   pageIndex: number;
+  globalPageCount: number;
+  globalPageIndex: number;
+  pagedNovelFlowIndex: NovelFlowIndex | null;
   pageTurnDirection: NavigationDirection;
   pageTurnToken: number;
   pendingPageTarget: PageTarget | null;

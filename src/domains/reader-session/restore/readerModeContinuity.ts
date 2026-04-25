@@ -63,8 +63,17 @@ export function resolveScrollContinuityTarget(params: {
     return null;
   }
 
+  const restoredTarget = cloneReaderRestoreTarget(continuitySnapshot.scrollTarget);
+  const restoredLocator = getReaderRestoreTargetLocator(restoredTarget);
+  if (restoredLocator) {
+    restoredTarget.locator = {
+      ...restoredLocator,
+      pageIndex: continuitySnapshot.pagedPageIndex,
+    };
+  }
+
   return {
-    ...cloneReaderRestoreTarget(continuitySnapshot.scrollTarget),
+    ...restoredTarget,
     mode: 'scroll',
   };
 }

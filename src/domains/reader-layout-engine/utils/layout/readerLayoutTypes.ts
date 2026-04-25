@@ -123,6 +123,13 @@ export interface ReaderMeasuredLine {
   width: number;
 }
 
+export interface ReaderLineRange {
+  end: ReaderLayoutCursor;
+  lineIndex: number;
+  start: ReaderLayoutCursor;
+  width: number;
+}
+
 export interface VirtualBlockMetrics {
   block: ReaderBlock;
   captionFont?: string;
@@ -141,6 +148,7 @@ export interface VirtualBlockMetrics {
   height: number;
   lineHeightPx: number;
   lines: ReaderMeasuredLine[];
+  lineRanges?: ReaderLineRange[];
   marginAfter: number;
   marginBefore: number;
   richLineFragments?: RichInline[][];
@@ -181,6 +189,7 @@ export interface ReaderTextPageItem {
   lineHeightPx: number;
   lineStartIndex: number;
   lines: ReaderMeasuredLine[];
+  lineRanges?: ReaderLineRange[];
   listContext?: PaginationListContext;
   marginAfter: number;
   marginBefore: number;
@@ -266,6 +275,7 @@ export interface PaginatedChapterLayout {
 }
 
 export type StaticTextLine = ReaderMeasuredLine;
+export type StaticTextLineRange = ReaderLineRange;
 export type StaticScrollBlockNode = VirtualBlockMetrics;
 export type StaticPagedNode = ReaderPageItem;
 export type StaticReaderNode = StaticScrollBlockNode | StaticPagedNode;

@@ -1,5 +1,6 @@
 import type { RichInline } from '@shared/contracts';
 import type {
+  ReaderLineRange,
   ReaderMeasuredLine,
   ReaderTextLayoutEngine,
 } from '../utils/layout/readerLayout';
@@ -82,6 +83,43 @@ export function createFakeReaderTextLayoutEngine(
 
   return {
     layoutLines,
+    walkLineRanges(params) {
+      return layoutLines({
+        ...params,
+        lineHeightPx: 1,
+      }).map((line): ReaderLineRange => ({
+        end: { ...line.end },
+        lineIndex: line.lineIndex,
+        start: { ...line.start },
+        width: line.width,
+      }));
+    },
+    layoutNextLineRange(params) {
+      const ranges = layoutLines({
+        ...params,
+        lineHeightPx: 1,
+      }).map((line): ReaderLineRange => ({
+        end: { ...line.end },
+        lineIndex: line.lineIndex,
+        start: { ...line.start },
+        width: line.width,
+      }));
+      return ranges.find((range) => (
+        range.start.segmentIndex > params.start.segmentIndex
+        || (
+          range.start.segmentIndex === params.start.segmentIndex
+          && range.start.graphemeIndex >= params.start.graphemeIndex
+        )
+      )) ?? null;
+    },
+    materializeLineRange(params) {
+      return layoutLines(params).find((line) => (
+        line.start.segmentIndex === params.range.start.segmentIndex
+        && line.start.graphemeIndex === params.range.start.graphemeIndex
+        && line.end.segmentIndex === params.range.end.segmentIndex
+        && line.end.graphemeIndex === params.range.end.graphemeIndex
+      )) ?? null;
+    },
     measureLineStats(params) {
       const lines = layoutLines({
         ...params,

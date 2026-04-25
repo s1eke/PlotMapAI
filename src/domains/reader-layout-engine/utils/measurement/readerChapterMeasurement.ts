@@ -2,6 +2,7 @@ import type { ChapterContent } from '@shared/contracts/reader';
 import type { ReaderImageDimensions } from '@domains/reader-media';
 import type {
   MeasuredChapterLayout,
+  ReaderMeasuredLine,
   ReaderImageLayoutConstraints,
   ReaderTypographyMetrics,
   VirtualBlockMetrics,
@@ -116,14 +117,39 @@ export function measureReaderBlocks(params: {
             prepareOptions,
           })
           : null;
-        const lines = richLayout?.lines ?? params.textLayoutEngine.layoutLines({
+        const lineRanges = richLayout ? null : params.textLayoutEngine.walkLineRanges?.({
           font,
           fontSizePx,
-          lineHeightPx,
           maxWidth,
           prepareOptions,
           text: block.text ?? '',
-        });
+        }) ?? null;
+        const rangeMaterializedLines = lineRanges && params.textLayoutEngine.materializeLineRange
+          ? lineRanges.map((range) => params.textLayoutEngine.materializeLineRange?.({
+            font,
+            fontSizePx,
+            lineHeightPx,
+            maxWidth,
+            prepareOptions,
+            range,
+            text: block.text ?? '',
+          }) ?? null)
+          : null;
+        const materializedLines = rangeMaterializedLines
+          ? rangeMaterializedLines.filter((line): line is ReaderMeasuredLine => Boolean(line))
+          : null;
+        const lines = richLayout?.lines ?? (
+          lineRanges && materializedLines && materializedLines.length === lineRanges.length
+            ? materializedLines
+            : params.textLayoutEngine.layoutLines({
+              font,
+              fontSizePx,
+              lineHeightPx,
+              maxWidth,
+              prepareOptions,
+              text: block.text ?? '',
+            })
+        );
         const contentHeight = lines.length * lineHeightPx;
 
         blockMetrics = {
@@ -135,6 +161,7 @@ export function measureReaderBlocks(params: {
           height: block.marginBefore + contentHeight + block.marginAfter,
           lineHeightPx,
           lines,
+          lineRanges: lineRanges ?? undefined,
           marginAfter: block.marginAfter,
           marginBefore: block.marginBefore,
           richLineFragments: richLayout?.richLineFragments

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ChapterContent } from '@shared/contracts/reader';
 import type {
   ReaderLayoutSignature,
+  ReaderRenderVariant,
   ReaderTypographyMetrics,
 } from '../../utils/layout/readerLayout';
 import type { ReaderVisibleRenderTarget } from '../../utils/render-cache/readerRenderCachePlanning';
@@ -50,10 +51,31 @@ describe('useReaderVisibleRenderResults', () => {
     vi.clearAllMocks();
     mockGetReaderRenderCacheEntryFromMemory.mockReturnValue(null);
     mockBuildStaticRenderTree.mockImplementation((params: {
-      chapter: { index: number };
-      variantFamily: string;
+      chapter: {
+        contentFormat: ChapterContent['contentFormat'];
+        contentVersion: number;
+        index: number;
+      };
+      layoutKey?: string;
+      layoutSignature: ReaderLayoutSignature;
+      novelId: number;
+      variantFamily: ReaderRenderVariant;
     }) => ({
       chapterIndex: params.chapter.index,
+      contentFormat: params.chapter.contentFormat,
+      contentHash: 'mock-content-hash',
+      contentVersion: params.chapter.contentVersion,
+      layoutFeatureSet: params.variantFamily === 'original-paged'
+        ? 'paged-pagination-block'
+        : 'scroll-rich-inline',
+      layoutKey: params.layoutKey ?? 'mock-layout',
+      layoutSignature: params.layoutSignature,
+      novelId: params.novelId,
+      queryManifest: {},
+      rendererVersion: 1,
+      storageKind: 'render-tree',
+      tree: null,
+      updatedAt: '2026-04-24T00:00:00.000Z',
       variantFamily: params.variantFamily,
     }));
     mockCountPageItems.mockReturnValue(3);
