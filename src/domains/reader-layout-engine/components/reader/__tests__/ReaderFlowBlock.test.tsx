@@ -26,6 +26,35 @@ describe('ReaderFlowBlock', () => {
     useReaderImageResourceMock.mockReset();
   });
 
+  it('renders hr blocks with the measured visible height', () => {
+    render(
+      <ReaderFlowBlock
+        imageRenderMode="paged"
+        novelId={1}
+        item={{
+          blockIndex: 1,
+          chapterIndex: 0,
+          contentHeight: READER_CONTENT_TOKEN_DEFAULTS.hrHeightPx,
+          font: '400 18px sans-serif',
+          fontSizePx: 18,
+          height: 33,
+          key: '0:hr:1:0',
+          kind: 'text',
+          lineHeightPx: 32,
+          lineStartIndex: 0,
+          lines: [],
+          marginAfter: 20,
+          marginBefore: 12,
+          renderRole: 'hr',
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId('reader-flow-hr')).toHaveStyle({
+      height: `${READER_CONTENT_TOKEN_DEFAULTS.hrHeightPx}px`,
+    });
+  });
+
   it('renders text fragments as a single preserved-whitespace node instead of per-line wrappers', () => {
     render(
       <ReaderFlowBlock

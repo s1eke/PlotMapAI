@@ -76,6 +76,7 @@ export function ReaderFlowBlockText({
           <div
             data-testid="reader-flow-hr"
             className={cn(getReaderContentBlockClassName({ kind: 'text', renderRole: 'hr' }), 'w-full')}
+            style={{ height: READER_CONTENT_TOKEN_DEFAULTS.hrHeightPx }}
           />
         </div>
       </div>
