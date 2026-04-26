@@ -104,6 +104,7 @@ function buildPagedContentProps(
 function buildScrollContentProps(
   scrollController: ReturnType<typeof useScrollReaderViewportController>,
   preferences: UseReaderReadingSurfaceControllerParams['preferences'],
+  renderableChapter: ChapterContent | null,
   novelId: number,
   imageHandlers: ReaderLayoutControllerImageHandlers,
   mode: UseReaderSessionResult['snapshot']['mode'],
@@ -124,6 +125,9 @@ function buildScrollContentProps(
     }),
     chapters: scrollController.renderableScrollLayouts,
     headerBgClassName: preferences.headerBg,
+    headerTitle: renderableChapter?.title
+      ?? scrollController.renderableScrollLayouts[0]?.chapter.title
+      ?? '',
     novelId,
     onChapterBodyElement: scrollController.handleScrollChapterBodyElement,
     onChapterElement: scrollController.handleScrollChapterElement,
@@ -346,6 +350,7 @@ export function useReaderReadingSurfaceController({
         scrollContentProps: buildScrollContentProps(
           scrollController,
           preferences,
+          renderableChapter,
           novelId,
           imageHandlers,
           mode,

@@ -389,6 +389,7 @@ describe('useReaderReadingSurfaceController', () => {
     expect(contentProps.scrollContentProps).toMatchObject({
       chapters: surfaceMocks.scrollController.renderableScrollLayouts,
       headerBgClassName: 'bg-header',
+      headerTitle: surfaceMocks.chapter.title,
       novelId: 1,
       readerTheme: 'paper',
     });

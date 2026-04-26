@@ -216,6 +216,54 @@ describe('ReaderFlowBlock', () => {
     });
   });
 
+  it('uses an explicit heading text override without measured line breaks', () => {
+    render(
+      <ReaderFlowBlock
+        headingTextOverride="第一章 牢狱之灾"
+        imageRenderMode="scroll"
+        novelId={1}
+        item={{
+          blockIndex: 0,
+          chapterIndex: 0,
+          contentHeight: 96,
+          font: '600 32px sans-serif',
+          fontSizePx: 32,
+          headingLevel: 2,
+          height: 96,
+          key: '0:heading:0:0',
+          kind: 'heading',
+          lineHeightPx: 48,
+          lineStartIndex: 0,
+          lines: [
+            {
+              end: { graphemeIndex: 4, segmentIndex: 0 },
+              lineIndex: 0,
+              start: { graphemeIndex: 0, segmentIndex: 0 },
+              text: '第一章',
+              width: 120,
+            },
+            {
+              end: { graphemeIndex: 9, segmentIndex: 0 },
+              lineIndex: 1,
+              start: { graphemeIndex: 4, segmentIndex: 0 },
+              text: '牢狱之灾',
+              width: 160,
+            },
+          ],
+          marginAfter: 0,
+          marginBefore: 0,
+          text: '第一章牢狱之灾',
+        }}
+      />,
+    );
+
+    const heading = screen.getByRole('heading', { level: 2, name: '第一章 牢狱之灾' });
+    expect(heading).toHaveStyle({
+      whiteSpace: 'normal',
+    });
+    expect(heading).not.toHaveStyle({ overflow: 'hidden' });
+  });
+
   it('renders heading text from measured lines when source text differs', () => {
     render(
       <ReaderFlowBlock

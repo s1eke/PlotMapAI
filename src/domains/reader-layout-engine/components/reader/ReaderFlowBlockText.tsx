@@ -54,11 +54,12 @@ export function ReaderFlowBlockText({
   const listPaddingStart = textItem.listContext
     ? Math.max(0, insets.listInset - insets.markerWidth - insets.markerGap) + insets.poemInset
     : insets.poemInset;
+  const hasTextOverride = typeof textItem.textOverride === 'string';
   const serializedText = serializeTextLines(textItem.lines);
   const hasRichLineFragments = Boolean(
-    textItem.richLineFragments?.some((line) => line.length > 0),
+    !hasTextOverride && textItem.richLineFragments?.some((line) => line.length > 0),
   );
-  const renderedText = serializedText;
+  const renderedText = textItem.textOverride ?? serializedText;
 
   if (textItem.renderRole === 'hr') {
     return (
@@ -170,6 +171,13 @@ export function ReaderFlowBlockText({
   let content = textItem.kind === 'heading'
     ? (() => {
       const TagName = getHeadingTagName(textItem.headingLevel);
+      let headingWhiteSpace: CSSProperties['whiteSpace'] = 'pre';
+      if (hasTextOverride) {
+        headingWhiteSpace = 'normal';
+      } else if (hasRichLineFragments) {
+        headingWhiteSpace = undefined;
+      }
+
       return (
         <TagName
           data-testid="reader-flow-text-fragment"
@@ -181,8 +189,8 @@ export function ReaderFlowBlockText({
           style={{
             ...textStyle,
             letterSpacing: `${READER_CONTENT_TOKEN_DEFAULTS.headingLetterSpacingEm}em`,
-            overflow: 'hidden',
-            whiteSpace: hasRichLineFragments ? undefined : 'pre',
+            overflow: hasTextOverride ? undefined : 'hidden',
+            whiteSpace: headingWhiteSpace,
           }}
         >
           {hasRichLineFragments

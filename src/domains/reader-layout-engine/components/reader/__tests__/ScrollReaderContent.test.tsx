@@ -28,10 +28,10 @@ import {
 
 const TEXT_LAYOUT_ENGINE = createFakeReaderTextLayoutEngine({ maxCharsPerLine: 28 });
 
-function createScrollChapterLayout(content: string) {
+function createScrollChapterLayout(content: string, title = 'Chapter 1') {
   const chapter = {
     index: 0,
-    title: 'Chapter 1',
+    title,
     plainText: content,
     richBlocks: [],
     contentFormat: 'plain' as const,
@@ -396,9 +396,9 @@ describe('ScrollReaderContent', () => {
     const flowRoot = container.querySelector('.pm-reader > .relative');
     const chapterElements = container.querySelectorAll(`.${READER_CONTENT_CLASS_NAMES.chapter}`);
 
-    expect(flowRoot).toHaveStyle({ height: '900px' });
-    expect(chapterElements[0]).toHaveStyle({ top: '0px' });
-    expect(chapterElements[1]).toHaveStyle({ top: '400px' });
+    expect(flowRoot).toHaveStyle({ height: '956px' });
+    expect(chapterElements[0]).toHaveStyle({ top: '56px' });
+    expect(chapterElements[1]).toHaveStyle({ top: '456px' });
     expect(screen.getByText('First text')).toBeInTheDocument();
     expect(screen.getByText('Second text')).toBeInTheDocument();
   });
@@ -426,8 +426,8 @@ describe('ScrollReaderContent', () => {
     const flowRoot = container.querySelector('.pm-reader > .relative');
     const chapterElement = container.querySelector(`.${READER_CONTENT_CLASS_NAMES.chapter}`);
 
-    expect(flowRoot).toHaveStyle({ height: `${layout.totalHeight}px` });
-    expect(chapterElement).toHaveStyle({ top: '0px' });
+    expect(flowRoot).toHaveStyle({ height: `${layout.totalHeight + 56}px` });
+    expect(chapterElement).toHaveStyle({ top: '56px' });
     expect(screen.getByText('Fallback text')).toBeInTheDocument();
   });
 
@@ -455,17 +455,14 @@ describe('ScrollReaderContent', () => {
   });
 
   it('matches the paged header treatment for long sticky chapter titles', () => {
-    const { chapter, layout } = createScrollChapterLayout('Text');
-    const longTitle = 'Chapter 1 with a very long title that should wrap instead of truncating';
+    const longTitle = 'Chapter 1 with a very long title that should stay in the page header';
+    const { chapter, layout } = createScrollChapterLayout('Text', longTitle);
 
     render(
       <ScrollReaderContent
         chapters={[{
           index: 0,
-          chapter: {
-            ...chapter,
-            title: longTitle,
-          },
+          chapter,
           layout,
         }]}
         novelId={1}
@@ -482,6 +479,38 @@ describe('ScrollReaderContent', () => {
     expect(stickyTitle).toHaveClass('truncate');
     expect(stickyTitle).toHaveClass('min-w-0');
     expect(stickyTitle).toHaveClass('flex-1');
+  });
+
+  it('renders the body chapter title directly from chapter.title in the content layer', () => {
+    const longTitle = 'Chapter title that wraps onto a second measured line';
+    const { chapter, layout } = createScrollChapterLayout('Text', longTitle);
+
+    render(
+      <ScrollReaderContent
+        chapters={[{
+          index: 0,
+          chapter,
+          layout,
+        }]}
+        novelId={1}
+        readerTheme="auto"
+        rootClassName="pm-reader pm-reader--scroll pm-reader--theme-auto"
+        rootStyle={{}}
+        textClassName=""
+        headerBgClassName="bg-reader-header"
+        onChapterElement={() => {}}
+      />,
+    );
+
+    const bodyTitle = screen.getByRole('heading', { level: 2, name: longTitle });
+    expect(bodyTitle).toHaveTextContent(longTitle);
+    expect(bodyTitle.textContent).not.toContain('\n');
+    expect(bodyTitle).toHaveStyle({ whiteSpace: 'normal' });
+    expect(bodyTitle.parentElement).not.toHaveStyle({ zIndex: '20' });
+    expect(bodyTitle.parentElement).not.toHaveClass('bg-reader-header');
+    expect(screen.getByTestId('scroll-reader-content-body').parentElement).not.toHaveStyle({
+      paddingTop: '56px',
+    });
   });
 
   it('renders only the windowed block range when one is provided', () => {

@@ -9,6 +9,8 @@ import type {
 } from '@shared/contracts';
 
 export const PAGED_VIEWPORT_TOP_PADDING_PX = 16;
+// 章节标题不来自正文段落；用一个命名哨兵值把这个约定显式化。
+export const CHAPTER_TITLE_PARAGRAPH_INDEX = -1;
 
 export type ReaderRenderVariant = 'original-scroll' | 'original-paged' | 'summary-shell';
 

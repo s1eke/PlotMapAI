@@ -2,6 +2,7 @@ import type { ChapterContent } from '@shared/contracts/reader';
 import type {
   ReaderBlock,
 } from './readerLayoutTypes';
+import { CHAPTER_TITLE_PARAGRAPH_INDEX } from './readerLayoutTypes';
 
 import {
   buildRichPaginationBlockSequence,
@@ -27,7 +28,7 @@ function toChapterTitleBlock(chapter: ChapterContent): ReaderBlock {
     blockIndex: 0,
     blockKey: createReaderBlockKey({
       kind: 'heading',
-      paragraphIndex: -1,
+      paragraphIndex: CHAPTER_TITLE_PARAGRAPH_INDEX,
       text: chapter.title,
     }),
     blockTextHash: createReaderTextHash(chapter.title),
@@ -40,7 +41,7 @@ function toChapterTitleBlock(chapter: ChapterContent): ReaderBlock {
     kind: 'heading',
     marginAfter: READER_CONTENT_TOKEN_DEFAULTS.chapterTitleMarginBottomPx,
     marginBefore: READER_CONTENT_TOKEN_DEFAULTS.chapterTitleMarginTopPx,
-    paragraphIndex: -1,
+    paragraphIndex: CHAPTER_TITLE_PARAGRAPH_INDEX,
     importFormatVersion: chapter.importFormatVersion,
     textQuote: createReaderTextQuote(chapter.title),
     text: chapter.title,

@@ -4,8 +4,6 @@ import type { ParsedBook } from '../types';
 import type { BookImportProgress } from '../progress';
 import { runParseEpubTask } from '../../workers/epubClient';
 
-export { parseEpubCore } from './core';
-
 export function parseEpub(
   file: File,
   options: WorkerTaskOptions<BookImportProgress> & {

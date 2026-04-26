@@ -42,7 +42,10 @@ export {
   getPageStartLocator,
   getPageStartLocatorFromStaticTree,
 } from '../locator/readerLocator';
-export { PAGED_VIEWPORT_TOP_PADDING_PX } from './readerLayoutTypes';
+export {
+  CHAPTER_TITLE_PARAGRAPH_INDEX,
+  PAGED_VIEWPORT_TOP_PADDING_PX,
+} from './readerLayoutTypes';
 export type {
   MeasuredChapterLayout,
   PageSlice,

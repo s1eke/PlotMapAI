@@ -51,6 +51,7 @@ export interface RenderTextItem {
   tableRowHeights?: number[];
   tableRows?: ReaderTextPageItem['tableRows'];
   text: string;
+  textOverride?: string;
 }
 
 export function serializeInlineKey(children: RichInline[]): string {

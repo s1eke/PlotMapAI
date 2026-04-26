@@ -6,6 +6,7 @@ import type {
   ReaderLayoutSignature,
   ReaderViewportMetrics,
 } from './readerLayoutTypes';
+import { CHAPTER_TITLE_PARAGRAPH_INDEX } from './readerLayoutTypes';
 
 import { buildChapterBlockSequence } from '@shared/text-processing/chapterBlocks';
 import {
@@ -133,7 +134,7 @@ export function buildReaderBlocks(
     blockIndex: 0,
     blockKey: createReaderBlockKey({
       kind: 'heading',
-      paragraphIndex: -1,
+      paragraphIndex: CHAPTER_TITLE_PARAGRAPH_INDEX,
       text: chapter.title,
     }),
     blockTextHash: createReaderTextHash(chapter.title),
@@ -143,7 +144,7 @@ export function buildReaderBlocks(
     text: chapter.title,
     marginBefore: READER_CONTENT_TOKEN_DEFAULTS.chapterTitleMarginTopPx,
     marginAfter: READER_CONTENT_TOKEN_DEFAULTS.chapterTitleMarginBottomPx,
-    paragraphIndex: -1,
+    paragraphIndex: CHAPTER_TITLE_PARAGRAPH_INDEX,
     renderRole: 'plain',
     textQuote: createReaderTextQuote(chapter.title),
     contentHash: chapter.contentHash,

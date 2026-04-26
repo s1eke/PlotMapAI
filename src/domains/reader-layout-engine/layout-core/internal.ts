@@ -33,6 +33,7 @@ export {
   measurePagedReaderChapterLayout,
   measureReaderChapterLayout,
   measureScrollReaderChapterLayout,
+  CHAPTER_TITLE_PARAGRAPH_INDEX,
   PAGED_VIEWPORT_TOP_PADDING_PX,
   serializeReaderLayoutSignature,
 } from '../utils/layout/readerLayout';
