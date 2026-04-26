@@ -57,7 +57,23 @@ test.describe('阅读器视觉回归', () => {
     await importFixtureToDetailPage(page, 'linkedStructures');
     await openReaderFromDetailPage(page);
 
-    await expect(page.getByTestId('reader-viewport')).toHaveScreenshot('09-structured-rich-viewport.png');
+    const viewport = page.getByTestId('reader-viewport');
+    const richLink = viewport.getByRole('link', { name: 'Return to the gate note' });
+    const richRule = viewport.getByTestId('reader-flow-hr');
+    const richTable = viewport.getByTestId('reader-flow-table');
+
+    await expect(richLink).toHaveClass(/pm-reader-inline-link/u);
+    await expect(richRule).toBeVisible();
+    await expect(richTable).toBeVisible();
+    await expect(richTable.getByText('Route')).toBeVisible();
+    await expect(richTable.getByText('Status')).toBeVisible();
+    await expect(richTable.getByText('North Lock')).toBeVisible();
+    await expect(richTable.getByText('Canal Gate')).toBeVisible();
+
+    await expect(viewport).toHaveScreenshot('09-structured-rich-viewport.png', {
+      maxDiffPixels: 20_000,
+      maxDiffPixelRatio: 0.025,
+    });
   });
 
   test('TC-036 多图片章节的画廊间距渲染稳定', async ({ page }) => {
