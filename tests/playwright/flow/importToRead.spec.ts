@@ -4,7 +4,7 @@ import { buildTestEpubFile, TEST_BOOK_TITLE } from '../fixtures/testEpubFile';
 import { disableAnimations } from '../helpers/appHarness';
 
 test.describe('导入后阅读流程', () => {
-  test('完整主流程：上传 → 书架 → 详情 → 阅读 → 返回', async ({ page }) => {
+  test('TC-007 完整主流程：上传 → 书架 → 详情 → 阅读 → 返回', async ({ page }) => {
     // 1. Start at bookshelf (empty)
     await page.goto('/');
     await disableAnimations(page);

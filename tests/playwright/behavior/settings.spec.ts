@@ -4,7 +4,7 @@ import { navigateToSettings } from '../helpers/appHarness';
 import { assertTabPanelVisible, switchTab } from '../helpers/settingsHarness';
 
 test.describe('设置页行为', () => {
-  test('三个标签页均存在且可切换', async ({ page }) => {
+  test('TC-049 三个标签页均存在且可切换', async ({ page }) => {
     await navigateToSettings(page);
 
     await expect(page.getByRole('button', { name: 'Book Parsing Rules' })).toBeVisible();
@@ -12,22 +12,22 @@ test.describe('设置页行为', () => {
     await expect(page.getByRole('button', { name: 'AI Analysis Settings' })).toBeVisible();
   });
 
-  test('选中目录标签时显示对应面板', async ({ page }) => {
+  test('TC-050 选中目录标签时显示对应面板', async ({ page }) => {
     await navigateToSettings(page);
     await assertTabPanelVisible(page, 'Book Parsing Rules');
   });
 
-  test('选中文本净化标签时显示对应面板', async ({ page }) => {
+  test('TC-051 选中文本净化标签时显示对应面板', async ({ page }) => {
     await navigateToSettings(page);
     await assertTabPanelVisible(page, 'Purification Rules');
   });
 
-  test('选中 AI 设置标签时显示对应面板', async ({ page }) => {
+  test('TC-052 选中 AI 设置标签时显示对应面板', async ({ page }) => {
     await navigateToSettings(page);
     await assertTabPanelVisible(page, 'AI Analysis Settings');
   });
 
-  test('各标签页之间切换正常', async ({ page }) => {
+  test('TC-053 各标签页之间切换正常', async ({ page }) => {
     await navigateToSettings(page);
 
     await switchTab(page, 'Purification Rules');
@@ -40,7 +40,7 @@ test.describe('设置页行为', () => {
     await expect(page.locator('.glass').first()).toBeVisible();
   });
 
-  test('刷新后仍保留设置页面状态', async ({ page }) => {
+  test('TC-054 刷新后仍保留设置页面状态', async ({ page }) => {
     await navigateToSettings(page);
     await expect(page.getByRole('heading', { level: 1 })).toContainText('Settings');
 

@@ -460,7 +460,7 @@ async function selectPagedRoundTripBaseline(
 }
 
 test.describe('阅读模式切换回归', () => {
-  test('多次滚动与翻页往返切换后位置保持稳定', async ({
+  test('TC-042 多次滚动与翻页往返切换后位置保持稳定', async ({
     page,
   }, testInfo) => {
     test.slow();
@@ -759,7 +759,7 @@ test.describe('阅读模式切换回归', () => {
     assertContentAnchorStable(reloadedAnchor, baselineAnchor!, 'final reload');
   });
 
-  test('多章节翻页模式显示全书页码并保留章节内页码数据', async ({
+  test('TC-043 多章节翻页模式显示全书页码并保留章节内页码数据', async ({
     page,
   }) => {
     const { novelId } = await importFixtureToDetailPage(page, 'multiChapterRich');
@@ -796,7 +796,7 @@ test.describe('阅读模式切换回归', () => {
     }).toBe(true);
   });
 
-  test('多章节书籍在模式切换后仍保持位置', async ({
+  test('TC-044 多章节书籍在模式切换后仍保持位置', async ({
     page,
   }, testInfo) => {
     test.slow();
@@ -980,7 +980,7 @@ test.describe('阅读模式切换回归', () => {
     );
   });
 
-  test('在章节边界处可正确恢复位置', async ({
+  test('TC-045 在章节边界处可正确恢复位置', async ({
     page,
   }, testInfo) => {
     test.slow();
@@ -1072,7 +1072,7 @@ test.describe('阅读模式切换回归', () => {
     await assertNoTraceProblems(page, testInfo, novelId, 0, 'chapter-boundary-scroll');
   });
 
-  test('封面翻页模式下位置保持稳定', async ({
+  test('TC-046 封面翻页模式下位置保持稳定', async ({
     page,
   }, testInfo) => {
     test.slow();
@@ -1212,7 +1212,7 @@ test.describe('阅读模式切换回归', () => {
     }
   });
 
-  test('模式切换后退出并重新进入 SPA，位置仍保持稳定', async ({
+  test('TC-047 模式切换后退出并重新进入 SPA，位置仍保持稳定', async ({
     page,
   }, testInfo) => {
     test.slow();

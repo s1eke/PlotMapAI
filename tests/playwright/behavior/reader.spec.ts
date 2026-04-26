@@ -36,7 +36,7 @@ async function importLongBookToDetailPage(
 }
 
 test.describe('阅读器行为', () => {
-  test('阅读器打开后展示章节内容', async ({ page }) => {
+  test('TC-032 阅读器打开后展示章节内容', async ({ page }) => {
     await importFixtureToDetailPage(page, 'scrollRich');
     await openReaderFromDetailPage(page);
 
@@ -44,7 +44,7 @@ test.describe('阅读器行为', () => {
     await expect(page.getByText('Street Prelude')).toBeVisible();
   });
 
-  test('退出阅读器后返回书籍详情', async ({ page }) => {
+  test('TC-033 退出阅读器后返回书籍详情', async ({ page }) => {
     const { title } = await importFixtureToDetailPage(page, 'scrollRich');
     await openReaderFromDetailPage(page);
 
@@ -53,7 +53,7 @@ test.describe('阅读器行为', () => {
     await expect(page.getByRole('heading', { name: title, level: 1 })).toBeVisible();
   });
 
-  test('刷新后保留滚动位置', async ({ page }) => {
+  test('TC-034 刷新后保留滚动位置', async ({ page }) => {
     const { novelId } = await importLongBookToDetailPage(page);
     await setReaderPreferences(page, { pageTurnMode: 'scroll' });
     await openReaderFromDetailPage(page);
@@ -88,7 +88,7 @@ test.describe('阅读器行为', () => {
     }, { timeout: 15_000 }).toBe(true);
   });
 
-  test('点击图片可打开查看器，按 Escape 可关闭', async ({ page }) => {
+  test('TC-035 点击图片可打开查看器，按 Escape 可关闭', async ({ page }) => {
     await importFixtureToDetailPage(page, 'imageViewer');
     await openReaderFromDetailPage(page);
 
@@ -106,7 +106,7 @@ test.describe('阅读器行为', () => {
     await expect(imageDialog).not.toBeVisible();
   });
 
-  test('原文和摘要切换在预置分析数据下可正常工作', async ({ page }) => {
+  test('TC-036 原文和摘要切换在预置分析数据下可正常工作', async ({ page }) => {
     const { novelId } = await importFixtureToDetailPage(page, 'analysisLinked');
     await openReaderFromDetailPage(page);
 
@@ -127,7 +127,7 @@ test.describe('阅读器行为', () => {
     await expect(page.getByText('Mara waited beneath the eastern bridge')).toBeVisible();
   });
 
-  test('滚动和翻页切换可保持阅读进度', async ({ page }) => {
+  test('TC-037 滚动和翻页切换可保持阅读进度', async ({ page }) => {
     test.slow();
 
     const { novelId } = await importLongBookToDetailPage(page);

@@ -1016,7 +1016,7 @@ async function runPagedRestoreRound(
 }
 
 test.describe('移动端阅读会话恢复', () => {
-  test('TC-001 滚动模式下退出重进，阅读记录恢复正常', async ({ page }) => {
+  test('TC-008 滚动模式下退出重进，阅读记录恢复正常', async ({ page }) => {
     await importEpubToDetailPage(
       page,
       await buildLongTestEpubFile(),
@@ -1054,7 +1054,7 @@ test.describe('移动端阅读会话恢复', () => {
     );
   });
 
-  test('TC-002 翻页模式下退出重进，阅读记录恢复正常', async ({ page }) => {
+  test('TC-009 翻页模式下退出重进，阅读记录恢复正常', async ({ page }) => {
     const { novelId } = await importEpubToDetailPage(
       page,
       await buildLongTestEpubFile(),
@@ -1077,7 +1077,7 @@ test.describe('移动端阅读会话恢复', () => {
     ).toBeGreaterThan(requirePagedPageIndex(roundTwoMarker, 'TC-002 round 2 marker'));
   });
 
-  test('TC-003 从滚动模式切换到翻页模式后，阅读记录恢复正常', async ({ page }) => {
+  test('TC-010 从滚动模式切换到翻页模式后，阅读记录恢复正常', async ({ page }) => {
     const { novelId } = await importEpubToDetailPage(
       page,
       await buildLongTestEpubFile(),
@@ -1104,7 +1104,7 @@ test.describe('移动端阅读会话恢复', () => {
     await expectViewportContainsSnippet(page, pagedMarker.anchorSnippet);
   });
 
-  test('TC-004 从翻页模式切换到滚动模式后，阅读记录恢复正常', async ({ page }) => {
+  test('TC-011 从翻页模式切换到滚动模式后，阅读记录恢复正常', async ({ page }) => {
     const { novelId } = await importEpubToDetailPage(
       page,
       await buildLongTestEpubFile(),
@@ -1131,7 +1131,7 @@ test.describe('移动端阅读会话恢复', () => {
     await expectViewportContainsSnippet(page, scrollMarker.anchorSnippet);
   });
 
-  test('TC-005 滚动模式下跨章节后，阅读记录恢复正常', async ({ page }) => {
+  test('TC-012 滚动模式下跨章节后，阅读记录恢复正常', async ({ page }) => {
     const { novelId } = await importEpubToDetailPage(
       page,
       await buildMultiChapterTestEpubFile(),
@@ -1178,7 +1178,7 @@ test.describe('移动端阅读会话恢复', () => {
     await expectViewportContainsNearbyPassage(page, restoredSnippet, 3);
   });
 
-  test('TC-006 翻页模式下跨章节后，阅读记录恢复正常', async ({ page }) => {
+  test('TC-013 翻页模式下跨章节后，阅读记录恢复正常', async ({ page }) => {
     const { novelId } = await importEpubToDetailPage(
       page,
       await buildMultiChapterTestEpubFile(),
@@ -1213,7 +1213,7 @@ test.describe('移动端阅读会话恢复', () => {
     await expectViewportContainsSnippet(page, marker.anchorSnippet);
   });
 
-  test('TC-007 通过目录跳转章节后，阅读记录恢复正常', async ({ page }) => {
+  test('TC-014 通过目录跳转章节后，阅读记录恢复正常', async ({ page }) => {
     const { novelId } = await importEpubToDetailPage(
       page,
       await buildMultiChapterTestEpubFile(),
@@ -1277,7 +1277,7 @@ test.describe('移动端阅读会话恢复', () => {
     await expectViewportContainsNearbyPassage(page, restoredSnippet, 3);
   });
 
-  test('TC-008 返回书架后重新打开，阅读记录恢复正常', async ({ page }) => {
+  test('TC-015 返回书架后重新打开，阅读记录恢复正常', async ({ page }) => {
     const { novelId } = await importEpubToDetailPage(
       page,
       await buildLongTestEpubFile(),
@@ -1299,7 +1299,7 @@ test.describe('移动端阅读会话恢复', () => {
     await expectViewportContainsSnippet(page, marker.anchorSnippet);
   });
 
-  test('TC-009 刷新页面后，阅读记录恢复正常', async ({ page }) => {
+  test('TC-016 刷新页面后，阅读记录恢复正常', async ({ page }) => {
     const { novelId } = await importEpubToDetailPage(
       page,
       await buildLongTestEpubFile(),
@@ -1322,7 +1322,7 @@ test.describe('移动端阅读会话恢复', () => {
     await expectViewportContainsSnippet(page, marker.anchorSnippet);
   });
 
-  test('TC-010 多次切换阅读方式后，以最后一次阅读位置为准恢复', async ({ page }) => {
+  test('TC-017 多次切换阅读方式后，以最后一次阅读位置为准恢复', async ({ page }) => {
     const { novelId } = await importEpubToDetailPage(
       page,
       await buildLongTestEpubFile(),
@@ -1354,7 +1354,7 @@ test.describe('移动端阅读会话恢复', () => {
     await expectViewportContainsSnippet(page, finalMarker.anchorSnippet);
   });
 
-  test('TC-011 不同书籍之间的阅读记录互不影响', async ({ page }) => {
+  test('TC-018 不同书籍之间的阅读记录互不影响', async ({ page }) => {
     const firstBook = {
       chapterTitle: 'Corridor A',
       title: 'Long Scroll Register A',
@@ -1414,7 +1414,7 @@ test.describe('移动端阅读会话恢复', () => {
     await expectViewportNotContainsSnippet(page, firstMarker.anchorSnippet);
   });
 
-  test('TC-012 同一章节内切换阅读方式后，阅读内容位置应连续', async ({ page }) => {
+  test('TC-019 同一章节内切换阅读方式后，阅读内容位置应连续', async ({ page }) => {
     const { novelId } = await importEpubToDetailPage(
       page,
       await buildLongTestEpubFile(),

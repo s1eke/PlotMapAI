@@ -50,7 +50,7 @@ async function waitForExactPagedProgress(
 }
 
 test.describe('阅读会话恢复', () => {
-  test('滚动模式：SPA 返回导航后可恢复滚动位置', async ({ page }) => {
+  test('TC-038 滚动模式：SPA 返回导航后可恢复滚动位置', async ({ page }) => {
     // 1. 导入一本较长的单章节书籍并以滚动模式打开。
     const { novelId } = await importEpubToDetailPage(
       page,
@@ -103,7 +103,7 @@ test.describe('阅读会话恢复', () => {
     ).toBeGreaterThan(0.1);
   });
 
-  test('翻页模式：SPA 返回导航后可恢复页码', async ({ page }) => {
+  test('TC-039 翻页模式：SPA 返回导航后可恢复页码', async ({ page }) => {
     // 1. 导入一本长书并以分页（滑动）模式打开。
     //    使用 openReaderDirect（完整 page.goto），以便应用重新读取我们将要设置的
     //    localStorage 偏好设置。SPA 导航不会重新读取偏好设置。
@@ -155,7 +155,7 @@ test.describe('阅读会话恢复', () => {
     expect(restoredSnapshot.currentPageIndex).toBe(expectedPageIndex);
   });
 
-  test('滚动切换到翻页后：SPA 导航后可恢复正确模式与页码', async ({
+  test('TC-040 滚动切换到翻页后：SPA 导航后可恢复正确模式与页码', async ({
     page,
   }) => {
     // 1. 以滚动模式打开，主产滚动进度。
@@ -226,7 +226,7 @@ test.describe('阅读会话恢复', () => {
     expect(restoredSnapshot.currentPageIndex).toBe(expectedPageIndex);
   });
 
-  test('多章节场景：SPA 返回导航后可恢复到正确章节', async ({ page }) => {
+  test('TC-041 多章节场景：SPA 返回导航后可恢复到正确章节', async ({ page }) => {
     // 1. 导入一本有 3 章节的书并以滚动模式打开。
     const { novelId } = await importEpubToDetailPage(
       page,
