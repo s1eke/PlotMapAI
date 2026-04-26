@@ -141,7 +141,10 @@ export default function ReaderViewport({
         return;
       }
 
-      event.preventDefault();
+      // 防御性检查：某些浏览器/边缘情况下事件可能不可取消
+      if (event.cancelable) {
+        event.preventDefault();
+      }
       onBlockedInteraction?.();
     };
 
@@ -252,7 +255,10 @@ export default function ReaderViewport({
       const controlledDeltaY =
         clampDelta(rawDeltaY, MAX_TOUCH_DELTA_PX) * TOUCH_DELTA_SCALE;
 
-      event.preventDefault();
+      // 防御性检查：某些浏览器/边缘情况下事件可能不可取消
+      if (event.cancelable) {
+        event.preventDefault();
+      }
       applyControlledScrollDelta(viewport, controlledDeltaY);
       state.velocity =
         (controlledDeltaY / elapsedMs) * 1000 * TOUCH_INERTIA_VELOCITY_SCALE;

@@ -32,8 +32,8 @@ function findNearestScrollableAncestor(target: EventTarget | null): HTMLElement 
   return null;
 }
 
-// PWA standalone: prevent iOS Safari rubber-band overscroll
-// CSS overscroll-behavior is unsupported on iOS, so we intercept touchmove
+// PWA 独立模式：阻止 iOS Safari 橡皮筋回弹效果
+// iOS 不支持 CSS overscroll-behavior，因此拦截 touchmove 事件
 if (window.matchMedia('(display-mode: standalone)').matches) {
   let lastY = 0;
 
@@ -54,8 +54,9 @@ if (window.matchMedia('(display-mode: standalone)').matches) {
     const atTop = scrollable.scrollTop <= 0;
     const atBottom = scrollable.scrollTop + scrollable.clientHeight >= scrollable.scrollHeight - 1;
 
-    // Pulling down at top or pulling up at bottom → overscroll → block
-    if ((dy > 0 && atTop) || (dy < 0 && atBottom)) {
+    // 在顶部下拉或在底部上拉时阻止过滚行为
+    // 防御性检查：某些浏览器/边缘情况下事件可能不可取消
+    if (e.cancelable && ((dy > 0 && atTop) || (dy < 0 && atBottom))) {
       e.preventDefault();
     }
   }, { passive: false });

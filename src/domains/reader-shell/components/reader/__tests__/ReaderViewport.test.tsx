@@ -255,6 +255,23 @@ describe('ReaderViewport', () => {
     expect(onBlockedInteraction).toHaveBeenCalledTimes(1);
   });
 
+  it('does not try to cancel non-cancelable blocked touchmove events', () => {
+    const onBlockedInteraction = vi.fn();
+    const { container } = renderViewport({
+      renderableChapter: chapter,
+      isPagedMode: false,
+      interactionLocked: true,
+      onBlockedInteraction,
+    });
+    const event = new Event('touchmove', { bubbles: true, cancelable: false });
+    const preventDefault = vi.spyOn(event, 'preventDefault');
+
+    container.firstChild?.dispatchEvent(event);
+
+    expect(preventDefault).not.toHaveBeenCalled();
+    expect(onBlockedInteraction).toHaveBeenCalledTimes(1);
+  });
+
   it('dismisses blocked paged drags before they can turn the page', () => {
     const onBlockedInteraction = vi.fn();
     const { container } = renderViewport({
