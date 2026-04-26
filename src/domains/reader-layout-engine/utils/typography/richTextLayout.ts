@@ -1,12 +1,13 @@
-import type { LayoutLine } from '@chenglou/pretext';
 import type { RichInline } from '@shared/contracts';
 import type { ReaderMeasuredLine } from '../layout/readerLayoutTypes';
+import type { ReaderTextPrepareOptions } from '../layout/readerTextPolicy';
 
 import {
   layoutWithLines,
 } from '@chenglou/pretext';
 
 import { getRichInlinePlainText } from '@shared/text-processing';
+import { normalizeReaderTextPrepareOptions } from '../layout/readerTextPolicy';
 
 import { sliceRichInlinesByGraphemeRange } from './richLineFragments';
 import {
@@ -68,9 +69,11 @@ function buildRichPreparedText(params: {
   baseFont: string;
   baseFontSizePx: number;
   inlines: RichInline[];
+  prepareOptions?: ReaderTextPrepareOptions;
 }): RichPreparedText | null {
   const plainText = getRichInlinePlainText(params.inlines);
-  const basePrepared = getPreparedText(plainText, params.baseFont);
+  const normalizedOptions = normalizeReaderTextPrepareOptions(params.prepareOptions);
+  const basePrepared = getPreparedText(plainText, params.baseFont, normalizedOptions);
   if (!basePrepared) {
     return null;
   }
@@ -84,6 +87,8 @@ function buildRichPreparedText(params: {
   const lineEndFitAdvances: number[] = [];
   const lineEndPaintAdvances: number[] = [];
   const breakableFitAdvances: Array<number[] | null> = [];
+  const spacingGraphemeCounts: number[] = [];
+  const hasLetterSpacing = normalizedOptions.letterSpacingPx !== 0;
   let searchCursor = 0;
 
   for (let index = 0; index < basePrepared.segments.length; index += 1) {
@@ -99,6 +104,9 @@ function buildRichPreparedText(params: {
       lineEndFitAdvances.push(basePrepared.lineEndFitAdvances[index] ?? 0);
       lineEndPaintAdvances.push(basePrepared.lineEndPaintAdvances[index] ?? 0);
       breakableFitAdvances.push(getSegmentBreakableFitAdvances(basePrepared, index));
+      if (hasLetterSpacing) {
+        spacingGraphemeCounts.push(basePrepared.spacingGraphemeCounts[index] ?? 0);
+      }
       continue;
     }
 
@@ -126,6 +134,9 @@ function buildRichPreparedText(params: {
       lineEndFitAdvances.push(basePrepared.lineEndFitAdvances[index] ?? 0);
       lineEndPaintAdvances.push(basePrepared.lineEndPaintAdvances[index] ?? 0);
       breakableFitAdvances.push(getSegmentBreakableFitAdvances(basePrepared, index));
+      if (hasLetterSpacing) {
+        spacingGraphemeCounts.push(basePrepared.spacingGraphemeCounts[index] ?? 0);
+      }
       continue;
     }
 
@@ -134,18 +145,25 @@ function buildRichPreparedText(params: {
       params.baseFont,
       params.baseFontSizePx,
     ));
-    const segmentWidth = graphemeWidthsForSegment.reduce((total, width) => total + width, 0);
+    const spacingGraphemeCount = graphemeWidthsForSegment.length;
+    const segmentGlyphWidth = graphemeWidthsForSegment.reduce((total, width) => total + width, 0);
+    const segmentWidth = spacingGraphemeCount > 1
+      ? segmentGlyphWidth + (spacingGraphemeCount - 1) * normalizedOptions.letterSpacingPx
+      : segmentGlyphWidth;
     widths.push(segmentWidth);
     lineEndFitAdvances.push(
       kind === 'space' || kind === 'preserved-space'
         ? 0
-        : segmentWidth,
+        : segmentWidth + (spacingGraphemeCount > 0 ? normalizedOptions.letterSpacingPx : 0),
     );
     lineEndPaintAdvances.push(
       kind === 'space'
         ? 0
         : segmentWidth,
     );
+    if (hasLetterSpacing) {
+      spacingGraphemeCounts.push(spacingGraphemeCount);
+    }
 
     if (getSegmentBreakableFitAdvances(basePrepared, index) !== null) {
       breakableFitAdvances.push(graphemeWidthsForSegment);
@@ -165,8 +183,10 @@ function buildRichPreparedText(params: {
       ...basePrepared,
       ...legacyBreakableFields,
       breakableFitAdvances,
+      letterSpacing: normalizedOptions.letterSpacingPx,
       lineEndFitAdvances,
       lineEndPaintAdvances,
+      spacingGraphemeCounts: hasLetterSpacing ? spacingGraphemeCounts : [],
       widths,
     },
     segmentRichFragments,
@@ -174,7 +194,7 @@ function buildRichPreparedText(params: {
 }
 
 function sliceRichPreparedLine(params: {
-  line: LayoutLine;
+  line: Pick<ReaderMeasuredLine, 'end' | 'start'>;
   segmentRichFragments: RichInline[][];
 }): RichInline[] {
   const { line } = params;
@@ -227,6 +247,7 @@ export function layoutRichTextWithPretext(params: {
   inlines: RichInline[];
   lineHeightPx: number;
   maxWidth: number;
+  prepareOptions?: ReaderTextPrepareOptions;
 }): ReaderRichTextLayoutResult | null {
   if (params.maxWidth <= 0 || params.inlines.length === 0) {
     return {

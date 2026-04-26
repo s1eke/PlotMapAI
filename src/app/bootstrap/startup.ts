@@ -7,6 +7,7 @@ import { AppErrorCode, isAppError } from '@shared/errors';
 import { initializeApp } from './initializeApp';
 
 export type StartupState =
+  | { kind: 'loading' }
   | { kind: 'ready' }
   | { kind: 'recovery-required'; error: AppError }
   | { kind: 'error'; error: AppError };

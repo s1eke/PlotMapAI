@@ -50,13 +50,26 @@ function enrichHintsWithProjectionMetadata(
   }
 
   const nextHints: NonNullable<StoredReaderState['hints']> = { ...hints };
+  delete nextHints.globalFlow;
   delete nextHints.pagedProjection;
   delete nextHints.scrollProjection;
 
+  if (hints.globalFlow) {
+    nextHints.globalFlow = {
+      ...hints.globalFlow,
+      basisCanonicalFingerprint:
+        hints.globalFlow.basisCanonicalFingerprint ?? params.basisCanonicalFingerprint,
+      capturedAt: hints.globalFlow.capturedAt ?? params.capturedAt,
+      sourceMode: hints.globalFlow.sourceMode ?? params.sourceMode,
+    };
+  }
+
   if (hints.pagedProjection) {
     nextHints.pagedProjection = hints.pagedProjection;
-  } else if (params.sourceMode === 'paged' && typeof hints.pageIndex === 'number') {
+  }
+  if (typeof hints.pageIndex === 'number') {
     nextHints.pagedProjection = {
+      ...nextHints.pagedProjection,
       basisCanonicalFingerprint: params.basisCanonicalFingerprint,
       capturedAt: params.capturedAt,
       sourceMode: params.sourceMode,
@@ -65,8 +78,10 @@ function enrichHintsWithProjectionMetadata(
 
   if (hints.scrollProjection) {
     nextHints.scrollProjection = hints.scrollProjection;
-  } else if (params.sourceMode === 'scroll' && typeof hints.chapterProgress === 'number') {
+  }
+  if (typeof hints.chapterProgress === 'number') {
     nextHints.scrollProjection = {
+      ...nextHints.scrollProjection,
       basisCanonicalFingerprint: params.basisCanonicalFingerprint,
       capturedAt: params.capturedAt,
       sourceMode: params.sourceMode,
@@ -92,6 +107,7 @@ export function useReaderStatePersistence(novelId: number): {
   const mode = useReaderSessionSelector((state) => state.mode);
   const lastContentMode = useReaderSessionSelector((state) => state.lastContentMode);
   const chapterProgress = useReaderSessionSelector((state) => state.chapterProgress);
+  const globalFlow = useReaderSessionSelector((state) => state.globalFlow);
   const locator = useReaderSessionSelector((state) => state.locator);
   const positionMetadata = useReaderSessionSelector((state) => state.positionMetadata);
   const storedState = useMemo<StoredReaderState>(() => buildStoredReaderState({
@@ -102,6 +118,7 @@ export function useReaderStatePersistence(novelId: number): {
         pageIndex: mode === 'paged' && positionMetadata?.sourceMode !== 'scroll'
           ? clampPageIndex(locator?.pageIndex)
           : undefined,
+        globalFlow,
         ...createReaderStateModeHints(mode, lastContentMode),
       },
       {
@@ -115,6 +132,7 @@ export function useReaderStatePersistence(novelId: number): {
   }), [
     canonical,
     chapterProgress,
+    globalFlow,
     lastContentMode,
     locator,
     mode,

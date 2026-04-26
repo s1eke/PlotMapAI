@@ -13,6 +13,7 @@ import type {
 } from '../../utils/layout/readerLayout';
 import { getOffsetForLocator } from '../../utils/layout/readerLayout';
 import {
+  calculateVisibleScrollBlockRanges,
   resolveCurrentPagedLocator,
   resolveCurrentScrollLocator,
 } from '../viewportLocators';
@@ -379,5 +380,132 @@ describe('viewportLocators canonical sampling', () => {
     expect(scrollOffset).not.toBeNull();
     expect(pagedOffset).not.toBeNull();
     expect(Math.abs((scrollOffset ?? 0) - (pagedOffset ?? 0))).toBeLessThanOrEqual(lineHeight);
+  });
+
+  it('uses flow block summaries for visible scroll block ranges before DOM offsets', () => {
+    const metrics = [
+      createTextMetric({ chapterIndex: 0, blockIndex: 0, lineCount: 1, lineHeightPx: 100, top: 0 }),
+      createTextMetric({
+        chapterIndex: 0,
+        blockIndex: 1,
+        lineCount: 1,
+        lineHeightPx: 100,
+        top: 100,
+      }),
+      createTextMetric({
+        chapterIndex: 0,
+        blockIndex: 2,
+        lineCount: 1,
+        lineHeightPx: 100,
+        top: 200,
+      }),
+    ];
+    const layout: MeasuredChapterLayout = {
+      blockCount: metrics.length,
+      chapterIndex: 0,
+      metrics,
+      renderMode: 'plain',
+      textWidth: 360,
+      totalHeight: 300,
+    };
+    const ranges = calculateVisibleScrollBlockRanges({
+      contentElement: createContentElement({ clientHeight: 80, scrollTop: 1120 }),
+      isPagedMode: false,
+      renderableScrollLayouts: [{
+        chapter: createChapter(0),
+        flowEntry: {
+          blockSummaries: metrics.map((metric) => ({
+            height: metric.height,
+            startOffset: metric.top,
+          })),
+          scrollStart: 1000,
+        },
+        index: 0,
+        layout,
+      }],
+      scrollChapterBodyElements: new Map([[0, createBodyElement(9999)]]),
+      scrollViewportHeight: 80,
+      scrollViewportTop: 1120,
+      viewMode: 'original',
+    });
+
+    expect(ranges.get(0)).toEqual({
+      startIndex: 0,
+      endIndex: 2,
+    });
+  });
+
+  it('prefers the live DOM scrollTop when the synced scroll state is stale', () => {
+    const metrics = [
+      createTextMetric({ chapterIndex: 0, blockIndex: 0, lineCount: 1, lineHeightPx: 100, top: 0 }),
+      createTextMetric({
+        chapterIndex: 0,
+        blockIndex: 1,
+        lineCount: 1,
+        lineHeightPx: 100,
+        top: 100,
+      }),
+      createTextMetric({
+        chapterIndex: 0,
+        blockIndex: 2,
+        lineCount: 1,
+        lineHeightPx: 100,
+        top: 200,
+      }),
+      createTextMetric({
+        chapterIndex: 0,
+        blockIndex: 3,
+        lineCount: 1,
+        lineHeightPx: 100,
+        top: 300,
+      }),
+      createTextMetric({
+        chapterIndex: 0,
+        blockIndex: 4,
+        lineCount: 1,
+        lineHeightPx: 100,
+        top: 400,
+      }),
+      createTextMetric({
+        chapterIndex: 0,
+        blockIndex: 5,
+        lineCount: 1,
+        lineHeightPx: 100,
+        top: 500,
+      }),
+    ];
+    const layout: MeasuredChapterLayout = {
+      blockCount: metrics.length,
+      chapterIndex: 0,
+      metrics,
+      renderMode: 'plain',
+      textWidth: 360,
+      totalHeight: 600,
+    };
+    const ranges = calculateVisibleScrollBlockRanges({
+      contentElement: createContentElement({ clientHeight: 80, scrollTop: 1500 }),
+      isPagedMode: false,
+      renderableScrollLayouts: [{
+        chapter: createChapter(0),
+        flowEntry: {
+          blockSummaries: metrics.map((metric) => ({
+            height: metric.height,
+            startOffset: metric.top,
+          })),
+          scrollStart: 1000,
+        },
+        index: 0,
+        layout,
+      }],
+      scrollChapterBodyElements: new Map([[0, createBodyElement(9999)]]),
+      scrollViewportHeight: 80,
+      scrollViewportTop: 1000,
+      viewMode: 'original',
+    });
+
+    expect(ranges.get(0)).toEqual({
+      startIndex: 2,
+      endIndex: 5,
+    });
   });
 });

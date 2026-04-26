@@ -1,6 +1,7 @@
 import type { ChapterContent } from '@shared/contracts/reader';
 import type { ReaderImageDimensions } from '@domains/reader-media';
 import type {
+  ReaderBlock,
   ReaderLayoutSignature,
   ReaderRenderQueryManifest,
   ReaderRenderVariant,
@@ -9,6 +10,7 @@ import type {
   StaticScrollChapterTree,
   StaticSummaryShellTree,
 } from './readerLayoutTypes';
+import type { ReaderTextLayoutEngine } from '../measurement/readerTextMeasurement';
 
 import {
   createMetricEndLocator,
@@ -18,11 +20,11 @@ import {
   buildPagedReaderBlocks,
   buildReaderBlocks,
 } from './readerLayoutShared';
-import { shouldUseRichScrollBlocks } from './richScroll';
 import {
-  buildStaticScrollChapterTree,
-  createScrollImageLayoutConstraints,
-} from './readerStaticTree';
+  buildRichScrollReaderBlocks,
+  shouldUseRichScrollBlocks,
+} from './richScroll';
+import { createScrollImageLayoutConstraints } from './readerStaticTree';
 import {
   createEstimatedMetricEndLocator,
   createEstimatedMetricStartLocator,
@@ -35,6 +37,7 @@ export function estimateReaderRenderQueryManifest(params: {
   imageDimensionsByKey: Map<string, ReaderImageDimensions | null | undefined>;
   layoutSignature: ReaderLayoutSignature;
   preferRichScrollRendering?: boolean;
+  textLayoutEngine?: ReaderTextLayoutEngine;
   typography: ReaderTypographyMetrics;
   variantFamily: ReaderRenderVariant;
 }): ReaderRenderQueryManifest {
@@ -44,32 +47,20 @@ export function estimateReaderRenderQueryManifest(params: {
 
   const preferRichScrollRendering = params.preferRichScrollRendering ?? true;
 
-  if (
+  const usesRichScrollBlocks =
     params.variantFamily === 'original-scroll'
-    && shouldUseRichScrollBlocks(params.chapter, preferRichScrollRendering)
-  ) {
-    const scrollTree = buildStaticScrollChapterTree(
-      params.chapter,
-      params.layoutSignature.textWidth,
-      params.typography,
-      params.imageDimensionsByKey,
-      createScrollImageLayoutConstraints(
-        params.layoutSignature.textWidth,
-        params.layoutSignature.pageHeight,
-      ),
-      undefined,
-      preferRichScrollRendering,
-    );
-
-    return createReaderRenderQueryManifest('original-scroll', scrollTree);
-  }
-
+    && shouldUseRichScrollBlocks(params.chapter, preferRichScrollRendering);
   const richAwarePaged =
     params.variantFamily === 'original-paged'
     && shouldUseRichScrollBlocks(params.chapter);
-  const blocks = params.variantFamily === 'original-paged'
-    ? buildPagedReaderBlocks(params.chapter, params.typography.paragraphSpacing)
-    : buildReaderBlocks(params.chapter, params.typography.paragraphSpacing);
+  let blocks: ReaderBlock[];
+  if (usesRichScrollBlocks) {
+    blocks = buildRichScrollReaderBlocks(params.chapter, params.typography.paragraphSpacing);
+  } else if (params.variantFamily === 'original-paged') {
+    blocks = buildPagedReaderBlocks(params.chapter, params.typography.paragraphSpacing);
+  } else {
+    blocks = buildReaderBlocks(params.chapter, params.typography.paragraphSpacing);
+  }
   const scrollImageLayoutConstraints = params.variantFamily === 'original-scroll'
     ? createScrollImageLayoutConstraints(
       params.layoutSignature.textWidth,
@@ -81,8 +72,9 @@ export function estimateReaderRenderQueryManifest(params: {
     params.layoutSignature.textWidth,
     params.typography,
     params.imageDimensionsByKey,
-    richAwarePaged,
+    usesRichScrollBlocks || richAwarePaged,
     scrollImageLayoutConstraints,
+    params.textLayoutEngine,
   ));
   const firstMeaningfulMetric = estimatedMetrics.find((metric) => metric.block.kind !== 'blank');
   const lastMeaningfulMetric = [...estimatedMetrics]

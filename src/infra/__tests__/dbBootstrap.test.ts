@@ -248,10 +248,10 @@ describe('prepareDatabase', () => {
     mockReportAppError.mockReset();
   });
 
-  it('opens the formal v8 baseline schema in a fresh environment', async () => {
+  it('opens the formal v9 baseline schema in a fresh environment', async () => {
     await prepareDatabase();
 
-    expect(db.verno).toBe(8);
+    expect(db.verno).toBe(9);
     expect(db.tables.map((table) => table.name).sort()).toEqual([
       'analysisChunks',
       'analysisJobs',
@@ -265,6 +265,7 @@ describe('prepareDatabase', () => {
       'novelImageGalleryEntries',
       'novels',
       'purificationRules',
+      'readerPretextMetrics',
       'readerProgress',
       'readerRenderCache',
       'tocRules',
@@ -281,8 +282,8 @@ describe('prepareDatabase', () => {
     await expect(readObjectStoreNames()).resolves.toContain('legacyStore');
     expect(mockDebugLog).toHaveBeenCalledWith('Storage', 'Database recovery required', expect.objectContaining({
       databaseName: PLOTMAPAI_DB_NAME,
-      expectedNativeVersion: 80,
-      targetVersion: 8,
+      expectedNativeVersion: 90,
+      targetVersion: 9,
     }));
     expect(mockReportAppError).toHaveBeenCalledTimes(1);
   });
@@ -296,21 +297,22 @@ describe('prepareDatabase', () => {
     await resetDatabaseForRecovery();
     await prepareDatabase();
 
-    expect(db.verno).toBe(8);
+    expect(db.verno).toBe(9);
     expect(db.tables.some((table) => table.name === 'legacyStore')).toBe(false);
     expect(db.tables.some((table) => table.name === 'novels')).toBe(true);
   });
 
-  it('migrates v7 databases to v8 and drops only legacy reader progress storage', async () => {
+  it('migrates v7 databases to v9 and drops only legacy reader progress storage', async () => {
     const novelId = await createVersionSevenDatabaseWithReaderProgress();
 
     await prepareDatabase();
 
-    expect(db.verno).toBe(8);
+    expect(db.verno).toBe(9);
     await expect(db.novels.get(novelId)).resolves.toBeDefined();
     await expect(db.readerProgress.get(novelId)).resolves.toMatchObject({
       activeChapterIndex: 2,
     });
+    await expect(readObjectStoreNames()).resolves.toContain('readerPretextMetrics');
     await expect(readObjectStoreNames()).resolves.not.toContain('readingProgress');
   });
 
@@ -322,7 +324,7 @@ describe('prepareDatabase', () => {
       details: expect.objectContaining({
         installedNativeVersion: 60,
         recognizedNativeVersion: false,
-        targetVersion: 8,
+        targetVersion: 9,
       }),
     });
   });
@@ -335,7 +337,7 @@ describe('prepareDatabase', () => {
       details: expect.objectContaining({
         installedNativeVersion: 10,
         recognizedNativeVersion: false,
-        targetVersion: 8,
+        targetVersion: 9,
       }),
     });
   });
@@ -348,7 +350,7 @@ describe('prepareDatabase', () => {
       details: expect.objectContaining({
         installedNativeVersion: 20,
         recognizedNativeVersion: false,
-        targetVersion: 8,
+        targetVersion: 9,
       }),
     });
   });

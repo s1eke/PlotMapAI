@@ -64,6 +64,7 @@ export function useScrollReaderWindowing(params: {
   retainedFocusedWindowChapterIndex: number | null;
   scrollAnchorSnapshotRef: MutableRefObject<ScrollAnchorSnapshot>;
   scrollChapterBodyElementsRef: MutableRefObject<Map<number, HTMLDivElement>>;
+  scrollModeChapters: number[];
   setScrollModeChapters: Dispatch<SetStateAction<number[]>>;
   setVisibleScrollBlockRangeByChapter: Dispatch<
     SetStateAction<Map<number, VisibleScrollBlockRange>>
@@ -87,6 +88,7 @@ export function useScrollReaderWindowing(params: {
   const cacheRef = useRef(cache);
   const fetchChapterContentRef = useRef(fetchChapterContent);
   const layoutQueriesRef = useRef(layoutQueries);
+  const pendingWindowFetchesRef = useRef<Set<number>>(new Set());
   const currentChapterIndex = currentChapter?.index ?? null;
 
   useEffect(() => {
@@ -140,12 +142,19 @@ export function useScrollReaderWindowing(params: {
     setStableScrollWindow(setScrollModeChapters, nextWindow);
 
     nextWindow.forEach((windowIndex) => {
-      if (!cacheRef.current.hasCachedChapter(windowIndex)) {
+      if (
+        !cacheRef.current.hasCachedChapter(windowIndex)
+        && !pendingWindowFetchesRef.current.has(windowIndex)
+      ) {
+        pendingWindowFetchesRef.current.add(windowIndex);
         fetchChapterContentRef.current(windowIndex)
           .then((chapter) => {
             cacheRef.current.setCachedChapter(chapter);
           })
-          .catch(() => {});
+          .catch(() => {})
+          .finally(() => {
+            pendingWindowFetchesRef.current.delete(windowIndex);
+          });
       }
     });
   }, [

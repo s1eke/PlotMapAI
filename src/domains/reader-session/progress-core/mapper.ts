@@ -37,6 +37,14 @@ function normalizePageIndex(value: number | undefined): number | undefined {
   return Math.max(0, Math.floor(value));
 }
 
+function normalizeOffset(value: number | undefined): number | undefined {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return undefined;
+  }
+
+  return Math.max(0, value);
+}
+
 function normalizeString(value: string | undefined): string | undefined {
   return typeof value === 'string' && value.length > 0 ? value : undefined;
 }
@@ -144,12 +152,25 @@ export function toReaderProgressProjectionRecord(
 ): ReaderProgressProjectionRecord | undefined {
   const scrollChapterProgress = clampChapterProgress(projection?.scroll?.chapterProgress);
   const pagedPageIndex = normalizePageIndex(projection?.paged?.pageIndex);
+  const globalScrollOffset = normalizeOffset(projection?.global?.globalScrollOffset);
+  const globalPageIndex = normalizePageIndex(projection?.global?.globalPageIndex);
 
-  if (scrollChapterProgress === undefined && pagedPageIndex === undefined) {
+  if (
+    scrollChapterProgress === undefined
+    && pagedPageIndex === undefined
+    && globalScrollOffset === undefined
+    && globalPageIndex === undefined
+  ) {
     return undefined;
   }
 
   return {
+    globalScrollOffset,
+    globalPageIndex,
+    globalCapturedAt: normalizeString(projection?.global?.capturedAt),
+    globalSourceMode: projection?.global?.sourceMode,
+    globalBasisCanonicalFingerprint: normalizeString(projection?.global?.basisCanonicalFingerprint),
+    globalLayoutKey: normalizeString(projection?.global?.layoutKey),
     pagedPageIndex,
     pagedCapturedAt: normalizeString(projection?.paged?.capturedAt),
     pagedSourceMode: projection?.paged?.sourceMode,
@@ -167,12 +188,37 @@ export function toReaderProgressProjection(
 ): ReaderProgressProjection | undefined {
   const scrollChapterProgress = clampChapterProgress(record?.scrollChapterProgress);
   const pagedPageIndex = normalizePageIndex(record?.pagedPageIndex);
+  const globalScrollOffset = normalizeOffset(record?.globalScrollOffset);
+  const globalPageIndex = normalizePageIndex(record?.globalPageIndex);
 
-  if (scrollChapterProgress === undefined && pagedPageIndex === undefined) {
+  if (
+    scrollChapterProgress === undefined
+    && pagedPageIndex === undefined
+    && globalScrollOffset === undefined
+    && globalPageIndex === undefined
+  ) {
     return undefined;
   }
 
   return {
+    global: globalScrollOffset === undefined && globalPageIndex === undefined
+      ? undefined
+      : {
+        ...(globalScrollOffset === undefined ? {} : { globalScrollOffset }),
+        ...(globalPageIndex === undefined ? {} : { globalPageIndex }),
+        ...(normalizeString(record?.globalCapturedAt)
+          ? { capturedAt: normalizeString(record?.globalCapturedAt) }
+          : {}),
+        ...(normalizeSourceMode(record?.globalSourceMode)
+          ? { sourceMode: normalizeSourceMode(record?.globalSourceMode) }
+          : {}),
+        ...(normalizeString(record?.globalBasisCanonicalFingerprint)
+          ? { basisCanonicalFingerprint: normalizeString(record?.globalBasisCanonicalFingerprint) }
+          : {}),
+        ...(normalizeString(record?.globalLayoutKey)
+          ? { layoutKey: normalizeString(record?.globalLayoutKey) }
+          : {}),
+      },
     paged: pagedPageIndex === undefined
       ? undefined
       : {

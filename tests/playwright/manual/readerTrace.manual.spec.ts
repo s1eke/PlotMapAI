@@ -85,7 +85,7 @@ async function readTraceDump(page: Page) {
 test.describe('阅读追踪手工复现', () => {
   test.skip(!MANUAL_TRACE_FLAG, '设置 PLAYWRIGHT_MANUAL_READER_TRACE=1 以运行此手工复现。');
 
-  test('当翻页与滚动分支不一致时捕获追踪产物', async ({ page }, testInfo) => {
+  test('TC-041 当翻页与滚动分支不一致时捕获追踪产物', async ({ page }, testInfo) => {
     await importFixtureToDetailPage(page, 'pagedRich');
     await openReaderFromDetailPage(page);
     await enableReaderTrace(page);

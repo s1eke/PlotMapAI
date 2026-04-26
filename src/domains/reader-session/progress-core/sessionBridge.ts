@@ -9,6 +9,7 @@ import {
   buildStoredReaderState,
   clampPageIndex,
   createCanonicalPositionFingerprint,
+  sanitizeGlobalFlowProjection,
   toCanonicalPositionFromLocator,
   toReaderLocatorFromCanonical,
 } from '@shared/utils/readerStoredState';
@@ -59,6 +60,9 @@ function normalizeReaderProgressSnapshot(
         edge: snapshot.position.edge,
       },
     projections: {
+      global: snapshot.projections?.global
+        ? sanitizeGlobalFlowProjection(snapshot.projections.global)
+        : undefined,
       paged: snapshot.projections?.paged?.pageIndex === undefined
         ? undefined
         : {
@@ -92,6 +96,12 @@ function normalizeReaderProgressSnapshotForFingerprint(
     ...normalized,
     capturedAt: undefined,
     projections: {
+      global: normalized.projections?.global
+        ? {
+          ...normalized.projections.global,
+          capturedAt: undefined,
+        }
+        : undefined,
       paged: normalized.projections?.paged
         ? {
           ...normalized.projections.paged,
@@ -170,6 +180,16 @@ export function createReaderProgressSnapshotFromSessionState(
           basisCanonicalFingerprint,
         }
         : undefined,
+      global: state.globalFlow
+        ? {
+          globalScrollOffset: state.globalFlow.globalScrollOffset,
+          globalPageIndex: state.globalFlow.globalPageIndex,
+          capturedAt,
+          sourceMode,
+          basisCanonicalFingerprint,
+          layoutKey: state.globalFlow.layoutKey,
+        }
+        : undefined,
     },
     captureQuality: position.type === 'locator' ? 'precise' : 'approximate',
     capturedAt,
@@ -211,6 +231,16 @@ export function toStoredReaderStateFromReaderProgressSnapshot(
           capturedAt: snapshot.projections.scroll.capturedAt,
           sourceMode: snapshot.projections.scroll.sourceMode,
           basisCanonicalFingerprint: snapshot.projections.scroll.basisCanonicalFingerprint,
+        }
+        : undefined,
+      globalFlow: snapshot.projections?.global
+        ? {
+          globalScrollOffset: snapshot.projections.global.globalScrollOffset,
+          globalPageIndex: snapshot.projections.global.globalPageIndex,
+          capturedAt: snapshot.projections.global.capturedAt,
+          sourceMode: snapshot.projections.global.sourceMode,
+          basisCanonicalFingerprint: snapshot.projections.global.basisCanonicalFingerprint,
+          layoutKey: snapshot.projections.global.layoutKey,
         }
         : undefined,
       viewMode: 'original',

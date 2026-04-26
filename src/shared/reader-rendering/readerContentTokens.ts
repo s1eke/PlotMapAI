@@ -63,6 +63,7 @@ export interface ReaderContentTokenDefaults {
   chapterTitleMarginBottomPx: number;
   chapterTitleMarginTopPx: number;
   headingLineHeightMultiplier: number;
+  headingLetterSpacingEm: number;
   headingMarginBottomPx: number;
   headingMarginTopPx: number;
   headingMinFontSizeNarrowViewportPx: number;
@@ -94,6 +95,7 @@ export const READER_CONTENT_TOKEN_DEFAULTS = {
   chapterTitleMarginBottomPx: 32,
   chapterTitleMarginTopPx: 8,
   headingLineHeightMultiplier: 1.4,
+  headingLetterSpacingEm: -0.015,
   headingMarginBottomPx: 20,
   headingMarginTopPx: 10,
   headingMinFontSizeNarrowViewportPx: 24,

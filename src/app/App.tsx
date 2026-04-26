@@ -40,11 +40,66 @@ function RouteFallback() {
   );
 }
 
+function StartupFallback() {
+  return (
+    <div className="flex min-h-screen w-full items-center justify-center bg-bg-primary text-text-secondary">
+      <Loader2 className="h-8 w-8 animate-spin text-accent" />
+    </div>
+  );
+}
+
 interface AppProps {
   startupState?: StartupState;
 }
 
-function App({ startupState: initialStartupState = { kind: 'ready' } }: AppProps) {
+function renderStartupContent(params: {
+  handleResetDatabase: () => Promise<void>;
+  handleRetryStartup: () => Promise<void>;
+  isResolvingStartup: boolean;
+  startupState: StartupState;
+}) {
+  const {
+    handleResetDatabase,
+    handleRetryStartup,
+    isResolvingStartup,
+    startupState,
+  } = params;
+
+  if (startupState.kind === 'loading') {
+    return <StartupFallback />;
+  }
+
+  if (startupState.kind === 'recovery-required') {
+    return (
+      <StartupRecoveryScreen
+        error={startupState.error}
+        isWorking={isResolvingStartup}
+        onRetry={handleRetryStartup}
+        onReset={handleResetDatabase}
+      />
+    );
+  }
+
+  return (
+    <Router>
+      <FileHandlingProvider>
+        <Layout>
+          <Suspense fallback={<RouteFallback />}>
+            <Routes>
+              <Route path={appPaths.bookshelf()} element={<LazyBookshelfPage />} />
+              <Route path="/novel/:id" element={<LazyBookDetailPage />} />
+              <Route path="/novel/:id/read" element={<LazyReaderPage />} />
+              <Route path="/novel/:id/graph" element={<LazyCharacterGraphPage />} />
+              <Route path={appPaths.settings()} element={<LazySettingsPage />} />
+            </Routes>
+          </Suspense>
+        </Layout>
+      </FileHandlingProvider>
+    </Router>
+  );
+}
+
+function App({ startupState: initialStartupState = { kind: 'loading' } }: AppProps) {
   const [startupState, setStartupState] = useState<StartupState>(initialStartupState);
   const [isResolvingStartup, setIsResolvingStartup] = useState(false);
 
@@ -59,6 +114,25 @@ function App({ startupState: initialStartupState = { kind: 'ready' } }: AppProps
   useEffect(() => {
     return registerGlobalErrorHandlers();
   }, []);
+
+  useEffect(() => {
+    if (startupState.kind !== 'loading') {
+      return undefined;
+    }
+
+    let active = true;
+
+    initializeAppSafely()
+      .then((nextStartupState) => {
+        if (active) {
+          setStartupState(nextStartupState);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [startupState.kind]);
 
   const handleRetryStartup = useCallback(async (): Promise<void> => {
     setIsResolvingStartup(true);
@@ -83,30 +157,12 @@ function App({ startupState: initialStartupState = { kind: 'ready' } }: AppProps
   return (
     <ThemeProvider>
       <AppErrorBoundary initialError={initialError}>
-        {startupState.kind === 'recovery-required' ? (
-          <StartupRecoveryScreen
-            error={startupState.error}
-            isWorking={isResolvingStartup}
-            onRetry={handleRetryStartup}
-            onReset={handleResetDatabase}
-          />
-        ) : (
-          <Router>
-            <FileHandlingProvider>
-              <Layout>
-                <Suspense fallback={<RouteFallback />}>
-                  <Routes>
-                    <Route path={appPaths.bookshelf()} element={<LazyBookshelfPage />} />
-                    <Route path="/novel/:id" element={<LazyBookDetailPage />} />
-                    <Route path="/novel/:id/read" element={<LazyReaderPage />} />
-                    <Route path="/novel/:id/graph" element={<LazyCharacterGraphPage />} />
-                    <Route path={appPaths.settings()} element={<LazySettingsPage />} />
-                  </Routes>
-                </Suspense>
-              </Layout>
-            </FileHandlingProvider>
-          </Router>
-        )}
+        {renderStartupContent({
+          handleResetDatabase,
+          handleRetryStartup,
+          isResolvingStartup,
+          startupState,
+        })}
       </AppErrorBoundary>
       {isDebugMode() && <DebugPanel />}
       {startupState.kind === 'ready' && <InstallPrompt />}

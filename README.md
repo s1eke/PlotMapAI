@@ -115,9 +115,11 @@ npm run dev:debug
 | `npm run analyze` | 输出 bundle 可视化分析报告 + architecture dependency graph report |
 | `npm run analyze:deps` | 输出 architecture dependency graph report 到 `dist/analysis` |
 | `npm run preview` | 预览生产构建 |
-| `npm run lint` | ESLint + dependency graph gate + 表权属校验 + 模块健康门禁 + capability drift gate + Reader 架构门禁 |
+| `npm run lint` | ESLint + dependency graph gate + 表权属校验 + 模块健康门禁 + 文档漂移门禁 + Reader 架构门禁 |
 | `npm run lint:deps` | 执行 dependency graph / file-level cycle 门禁 |
+| `npm run lint:docs` | 统一校验生成文档同步，包括 rich-content support matrix 与 E2E 用例清单 |
 | `npm run lint:capabilities` | 校验 rich-content capability registry 与 support matrix 文档同步 |
+| `npm run lint:e2e-inventory` | 校验 Playwright E2E 用例编号与清单文档同步 |
 | `npm run lint:ownership` | 执行 Dexie 表 ownership 静态校验 |
 | `npm run lint:module-health` | 执行热点目录模块健康门禁 |
 | `npm test` | 运行 Vitest（单次） |
@@ -189,8 +191,10 @@ README 只保留高层说明；精确规则、allowlist 和阈值统一收敛到
 - 分层与 Reader 规则 contract: [`scripts/architecture/contracts/architecture.json`](scripts/architecture/contracts/architecture.json)
 - Dexie 表 ownership contract: [`scripts/architecture/contracts/table-ownership.json`](scripts/architecture/contracts/table-ownership.json)
 - rich-content capability registry: [`src/shared/contracts/rich-content-capabilities.ts`](src/shared/contracts/rich-content-capabilities.ts)
+- E2E 测试用例清单: [`docs/e2e-test-cases-inventory.md`](docs/e2e-test-cases-inventory.md)
 - dependency graph gate: [`scripts/checkDependencyGraph.mjs`](scripts/checkDependencyGraph.mjs)
 - rich-content support matrix gate: [`scripts/checkRichContentCapabilities.mjs`](scripts/checkRichContentCapabilities.mjs)
+- E2E test inventory gate: [`scripts/checkE2eTestCasesInventory.mjs`](scripts/checkE2eTestCasesInventory.mjs)
 - Reader 专项门禁: [`scripts/checkReaderArchitecture.mjs`](scripts/checkReaderArchitecture.mjs)
 - 表 ownership 门禁: [`scripts/checkTableOwnership.mjs`](scripts/checkTableOwnership.mjs)
 - 热点目录模块健康门禁: [`scripts/checkModuleHealth.mjs`](scripts/checkModuleHealth.mjs)
@@ -203,6 +207,7 @@ README 只保留高层说明；精确规则、allowlist 和阈值统一收敛到
 - Dexie 表 ownership 与 application 层跨域编排白名单
 - `book-import`、`application/services`、`shared/text-processing`、`app/debug` 的热点模块逻辑行数硬上限、函数长度与导入耦合
 - rich-content support matrix、类型契约、EPUB parser、Reader content contract 与 plain-text projection 的防漂移校验
+- Playwright E2E 用例编号、分类清单与生成文档的防漂移校验
 
 ## 核心数据流
 

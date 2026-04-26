@@ -7,6 +7,7 @@ import type {
   StoredReaderState,
 } from '@shared/contracts/reader';
 import type { ScrollReaderLayout } from './scrollReaderControllerTypes';
+import type { NovelFlowIndex } from '../layout-core/internal';
 
 export interface UseScrollReaderRestoreParams {
   chapterIndex: number;
@@ -37,7 +38,9 @@ export interface UseScrollReaderRestoreParams {
   scrollChapterBodyElementsRef: MutableRefObject<Map<number, HTMLDivElement>>;
   scrollChapterElementsRef: MutableRefObject<Map<number, HTMLDivElement>>;
   scrollLayouts: ReadonlyMap<number, ScrollReaderLayout>;
+  novelFlowIndex: NovelFlowIndex | null;
   setScrollModeChapters: Dispatch<SetStateAction<number[]>>;
   stopRestoreMask: () => void;
+  syncViewportState: (options?: { force?: boolean }) => void;
   viewportContentRef: RefObject<HTMLDivElement | null>;
 }

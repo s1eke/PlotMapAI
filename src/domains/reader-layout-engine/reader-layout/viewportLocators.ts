@@ -10,6 +10,7 @@ import type {
 } from '../utils/layout/readerLayout';
 import {
   findVisibleBlockRange,
+  findVisibleBlockRangeFromBlockSummaries,
   findLocatorForLayoutOffset,
   findPageIndexForLocator,
   getChapterBoundaryLocator,
@@ -24,6 +25,7 @@ import {
   getReaderRestoreTargetBoundary,
   getReaderRestoreTargetLocator,
 } from '@shared/utils/readerStoredState';
+import { clampAnchorRatio } from './viewportLocatorMath';
 type ReaderPagedLayout = PaginatedChapterLayout;
 type ReaderScrollLayout = MeasuredChapterLayout;
 
@@ -32,6 +34,7 @@ interface ScrollCanonicalSamplingSource {
   contentElement: HTMLDivElement;
   scrollLayouts: ReadonlyMap<number, ReaderScrollLayout>;
   scrollChapterBodyElements: ReadonlyMap<number, HTMLDivElement>;
+  scrollChapterGlobalOffsets?: ReadonlyMap<number, number>;
   scrollReaderChapters: Array<{ index: number; chapter: ChapterContent }>;
 }
 
@@ -43,22 +46,6 @@ interface PagedCanonicalSamplingSource {
 type CanonicalSamplingSource =
   | { mode: 'scroll'; source: ScrollCanonicalSamplingSource }
   | { mode: 'paged'; source: PagedCanonicalSamplingSource };
-
-function clampAnchorRatio(anchorRatio: number): number {
-  if (!Number.isFinite(anchorRatio)) {
-    return SCROLL_READING_ANCHOR_RATIO;
-  }
-
-  if (anchorRatio <= 0) {
-    return 0;
-  }
-
-  if (anchorRatio >= 1) {
-    return 1;
-  }
-
-  return anchorRatio;
-}
 
 function compactLocatorMetadata(metadata: Partial<ReaderLocator>): Partial<ReaderLocator> {
   return Object.fromEntries(
@@ -305,13 +292,16 @@ function sampleScrollCanonicalPosition(
     if (!chapterBodyElement || !chapterLayout) {
       continue;
     }
+    const chapterBodyOffsetTop =
+      source.scrollChapterGlobalOffsets?.get(renderableChapter.index)
+      ?? chapterBodyElement.offsetTop;
     if (
-      chapterBodyElement.offsetTop <= visibleMarker
-      && chapterBodyElement.offsetTop > currentTop
+      chapterBodyOffsetTop <= visibleMarker
+      && chapterBodyOffsetTop > currentTop
     ) {
       currentBodyElement = chapterBodyElement;
       currentLayout = chapterLayout;
-      currentTop = chapterBodyElement.offsetTop;
+      currentTop = chapterBodyOffsetTop;
     }
   }
 
@@ -319,7 +309,10 @@ function sampleScrollCanonicalPosition(
     return null;
   }
 
-  return findLocatorForLayoutOffset(currentLayout, visibleMarker - currentBodyElement.offsetTop);
+  const currentBodyOffsetTop =
+    source.scrollChapterGlobalOffsets?.get(currentLayout.chapterIndex)
+    ?? currentBodyElement.offsetTop;
+  return findLocatorForLayoutOffset(currentLayout, visibleMarker - currentBodyOffsetTop);
 }
 
 function samplePagedCanonicalPosition(
@@ -375,6 +368,7 @@ export function resolveCurrentScrollLocator(params: {
   isPagedMode: boolean;
   scrollLayouts: ReadonlyMap<number, ReaderScrollLayout>;
   scrollChapterBodyElements: ReadonlyMap<number, HTMLDivElement>;
+  scrollChapterGlobalOffsets?: ReadonlyMap<number, number>;
   scrollReaderChapters: Array<{ index: number; chapter: ChapterContent }>;
   viewMode: 'original' | 'summary';
 }): ReaderLocator | null {
@@ -395,6 +389,7 @@ export function resolveCurrentScrollLocator(params: {
         contentElement: params.contentElement,
         scrollLayouts: params.scrollLayouts,
         scrollChapterBodyElements: params.scrollChapterBodyElements,
+        scrollChapterGlobalOffsets: params.scrollChapterGlobalOffsets,
         scrollReaderChapters: params.scrollReaderChapters,
       },
     },
@@ -427,6 +422,7 @@ export function resolveCurrentPagedLocator(params: {
 export function resolveCurrentScrollLocatorOffset(params: {
   locator: ReaderLocator;
   scrollChapterBodyElements: ReadonlyMap<number, HTMLDivElement>;
+  scrollChapterGlobalOffsets?: ReadonlyMap<number, number>;
   scrollLayouts: ReadonlyMap<number, ReaderScrollLayout>;
 }): number | null {
   const chapterBodyElement = params.scrollChapterBodyElements.get(params.locator.chapterIndex);
@@ -440,7 +436,8 @@ export function resolveCurrentScrollLocatorOffset(params: {
     return null;
   }
 
-  return chapterBodyElement.offsetTop + offset;
+  return (params.scrollChapterGlobalOffsets?.get(params.locator.chapterIndex)
+    ?? chapterBodyElement.offsetTop) + offset;
 }
 
 export function resolvePagedViewportState(params: {
@@ -485,6 +482,10 @@ export function calculateVisibleScrollBlockRanges(params: {
   isPagedMode: boolean;
   renderableScrollLayouts: Array<{
     chapter: ChapterContent;
+    flowEntry?: {
+      blockSummaries?: Array<{ height: number; startOffset: number }>;
+      scrollStart: number;
+    } | null;
     index: number;
     layout: ReaderScrollLayout;
   }>;
@@ -507,8 +508,24 @@ export function calculateVisibleScrollBlockRanges(params: {
 
   const nextRanges = new Map<number, ReturnType<typeof findVisibleBlockRange>>();
   const overscanPx = Math.max(240, Math.round(viewportHeight * 0.75));
+  const viewportScrollTop = params.contentElement.scrollTop ?? params.scrollViewportTop;
   for (const renderableChapter of params.renderableScrollLayouts) {
     const chapterBodyElement = params.scrollChapterBodyElements.get(renderableChapter.index);
+    const chapterGlobalOffset = renderableChapter.flowEntry?.scrollStart;
+    if (typeof chapterGlobalOffset === 'number' && renderableChapter.flowEntry?.blockSummaries) {
+      nextRanges.set(
+        renderableChapter.index,
+        findVisibleBlockRangeFromBlockSummaries(
+          renderableChapter.flowEntry.blockSummaries,
+          renderableChapter.layout.totalHeight,
+          viewportScrollTop - chapterGlobalOffset,
+          viewportHeight,
+          overscanPx,
+        ),
+      );
+      continue;
+    }
+
     if (!chapterBodyElement) {
       continue;
     }
@@ -516,7 +533,7 @@ export function calculateVisibleScrollBlockRanges(params: {
     const chapterBodyRect = chapterBodyElement.getBoundingClientRect();
     const offsetTop = Number.isFinite(viewportRect.top) && Number.isFinite(chapterBodyRect.top)
       ? viewportRect.top - chapterBodyRect.top
-      : params.scrollViewportTop - chapterBodyElement.offsetTop;
+      : viewportScrollTop - (chapterGlobalOffset ?? chapterBodyElement.offsetTop);
     nextRanges.set(
       renderableChapter.index,
       findVisibleBlockRange(

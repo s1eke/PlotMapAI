@@ -2,12 +2,14 @@ import type { ChapterContent } from '@shared/contracts/reader';
 import type { ReaderImageDimensions } from '@domains/reader-media';
 import type {
   ReaderLayoutSignature,
+  ReaderTextLayoutEngine,
   ReaderRenderVariant,
   ReaderTypographyMetrics,
   StaticChapterRenderTree,
 } from '../layout/readerLayout';
 
 import {
+  createChapterContentHash,
   buildStaticPagedChapterTree,
   buildStaticScrollChapterTree,
   buildStaticSummaryShellTree,
@@ -15,6 +17,12 @@ import {
   estimateReaderRenderQueryManifest,
 } from '../layout/readerLayout';
 import type { ReaderRenderCacheEntry, ReaderRenderCacheManifestEntry } from './readerRenderCacheCore';
+import {
+  createCachedPretextTextLayoutEngine,
+  createReaderTextMetricSignature,
+  loadPretextMetricsBundle,
+  persistPretextMetricsBundle,
+} from './readerPretextMetrics';
 
 export {
   buildReaderRenderCacheKey,
@@ -47,10 +55,25 @@ export {
   getReaderRenderCacheEntryFromDexie,
   getReaderRenderCacheEntryFromMemory,
   getReaderRenderCacheRecordFromDexie,
+  getReaderRenderCacheRecordsForNovelVariantFromDexie,
   isMaterializedReaderRenderCacheEntry,
   persistReaderRenderCacheEntry,
   primeReaderRenderCacheEntry,
 } from './readerRenderCacheStorage';
+export {
+  createCachedPretextTextLayoutEngine,
+  createReaderTextLineStatsKey,
+  createReaderTextMetricSignature,
+  deletePersistedReaderPretextMetrics,
+  loadPretextMetricsBundle,
+  persistPretextMetricsBundle,
+  READER_PRETEXT_METRICS_VERSION,
+  serializeReaderTextMetricSignature,
+} from './readerPretextMetrics';
+export type {
+  ReaderPretextMetricsBundle,
+  ReaderTextMetricSignature,
+} from './readerPretextMetrics';
 import {
   createReaderRenderCacheEntry,
   createReaderRenderCacheManifestEntry,
@@ -143,6 +166,7 @@ export function buildStaticRenderManifest(params: {
   layoutSignature: ReaderLayoutSignature;
   novelId: number;
   preferRichScrollRendering?: boolean;
+  textLayoutEngine?: ReaderTextLayoutEngine;
   typography: ReaderTypographyMetrics;
   variantFamily: ReaderRenderVariant;
 }): ReaderRenderCacheManifestEntry {
@@ -162,9 +186,54 @@ export function buildStaticRenderManifest(params: {
       imageDimensionsByKey: params.imageDimensionsByKey,
       layoutSignature: params.layoutSignature,
       preferRichScrollRendering: params.preferRichScrollRendering,
+      textLayoutEngine: params.textLayoutEngine,
       typography: params.typography,
       variantFamily: params.variantFamily,
     }),
     variantFamily: params.variantFamily,
   });
+}
+
+export async function buildStaticRenderManifestWithPretextMetrics(params: {
+  chapter: ChapterContent;
+  imageDimensionsByKey: Map<string, ReaderImageDimensions | null | undefined>;
+  layoutKey?: string;
+  layoutSignature: ReaderLayoutSignature;
+  novelId: number;
+  preferRichScrollRendering?: boolean;
+  textLayoutEngine?: ReaderTextLayoutEngine;
+  typography: ReaderTypographyMetrics;
+  variantFamily: ReaderRenderVariant;
+}): Promise<ReaderRenderCacheManifestEntry> {
+  const contentHash = createChapterContentHash(params.chapter);
+  const signature = createReaderTextMetricSignature({
+    layoutSignature: params.layoutSignature,
+    typography: params.typography,
+  });
+  try {
+    const bundle = await loadPretextMetricsBundle({
+      chapterIndex: params.chapter.index,
+      contentFormat: params.chapter.contentFormat,
+      contentHash,
+      contentVersion: params.chapter.contentVersion,
+      novelId: params.novelId,
+      signature,
+    });
+    const cachedEngine = createCachedPretextTextLayoutEngine({
+      baseEngine: params.textLayoutEngine,
+      bundle,
+    });
+    const manifestEntry = buildStaticRenderManifest({
+      ...params,
+      textLayoutEngine: cachedEngine.textLayoutEngine,
+    });
+
+    if (cachedEngine.hasChanges()) {
+      await persistPretextMetricsBundle(cachedEngine.createBundle()).catch(() => undefined);
+    }
+
+    return manifestEntry;
+  } catch {
+    return buildStaticRenderManifest(params);
+  }
 }

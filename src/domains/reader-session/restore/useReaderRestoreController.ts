@@ -208,9 +208,25 @@ export function useReaderRestoreController({
         targetMode,
       });
       if (isStrictModeSwitch && strictSourceMode === 'paged' && strictTargetMode === 'scroll') {
+        const currentPagedState = navigation.getPagedState();
+        const sourcePageIndex =
+          sourceRestoreTarget.locator?.pageIndex ?? sourceRestoreTarget.pageIndex;
+        const continuitySourceTarget = typeof sourcePageIndex === 'number'
+          || typeof currentPagedState.pageIndex !== 'number'
+          ? sourceRestoreTarget
+          : {
+            ...sourceRestoreTarget,
+            pageIndex: currentPagedState.pageIndex,
+            locator: sourceRestoreTarget.locator
+              ? {
+                ...sourceRestoreTarget.locator,
+                pageIndex: currentPagedState.pageIndex,
+              }
+              : sourceRestoreTarget.locator,
+          };
         targetRestoreTarget = resolveScrollContinuityTarget({
           continuitySnapshot: scrollPagedContinuityRef.current,
-          sourceTarget: sourceRestoreTarget,
+          sourceTarget: continuitySourceTarget,
         }) ?? targetRestoreTarget;
       }
       const nextLastContentMode = currentReaderState.hints?.contentMode

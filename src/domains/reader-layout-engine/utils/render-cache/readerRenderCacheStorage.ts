@@ -193,6 +193,42 @@ export async function getReaderRenderCacheEntryFromDexie<TTree extends StaticCha
   return record;
 }
 
+export async function getReaderRenderCacheRecordsForNovelVariantFromDexie<
+  TTree extends StaticChapterRenderTree,
+>(params: {
+  novelId: number;
+  variantFamily: ReaderRenderVariant;
+}): Promise<Array<ReaderRenderCacheRecord<TTree>>> {
+  await cleanupExpiredReaderRenderCacheIfNeeded();
+
+  const familyRecords = await db.readerRenderCache
+    .where('[novelId+variantFamily]')
+    .equals([params.novelId, params.variantFamily])
+    .toArray();
+  const freshRecords: PersistedReaderRenderCacheRecord[] = [];
+  const expiredIds: number[] = [];
+
+  for (const record of familyRecords) {
+    if (isPersistedReaderRenderCacheExpired(record)) {
+      expiredIds.push(record.id);
+      continue;
+    }
+    freshRecords.push(record);
+  }
+
+  if (expiredIds.length > 0) {
+    await db.readerRenderCache.bulkDelete(expiredIds);
+  }
+
+  return Promise.all(
+    freshRecords
+      .sort((left, right) => left.chapterIndex - right.chapterIndex)
+      .map(async (record) => toDomainReaderRenderCacheRecord<TTree>(
+        await refreshPersistedReaderRenderCacheIfNeeded(record),
+      )),
+  );
+}
+
 export function primeReaderRenderCacheEntry<TTree extends StaticChapterRenderTree>(
   entry: ReaderRenderCacheEntry<TTree>,
 ): ReaderRenderCacheEntry<TTree> {

@@ -13,10 +13,13 @@ import {
   PAGED_VIEWPORT_TOP_PADDING_PX,
   ReaderFlowBlock,
 } from '../../layout-core/internal';
+import ReaderPageHeader from './ReaderPageHeader';
 
 interface PagedPageFrameProps {
   chapter: ChapterContent;
   headerBgClassName: string;
+  indicatorPageCount?: number;
+  indicatorPageIndex?: number;
   layout: PaginatedChapterLayout;
   novelId: number;
   onImageActivate?: (payload: ReaderImageActivationPayload) => void;
@@ -33,12 +36,15 @@ interface PagedPageFrameProps {
   readerTheme: string;
   rootClassName: string;
   rootStyle: CSSProperties;
+  showPageIndicator?: boolean;
   textClassName: string;
 }
 
 export function PagedPageFrame({
   chapter,
   headerBgClassName,
+  indicatorPageCount,
+  indicatorPageIndex,
   layout,
   novelId,
   onImageActivate,
@@ -52,33 +58,38 @@ export function PagedPageFrame({
   readerTheme,
   rootClassName,
   rootStyle,
+  showPageIndicator = true,
   textClassName,
 }: PagedPageFrameProps) {
+  const hasIndicatorPage =
+    typeof indicatorPageCount === 'number'
+    && typeof indicatorPageIndex === 'number'
+    && indicatorPageCount > 0;
+  const resolvedIndicatorPageCount = hasIndicatorPage ? indicatorPageCount : pageCount;
+  const resolvedIndicatorPageIndex = hasIndicatorPage ? indicatorPageIndex : pageIndex;
+
   return (
     <div
       data-testid="paged-reader-page-frame"
+      data-indicator-page-count={resolvedIndicatorPageCount}
+      data-indicator-page-index={resolvedIndicatorPageIndex}
+      data-page-count={pageCount}
+      data-page-index={pageIndex}
       className={cn(rootClassName, 'flex h-full w-full flex-col')}
       style={rootStyle}
     >
       <div className={cn(READER_CONTENT_CLASS_NAMES.chapter, 'flex h-full w-full flex-col')}>
-        <div
-          className={cn(
-            READER_CONTENT_CLASS_NAMES.chapterHeader,
-            'w-full shrink-0 border-b border-border-color/20 backdrop-blur-sm',
-            headerBgClassName,
-          )}
-        >
-          <div className={cn('mx-auto flex w-full max-w-[1400px] items-center justify-between gap-4 px-4 py-3 sm:px-8 md:px-12', textClassName)}>
-            <h1 className={cn('truncate text-sm font-medium transition-colors', readerTheme === 'auto' ? 'text-text-secondary' : 'opacity-60')}>
-              {chapter.title}
-            </h1>
-            {pageCount > 1 ? (
-              <div className="whitespace-nowrap text-xs font-medium text-text-secondary">
-                {pageIndex + 1} / {pageCount}
-              </div>
-            ) : null}
-          </div>
-        </div>
+        <ReaderPageHeader
+          headerBgClassName={headerBgClassName}
+          indicatorPageCount={resolvedIndicatorPageCount}
+          indicatorPageIndex={resolvedIndicatorPageIndex}
+          pageCount={pageCount}
+          pageIndex={pageIndex}
+          readerTheme={readerTheme}
+          showPageIndicator={showPageIndicator}
+          textClassName={textClassName}
+          title={chapter.title}
+        />
 
         <div className={cn('min-h-0 flex-1', pageBgClassName ?? headerBgClassName)}>
           <div className={cn('mx-auto h-full w-full max-w-[1400px] px-4 sm:px-8 md:px-12', textClassName)}>
@@ -113,7 +124,6 @@ export function PagedPageFrame({
                   >
                     {column.items.map((item) => (
                       <ReaderFlowBlock
-                        chapterTitle={chapter.title}
                         key={item.key}
                         imageRenderMode="paged"
                         item={item}

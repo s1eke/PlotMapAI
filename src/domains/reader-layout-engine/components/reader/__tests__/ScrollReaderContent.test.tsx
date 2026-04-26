@@ -28,10 +28,10 @@ import {
 
 const TEXT_LAYOUT_ENGINE = createFakeReaderTextLayoutEngine({ maxCharsPerLine: 28 });
 
-function createScrollChapterLayout(content: string) {
+function createScrollChapterLayout(content: string, title = 'Chapter 1') {
   const chapter = {
     index: 0,
-    title: 'Chapter 1',
+    title,
     plainText: content,
     richBlocks: [],
     contentFormat: 'plain' as const,
@@ -273,7 +273,18 @@ describe('ScrollReaderContent', () => {
       />,
     );
 
-    expect(screen.getByRole('heading', { name: 'Chapter 1', level: 1 })).toBeInTheDocument();
+    const pageHeaderTitle = screen.getByRole('heading', { name: 'Chapter 1', level: 1 });
+    const pageHeader = pageHeaderTitle.closest(`.${READER_CONTENT_CLASS_NAMES.chapterHeader}`);
+    const scrollRoot = screen.getByTestId('scroll-reader-content-body').closest('.pm-reader');
+
+    expect(pageHeaderTitle).toBeInTheDocument();
+    expect(pageHeader).toBeInTheDocument();
+    expect(pageHeader).toHaveClass('w-full');
+    expect(pageHeader).not.toHaveClass('-mx-4');
+    expect(pageHeader?.parentElement).toHaveClass('sticky', 'top-0');
+    expect(scrollRoot).toHaveClass('w-full');
+    expect(scrollRoot).not.toHaveClass('max-w-[1200px]');
+    expect(screen.queryByText('1 / 1')).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Chapter 1', level: 2 })).toBeInTheDocument();
     expect(screen.getByText('Text')).toBeInTheDocument();
     expect(screen.getByTestId('scroll-reader-content-body')).toBeInTheDocument();
@@ -326,6 +337,100 @@ describe('ScrollReaderContent', () => {
     expect(screen.queryByRole('heading', { name: 'Wrong Heading', level: 2 })).not.toBeInTheDocument();
   });
 
+  it('positions rendered chapters inside the continuous novel flow', () => {
+    const first = createScrollChapterLayout('First text');
+    const second = createScrollChapterLayout('Second text');
+    const secondChapter = {
+      ...second.chapter,
+      index: 1,
+      title: 'Chapter 2',
+    };
+
+    const { container } = render(
+      <ScrollReaderContent
+        chapters={[{
+          index: 0,
+          chapter: first.chapter,
+          flowEntry: {
+            blockSummaries: [],
+            chapterIndex: 0,
+            endLocator: null,
+            manifestStatus: 'materialized',
+            pageEnd: 0,
+            pageStart: 0,
+            scrollEnd: 400,
+            scrollStart: 0,
+            startLocator: null,
+          },
+          layout: first.layout,
+        }, {
+          index: 1,
+          chapter: secondChapter,
+          flowEntry: {
+            blockSummaries: [],
+            chapterIndex: 1,
+            endLocator: null,
+            manifestStatus: 'materialized',
+            pageEnd: 0,
+            pageStart: 0,
+            scrollEnd: 900,
+            scrollStart: 400,
+            startLocator: null,
+          },
+          layout: {
+            ...second.layout,
+            chapterIndex: 1,
+          },
+        }]}
+        novelId={1}
+        readerTheme="auto"
+        rootClassName="pm-reader pm-reader--scroll pm-reader--theme-auto"
+        rootStyle={{}}
+        scrollFlowTotalHeight={900}
+        textClassName=""
+        headerBgClassName=""
+        onChapterElement={() => {}}
+      />,
+    );
+
+    const flowRoot = container.querySelector('.pm-reader > .relative');
+    const chapterElements = container.querySelectorAll(`.${READER_CONTENT_CLASS_NAMES.chapter}`);
+
+    expect(flowRoot).toHaveStyle({ height: '956px' });
+    expect(chapterElements[0]).toHaveStyle({ top: '56px' });
+    expect(chapterElements[1]).toHaveStyle({ top: '456px' });
+    expect(screen.getByText('First text')).toBeInTheDocument();
+    expect(screen.getByText('Second text')).toBeInTheDocument();
+  });
+
+  it('falls back to layout height and zero top when flow entries are absent', () => {
+    const { chapter, layout } = createScrollChapterLayout('Fallback text');
+
+    const { container } = render(
+      <ScrollReaderContent
+        chapters={[{
+          index: 0,
+          chapter,
+          layout,
+        }]}
+        novelId={1}
+        readerTheme="auto"
+        rootClassName="pm-reader pm-reader--scroll pm-reader--theme-auto"
+        rootStyle={{}}
+        textClassName=""
+        headerBgClassName=""
+        onChapterElement={() => {}}
+      />,
+    );
+
+    const flowRoot = container.querySelector('.pm-reader > .relative');
+    const chapterElement = container.querySelector(`.${READER_CONTENT_CLASS_NAMES.chapter}`);
+
+    expect(flowRoot).toHaveStyle({ height: `${layout.totalHeight + 56}px` });
+    expect(chapterElement).toHaveStyle({ top: '56px' });
+    expect(screen.getByText('Fallback text')).toBeInTheDocument();
+  });
+
   it('lets the scroll reader text body inherit the global sans font stack', () => {
     const { chapter, layout } = createScrollChapterLayout('Text');
 
@@ -349,18 +454,15 @@ describe('ScrollReaderContent', () => {
     expect(screen.getByTestId('scroll-reader-content-body')).not.toHaveClass('font-serif');
   });
 
-  it('allows sticky chapter titles to wrap instead of truncating long titles', () => {
-    const { chapter, layout } = createScrollChapterLayout('Text');
-    const longTitle = 'Chapter 1 with a very long title that should wrap instead of truncating';
+  it('matches the paged header treatment for long sticky chapter titles', () => {
+    const longTitle = 'Chapter 1 with a very long title that should stay in the page header';
+    const { chapter, layout } = createScrollChapterLayout('Text', longTitle);
 
     render(
       <ScrollReaderContent
         chapters={[{
           index: 0,
-          chapter: {
-            ...chapter,
-            title: longTitle,
-          },
+          chapter,
           layout,
         }]}
         novelId={1}
@@ -374,9 +476,41 @@ describe('ScrollReaderContent', () => {
     );
 
     const stickyTitle = screen.getByRole('heading', { name: longTitle, level: 1 });
-    expect(stickyTitle).toHaveClass('break-words');
-    expect(stickyTitle).toHaveClass('whitespace-normal');
-    expect(stickyTitle).not.toHaveClass('truncate');
+    expect(stickyTitle).toHaveClass('truncate');
+    expect(stickyTitle).toHaveClass('min-w-0');
+    expect(stickyTitle).toHaveClass('flex-1');
+  });
+
+  it('renders the body chapter title directly from chapter.title in the content layer', () => {
+    const longTitle = 'Chapter title that wraps onto a second measured line';
+    const { chapter, layout } = createScrollChapterLayout('Text', longTitle);
+
+    render(
+      <ScrollReaderContent
+        chapters={[{
+          index: 0,
+          chapter,
+          layout,
+        }]}
+        novelId={1}
+        readerTheme="auto"
+        rootClassName="pm-reader pm-reader--scroll pm-reader--theme-auto"
+        rootStyle={{}}
+        textClassName=""
+        headerBgClassName="bg-reader-header"
+        onChapterElement={() => {}}
+      />,
+    );
+
+    const bodyTitle = screen.getByRole('heading', { level: 2, name: longTitle });
+    expect(bodyTitle).toHaveTextContent(longTitle);
+    expect(bodyTitle.textContent).not.toContain('\n');
+    expect(bodyTitle).toHaveStyle({ whiteSpace: 'normal' });
+    expect(bodyTitle.parentElement).not.toHaveStyle({ zIndex: '20' });
+    expect(bodyTitle.parentElement).not.toHaveClass('bg-reader-header');
+    expect(screen.getByTestId('scroll-reader-content-body').parentElement).not.toHaveStyle({
+      paddingTop: '56px',
+    });
   });
 
   it('renders only the windowed block range when one is provided', () => {
@@ -407,6 +541,35 @@ describe('ScrollReaderContent', () => {
     const fragments = container.querySelectorAll('[data-testid="reader-flow-text-fragment"]');
     expect(fragments).toHaveLength(1);
     expect(fragments[0]?.children).toHaveLength(0);
+  });
+
+  it('falls back to the full chapter when the windowed block range is temporarily empty', () => {
+    const { chapter, layout } = createScrollChapterLayout('First paragraph\nSecond paragraph');
+
+    const { container } = render(
+      <ScrollReaderContent
+        chapters={[{
+          index: 0,
+          chapter,
+          layout,
+        }]}
+        novelId={1}
+        readerTheme="auto"
+        rootClassName="pm-reader pm-reader--scroll pm-reader--theme-auto"
+        rootStyle={{}}
+        textClassName=""
+        headerBgClassName=""
+        onChapterElement={() => {}}
+        visibleBlockRangeByChapter={new Map([
+          [0, { startIndex: 0, endIndex: -1 }],
+        ])}
+      />,
+    );
+
+    expect(screen.getByText('First paragraph')).toBeInTheDocument();
+    expect(screen.getByText('Second paragraph')).toBeInTheDocument();
+    expect(container.querySelectorAll('[data-testid="reader-flow-text-fragment"]').length)
+      .toBeGreaterThan(1);
   });
 
   it('renders rich blocks in scroll mode and keeps image activation aligned to block indices', async () => {

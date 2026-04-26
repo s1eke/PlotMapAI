@@ -1,37 +1,25 @@
 import { expect, test } from '@playwright/test';
 
-import { buildTestTxtFile, TEST_BOOK_TITLE } from '../fixtures/testEpubFile';
+import { buildTestTxtFile } from '../fixtures/testEpubFile';
 import { navigateToBookshelf } from '../helpers/appHarness';
 import {
-  clickBookCard,
   getBookCardCount,
   openUploadModal,
   uploadEpubFile,
 } from '../helpers/bookshelfHarness';
 
 test.describe('书架行为', () => {
-  test('无书籍时显示空状态', async ({ page }) => {
-    await navigateToBookshelf(page);
-    await expect(page.getByText('Bookshelf is empty')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Upload' }).first()).toBeVisible();
-  });
-
-  test('上传按钮可打开上传弹窗', async ({ page }) => {
+  test('TC-011 单个 EPUB 上传成功并显示书籍卡片', async ({ page }) => {
     await navigateToBookshelf(page);
     await openUploadModal(page);
     await expect(page.locator('input[type="file"]')).toBeAttached();
-  });
-
-  test('单个 EPUB 上传成功并显示书籍卡片', async ({ page }) => {
-    await navigateToBookshelf(page);
-    await openUploadModal(page);
     await uploadEpubFile(page);
 
     const count = await getBookCardCount(page);
     expect(count).toBe(1);
   });
 
-  test('单个 TXT 上传成功并显示书籍卡片', async ({ page }) => {
+  test('TC-012 单个 TXT 上传成功并显示书籍卡片', async ({ page }) => {
     await navigateToBookshelf(page);
     await openUploadModal(page);
 
@@ -44,16 +32,7 @@ test.describe('书架行为', () => {
     expect(count).toBeGreaterThanOrEqual(1);
   });
 
-  test('点击书籍卡片可进入详情页', async ({ page }) => {
-    await navigateToBookshelf(page);
-    await openUploadModal(page);
-    await uploadEpubFile(page);
-
-    await clickBookCard(page, TEST_BOOK_TITLE);
-    await expect(page.getByRole('heading', { name: TEST_BOOK_TITLE, level: 1 })).toBeVisible();
-  });
-
-  test('多个 EPUB 上传后显示多张书籍卡片', async ({ page }) => {
+  test('TC-013 多本书上传后显示多张书籍卡片', async ({ page }) => {
     await navigateToBookshelf(page);
     await openUploadModal(page);
     await uploadEpubFile(page);

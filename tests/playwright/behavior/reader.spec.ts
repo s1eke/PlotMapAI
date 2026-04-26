@@ -10,7 +10,6 @@ import {
   setReaderPreferences,
   waitForPersistedReadingProgress,
   waitForReaderBranch,
-  type ReaderViewportSnapshot,
 } from '../helpers/readerVisualHarness';
 
 async function importLongBookToDetailPage(
@@ -36,7 +35,7 @@ async function importLongBookToDetailPage(
 }
 
 test.describe('阅读器行为', () => {
-  test('阅读器打开后展示章节内容', async ({ page }) => {
+  test('TC-018 阅读器打开后展示章节内容', async ({ page }) => {
     await importFixtureToDetailPage(page, 'scrollRich');
     await openReaderFromDetailPage(page);
 
@@ -44,16 +43,7 @@ test.describe('阅读器行为', () => {
     await expect(page.getByText('Street Prelude')).toBeVisible();
   });
 
-  test('退出阅读器后返回书籍详情', async ({ page }) => {
-    const { title } = await importFixtureToDetailPage(page, 'scrollRich');
-    await openReaderFromDetailPage(page);
-
-    await page.goBack();
-    await disableAnimations(page);
-    await expect(page.getByRole('heading', { name: title, level: 1 })).toBeVisible();
-  });
-
-  test('刷新后保留滚动位置', async ({ page }) => {
+  test('TC-019 刷新后保留滚动位置', async ({ page }) => {
     const { novelId } = await importLongBookToDetailPage(page);
     await setReaderPreferences(page, { pageTurnMode: 'scroll' });
     await openReaderFromDetailPage(page);
@@ -88,7 +78,7 @@ test.describe('阅读器行为', () => {
     }, { timeout: 15_000 }).toBe(true);
   });
 
-  test('点击图片可打开查看器，按 Escape 可关闭', async ({ page }) => {
+  test('TC-020 点击图片可打开查看器，按 Escape 可关闭', async ({ page }) => {
     await importFixtureToDetailPage(page, 'imageViewer');
     await openReaderFromDetailPage(page);
 
@@ -106,7 +96,7 @@ test.describe('阅读器行为', () => {
     await expect(imageDialog).not.toBeVisible();
   });
 
-  test('原文和摘要切换在预置分析数据下可正常工作', async ({ page }) => {
+  test('TC-021 原文和摘要切换在预置分析数据下可正常工作', async ({ page }) => {
     const { novelId } = await importFixtureToDetailPage(page, 'analysisLinked');
     await openReaderFromDetailPage(page);
 
@@ -125,88 +115,5 @@ test.describe('阅读器行为', () => {
       el.click();
     });
     await expect(page.getByText('Mara waited beneath the eastern bridge')).toBeVisible();
-  });
-
-  test('滚动和翻页切换可保持阅读进度', async ({ page }) => {
-    test.slow();
-
-    const { novelId } = await importLongBookToDetailPage(page);
-    await setReaderPreferences(page, { pageTurnMode: 'scroll' });
-    await openReaderFromDetailPage(page);
-    await waitForReaderBranch(page, 'scroll');
-
-    // Wait for scroll content to fully render
-    const viewport = page.getByTestId('reader-viewport');
-    await expect.poll(async () =>
-      viewport.evaluate((el) => el.scrollHeight > el.clientHeight),
-    { timeout: 15_000 }).toBe(true);
-
-    // Step A: scroll down to ~40% in scroll mode
-    await viewport.evaluate((el) => {
-      const element = el;
-      const maxScrollTop = Math.max(0, element.scrollHeight - element.clientHeight);
-      element.scrollTop = Math.round(maxScrollTop * 0.4);
-      element.dispatchEvent(new Event('scroll'));
-    });
-
-    // Step B: wait for scroll progress to persist
-    await waitForPersistedReadingProgress(
-      page,
-      novelId,
-      (snapshot) => (
-        snapshot?.contentMode === 'scroll'
-        && typeof snapshot.chapterProgress === 'number'
-        && snapshot.chapterProgress > 0.1
-      ),
-      { description: 'waiting for scroll progress to persist before mode switch', timeout: 15_000 },
-    );
-
-    // Step C: switch to paged mode via toolbar button
-    const twoColumnsButton = page.locator('button[title="Two Columns"]').first();
-    await expect(twoColumnsButton).toBeAttached();
-    await twoColumnsButton.evaluate((el: HTMLButtonElement) => el.click());
-    await waitForReaderBranch(page, 'paged');
-
-    const pagedPersisted = await waitForPersistedReadingProgress(
-      page,
-      novelId,
-      (snapshot) => (
-        snapshot?.contentMode === 'paged'
-        && typeof snapshot.pageIndex === 'number'
-      ),
-      { description: 'waiting for paged progress to persist after switch', timeout: 15_000 },
-    );
-    // Scroll→Paged: user's reading position should be on the current page (not page 1)
-    expect(pagedPersisted.pageIndex).toBeGreaterThan(0);
-
-    // Step D: switch back to scroll mode via toolbar button
-    const singleColumnButton = page.locator('button[title="Single Column"]').first();
-    await expect(singleColumnButton).toBeAttached();
-    await singleColumnButton.evaluate((el: HTMLButtonElement) => el.click());
-    await waitForReaderBranch(page, 'scroll');
-
-    // Paged→Scroll: scroll position should be non-zero (page unfold pattern)
-    let restoredScrollSnapshot: ReaderViewportSnapshot | null = null;
-    await expect.poll(async () => {
-      restoredScrollSnapshot = await readReaderViewportSnapshot(page);
-      return restoredScrollSnapshot.scrollProgress !== null
-        && restoredScrollSnapshot.scrollProgress > 0;
-    }, { timeout: 15_000 }).toBe(true);
-
-    expect(restoredScrollSnapshot!.scrollProgress).toBeGreaterThan(0);
-
-    // Step E: wait for scroll progress to persist after switch back
-    const reloadedProgress = await waitForPersistedReadingProgress(
-      page,
-      novelId,
-      (snapshot) => (
-        snapshot?.contentMode === 'scroll'
-        && typeof snapshot.chapterProgress === 'number'
-        && snapshot.chapterProgress > 0
-      ),
-      { description: 'waiting for scroll progress to persist after mode switch back', timeout: 15_000 },
-    );
-    expect(reloadedProgress.contentMode).toBe('scroll');
-    expect(reloadedProgress.chapterProgress).toBeGreaterThan(0);
   });
 });

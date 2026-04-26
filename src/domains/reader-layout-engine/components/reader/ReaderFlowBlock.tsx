@@ -10,7 +10,7 @@ import { ReaderFlowBlockText } from './ReaderFlowBlockText';
 import type { RenderImageItem, RenderTextItem } from './readerFlowBlockShared';
 
 interface ReaderFlowBlockProps {
-  chapterTitle?: string;
+  headingTextOverride?: string;
   imageRenderMode: 'paged' | 'scroll';
   item: StaticReaderNode;
   novelId: number;
@@ -139,7 +139,7 @@ function resolveRenderTextItem(item: StaticReaderNode): RenderTextItem | null {
 }
 
 export default function ReaderFlowBlock({
-  chapterTitle,
+  headingTextOverride,
   imageRenderMode,
   item,
   novelId,
@@ -172,9 +172,10 @@ export default function ReaderFlowBlock({
 
   return (
     <ReaderFlowBlockText
-      chapterTitle={chapterTitle}
       positionStyle={positionStyle}
-      textItem={textItem}
+      textItem={textItem.kind === 'heading' && typeof headingTextOverride === 'string'
+        ? { ...textItem, textOverride: headingTextOverride }
+        : textItem}
     />
   );
 }

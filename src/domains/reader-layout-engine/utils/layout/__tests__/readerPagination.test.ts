@@ -477,6 +477,7 @@ describe('readerPagination', () => {
       chapter,
       imageDimensionsByKey: new Map(),
       layoutSignature,
+      textLayoutEngine,
       typography,
       variantFamily: 'original-paged',
     });

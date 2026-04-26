@@ -27,8 +27,6 @@
 
 .pm-reader-block--heading {
   color: var(--pm-reader-text);
-  letter-spacing: -0.015em;
-  overflow-wrap: anywhere;
 }
 
 .pm-reader-block--paragraph {

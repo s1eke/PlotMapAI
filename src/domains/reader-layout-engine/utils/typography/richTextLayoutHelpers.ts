@@ -1,5 +1,6 @@
 import type { PreparedTextWithSegments } from '@chenglou/pretext';
 import type { Mark, RichInline } from '@shared/contracts';
+import type { ReaderTextPrepareOptions } from '../layout/readerTextPolicy';
 
 import {
   layoutNextLine,
@@ -7,6 +8,10 @@ import {
 } from '@chenglou/pretext';
 
 import { resolveRichInlineTypography } from './richInlineTypography';
+import {
+  serializeReaderTextPrepareOptions,
+  toPretextPrepareOptions,
+} from '../layout/readerTextPolicy';
 
 const UNBOUNDED_LAYOUT_WIDTH = 100_000;
 const MAX_PREPARED_TEXT_CACHE_SIZE = 512;
@@ -59,8 +64,12 @@ export function getGraphemes(text: string): string[] {
     : Array.from(text);
 }
 
-export function getPreparedText(text: string, font: string): PreparedTextWithSegments | null {
-  const cacheKey = `${font}\u0000${text}`;
+export function getPreparedText(
+  text: string,
+  font: string,
+  prepareOptions?: ReaderTextPrepareOptions,
+): PreparedTextWithSegments | null {
+  const cacheKey = `${font}\u0000${serializeReaderTextPrepareOptions(prepareOptions)}\u0000${text}`;
   const cached = preparedTextCache.get(cacheKey);
   if (cached !== undefined) {
     return setCachedValue(preparedTextCache, cacheKey, cached, MAX_PREPARED_TEXT_CACHE_SIZE);
@@ -70,7 +79,7 @@ export function getPreparedText(text: string, font: string): PreparedTextWithSeg
     return setCachedValue(
       preparedTextCache,
       cacheKey,
-      prepareWithSegments(text, font),
+      prepareWithSegments(text, font, toPretextPrepareOptions(prepareOptions)),
       MAX_PREPARED_TEXT_CACHE_SIZE,
     );
   } catch {

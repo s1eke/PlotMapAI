@@ -42,6 +42,8 @@ export interface ReaderNavigationRuntimeValue {
   setChapterChangeSource: (nextSource: ChapterChangeSource) => void;
   getPendingPageTarget: () => PageTarget | null;
   setPendingPageTarget: (nextTarget: PageTarget | null) => void;
+  getPendingPageIndex: () => number | null;
+  setPendingPageIndex: (nextPageIndex: number | null) => void;
   getPagedState: () => { pageCount: number; pageIndex: number };
   setPagedState: (nextState: { pageCount: number; pageIndex: number }) => void;
 }

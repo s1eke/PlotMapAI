@@ -203,6 +203,7 @@ export function useReaderLifecycleController({
     try {
       const runtime: ReaderLoadActiveChapterRuntime = {
         navigationSource: navigation.getChapterChangeSource(),
+        pendingPageIndex: navigation.getPendingPageIndex(),
         pendingPageTarget: navigation.getPendingPageTarget(),
       };
       const {

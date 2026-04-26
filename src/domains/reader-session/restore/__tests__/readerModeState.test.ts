@@ -4,7 +4,10 @@ import { describe, expect, it } from 'vitest';
 
 import type { ReaderLocator, StoredReaderState } from '@shared/contracts/reader';
 
-import { captureReaderStateSnapshot } from '../readerModeState';
+import {
+  captureReaderStateSnapshot,
+  toRestoreTargetFromState,
+} from '../readerModeState';
 
 describe('captureReaderStateSnapshot', () => {
   it('preserves scroll progress when the viewport element is missing during capture', () => {
@@ -243,5 +246,75 @@ describe('captureReaderStateSnapshot', () => {
 
     expect(nextState.hints?.chapterProgress).toBe(0.72);
     expect(nextState.hints?.pageIndex).toBe(5);
+  });
+
+  it('uses the current chapter capture during navigation after the locator reaches the target chapter', () => {
+    const previousState: StoredReaderState = {
+      canonical: {
+        chapterIndex: 0,
+        blockIndex: 24,
+        kind: 'text',
+      },
+      hints: {
+        chapterProgress: 0.64,
+        contentMode: 'scroll',
+      },
+    };
+    const currentLocator: ReaderLocator = {
+      chapterIndex: 1,
+      blockIndex: 8,
+      kind: 'text',
+      lineIndex: 2,
+    };
+
+    const nextState = captureReaderStateSnapshot({
+      chapterIndex: 1,
+      currentAnchor: {
+        chapterIndex: 1,
+        chapterProgress: 0.31,
+      },
+      currentOriginalLocator: currentLocator,
+      currentPagedLocator: null,
+      latestReaderState: previousState,
+      mode: 'scroll',
+      navigationSource: 'navigation',
+      storedReaderState: previousState,
+      viewportContentElement: null,
+    });
+
+    expect(nextState.canonical).toEqual({
+      chapterIndex: 1,
+      blockIndex: 8,
+      kind: 'text',
+      lineIndex: 2,
+    });
+    expect(nextState.hints?.chapterProgress).toBe(0.31);
+    expect(nextState.hints?.contentMode).toBe('scroll');
+  });
+});
+
+describe('toRestoreTargetFromState', () => {
+  it('keeps scroll progress for scroll-mode targets when projection metadata is stale', () => {
+    const target = toRestoreTargetFromState({
+      chapterIndex: 1,
+      mode: 'scroll',
+      state: {
+        canonical: {
+          chapterIndex: 1,
+          blockIndex: 6,
+          kind: 'text',
+        },
+        hints: {
+          chapterProgress: 0.27,
+          contentMode: 'scroll',
+          scrollProjection: {
+            basisCanonicalFingerprint: 'stale',
+            sourceMode: 'scroll',
+          },
+        },
+      },
+    });
+
+    expect(target.chapterProgress).toBe(0.27);
   });
 });

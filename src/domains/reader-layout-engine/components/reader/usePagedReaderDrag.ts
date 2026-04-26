@@ -35,6 +35,10 @@ export interface CommittedDragTransition {
   preview: PagePreviewTarget;
 }
 
+export type PagedDragTransition = CommittedDragTransition & {
+  phase: 'committed' | 'live';
+};
+
 interface UsePagedReaderDragParams {
   canDragNext: boolean;
   canDragPrev: boolean;
@@ -54,7 +58,7 @@ interface UsePagedReaderDragParams {
 }
 
 interface UsePagedReaderDragResult {
-  activeDragTransition: CommittedDragTransition | null;
+  activeDragTransition: PagedDragTransition | null;
   currentLayerX: MotionValue<number>;
   handleClickCapture: (event: React.MouseEvent<HTMLDivElement>) => void;
   handlePan: (_event: PointerEvent, info: PanInfo) => void;
@@ -374,18 +378,27 @@ export function usePagedReaderDrag({
   } else if (dragDirection === 'next') {
     livePreviewTarget = nextPreviewTarget;
   }
-  const activeDragTransition = !committedDragTransition
+  let activeDragTransition: PagedDragTransition | null = null;
+  if (
+    !committedDragTransition
     && dragDirection
     && livePreviewTarget
     && (pageTurnMode === 'cover' || pageTurnMode === 'slide')
     && currentPreviewTarget
-    ? {
+  ) {
+    activeDragTransition = {
       current: currentPreviewTarget,
       direction: dragDirection,
       mode: pageTurnMode,
+      phase: 'live' as const,
       preview: livePreviewTarget,
-    }
-    : committedDragTransition;
+    };
+  } else if (committedDragTransition) {
+    activeDragTransition = {
+      ...committedDragTransition,
+      phase: 'committed' as const,
+    };
+  }
 
   return {
     activeDragTransition,

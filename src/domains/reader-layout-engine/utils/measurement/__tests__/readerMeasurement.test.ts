@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { READER_CONTENT_TOKEN_DEFAULTS } from '@shared/reader-rendering';
 import { createFakeReaderTextLayoutEngine } from '../../../test/createFakeReaderTextLayoutEngine';
 import {
   createReaderTypographyMetrics,
@@ -73,6 +74,40 @@ describe('readerMeasurement', () => {
       measuredLayout.metrics.reduce((total, metric) => total + metric.height, 0),
       5,
     );
+  });
+
+  it('stores project-owned line ranges for plain text metrics', () => {
+    const textLayoutEngine = createFakeReaderTextLayoutEngine({ maxCharsPerLine: 4 });
+    const typography = createReaderTypographyMetrics(16, 1.5, 12, 320);
+    const measuredLayout = measureReaderChapterLayout(
+      {
+        index: 0,
+        title: 'Title',
+        plainText: 'abcdefgh',
+        richBlocks: [],
+        contentFormat: 'plain',
+        contentVersion: 1,
+        wordCount: 8,
+        totalChapters: 1,
+        hasPrev: false,
+        hasNext: false,
+      },
+      240,
+      typography,
+      new Map(),
+      undefined,
+      textLayoutEngine,
+    );
+    const textMetric = measuredLayout.metrics.find((metric) => metric.block.kind === 'text');
+
+    expect(textMetric?.lineRanges?.map((range) => ({
+      end: range.end.graphemeIndex,
+      start: range.start.graphemeIndex,
+    }))).toEqual([
+      { start: 0, end: 4 },
+      { start: 4, end: 8 },
+    ]);
+    expect(textMetric?.lines.map((line) => line.text)).toEqual(['abcd', 'efgh']);
   });
 
   it('caps scroll-mode image size to the viewport height while preserving aspect ratio', () => {
@@ -306,9 +341,13 @@ describe('readerMeasurement', () => {
       layoutWithLines: () => {
         throw new Error('forced fallback layout');
       },
+      measureLineStats: () => {
+        throw new Error('forced fallback layout');
+      },
       prepareWithSegments: () => {
         throw new Error('forced fallback layout');
       },
+      setLocale: vi.fn(),
     }));
 
     const {
@@ -337,6 +376,72 @@ describe('readerMeasurement', () => {
     resetCache();
   });
 
+  it('passes project text policy options into pretext prepare calls', async () => {
+    const prepareWithSegments = vi.fn((text: string) => ({ text }));
+    vi.doMock('@chenglou/pretext', () => ({
+      layoutWithLines: (prepared: { text: string }, maxWidth: number) => ({
+        height: 24,
+        lineCount: 1,
+        lines: [{
+          end: {
+            graphemeIndex: prepared.text.length,
+            segmentIndex: 0,
+          },
+          start: {
+            graphemeIndex: 0,
+            segmentIndex: 0,
+          },
+          text: prepared.text,
+          width: maxWidth,
+        }],
+      }),
+      measureLineStats: (prepared: { text: string }, maxWidth: number) => ({
+        lineCount: prepared.text.length > 0 ? 1 : 0,
+        maxLineWidth: maxWidth,
+      }),
+      prepareWithSegments,
+      setLocale: vi.fn(),
+    }));
+
+    const {
+      createReaderTypographyMetrics: createTypography,
+      measureReaderChapterLayout: measureLayout,
+      resetReaderLayoutPretextCacheForTests: resetCache,
+    } = await import('../../layout/readerLayout');
+
+    const typography = createTypography(20, 1.5, 12, 480);
+    measureLayout({
+      index: 0,
+      title: 'Chapter Heading',
+      plainText: 'Body paragraph',
+      richBlocks: [],
+      contentFormat: 'plain',
+      contentVersion: 1,
+      wordCount: 10,
+      totalChapters: 1,
+      hasPrev: false,
+      hasNext: false,
+    }, 320, typography, new Map());
+
+    const headingCall = prepareWithSegments.mock.calls.find(([text]) => text === 'Chapter Heading');
+    const bodyCall = prepareWithSegments.mock.calls.find(([text]) => text === 'Body paragraph');
+
+    expect(headingCall?.[2]).toMatchObject({
+      whiteSpace: 'normal',
+      wordBreak: 'normal',
+    });
+    expect(headingCall?.[2].letterSpacing).toBeCloseTo(
+      READER_CONTENT_TOKEN_DEFAULTS.headingLetterSpacingEm * typography.headingFontSize,
+    );
+    expect(bodyCall?.[2]).toEqual({
+      letterSpacing: 0,
+      whiteSpace: 'normal',
+      wordBreak: 'normal',
+    });
+
+    resetCache();
+  });
+
   it('keeps the pretext cache bounded with LRU eviction', async () => {
     vi.doMock('@chenglou/pretext', () => ({
       layoutWithLines: (prepared: { text: string }, maxWidth: number) => ({
@@ -355,7 +460,12 @@ describe('readerMeasurement', () => {
           width: maxWidth,
         }],
       }),
+      measureLineStats: (prepared: { text: string }, maxWidth: number) => ({
+        lineCount: prepared.text.length > 0 ? 1 : 0,
+        maxLineWidth: maxWidth,
+      }),
       prepareWithSegments: (text: string) => ({ text }),
+      setLocale: vi.fn(),
     }));
 
     const {
@@ -385,5 +495,198 @@ describe('readerMeasurement', () => {
     expect(getCacheSize()).toBeLessThanOrEqual(256);
 
     resetCache();
+  });
+
+  it('covers multilingual text policy fixtures with the pretext adapter', async () => {
+    const { browserReaderTextLayoutEngine } = await import('../readerTextMeasurement');
+    const baseParams = {
+      font: '400 16px sans-serif',
+      fontSizePx: 16,
+      lineHeightPx: 24,
+      maxWidth: 120,
+    };
+    const fixtures = [
+      {
+        name: 'cjk parenthetical note',
+        text: '第一章（新的注释）在雨声里展开。',
+      },
+      {
+        name: 'cjk latin numeric mix',
+        text: '第12区Alpha节点在23:59重新上线',
+      },
+      {
+        name: 'emoji astral unicode',
+        text: 'Lantern 🚀 signal meets 星河✨',
+      },
+      {
+        name: 'url and long word',
+        text: 'https://example.test/archive/supercalifragilisticexpialidocious',
+      },
+      {
+        name: 'soft hyphen',
+        text: 'inter\u00adstellar carto\u00adgraphy repeats',
+      },
+      {
+        name: 'keep-all policy',
+        prepareOptions: {
+          wordBreak: 'keep-all' as const,
+        },
+        text: '连续中文Alpha123混排节点',
+      },
+      {
+        name: 'heading letter spacing',
+        prepareOptions: {
+          letterSpacingPx: READER_CONTENT_TOKEN_DEFAULTS.headingLetterSpacingEm * 24,
+        },
+        text: 'Narrow 混排 Heading 2026',
+      },
+    ];
+
+    for (const fixture of fixtures) {
+      const lines = browserReaderTextLayoutEngine.layoutLines({
+        ...baseParams,
+        prepareOptions: fixture.prepareOptions,
+        text: fixture.text,
+      });
+
+      expect(lines.length, fixture.name).toBeGreaterThan(0);
+      expect(lines.every((line, index) => line.lineIndex === index), fixture.name).toBe(true);
+    }
+
+    const preWrapLines = browserReaderTextLayoutEngine.layoutLines({
+      ...baseParams,
+      maxWidth: 400,
+      prepareOptions: {
+        whiteSpace: 'pre-wrap',
+      },
+      text: '第一行  A\tB\n第二行 emoji 🚀',
+    });
+
+    expect(preWrapLines.length).toBeGreaterThanOrEqual(2);
+    expect(preWrapLines.some((line) => line.text.includes('第二行'))).toBe(true);
+  });
+
+  it('preserves hard break boundaries in pre-wrap fallback layout', async () => {
+    vi.doMock('@chenglou/pretext', () => ({
+      layoutWithLines: () => {
+        throw new Error('forced fallback layout');
+      },
+      measureLineStats: () => {
+        throw new Error('forced fallback layout');
+      },
+      prepareWithSegments: () => {
+        throw new Error('forced fallback layout');
+      },
+      setLocale: vi.fn(),
+    }));
+
+    const { browserReaderTextLayoutEngine } = await import('../readerTextMeasurement');
+
+    const lines = browserReaderTextLayoutEngine.layoutLines({
+      font: '400 16px sans-serif',
+      fontSizePx: 16,
+      lineHeightPx: 24,
+      maxWidth: 1_000,
+      prepareOptions: {
+        whiteSpace: 'pre-wrap',
+      },
+      text: 'alpha  beta\tgamma\n\n终章',
+    });
+
+    expect(lines.map((line) => line.text)).toEqual([
+      'alpha  beta\tgamma',
+      '',
+      '终章',
+    ]);
+  });
+
+  it('measures line stats without materializing pretext lines', async () => {
+    const layoutWithLines = vi.fn(() => {
+      throw new Error('stats path should not materialize lines');
+    });
+    const measureLineStats = vi.fn((prepared: { text: string }, maxWidth: number) => ({
+      lineCount: Math.ceil(prepared.text.length / 8),
+      maxLineWidth: maxWidth - 4,
+    }));
+    const prepareWithSegments = vi.fn((text: string) => ({ text }));
+    vi.doMock('@chenglou/pretext', () => ({
+      layoutWithLines,
+      measureLineStats,
+      prepareWithSegments,
+      setLocale: vi.fn(),
+    }));
+
+    const { browserReaderTextLayoutEngine } = await import('../readerTextMeasurement');
+
+    const stats = browserReaderTextLayoutEngine.measureLineStats?.({
+      font: '400 16px sans-serif',
+      fontSizePx: 16,
+      maxWidth: 96,
+      text: 'stats fixture text',
+    });
+
+    expect(stats).toEqual({
+      lineCount: 3,
+      maxLineWidth: 92,
+    });
+    expect(prepareWithSegments).toHaveBeenCalledTimes(1);
+    expect(measureLineStats).toHaveBeenCalledTimes(1);
+    expect(layoutWithLines).not.toHaveBeenCalled();
+  });
+
+  it('clears reader text layout caches when locale is set manually', async () => {
+    const setLocale = vi.fn();
+    const prepareWithSegments = vi.fn((text: string) => ({ text }));
+    vi.doMock('@chenglou/pretext', () => ({
+      layoutWithLines: (prepared: { text: string }, maxWidth: number) => ({
+        height: 24,
+        lineCount: 1,
+        lines: [{
+          end: {
+            graphemeIndex: prepared.text.length,
+            segmentIndex: 0,
+          },
+          start: {
+            graphemeIndex: 0,
+            segmentIndex: 0,
+          },
+          text: prepared.text,
+          width: maxWidth,
+        }],
+      }),
+      measureLineStats: (prepared: { text: string }, maxWidth: number) => ({
+        lineCount: prepared.text.length > 0 ? 1 : 0,
+        maxLineWidth: maxWidth,
+      }),
+      prepareWithSegments,
+      setLocale,
+    }));
+
+    const {
+      browserReaderTextLayoutEngine,
+      getReaderLayoutPretextCacheSizeForTests: getCacheSize,
+      setReaderTextLayoutLocale,
+    } = await import('../readerTextMeasurement');
+    const params = {
+      font: '400 16px sans-serif',
+      fontSizePx: 16,
+      lineHeightPx: 24,
+      maxWidth: 160,
+      text: 'Locale cache fixture',
+    };
+
+    browserReaderTextLayoutEngine.layoutLines(params);
+    browserReaderTextLayoutEngine.layoutLines(params);
+
+    expect(prepareWithSegments).toHaveBeenCalledTimes(1);
+    expect(getCacheSize()).toBeGreaterThan(0);
+
+    setReaderTextLayoutLocale('zh-Hans');
+
+    expect(setLocale).toHaveBeenCalledWith('zh-Hans');
+    expect(getCacheSize()).toBe(0);
+
+    browserReaderTextLayoutEngine.layoutLines(params);
+    expect(prepareWithSegments).toHaveBeenCalledTimes(2);
   });
 });

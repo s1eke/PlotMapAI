@@ -10,7 +10,10 @@ import type {
 
 import { useTranslation } from 'react-i18next';
 
-import { READER_CONTENT_CLASS_NAMES } from '@shared/reader-rendering';
+import {
+  READER_CONTENT_CLASS_NAMES,
+  READER_CONTENT_TOKEN_DEFAULTS,
+} from '@shared/reader-rendering';
 import { cn } from '@shared/utils/cn';
 import { useReaderImageResource } from '@domains/reader-media';
 import {
@@ -22,9 +25,12 @@ import {
   resolveRichScrollBlockInsets,
 } from '../../utils/layout/richScroll';
 import RichInlineRenderer from './RichInlineRenderer';
+import {
+  renderRichLineFragments,
+  serializeTextLines,
+} from './readerFlowBlockShared';
 
 interface RichBlockRendererProps {
-  chapterTitle?: string;
   item: StaticScrollBlockNode;
   novelId: number;
   onImageActivate?: (payload: ReaderImageActivationPayload) => void;
@@ -121,7 +127,7 @@ function getHeadingTagName(level: number): 'h2' | 'h3' | 'h4' | 'h5' | 'h6' {
   return 'h6';
 }
 
-function renderRichContent(metric: StaticScrollBlockNode, chapterTitle?: string) {
+function renderRichContent(metric: StaticScrollBlockNode) {
   const { block } = metric;
   const richChildren = block.richChildren ?? [];
   let textFragmentTestId = 'reader-rich-text-fragment';
@@ -133,30 +139,34 @@ function renderRichContent(metric: StaticScrollBlockNode, chapterTitle?: string)
 
   if (block.kind === 'heading') {
     const TagName = getHeadingTagName(block.blockIndex === 0 ? 2 : (block.headingLevel ?? 2));
+    const hasRichLineFragments = Boolean(
+      metric.richLineFragments?.some((line) => line.length > 0),
+    );
 
     return (
       <TagName
         data-testid="reader-rich-text-fragment"
         className={cn(
           getReaderContentBlockClassName(block),
-          'break-words whitespace-pre-wrap font-semibold',
+          'break-words font-semibold',
           resolveTextAlignClass(block.align),
         )}
         style={{
           font: metric.font,
           fontSize: `${metric.fontSizePx}px`,
+          letterSpacing: `${READER_CONTENT_TOKEN_DEFAULTS.headingLetterSpacingEm}em`,
           lineHeight: `${metric.lineHeightPx}px`,
+          whiteSpace: hasRichLineFragments ? undefined : 'pre',
         }}
       >
-        <RichInlineRenderer
-          baseFont={metric.font}
-          baseFontSizePx={metric.fontSizePx}
-          inlines={richChildren.length > 0 ? richChildren : [{
-            type: 'text',
-            text: chapterTitle ?? block.text ?? '',
-          }]}
-          keyPrefix={`${block.key}:heading`}
-        />
+        {hasRichLineFragments
+          ? renderRichLineFragments(
+            metric.richLineFragments ?? [],
+            `${block.key}:heading`,
+            metric.font,
+            metric.fontSizePx,
+          )
+          : serializeTextLines(metric.lines)}
       </TagName>
     );
   }
@@ -262,7 +272,6 @@ function renderRichContent(metric: StaticScrollBlockNode, chapterTitle?: string)
 }
 
 export default function RichBlockRenderer({
-  chapterTitle,
   item,
   novelId,
   onImageActivate,
@@ -283,7 +292,7 @@ export default function RichBlockRenderer({
     ? Math.max(0, insets.listInset - insets.markerWidth - insets.markerGap) + insets.poemInset
     : insets.poemInset;
 
-  let content = renderRichContent(metric, chapterTitle);
+  let content = renderRichContent(metric);
 
   if (block.kind === 'image') {
     content = (

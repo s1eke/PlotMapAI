@@ -1,7 +1,7 @@
 {
   "name": "plotmapai",
   "private": true,
-  "version": "1.1.2",
+  "version": "1.1.3",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -11,10 +11,12 @@
     "analyze": "ANALYZE_BUNDLE=1 npm run build && npm run analyze:deps",
     "analyze:deps": "node scripts/checkDependencyGraph.mjs --report",
     "generate:pwa-icons": "node scripts/generateMaskableIcons.mjs",
-    "lint": "eslint . && npm run lint:deps && npm run lint:ownership && npm run lint:module-health && npm run lint:capabilities && node scripts/checkReaderArchitecture.mjs --strict",
+    "lint": "eslint . && npm run lint:deps && npm run lint:ownership && npm run lint:module-health && npm run lint:docs && node scripts/checkReaderArchitecture.mjs --strict",
     "lint:deps": "node scripts/checkDependencyGraph.mjs",
     "lint:fix": "eslint . --fix",
     "lint:capabilities": "node --experimental-strip-types scripts/checkRichContentCapabilities.mjs",
+    "lint:docs": "npm run lint:capabilities && npm run lint:e2e-inventory",
+    "lint:e2e-inventory": "node scripts/checkE2eTestCasesInventory.mjs",
     "lint:module-health": "node scripts/checkModuleHealth.mjs",
     "lint:ownership": "node scripts/checkTableOwnership.mjs",
     "preview": "npm run build && vite preview",
@@ -26,7 +28,7 @@
     "coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "@chenglou/pretext": "^0.0.5",
+    "@chenglou/pretext": "^0.0.6",
     "@tailwindcss/vite": "^4.2.1",
     "@xmldom/xmldom": "^0.9.9",
     "clsx": "^2.1.1",

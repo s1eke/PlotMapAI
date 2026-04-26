@@ -223,6 +223,20 @@
         "排版缓存工具",
         "deletePersistedReaderRenderCache"
       ]
+    },
+    {
+      "name": "readerPretextMetrics",
+      "ownerDomain": "reader-layout-engine",
+      "allowedDirectAccessSummary": "阅读器排版引擎，应用层编排",
+      "allowedDirectAccessPaths": [
+        "src/domains/reader-layout-engine/**/*.ts",
+        "src/domains/reader-layout-engine/**/*.tsx"
+      ],
+      "allowedApplicationPaths": ["src/application/services/bookLifecycleService.ts"],
+      "publicApi": [
+        "pretext metrics cache utilities",
+        "deletePersistedReaderPretextMetrics"
+      ]
     }
   ]
 }

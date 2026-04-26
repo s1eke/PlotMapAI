@@ -1,4 +1,7 @@
-import type { LayoutCursor } from '@chenglou/pretext';
+export interface ReaderLayoutCursor {
+  segmentIndex: number;
+  graphemeIndex: number;
+}
 
 export interface ReaderLocator {
   chapterIndex: number;
@@ -9,8 +12,8 @@ export interface ReaderLocator {
   imageKey?: string;
   kind: 'heading' | 'text' | 'image';
   lineIndex?: number;
-  startCursor?: LayoutCursor;
-  endCursor?: LayoutCursor;
+  startCursor?: ReaderLayoutCursor;
+  endCursor?: ReaderLayoutCursor;
   edge?: 'start' | 'end';
   pageIndex?: number;
   textQuote?: {

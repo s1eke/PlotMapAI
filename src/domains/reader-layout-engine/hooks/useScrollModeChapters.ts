@@ -1,13 +1,42 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Chapter, ChapterContent } from '@shared/contracts/reader';
+import type { NovelFlowIndex } from '../layout-core/internal';
 import {
+  clampProgress,
   getChapterLocalProgress,
+  getContainerMaxScrollTop,
   SCROLL_READING_ANCHOR_RATIO,
 } from '@shared/utils/readerPosition';
 
 export interface ScrollModeAnchor {
   chapterIndex: number;
   chapterProgress: number;
+}
+
+function isFocusedSingleChapterContainer(params: {
+  container: HTMLDivElement;
+  chapterElement: HTMLDivElement;
+}): boolean {
+  const { container, chapterElement } = params;
+  return container.scrollHeight > 0
+    && chapterElement.offsetHeight > 0
+    && container.scrollHeight <= chapterElement.offsetHeight + 1;
+}
+
+function resolveReadingAnchorProgress(params: {
+  container: HTMLDivElement;
+  chapterElement: HTMLDivElement;
+  readingAnchorOffset: number;
+}): number {
+  const { container, chapterElement, readingAnchorOffset } = params;
+  if (isFocusedSingleChapterContainer({ container, chapterElement })) {
+    const maxScrollTop = getContainerMaxScrollTop(container);
+    return maxScrollTop > 0
+      ? clampProgress((container.scrollTop + readingAnchorOffset) / maxScrollTop)
+      : 0;
+  }
+
+  return getChapterLocalProgress(container, chapterElement, readingAnchorOffset);
 }
 
 export function useScrollModeChapters(
@@ -19,6 +48,7 @@ export function useScrollModeChapters(
   scrollModeChapters: number[],
   setScrollModeChapters: React.Dispatch<React.SetStateAction<number[]>>,
   chapterDataRevision: number,
+  getNovelFlowIndex?: () => NovelFlowIndex | null,
   onReadingAnchorChange?: (anchor: ScrollModeAnchor) => void,
   onHandledUserScroll?: () => void,
 ): {
@@ -33,6 +63,7 @@ export function useScrollModeChapters(
   const pendingScrollFetchesRef = useRef<Set<number>>(new Set());
   const viewportSyncFrameRef = useRef<number | null>(null);
   const pendingViewportTopRef = useRef(0);
+  const lastHandledScrollTopRef = useRef(0);
   const [scrollViewportTop, setScrollViewportTop] = useState(0);
 
   const syncViewportState = useCallback((options?: { force?: boolean }) => {
@@ -100,16 +131,11 @@ export function useScrollModeChapters(
     pendingScrollFetchesRef.current.add(prevIdx);
     fetchChapterContent(prevIdx)
       .then(() => {
-        const container = contentRef.current;
-        const prevHeight = container?.scrollHeight ?? 0;
         setScrollModeChapters((prev) => {
           if (prev.includes(prevIdx)) return prev;
-          return [prevIdx, ...prev];
+          return [...prev, prevIdx].sort((left, right) => left - right);
         });
         requestAnimationFrame(() => {
-          if (container) {
-            container.scrollTop += container.scrollHeight - prevHeight;
-          }
           syncViewportState({ force: true });
           preloadAdjacent(prevIdx, false);
         });
@@ -118,7 +144,6 @@ export function useScrollModeChapters(
         pendingScrollFetchesRef.current.delete(prevIdx);
       });
   }, [
-    contentRef,
     fetchChapterContent,
     preloadAdjacent,
     scrollModeChapters,
@@ -134,6 +159,7 @@ export function useScrollModeChapters(
     const container = contentRef.current;
     const visibleMarker =
       container.scrollTop + container.clientHeight * SCROLL_READING_ANCHOR_RATIO;
+
     let currentReadIdx: number | null = null;
     let currentReadOffsetTop = Number.NEGATIVE_INFINITY;
 
@@ -157,10 +183,15 @@ export function useScrollModeChapters(
     if (!chapterElement) {
       return null;
     }
+    const readingAnchorOffset = container.clientHeight * SCROLL_READING_ANCHOR_RATIO;
 
     return {
       chapterIndex: currentReadIdx,
-      chapterProgress: getChapterLocalProgress(container, chapterElement),
+      chapterProgress: resolveReadingAnchorProgress({
+        container,
+        chapterElement,
+        readingAnchorOffset,
+      }),
     };
   }, [contentRef, enabled, scrollModeChapters]);
 
@@ -176,24 +207,41 @@ export function useScrollModeChapters(
 
     const el = contentRef.current;
     const { scrollTop } = el;
+    const previousHandledScrollTop = lastHandledScrollTopRef.current;
+    lastHandledScrollTopRef.current = scrollTop;
+    const isScrollingTowardTop = scrollTop < previousHandledScrollTop;
     const anchor = getCurrentAnchor();
     if (anchor) {
       onReadingAnchorChange?.(anchor);
     }
 
     if (scrollModeChapters.length > 0 && anchor) {
-      const lastIdx = scrollModeChapters[scrollModeChapters.length - 1];
+      const novelFlowIndex = getNovelFlowIndex?.() ?? null;
+      const loadedEntries = novelFlowIndex?.chapters.filter((entry) => (
+        entry.manifestStatus === 'materialized'
+      ));
+      const lastIdx = loadedEntries && loadedEntries.length > 0
+        ? loadedEntries[loadedEntries.length - 1].chapterIndex
+        : scrollModeChapters[scrollModeChapters.length - 1];
       const nextIdx = lastIdx + 1;
       if (nextIdx < chapters.length) {
-        const chEl = scrollChapterElementsRef.current.get(anchor.chapterIndex);
-        if (chEl && anchor.chapterProgress >= 0.5) {
+        const shouldPreloadNext =
+          (anchor.chapterIndex >= lastIdx && anchor.chapterProgress >= 0.5)
+          || (anchor.chapterIndex >= lastIdx - 1 && anchor.chapterProgress >= 0.75);
+        if (shouldPreloadNext) {
           appendNextChapter(nextIdx);
         }
       }
     }
 
-    if (scrollTop < 50 && scrollModeChapters.length > 0) {
-      const firstIdx = scrollModeChapters[0];
+    if (scrollTop < 50 && isScrollingTowardTop && scrollModeChapters.length > 0) {
+      const novelFlowIndex = getNovelFlowIndex?.() ?? null;
+      const loadedEntries = novelFlowIndex?.chapters.filter((entry) => (
+        entry.manifestStatus === 'materialized'
+      ));
+      const firstIdx = loadedEntries && loadedEntries.length > 0
+        ? loadedEntries[0].chapterIndex
+        : scrollModeChapters[0];
       const prevIdx = firstIdx - 1;
       prependPrevChapter(prevIdx);
     }
@@ -208,6 +256,7 @@ export function useScrollModeChapters(
     syncViewportState,
     onHandledUserScroll,
     enabled,
+    getNovelFlowIndex,
   ]);
 
   useEffect(() => {
@@ -221,9 +270,16 @@ export function useScrollModeChapters(
 
       const container = contentRef.current;
       if (!container || container.clientHeight <= 0) return;
-      if (container.scrollHeight > container.clientHeight + 1) return;
+      const novelFlowIndex = getNovelFlowIndex?.() ?? null;
+      const flowHeight = novelFlowIndex?.totalScrollHeight ?? container.scrollHeight;
+      if (flowHeight > container.clientHeight + 1) return;
 
-      const lastIdx = scrollModeChapters[scrollModeChapters.length - 1];
+      const loadedEntries = novelFlowIndex?.chapters.filter((entry) => (
+        entry.manifestStatus === 'materialized'
+      ));
+      const lastIdx = loadedEntries && loadedEntries.length > 0
+        ? loadedEntries[loadedEntries.length - 1].chapterIndex
+        : scrollModeChapters[scrollModeChapters.length - 1];
       appendNextChapter(lastIdx + 1);
     };
 
@@ -232,7 +288,14 @@ export function useScrollModeChapters(
       cancelled = true;
       cancelAnimationFrame(frameId);
     };
-  }, [appendNextChapter, chapterDataRevision, contentRef, enabled, scrollModeChapters]);
+  }, [
+    appendNextChapter,
+    chapterDataRevision,
+    contentRef,
+    enabled,
+    getNovelFlowIndex,
+    scrollModeChapters,
+  ]);
 
   useEffect(() => {
     if (!enabled) {

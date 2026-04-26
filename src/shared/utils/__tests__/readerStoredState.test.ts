@@ -13,6 +13,7 @@ import {
   toReaderLocatorFromCanonicalV2,
   toReaderLocatorFromCanonical,
 } from '../readerStoredState';
+import { createRestoreTargetFromPersistedState } from '../readerPosition';
 
 describe('readerStoredState canonical metadata', () => {
   it('round-trips stable locator identity through canonical positions', () => {
@@ -197,6 +198,62 @@ describe('readerStoredState canonical metadata', () => {
     )).toBe(false);
   });
 
+  it('sanitizes global flow projections and carries them into restore targets', () => {
+    const canonical = {
+      chapterIndex: 1,
+      blockIndex: 3,
+      kind: 'text' as const,
+    };
+    const fingerprint = createCanonicalPositionFingerprint(canonical);
+    const state = buildStoredReaderState({
+      canonical,
+      hints: {
+        contentMode: 'scroll',
+        globalFlow: {
+          basisCanonicalFingerprint: fingerprint,
+          capturedAt: '2026-04-24T00:00:00.000Z',
+          globalPageIndex: 12.8,
+          globalScrollOffset: 2048.5,
+          layoutKey: 'layout-a',
+          sourceMode: 'scroll',
+        },
+      },
+    });
+    const target = createRestoreTargetFromPersistedState(state, 'scroll');
+
+    expect(state.hints?.globalFlow).toEqual({
+      basisCanonicalFingerprint: fingerprint,
+      capturedAt: '2026-04-24T00:00:00.000Z',
+      globalPageIndex: 12,
+      globalScrollOffset: 2048.5,
+      layoutKey: 'layout-a',
+      sourceMode: 'scroll',
+    });
+    expect(target?.globalFlow).toEqual(state.hints?.globalFlow);
+  });
+
+  it('keeps scroll chapter progress for scroll-mode restore targets when projection metadata is stale', () => {
+    const state = buildStoredReaderState({
+      canonical: {
+        chapterIndex: 1,
+        blockIndex: 6,
+        kind: 'text',
+      },
+      hints: {
+        chapterProgress: 0.27,
+        contentMode: 'scroll',
+        scrollProjection: {
+          basisCanonicalFingerprint: 'stale',
+          sourceMode: 'scroll',
+        },
+      },
+    });
+
+    const target = createRestoreTargetFromPersistedState(state, 'scroll');
+
+    expect(target?.chapterProgress).toBe(0.27);
+  });
+
   it('drops projection metadata when merging across chapters without overrides', () => {
     const merged = mergeStoredReaderState({
       canonical: {
@@ -284,5 +341,30 @@ describe('readerStoredState canonical metadata', () => {
     expect(merged.hints?.pageIndex).toBeUndefined();
     expect(merged.hints?.scrollProjection).toBeUndefined();
     expect(merged.hints?.pagedProjection).toBeUndefined();
+  });
+
+  it('clears global flow when the matching projection coordinate is cleared', () => {
+    const merged = mergeStoredReaderState({
+      canonical: {
+        chapterIndex: 1,
+        blockIndex: 3,
+        kind: 'text',
+      },
+      hints: {
+        chapterProgress: 0.4,
+        globalFlow: {
+          globalScrollOffset: 512,
+          layoutKey: 'layout-a',
+          sourceMode: 'scroll',
+        },
+      },
+    }, {
+      hints: {
+        chapterProgress: undefined,
+      },
+    });
+
+    expect(merged.hints?.chapterProgress).toBeUndefined();
+    expect(merged.hints?.globalFlow).toBeUndefined();
   });
 });

@@ -13,6 +13,7 @@ import type {
 import type {
   ReaderRenderCacheRecord as DomainReaderRenderCacheRecord,
 } from './readerRenderCacheCore';
+import { createReaderLayoutSignature } from '../layout/readerLayout';
 
 function toReaderLocator(record?: import('@infra/db/reader').ReaderLocatorRecord | null): ReaderLocator | null | undefined {
   if (record === null) {
@@ -73,7 +74,7 @@ function toReaderLocatorRecord(locator?: ReaderLocator | null): import('@infra/d
 }
 
 function toReaderLayoutSignature(record: ReaderLayoutSignatureRecord): ReaderLayoutSignature {
-  return { ...record };
+  return createReaderLayoutSignature(record);
 }
 
 function toReaderLayoutSignatureRecord(

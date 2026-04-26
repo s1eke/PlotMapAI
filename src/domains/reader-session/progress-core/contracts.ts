@@ -39,6 +39,14 @@ export interface ReaderProgressProjection {
     basisCanonicalFingerprint?: string;
     layoutKey?: string;
   };
+  global?: {
+    globalScrollOffset?: number;
+    globalPageIndex?: number;
+    capturedAt?: string;
+    sourceMode?: ReaderProgressMode;
+    basisCanonicalFingerprint?: string;
+    layoutKey?: string;
+  };
 }
 
 export interface ReaderProgressSnapshot {

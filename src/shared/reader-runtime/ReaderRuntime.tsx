@@ -124,6 +124,7 @@ export function ReaderRuntimeProvider({
   const pagedViewportRef = useRef<HTMLDivElement>(null);
   const chapterChangeSourceRef = useRef<import('@shared/contracts/reader').ChapterChangeSource>(null);
   const pendingPageTargetRef = useRef<import('@shared/contracts/reader').PageTarget | null>(null);
+  const pendingPageIndexRef = useRef<number | null>(null);
   const pagedStateRef = useRef({ pageCount: 1, pageIndex: 0 });
   const currentAnchorResolverRef = useRef<() => ScrollModeAnchor | null>(() => null);
   const currentOriginalLocatorResolverRef = useRef<() => ReaderLocator | null>(() => null);
@@ -162,6 +163,12 @@ export function ReaderRuntimeProvider({
     getPendingPageTarget: () => pendingPageTargetRef.current,
     setPendingPageTarget: (nextTarget) => {
       pendingPageTargetRef.current = nextTarget;
+    },
+    getPendingPageIndex: () => pendingPageIndexRef.current,
+    setPendingPageIndex: (nextPageIndex) => {
+      pendingPageIndexRef.current = typeof nextPageIndex === 'number'
+        ? Math.max(0, Math.floor(nextPageIndex))
+        : null;
     },
     getPagedState: () => pagedStateRef.current,
     setPagedState: (nextState) => {

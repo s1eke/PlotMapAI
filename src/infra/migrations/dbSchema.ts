@@ -16,6 +16,15 @@ const DB_SCHEMA_V7 = {
   readerRenderCache: READER_DB_SCHEMA.readerRenderCache,
 } as const;
 
+const DB_SCHEMA_V8 = {
+  ...LIBRARY_DB_SCHEMA,
+  ...SETTINGS_DB_SCHEMA,
+  ...ANALYSIS_DB_SCHEMA,
+  readerProgress: READER_DB_SCHEMA.readerProgress,
+  readerRenderCache: READER_DB_SCHEMA.readerRenderCache,
+  readingProgress: null,
+} as const;
+
 const CURRENT_DB_SCHEMA = {
   ...LIBRARY_DB_SCHEMA,
   ...SETTINGS_DB_SCHEMA,
@@ -23,7 +32,7 @@ const CURRENT_DB_SCHEMA = {
   ...READER_DB_SCHEMA,
 } as const;
 
-const DB_SCHEMA_V8 = {
+const DB_SCHEMA_V9 = {
   ...CURRENT_DB_SCHEMA,
   readingProgress: null,
 } as const;
@@ -41,9 +50,17 @@ export const DB_SCHEMA_MIGRATIONS: readonly DbSchemaMigration[] = [{
   scope: 'db-schema',
   description: 'Reader progress core baseline without legacy readingProgress storage.',
   retireWhen: {
-    condition: 'Current supported schema baseline.',
+    condition: 'Superseded by v9 schema with persisted reader pretext metrics.',
   },
   stores: DB_SCHEMA_V8,
+}, {
+  version: 9,
+  scope: 'db-schema',
+  description: 'Persisted reader pretext metrics cache for shared original manifest derivation.',
+  retireWhen: {
+    condition: 'Current supported schema baseline.',
+  },
+  stores: DB_SCHEMA_V9,
 }] as const;
 
 export const CURRENT_DB_SCHEMA_VERSION = DB_SCHEMA_MIGRATIONS.at(-1)?.version ?? 1;

@@ -9,17 +9,21 @@ describe('readerRenderCache', () => {
     vi.resetModules();
   });
 
-  it('builds manifest summaries without invoking pretext measurement', async () => {
+  it('builds manifest summaries with stats without materializing pretext lines', async () => {
     const layoutWithLines = vi.fn(() => {
       throw new Error('manifest build should not invoke layoutWithLines');
     });
-    const prepareWithSegments = vi.fn(() => {
-      throw new Error('manifest build should not invoke prepareWithSegments');
-    });
+    const measureLineStats = vi.fn((prepared: { text: string }, maxWidth: number) => ({
+      lineCount: Math.max(1, Math.ceil(prepared.text.length / 24)),
+      maxLineWidth: Math.min(maxWidth, prepared.text.length * 8),
+    }));
+    const prepareWithSegments = vi.fn((text: string) => ({ text }));
 
     vi.doMock('@chenglou/pretext', () => ({
       layoutWithLines,
+      measureLineStats,
       prepareWithSegments,
+      setLocale: vi.fn(),
     }));
 
     const {
@@ -118,7 +122,219 @@ describe('readerRenderCache', () => {
       pageCount: expect.any(Number),
     }));
     expect(pagedManifest.queryManifest.pageCount).toBeGreaterThan(0);
-    expect(prepareWithSegments).not.toHaveBeenCalled();
+    expect(prepareWithSegments).toHaveBeenCalled();
+    expect(measureLineStats).toHaveBeenCalled();
+    expect(layoutWithLines).not.toHaveBeenCalled();
+
+    resetReaderLayoutPretextCacheForTests();
+  });
+
+  it('reuses persisted pretext metrics while deriving scroll and paged manifests', async () => {
+    const measureLineStats = vi.fn((prepared: { text: string }, maxWidth: number) => ({
+      lineCount: Math.max(1, Math.ceil(prepared.text.length / 20)),
+      maxLineWidth: Math.min(maxWidth, prepared.text.length * 8),
+    }));
+    vi.doMock('@chenglou/pretext', () => ({
+      layoutWithLines: vi.fn(),
+      measureLineStats,
+      prepareWithSegments: vi.fn((text: string) => ({ text })),
+      setLocale: vi.fn(),
+    }));
+
+    const { db } = await import('@infra/db');
+    const {
+      createReaderLayoutSignature,
+      createReaderTypographyMetrics,
+      resetReaderLayoutPretextCacheForTests,
+    } = await import('../../layout/readerLayout');
+    const { buildStaticRenderManifestWithPretextMetrics } = await import('../readerRenderCache');
+
+    await db.delete();
+    await db.open();
+
+    const chapter = {
+      index: 0,
+      title: 'Shared Metrics',
+      plainText: 'Shared paragraph for scroll and paged manifest derivation.',
+      richBlocks: [],
+      contentFormat: 'plain' as const,
+      contentVersion: 1,
+      hasNext: false,
+      hasPrev: false,
+      totalChapters: 1,
+      wordCount: 80,
+    };
+    const layoutSignature = createReaderLayoutSignature({
+      columnCount: 1,
+      columnGap: 0,
+      fontSize: 18,
+      lineSpacing: 1.6,
+      pageHeight: 720,
+      paragraphSpacing: 16,
+      textWidth: 420,
+    });
+    const typography = createReaderTypographyMetrics(18, 1.6, 16, 420);
+
+    const scrollManifest = await buildStaticRenderManifestWithPretextMetrics({
+      chapter,
+      imageDimensionsByKey: new Map(),
+      layoutSignature,
+      novelId: 11,
+      typography,
+      variantFamily: 'original-scroll',
+    });
+    const callsAfterScroll = measureLineStats.mock.calls.length;
+    const pagedManifest = await buildStaticRenderManifestWithPretextMetrics({
+      chapter,
+      imageDimensionsByKey: new Map(),
+      layoutSignature: {
+        ...layoutSignature,
+        pageHeight: 360,
+      },
+      novelId: 11,
+      typography,
+      variantFamily: 'original-paged',
+    });
+
+    expect(scrollManifest.queryManifest.totalHeight).toBeGreaterThan(0);
+    expect(pagedManifest.queryManifest.pageCount).toBeGreaterThan(0);
+    expect(callsAfterScroll).toBeGreaterThan(0);
+    expect(measureLineStats).toHaveBeenCalledTimes(callsAfterScroll);
+    await expect(db.readerPretextMetrics.count()).resolves.toBe(1);
+
+    resetReaderLayoutPretextCacheForTests();
+  });
+
+  it('keys pretext metrics by text measurement signature and ignores stale content', async () => {
+    const { db } = await import('@infra/db');
+    const {
+      createReaderLayoutSignature,
+      createReaderTypographyMetrics,
+    } = await import('../../layout/readerLayout');
+    const {
+      createReaderTextMetricSignature,
+      loadPretextMetricsBundle,
+      persistPretextMetricsBundle,
+      serializeReaderTextMetricSignature,
+    } = await import('../readerRenderCache');
+
+    await db.delete();
+    await db.open();
+
+    const baseSignature = createReaderTextMetricSignature({
+      layoutSignature: createReaderLayoutSignature({
+        columnCount: 1,
+        columnGap: 0,
+        fontSize: 18,
+        lineSpacing: 1.6,
+        pageHeight: 720,
+        paragraphSpacing: 16,
+        textWidth: 420,
+      }),
+      typography: createReaderTypographyMetrics(18, 1.6, 16, 420),
+    });
+    const largerSignature = createReaderTextMetricSignature({
+      layoutSignature: createReaderLayoutSignature({
+        columnCount: 1,
+        columnGap: 0,
+        fontSize: 22,
+        lineSpacing: 1.6,
+        pageHeight: 720,
+        paragraphSpacing: 16,
+        textWidth: 420,
+      }),
+      typography: createReaderTypographyMetrics(22, 1.6, 16, 420),
+    });
+
+    expect(serializeReaderTextMetricSignature(largerSignature)).not.toBe(
+      serializeReaderTextMetricSignature(baseSignature),
+    );
+
+    const bundle = await loadPretextMetricsBundle({
+      chapterIndex: 0,
+      contentFormat: 'plain',
+      contentHash: 'fresh',
+      contentVersion: 1,
+      novelId: 12,
+      signature: baseSignature,
+    });
+    bundle.entries.set('line', { lineCount: 2, maxLineWidth: 120 });
+    await persistPretextMetricsBundle(bundle);
+
+    const staleContentBundle = await loadPretextMetricsBundle({
+      chapterIndex: 0,
+      contentFormat: 'plain',
+      contentHash: 'changed',
+      contentVersion: 1,
+      novelId: 12,
+      signature: baseSignature,
+    });
+    expect(staleContentBundle.entries.size).toBe(0);
+
+    const changedSignatureBundle = await loadPretextMetricsBundle({
+      chapterIndex: 0,
+      contentFormat: 'plain',
+      contentHash: 'fresh',
+      contentVersion: 1,
+      novelId: 12,
+      signature: largerSignature,
+    });
+    expect(changedSignatureBundle.entries.size).toBe(0);
+  });
+
+  it('falls back to approximate manifest estimates when pretext stats fail', async () => {
+    const layoutWithLines = vi.fn(() => {
+      throw new Error('manifest fallback should not invoke layoutWithLines');
+    });
+    const measureLineStats = vi.fn(() => {
+      throw new Error('forced stats failure');
+    });
+    const prepareWithSegments = vi.fn((text: string) => ({ text }));
+
+    vi.doMock('@chenglou/pretext', () => ({
+      layoutWithLines,
+      measureLineStats,
+      prepareWithSegments,
+      setLocale: vi.fn(),
+    }));
+
+    const {
+      createReaderLayoutSignature,
+      createReaderTypographyMetrics,
+      resetReaderLayoutPretextCacheForTests,
+    } = await import('../../layout/readerLayout');
+    const { buildStaticRenderManifest } = await import('../readerRenderCache');
+
+    const manifest = buildStaticRenderManifest({
+      chapter: {
+        index: 0,
+        title: 'Fallback Stats',
+        plainText: 'Fallback paragraph for stats failure.',
+        richBlocks: [],
+        contentFormat: 'plain' as const,
+        contentVersion: 1,
+        hasNext: false,
+        hasPrev: false,
+        totalChapters: 1,
+        wordCount: 20,
+      },
+      imageDimensionsByKey: new Map(),
+      layoutSignature: createReaderLayoutSignature({
+        columnCount: 1,
+        columnGap: 0,
+        fontSize: 18,
+        lineSpacing: 1.6,
+        pageHeight: 800,
+        paragraphSpacing: 16,
+        textWidth: 420,
+      }),
+      novelId: 9,
+      typography: createReaderTypographyMetrics(18, 1.6, 16, 420),
+      variantFamily: 'original-scroll',
+    });
+
+    expect(manifest.queryManifest.lineCount).toBeGreaterThan(0);
+    expect(measureLineStats).toHaveBeenCalled();
     expect(layoutWithLines).not.toHaveBeenCalled();
 
     resetReaderLayoutPretextCacheForTests();
@@ -462,7 +678,12 @@ describe('readerRenderCache', () => {
             width: prepared.widths.reduce((total, width) => total + width, 0),
           }],
         }),
+        measureLineStats: (prepared: ReturnType<typeof prepareWithSegments>) => ({
+          lineCount: 1,
+          maxLineWidth: prepared.widths.reduce((total, width) => total + width, 0),
+        }),
         prepareWithSegments,
+        setLocale: vi.fn(),
       };
     });
 

@@ -1,7 +1,10 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { READER_CONTENT_CLASS_NAMES } from '@shared/reader-rendering';
+import {
+  READER_CONTENT_CLASS_NAMES,
+  READER_CONTENT_TOKEN_DEFAULTS,
+} from '@shared/reader-rendering';
 
 const useReaderImageResourceMock = vi.hoisted(() => vi.fn());
 
@@ -21,6 +24,35 @@ import ReaderFlowBlock from '../ReaderFlowBlock';
 describe('ReaderFlowBlock', () => {
   afterEach(() => {
     useReaderImageResourceMock.mockReset();
+  });
+
+  it('renders hr blocks with the measured visible height', () => {
+    render(
+      <ReaderFlowBlock
+        imageRenderMode="paged"
+        novelId={1}
+        item={{
+          blockIndex: 1,
+          chapterIndex: 0,
+          contentHeight: READER_CONTENT_TOKEN_DEFAULTS.hrHeightPx,
+          font: '400 18px sans-serif',
+          fontSizePx: 18,
+          height: 33,
+          key: '0:hr:1:0',
+          kind: 'text',
+          lineHeightPx: 32,
+          lineStartIndex: 0,
+          lines: [],
+          marginAfter: 20,
+          marginBefore: 12,
+          renderRole: 'hr',
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId('reader-flow-hr')).toHaveStyle({
+      height: `${READER_CONTENT_TOKEN_DEFAULTS.hrHeightPx}px`,
+    });
   });
 
   it('renders text fragments as a single preserved-whitespace node instead of per-line wrappers', () => {
@@ -163,7 +195,6 @@ describe('ReaderFlowBlock', () => {
   it('renders heading fragments as a single h2 node', () => {
     render(
       <ReaderFlowBlock
-        chapterTitle="Chapter One"
         imageRenderMode="paged"
         novelId={1}
         item={{
@@ -202,20 +233,69 @@ describe('ReaderFlowBlock', () => {
 
     const fragment = screen.getByRole('heading', { level: 2 });
     expect(fragment).toHaveAttribute('data-testid', 'reader-flow-text-fragment');
-    expect(fragment.textContent).toBe('Chapter One');
+    expect(fragment.textContent).toBe('Chapter\nOne');
     expect(fragment.children).toHaveLength(0);
     expect(fragment).toHaveClass(
       READER_CONTENT_CLASS_NAMES.block,
       READER_CONTENT_CLASS_NAMES.blockHeading,
     );
+    expect(fragment).toHaveStyle({
+      letterSpacing: `${READER_CONTENT_TOKEN_DEFAULTS.headingLetterSpacingEm}em`,
+      whiteSpace: 'pre',
+    });
   });
 
-  it('prefers the original heading text when line fragments are incomplete', () => {
-    const rawTitle = '第36章 命途的起点，以及【记忆】的游戏';
-
+  it('uses an explicit heading text override without measured line breaks', () => {
     render(
       <ReaderFlowBlock
-        chapterTitle={rawTitle}
+        headingTextOverride="第一章 牢狱之灾"
+        imageRenderMode="scroll"
+        novelId={1}
+        item={{
+          blockIndex: 0,
+          chapterIndex: 0,
+          contentHeight: 96,
+          font: '600 32px sans-serif',
+          fontSizePx: 32,
+          headingLevel: 2,
+          height: 96,
+          key: '0:heading:0:0',
+          kind: 'heading',
+          lineHeightPx: 48,
+          lineStartIndex: 0,
+          lines: [
+            {
+              end: { graphemeIndex: 4, segmentIndex: 0 },
+              lineIndex: 0,
+              start: { graphemeIndex: 0, segmentIndex: 0 },
+              text: '第一章',
+              width: 120,
+            },
+            {
+              end: { graphemeIndex: 9, segmentIndex: 0 },
+              lineIndex: 1,
+              start: { graphemeIndex: 4, segmentIndex: 0 },
+              text: '牢狱之灾',
+              width: 160,
+            },
+          ],
+          marginAfter: 0,
+          marginBefore: 0,
+          text: '第一章牢狱之灾',
+        }}
+      />,
+    );
+
+    const heading = screen.getByRole('heading', { level: 2, name: '第一章 牢狱之灾' });
+    expect(heading).toHaveStyle({
+      whiteSpace: 'normal',
+    });
+    expect(heading).not.toHaveStyle({ overflow: 'hidden' });
+  });
+
+  it('renders heading text from measured lines when source text differs', () => {
+    render(
+      <ReaderFlowBlock
         imageRenderMode="paged"
         novelId={1}
         item={{
@@ -253,10 +333,10 @@ describe('ReaderFlowBlock', () => {
     );
 
     const fragment = screen.getByRole('heading', { level: 2 });
-    expect(fragment.textContent).toBe(rawTitle);
+    expect(fragment.textContent).toBe('第36章\n忆】的游戏');
     expect(fragment).toHaveStyle({
-      overflowWrap: 'anywhere',
-      whiteSpace: 'pre-wrap',
+      letterSpacing: `${READER_CONTENT_TOKEN_DEFAULTS.headingLetterSpacingEm}em`,
+      whiteSpace: 'pre',
     });
   });
 

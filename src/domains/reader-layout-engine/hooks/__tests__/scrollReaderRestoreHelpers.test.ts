@@ -43,7 +43,7 @@ function makeChapterElement({
 }
 
 describe('resolvePendingScrollTarget', () => {
-  it('falls back to chapter-local progress when the locator position drifts too far', () => {
+  it('keeps a precise scroll locator when chapter-local progress drifts', () => {
     const container = makeContainer();
     const chapterElement = makeChapterElement({
       offsetHeight: 1000,
@@ -68,6 +68,7 @@ describe('resolvePendingScrollTarget', () => {
         current: new Map([[2, chapterElement]]),
       },
       scrollLayouts: new Map(),
+      novelFlowIndex: null,
       target: {
         chapterIndex: 2,
         chapterProgress: 0.6,
@@ -80,7 +81,52 @@ describe('resolvePendingScrollTarget', () => {
       state: 'success',
       value: {
         locator: targetLocator,
-        scrollTop: 2440,
+        scrollTop: 2320,
+      },
+    });
+  });
+
+  it('falls back to progress when an exact scroll locator clamps to the viewport boundary', () => {
+    const container = makeContainer({
+      scrollHeight: 3000,
+    });
+    const chapterElement = makeChapterElement({
+      offsetHeight: 1000,
+      offsetTop: 2200,
+    });
+    const targetLocator = {
+      chapterIndex: 2,
+      blockIndex: 24,
+      kind: 'text' as const,
+      lineIndex: 2,
+    };
+
+    const result = resolvePendingScrollTarget({
+      container,
+      layoutQueries: {
+        resolveScrollLocatorOffset: () => 3500,
+      },
+      scrollChapterBodyElementsRef: {
+        current: new Map(),
+      },
+      scrollChapterElementsRef: {
+        current: new Map([[2, chapterElement]]),
+      },
+      scrollLayouts: new Map(),
+      novelFlowIndex: null,
+      target: {
+        chapterIndex: 2,
+        chapterProgress: 0.6,
+        locator: targetLocator,
+        mode: 'scroll',
+      },
+    });
+
+    expect(result).toEqual({
+      state: 'success',
+      value: {
+        locator: targetLocator,
+        scrollTop: 2140,
       },
     });
   });
@@ -101,7 +147,7 @@ describe('resolvePendingScrollTarget', () => {
     const result = resolvePendingScrollTarget({
       container,
       layoutQueries: {
-        resolveScrollLocatorOffset: () => 2590,
+        resolveScrollLocatorOffset: () => 2400,
       },
       scrollChapterBodyElementsRef: {
         current: new Map(),
@@ -110,6 +156,7 @@ describe('resolvePendingScrollTarget', () => {
         current: new Map([[2, chapterElement]]),
       },
       scrollLayouts: new Map(),
+      novelFlowIndex: null,
       target: {
         chapterIndex: 2,
         chapterProgress: 0.5,
@@ -122,7 +169,7 @@ describe('resolvePendingScrollTarget', () => {
       state: 'success',
       value: {
         locator: targetLocator,
-        scrollTop: 2410,
+        scrollTop: 2220,
       },
     });
   });
@@ -153,6 +200,7 @@ describe('resolvePendingScrollTarget', () => {
         current: new Map([[2, chapterElement]]),
       },
       scrollLayouts: new Map(),
+      novelFlowIndex: null,
       target: {
         chapterIndex: 2,
         chapterProgress: 0.6,
@@ -165,7 +213,45 @@ describe('resolvePendingScrollTarget', () => {
       state: 'success',
       value: {
         locator: targetLocator,
-        scrollTop: 2440,
+        scrollTop: 2260,
+      },
+    });
+  });
+
+  it('maps chapter progress onto the focused single-chapter viewport range', () => {
+    const container = makeContainer({
+      clientHeight: 600,
+      scrollHeight: 4200,
+    });
+    const chapterElement = makeChapterElement({
+      offsetHeight: 4200,
+      offsetTop: 0,
+    });
+    const result = resolvePendingScrollTarget({
+      container,
+      layoutQueries: {
+        resolveScrollLocatorOffset: () => 2500,
+      },
+      scrollChapterBodyElementsRef: {
+        current: new Map(),
+      },
+      scrollChapterElementsRef: {
+        current: new Map([[2, chapterElement]]),
+      },
+      scrollLayouts: new Map(),
+      novelFlowIndex: null,
+      target: {
+        chapterIndex: 2,
+        chapterProgress: 0.25,
+        mode: 'scroll',
+      },
+    });
+
+    expect(result).toEqual({
+      state: 'success',
+      value: {
+        locator: null,
+        scrollTop: 720,
       },
     });
   });
@@ -196,6 +282,7 @@ describe('resolvePendingScrollTarget', () => {
         current: new Map([[2, chapterElement]]),
       },
       scrollLayouts: new Map(),
+      novelFlowIndex: null,
       target: {
         chapterIndex: 2,
         locator: targetLocator,

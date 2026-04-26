@@ -6,6 +6,7 @@ import {
   calculateVisibleScrollBlockRanges,
   resolveCurrentScrollLocator,
   resolveCurrentScrollLocatorOffset,
+  resolveLocatorGlobalOffset,
 } from '../layout-core/internal';
 import type { ChapterContent } from '@shared/contracts/reader';
 import type {
@@ -14,6 +15,7 @@ import type {
   ScrollReaderLayout,
   VisibleScrollBlockRange,
 } from './scrollReaderControllerTypes';
+import type { NovelFlowIndex } from '../layout-core/internal';
 
 function areVisibleScrollBlockRangesEqual(
   previousRanges: ReadonlyMap<number, VisibleScrollBlockRange>,
@@ -56,6 +58,7 @@ export function useScrollReaderViewportSync(params: {
     suppressScrollSyncTemporarily: () => void;
   };
   renderableScrollLayouts: RenderableScrollLayout[];
+  novelFlowIndex: NovelFlowIndex | null;
   scrollChapterBodyElementsRef: MutableRefObject<Map<number, HTMLDivElement>>;
   scrollChapterElementsRef: MutableRefObject<Map<number, HTMLDivElement>>;
   scrollLayouts: ReadonlyMap<number, ScrollReaderLayout>;
@@ -77,6 +80,7 @@ export function useScrollReaderViewportSync(params: {
     layoutQueries,
     persistence,
     renderableScrollLayouts,
+    novelFlowIndex,
     scrollChapterBodyElementsRef,
     scrollChapterElementsRef,
     scrollLayouts,
@@ -88,12 +92,22 @@ export function useScrollReaderViewportSync(params: {
   } = params;
   const [visibleScrollBlockRangeByChapter, setVisibleScrollBlockRangeByChapter] =
     useState<Map<number, VisibleScrollBlockRange>>(new Map());
+  const latestChapterIndexRef = useRef(chapterIndex);
+  const latestNovelFlowIndexRef = useRef(novelFlowIndex);
+  const latestRenderableScrollLayoutsRef = useRef(renderableScrollLayouts);
+  const latestScrollLayoutsRef = useRef(scrollLayouts);
+  const latestScrollReaderChaptersRef = useRef(scrollReaderChapters);
   const scrollAnchorSnapshotRef = useRef<ScrollAnchorSnapshot>({
     chapterIndex: null,
     chapterOffsetTop: null,
     firstRenderableChapterIndex: null,
     scrollTop: 0,
   });
+  latestChapterIndexRef.current = chapterIndex;
+  latestNovelFlowIndexRef.current = novelFlowIndex;
+  latestRenderableScrollLayoutsRef.current = renderableScrollLayouts;
+  latestScrollLayoutsRef.current = scrollLayouts;
+  latestScrollReaderChaptersRef.current = scrollReaderChapters;
 
   useLayoutEffect(() => {
     if (!enabled) {
@@ -146,32 +160,51 @@ export function useScrollReaderViewportSync(params: {
   ]);
 
   const getCurrentScrollLocator = useCallback(() => {
+    const scrollChapterGlobalOffsets = new Map(
+      latestRenderableScrollLayoutsRef.current
+        .filter((chapter) => chapter.flowEntry)
+        .map((chapter) => [chapter.index, chapter.flowEntry?.scrollStart ?? 0]),
+    );
+
     return resolveCurrentScrollLocator({
-      chapterIndex,
+      chapterIndex: latestChapterIndexRef.current,
       contentElement: viewportContentRef.current,
       isPagedMode: false,
-      scrollLayouts,
+      scrollLayouts: latestScrollLayoutsRef.current,
       scrollChapterBodyElements: scrollChapterBodyElementsRef.current,
-      scrollReaderChapters,
+      scrollChapterGlobalOffsets,
+      scrollReaderChapters: latestScrollReaderChaptersRef.current,
       viewMode: 'original',
     });
   }, [
-    chapterIndex,
     scrollChapterBodyElementsRef,
-    scrollLayouts,
-    scrollReaderChapters,
     viewportContentRef,
   ]);
 
   const resolveScrollLocatorOffset = useCallback(
     (locator: Parameters<typeof resolveCurrentScrollLocatorOffset>[0]['locator']) => {
+      const activeNovelFlowIndex = latestNovelFlowIndexRef.current;
+      if (activeNovelFlowIndex) {
+        const globalOffset = resolveLocatorGlobalOffset(activeNovelFlowIndex, locator);
+        if (globalOffset !== null) {
+          return globalOffset;
+        }
+      }
+
+      const scrollChapterGlobalOffsets = new Map(
+        latestRenderableScrollLayoutsRef.current
+          .filter((chapter) => chapter.flowEntry)
+          .map((chapter) => [chapter.index, chapter.flowEntry?.scrollStart ?? 0]),
+      );
+
       return resolveCurrentScrollLocatorOffset({
         locator,
         scrollChapterBodyElements: scrollChapterBodyElementsRef.current,
-        scrollLayouts,
+        scrollChapterGlobalOffsets,
+        scrollLayouts: latestScrollLayoutsRef.current,
       });
     },
-    [scrollChapterBodyElementsRef, scrollLayouts],
+    [scrollChapterBodyElementsRef],
   );
 
   useEffect(() => {

@@ -78,6 +78,19 @@ function renderViewport(overrides: Partial<React.ComponentProps<typeof ReaderVie
   );
 }
 
+function makeScrollable(element: HTMLDivElement) {
+  Object.defineProperty(element, 'clientHeight', {
+    configurable: true,
+    value: 200,
+  });
+  Object.defineProperty(element, 'scrollHeight', {
+    configurable: true,
+    value: 1200,
+  });
+  const scrollContainer = element;
+  scrollContainer.scrollTop = 100;
+}
+
 describe('ReaderViewport', () => {
   it('renders the empty state when there is no chapter and no loading overlay', () => {
     renderViewport();
@@ -176,6 +189,58 @@ describe('ReaderViewport', () => {
     expect(onBlockedInteraction).toHaveBeenCalledTimes(1);
   });
 
+  it('dampens wheel scrolling in original scroll mode', () => {
+    const onContentScroll = vi.fn();
+    renderViewport({
+      renderableChapter: chapter,
+      isPagedMode: false,
+      viewMode: 'original',
+      onContentScroll,
+    });
+    const viewport = screen.getByTestId('reader-viewport') as HTMLDivElement;
+    makeScrollable(viewport);
+
+    fireEvent.wheel(viewport, { deltaY: 120 });
+
+    expect(viewport.scrollTop).toBeGreaterThan(100);
+    expect(viewport.scrollTop).toBeLessThan(220);
+    expect(onContentScroll).toHaveBeenCalled();
+  });
+
+  it('leaves summary mode wheel scrolling to the browser', () => {
+    renderViewport({
+      renderableChapter: chapter,
+      isPagedMode: false,
+      viewMode: 'summary',
+    });
+    const viewport = screen.getByTestId('reader-viewport') as HTMLDivElement;
+    makeScrollable(viewport);
+
+    fireEvent.wheel(viewport, { deltaY: 120 });
+
+    expect(viewport.scrollTop).toBe(100);
+  });
+
+  it('dampens direct touch drag distance in original scroll mode', () => {
+    renderViewport({
+      renderableChapter: chapter,
+      isPagedMode: false,
+      viewMode: 'original',
+    });
+    const viewport = screen.getByTestId('reader-viewport') as HTMLDivElement;
+    makeScrollable(viewport);
+
+    fireEvent.touchStart(viewport, {
+      touches: [{ clientY: 500 }],
+    });
+    fireEvent.touchMove(viewport, {
+      touches: [{ clientY: 440 }],
+    });
+
+    expect(viewport.scrollTop).toBeGreaterThan(100);
+    expect(viewport.scrollTop).toBeLessThan(160);
+  });
+
   it('dismisses blocked touchmove interactions while the menu is visible', () => {
     const onBlockedInteraction = vi.fn();
     const { container } = renderViewport({
@@ -187,6 +252,23 @@ describe('ReaderViewport', () => {
 
     fireEvent.touchMove(container.firstChild as HTMLElement);
 
+    expect(onBlockedInteraction).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not try to cancel non-cancelable blocked touchmove events', () => {
+    const onBlockedInteraction = vi.fn();
+    const { container } = renderViewport({
+      renderableChapter: chapter,
+      isPagedMode: false,
+      interactionLocked: true,
+      onBlockedInteraction,
+    });
+    const event = new Event('touchmove', { bubbles: true, cancelable: false });
+    const preventDefault = vi.spyOn(event, 'preventDefault');
+
+    container.firstChild?.dispatchEvent(event);
+
+    expect(preventDefault).not.toHaveBeenCalled();
     expect(onBlockedInteraction).toHaveBeenCalledTimes(1);
   });
 

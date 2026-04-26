@@ -9,6 +9,7 @@ export {
   createReaderTypographyMetrics,
   getReaderLayoutPretextCacheSizeForTests,
   resetReaderLayoutPretextCacheForTests,
+  setReaderTextLayoutLocale,
 } from '../measurement/readerTextMeasurement';
 export {
   measurePagedReaderChapterLayout,
@@ -35,12 +36,16 @@ export {
   findPageIndexForLocator,
   findPageIndexForLocatorInStaticTree,
   findVisibleBlockRange,
+  findVisibleBlockRangeFromBlockSummaries,
   getOffsetForLocator,
   getOffsetForLocatorInStaticTree,
   getPageStartLocator,
   getPageStartLocatorFromStaticTree,
 } from '../locator/readerLocator';
-export { PAGED_VIEWPORT_TOP_PADDING_PX } from './readerLayoutTypes';
+export {
+  CHAPTER_TITLE_PARAGRAPH_INDEX,
+  PAGED_VIEWPORT_TOP_PADDING_PX,
+} from './readerLayoutTypes';
 export type {
   MeasuredChapterLayout,
   PageSlice,
@@ -49,8 +54,10 @@ export type {
   ReaderBlock,
   ReaderImageLayoutConstraints,
   ReaderImagePageItem,
+  ReaderLayoutCursor,
   ReaderLayoutSignature,
   ReaderLocator,
+  ReaderLineRange,
   ReaderMeasuredLine,
   ReaderPageColumn,
   ReaderPageItem,
@@ -67,10 +74,15 @@ export type {
   StaticScrollChapterTree,
   StaticSummaryShellTree,
   StaticTextLine,
+  StaticTextLineRange,
   VirtualBlockMetrics,
   VisibleBlockRange,
 } from './readerLayoutTypes';
 export type {
   ReaderRichTextLayoutResult,
+  ReaderTextLineStats,
+  ReaderTextPrepareOptions,
   ReaderTextLayoutEngine,
+  ReaderTextWhiteSpace,
+  ReaderTextWordBreak,
 } from '../measurement/readerTextMeasurement';

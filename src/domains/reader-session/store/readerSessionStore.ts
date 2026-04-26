@@ -201,6 +201,7 @@ function updateStoredReaderState(
     canonical: nextCanonical,
     chapterIndex: nextChapterIndex,
     chapterProgress: clampChapterProgress(merged.hints?.chapterProgress),
+    globalFlow: merged.hints?.globalFlow,
     locator: nextLocator,
     positionMetadata: merged.metadata,
     hasUserInteracted: options.markUserInteracted ?? currentState.hasUserInteracted,
@@ -230,6 +231,7 @@ export async function hydrateSession(
     canonical: initialStoredState.canonical,
     chapterIndex: getStoredChapterIndex(initialStoredState),
     chapterProgress: undefined,
+    globalFlow: undefined,
     positionMetadata: initialStoredState.metadata,
     locator: toReaderLocatorFromCanonical(initialStoredState.canonical),
     mode: 'scroll',
@@ -327,6 +329,7 @@ export async function hydrateSession(
     mode: resolvedMode.mode,
     chapterIndex: getStoredChapterIndex(baseState),
     chapterProgress: clampChapterProgress(baseState.hints?.chapterProgress),
+    globalFlow: baseState.hints?.globalFlow,
     locator: toReaderLocatorFromCanonical(
       baseState.canonical,
       isReaderProjectionFreshForCanonical(baseState.hints?.pagedProjection, baseState.canonical)
@@ -381,6 +384,8 @@ export function setChapterIndex(chapterIndex: number, options: SessionUpdateOpti
     chapterIndex,
     chapterProgress:
       currentState.chapterIndex === chapterIndex ? currentState.chapterProgress : undefined,
+    globalFlow:
+      currentState.chapterIndex === chapterIndex ? currentState.globalFlow : undefined,
     locator:
       currentState.locator?.chapterIndex === chapterIndex ? currentState.locator : undefined,
     hasUserInteracted: options.markUserInteracted ?? currentState.hasUserInteracted,

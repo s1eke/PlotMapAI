@@ -51,6 +51,9 @@ export interface ReaderLayoutSignatureRecord {
   fontSize: number;
   lineSpacing: number;
   paragraphSpacing: number;
+  textLayoutPolicyKey?: string;
+  textLayoutPolicyVersion?: number;
+  richTextStrategyVersion?: number;
 }
 
 export interface ReaderRenderQueryManifestRecord {
@@ -60,6 +63,29 @@ export interface ReaderRenderQueryManifestRecord {
   totalHeight?: number;
   startLocator?: ReaderLocatorRecord | null;
   endLocator?: ReaderLocatorRecord | null;
+}
+
+export interface ReaderTextLineStatsRecord {
+  lineCount: number;
+  maxLineWidth: number;
+}
+
+export interface ReaderPretextMetricEntryRecord {
+  key: string;
+  stats: ReaderTextLineStatsRecord;
+}
+
+export interface ReaderTextMetricSignatureRecord {
+  bodyFont: string;
+  fontSize: number;
+  headingFont: string;
+  lineSpacing: number;
+  metricsVersion: number;
+  paragraphSpacing: number;
+  richTextStrategyVersion?: number;
+  textLayoutPolicyKey?: string;
+  textLayoutPolicyVersion?: number;
+  textWidth: number;
 }
 
 export type ReaderLayoutFeatureSetRecord =
@@ -277,6 +303,12 @@ export interface ReaderProgressProjectionRecord {
   pagedSourceMode?: ReaderProgressModeRecord;
   pagedBasisCanonicalFingerprint?: string;
   pagedLayoutKey?: string;
+  globalScrollOffset?: number;
+  globalPageIndex?: number;
+  globalCapturedAt?: string;
+  globalSourceMode?: ReaderProgressModeRecord;
+  globalBasisCanonicalFingerprint?: string;
+  globalLayoutKey?: string;
 }
 
 export interface ReaderProgressRecord {
@@ -312,13 +344,30 @@ export interface ReaderRenderCacheRecord {
   expiresAt: string;
 }
 
+export interface ReaderPretextMetricsRecord {
+  id: number;
+  novelId: number;
+  chapterIndex: number;
+  contentHash: string;
+  contentFormat: 'plain' | 'rich';
+  contentVersion: number;
+  signatureKey: string;
+  signature: ReaderTextMetricSignatureRecord;
+  entries: ReaderPretextMetricEntryRecord[];
+  updatedAt: string;
+  expiresAt: string;
+}
+
 export const READER_DB_SCHEMA = {
   readerProgress: 'novelId, updatedAt, mode, activeChapterIndex',
+  readerPretextMetrics:
+    '++id, [novelId+chapterIndex+signatureKey], [novelId+chapterIndex], novelId, updatedAt, expiresAt',
   readerRenderCache:
     '++id, [novelId+chapterIndex+variantFamily], [novelId+variantFamily], updatedAt, expiresAt',
 } as const;
 
 export interface ReaderTables {
+  readerPretextMetrics: EntityTable<ReaderPretextMetricsRecord, 'id'>;
   readerProgress: EntityTable<ReaderProgressRecord, 'novelId'>;
   readerRenderCache: EntityTable<ReaderRenderCacheRecord, 'id'>;
 }

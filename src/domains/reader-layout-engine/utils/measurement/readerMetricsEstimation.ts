@@ -5,6 +5,7 @@ import type {
   ReaderRenderQueryManifest,
   ReaderTypographyMetrics,
 } from '../layout/readerLayoutTypes';
+import type { ReaderTextLayoutEngine, ReaderTextPrepareOptions } from './readerTextMeasurement';
 
 import {
   getApproximateMaxCharsPerLine,
@@ -13,6 +14,11 @@ import {
 import { getRichScrollHorizontalTextWidth } from '../layout/richScroll';
 import { READER_CONTENT_TOKEN_DEFAULTS } from '@shared/reader-rendering';
 import { getRichInlinePlainText } from '@shared/text-processing';
+import {
+  createHeadingTextPrepareOptions,
+  DEFAULT_READER_TEXT_PREPARE_OPTIONS,
+} from '../layout/readerTextPolicy';
+import { browserReaderTextLayoutEngine } from './readerTextMeasurement';
 
 export interface EstimatedReaderBlockMetric {
   block: ReaderBlock;
@@ -72,7 +78,9 @@ function estimateTableContentHeight(
   tableRows: NonNullable<ReaderBlock['tableRows']>,
   maxWidth: number,
   lineHeightPx: number,
+  font: string,
   fontSizePx: number,
+  textLayoutEngine: ReaderTextLayoutEngine,
 ): { contentHeight: number; rowHeights: number[] } {
   if (tableRows.length === 0) {
     return {
@@ -92,7 +100,14 @@ function estimateTableContentHeight(
   const rowHeights = tableRows.map((row) => {
     const maxCellHeight = Math.max(...row.map((cell) => {
       const lineCount = Math.max(
-        estimateTextLineCount(getRichInlinePlainText(cell.children), cellMaxWidth, fontSizePx),
+        estimateTextLineCount({
+          font,
+          fontSizePx,
+          maxWidth: cellMaxWidth,
+          prepareOptions: DEFAULT_READER_TEXT_PREPARE_OPTIONS,
+          text: getRichInlinePlainText(cell.children),
+          textLayoutEngine,
+        }),
         1,
       );
       return lineCount * lineHeightPx + READER_CONTENT_TOKEN_DEFAULTS.tableCellPaddingYPx * 2;
@@ -109,13 +124,31 @@ function estimateTableContentHeight(
   };
 }
 
-function estimateTextLineCount(text: string, maxWidth: number, fontSizePx: number): number {
-  if (!text) {
+function estimateTextLineCount(params: {
+  font: string;
+  fontSizePx: number;
+  maxWidth: number;
+  prepareOptions?: ReaderTextPrepareOptions;
+  text: string;
+  textLayoutEngine: ReaderTextLayoutEngine;
+}): number {
+  if (!params.text) {
     return 0;
   }
 
-  const maxCharsPerLine = getApproximateMaxCharsPerLine(maxWidth, fontSizePx);
-  return Math.max(1, Math.ceil(text.length / maxCharsPerLine));
+  const stats = params.textLayoutEngine.measureLineStats?.({
+    font: params.font,
+    fontSizePx: params.fontSizePx,
+    maxWidth: params.maxWidth,
+    prepareOptions: params.prepareOptions,
+    text: params.text,
+  });
+  if (stats && Number.isFinite(stats.lineCount)) {
+    return Math.max(1, Math.ceil(stats.lineCount));
+  }
+
+  const maxCharsPerLine = getApproximateMaxCharsPerLine(params.maxWidth, params.fontSizePx);
+  return Math.max(1, Math.ceil(params.text.length / maxCharsPerLine));
 }
 
 export function estimateReaderBlockMetric(
@@ -125,6 +158,7 @@ export function estimateReaderBlockMetric(
   imageDimensionsByKey: Map<string, ReaderImageDimensions | null | undefined>,
   richAware = false,
   imageLayoutConstraints?: ReaderImageLayoutConstraints,
+  textLayoutEngine: ReaderTextLayoutEngine = browserReaderTextLayoutEngine,
 ): EstimatedReaderBlockMetric {
   if (block.kind === 'heading' || block.kind === 'text') {
     const maxWidth = richAware
@@ -136,12 +170,20 @@ export function estimateReaderBlockMetric(
     const lineHeightPx = block.kind === 'heading'
       ? typography.headingLineHeightPx
       : typography.bodyLineHeightPx;
+    const font = block.kind === 'heading'
+      ? typography.headingFont
+      : typography.bodyFont;
+    const prepareOptions = block.kind === 'heading'
+      ? createHeadingTextPrepareOptions(fontSizePx)
+      : DEFAULT_READER_TEXT_PREPARE_OPTIONS;
     if (block.renderRole === 'table' && block.tableRows) {
       const tableMetrics = estimateTableContentHeight(
         block.tableRows,
         maxWidth,
         lineHeightPx,
+        font,
         fontSizePx,
+        textLayoutEngine,
       );
       return {
         block,
@@ -156,7 +198,14 @@ export function estimateReaderBlockMetric(
 
     const lineCount = block.renderRole === 'hr'
       ? 0
-      : estimateTextLineCount(block.text ?? '', maxWidth, fontSizePx);
+      : estimateTextLineCount({
+        font,
+        fontSizePx,
+        maxWidth,
+        prepareOptions,
+        text: block.text ?? '',
+        textLayoutEngine,
+      });
     const contentHeight = block.renderRole === 'hr'
       ? 1
       : lineCount * lineHeightPx;
@@ -184,9 +233,14 @@ export function estimateReaderBlockMetric(
     const displayWidth = resolvedImageSize.width;
     const displayHeight = resolvedImageSize.height;
     const captionHeight = estimateTextLineCount(
-      getRichInlinePlainText(block.imageCaption ?? []),
-      displayWidth,
-      typography.bodyFontSize,
+      {
+        font: typography.bodyFont,
+        fontSizePx: typography.bodyFontSize,
+        maxWidth: displayWidth,
+        prepareOptions: DEFAULT_READER_TEXT_PREPARE_OPTIONS,
+        text: getRichInlinePlainText(block.imageCaption ?? []),
+        textLayoutEngine,
+      },
     ) * typography.bodyLineHeightPx;
     const captionSpacing = captionHeight > 0 ? 8 : 0;
 

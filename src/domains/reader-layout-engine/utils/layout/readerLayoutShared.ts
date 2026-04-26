@@ -6,6 +6,7 @@ import type {
   ReaderLayoutSignature,
   ReaderViewportMetrics,
 } from './readerLayoutTypes';
+import { CHAPTER_TITLE_PARAGRAPH_INDEX } from './readerLayoutTypes';
 
 import { buildChapterBlockSequence } from '@shared/text-processing/chapterBlocks';
 import {
@@ -20,6 +21,11 @@ import {
   buildRichScrollReaderBlocks,
   shouldUseRichScrollBlocks,
 } from './richScroll';
+import {
+  DEFAULT_READER_TEXT_LAYOUT_POLICY_KEY,
+  READER_TEXT_LAYOUT_POLICY_VERSION,
+  RICH_TEXT_STRATEGY_VERSION,
+} from './readerTextPolicy';
 
 const DEFAULT_IMAGE_ASPECT_RATIO = 4 / 3;
 const TEXT_FALLBACK_WIDTH_RATIO = 0.55;
@@ -80,6 +86,9 @@ export function createReaderLayoutSignature({
   pageHeight,
   paragraphSpacing,
   textWidth,
+  textLayoutPolicyKey,
+  textLayoutPolicyVersion,
+  richTextStrategyVersion,
 }: ReaderLayoutSignature): ReaderLayoutSignature {
   return {
     columnCount,
@@ -88,21 +97,30 @@ export function createReaderLayoutSignature({
     lineSpacing,
     pageHeight,
     paragraphSpacing,
+    richTextStrategyVersion: richTextStrategyVersion ?? RICH_TEXT_STRATEGY_VERSION,
     textWidth,
+    textLayoutPolicyKey: textLayoutPolicyKey ?? DEFAULT_READER_TEXT_LAYOUT_POLICY_KEY,
+    textLayoutPolicyVersion: textLayoutPolicyVersion ?? READER_TEXT_LAYOUT_POLICY_VERSION,
   };
 }
 
 export function serializeReaderLayoutSignature(signature: ReaderLayoutSignature): string {
+  const normalized = createReaderLayoutSignature(signature);
   return [
-    signature.textWidth,
-    signature.pageHeight,
-    signature.columnCount,
-    signature.columnGap,
-    signature.fontSize,
-    signature.lineSpacing,
-    signature.paragraphSpacing,
+    normalized.textWidth,
+    normalized.pageHeight,
+    normalized.columnCount,
+    normalized.columnGap,
+    normalized.fontSize,
+    normalized.lineSpacing,
+    normalized.paragraphSpacing,
   ]
     .map((value) => (Number.isFinite(value) ? value.toFixed(3) : '0'))
+    .concat([
+      normalized.textLayoutPolicyKey ?? DEFAULT_READER_TEXT_LAYOUT_POLICY_KEY,
+      `${normalized.textLayoutPolicyVersion ?? READER_TEXT_LAYOUT_POLICY_VERSION}`,
+      `${normalized.richTextStrategyVersion ?? RICH_TEXT_STRATEGY_VERSION}`,
+    ])
     .join('|');
 }
 
@@ -116,7 +134,7 @@ export function buildReaderBlocks(
     blockIndex: 0,
     blockKey: createReaderBlockKey({
       kind: 'heading',
-      paragraphIndex: -1,
+      paragraphIndex: CHAPTER_TITLE_PARAGRAPH_INDEX,
       text: chapter.title,
     }),
     blockTextHash: createReaderTextHash(chapter.title),
@@ -126,7 +144,7 @@ export function buildReaderBlocks(
     text: chapter.title,
     marginBefore: READER_CONTENT_TOKEN_DEFAULTS.chapterTitleMarginTopPx,
     marginAfter: READER_CONTENT_TOKEN_DEFAULTS.chapterTitleMarginBottomPx,
-    paragraphIndex: -1,
+    paragraphIndex: CHAPTER_TITLE_PARAGRAPH_INDEX,
     renderRole: 'plain',
     textQuote: createReaderTextQuote(chapter.title),
     contentHash: chapter.contentHash,

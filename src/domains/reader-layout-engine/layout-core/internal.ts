@@ -21,6 +21,7 @@ export {
   findPageIndexForLocator,
   findPageIndexForLocatorInStaticTree,
   findVisibleBlockRange,
+  findVisibleBlockRangeFromBlockSummaries,
   getChapterBoundaryLocator,
   getChapterEndLocator,
   getChapterStartLocator,
@@ -32,6 +33,7 @@ export {
   measurePagedReaderChapterLayout,
   measureReaderChapterLayout,
   measureScrollReaderChapterLayout,
+  CHAPTER_TITLE_PARAGRAPH_INDEX,
   PAGED_VIEWPORT_TOP_PADDING_PX,
   serializeReaderLayoutSignature,
 } from '../utils/layout/readerLayout';
@@ -44,6 +46,7 @@ export type {
   ReaderImageLayoutConstraints,
   ReaderImagePageItem,
   ReaderLayoutSignature,
+  ReaderLineRange,
   ReaderLocator,
   ReaderMeasuredLine,
   ReaderPageColumn,
@@ -62,6 +65,7 @@ export type {
   StaticScrollChapterTree,
   StaticSummaryShellTree,
   StaticTextLine,
+  StaticTextLineRange,
   VirtualBlockMetrics,
   VisibleBlockRange,
 } from '../utils/layout/readerLayout';
@@ -76,3 +80,26 @@ export {
 } from '@shared/reader-rendering';
 export type { ReaderImageActivationPayload, ReaderImageGalleryEntry } from '@shared/contracts/reader';
 export { preloadReaderImageResources } from '@domains/reader-media';
+export {
+  buildNovelFlowIndex,
+  createChapterFlowManifestFromRenderCacheRecord,
+  createChapterFlowManifestFromScrollTree,
+  isChapterFlowManifestCompatible,
+  mergeChapterFlowManifests,
+  resolveGlobalOffsetPosition,
+  resolveGlobalPagePosition,
+  resolveLocatorGlobalOffset,
+  resolveLocatorGlobalPageIndex,
+  toGlobalOffset,
+  toGlobalPageIndex,
+} from '../utils/flow-index/novelFlowIndex';
+export type {
+  ChapterFlowBlockSummary,
+  ChapterFlowManifest,
+  ChapterFlowManifestIdentity,
+  ChapterFlowManifestStatus,
+  GlobalPagedPosition,
+  GlobalScrollPosition,
+  NovelFlowChapterEntry,
+  NovelFlowIndex,
+} from '../utils/flow-index/novelFlowIndex';

@@ -7,6 +7,7 @@ import type { ReaderTextLayoutEngine } from './readerTextMeasurement';
 
 import { READER_CONTENT_TOKEN_DEFAULTS } from '@shared/reader-rendering';
 import { getRichInlinePlainText } from '@shared/text-processing';
+import { DEFAULT_READER_TEXT_PREPARE_OPTIONS } from '../layout/readerTextPolicy';
 import { measureTextHeightWithBrowserLayout } from './readerTextMeasurement';
 
 export function measureCaptionLines(params: {
@@ -37,6 +38,7 @@ export function measureCaptionLines(params: {
       inlines: params.captionInlines,
       lineHeightPx: params.lineHeightPx,
       maxWidth: params.maxWidth,
+      prepareOptions: DEFAULT_READER_TEXT_PREPARE_OPTIONS,
     })
     : null;
   const captionLines = richCaptionLayout?.lines ?? (
@@ -46,6 +48,7 @@ export function measureCaptionLines(params: {
         fontSizePx: params.typography.bodyFontSize,
         lineHeightPx: params.lineHeightPx,
         maxWidth: params.maxWidth,
+        prepareOptions: DEFAULT_READER_TEXT_PREPARE_OPTIONS,
         text: params.captionText,
       })
       : []
@@ -58,6 +61,7 @@ export function measureCaptionLines(params: {
       fontSizePx: params.typography.bodyFontSize,
       lineHeightPx: params.lineHeightPx,
       maxWidth: params.maxWidth,
+      prepareOptions: DEFAULT_READER_TEXT_PREPARE_OPTIONS,
       text: params.captionText,
     });
   const captionHeight = Math.max(measuredCaptionHeight, browserCaptionHeight ?? 0);
@@ -116,6 +120,7 @@ export function measureTableRows(params: {
           inlines: cell.children,
           lineHeightPx: params.lineHeightPx,
           maxWidth: cellMaxWidth,
+          prepareOptions: DEFAULT_READER_TEXT_PREPARE_OPTIONS,
         })
         : null;
       const measuredLines = richCellLayout?.lines ?? (
@@ -125,6 +130,7 @@ export function measureTableRows(params: {
             fontSizePx: params.typography.bodyFontSize,
             lineHeightPx: params.lineHeightPx,
             maxWidth: cellMaxWidth,
+            prepareOptions: DEFAULT_READER_TEXT_PREPARE_OPTIONS,
             text: cellText,
           })
           : []

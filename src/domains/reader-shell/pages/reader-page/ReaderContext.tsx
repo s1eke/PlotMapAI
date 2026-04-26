@@ -129,16 +129,20 @@ export function ReaderContextProvider({
   const navigationValue = useMemo<ReaderNavigationRuntimeValue>(() => ({
     getChapterChangeSource: value.getChapterChangeSource,
     getPagedState: value.getPagedState,
+    getPendingPageIndex: value.getPendingPageIndex,
     getPendingPageTarget: value.getPendingPageTarget,
     setChapterChangeSource: value.setChapterChangeSource,
     setPagedState: value.setPagedState,
+    setPendingPageIndex: value.setPendingPageIndex,
     setPendingPageTarget: value.setPendingPageTarget,
   }), [
     value.getChapterChangeSource,
     value.getPagedState,
+    value.getPendingPageIndex,
     value.getPendingPageTarget,
     value.setChapterChangeSource,
     value.setPagedState,
+    value.setPendingPageIndex,
     value.setPendingPageTarget,
   ]);
 

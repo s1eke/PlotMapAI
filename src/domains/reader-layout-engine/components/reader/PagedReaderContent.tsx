@@ -1,7 +1,7 @@
 import type { ChapterContent, PageTarget } from '@shared/contracts/reader';
 import type { Variants } from 'motion/react';
-import type { PaginatedChapterLayout } from '../../layout-core/internal';
 import type {
+  PaginatedChapterLayout,
   ReaderImageActivationPayload,
   ReaderImageGalleryEntry,
 } from '../../layout-core/internal';
@@ -9,6 +9,7 @@ import type {
   PendingCommittedPageOverride,
   ReaderPageTurnMode,
 } from '../../paged-runtime/internal';
+import ReaderPageHeader from './ReaderPageHeader';
 
 import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
@@ -33,6 +34,8 @@ interface PagedReaderContentProps {
   chapter: ChapterContent;
   currentLayout?: PaginatedChapterLayout | null;
   disableAnimation?: boolean;
+  displayPageCount: number;
+  displayPageIndex: number;
   fitsTwoColumns?: boolean;
   headerBgClassName: string;
   interactionLocked?: boolean;
@@ -165,10 +168,35 @@ function resolveNextPreviewTarget(params: {
   };
 }
 
+interface PageIndicatorProjection {
+  pageCount: number;
+  pageIndex: number;
+}
+
+function resolvePageIndicatorProjection(params: {
+  displayPageCount: number;
+  displayPageIndex: number;
+  pageOffset?: number;
+}): PageIndicatorProjection {
+  const pageCount = Number.isFinite(params.displayPageCount)
+    ? Math.max(1, Math.floor(params.displayPageCount))
+    : 1;
+  const pageIndex = Number.isFinite(params.displayPageIndex)
+    ? Math.floor(params.displayPageIndex)
+    : 0;
+
+  return {
+    pageCount,
+    pageIndex: Math.max(0, pageIndex + (params.pageOffset ?? 0)),
+  };
+}
+
 export default function PagedReaderContent({
   chapter,
   currentLayout = null,
   disableAnimation = false,
+  displayPageCount,
+  displayPageIndex,
   fitsTwoColumns = false,
   headerBgClassName,
   interactionLocked = false,
@@ -310,6 +338,32 @@ export default function PagedReaderContent({
     return null;
   }
 
+  const currentFrameIndicator = resolvePageIndicatorProjection({
+    displayPageCount,
+    displayPageIndex,
+  });
+  let dragCurrentPageOffset = 0;
+  let dragPreviewPageOffset = 0;
+  if (drag.activeDragTransition?.phase === 'committed') {
+    dragCurrentPageOffset = drag.activeDragTransition.direction === 'next' ? -1 : 1;
+  } else if (drag.activeDragTransition?.phase === 'live') {
+    dragPreviewPageOffset = drag.activeDragTransition.direction === 'next' ? 1 : -1;
+  }
+  const dragCurrentIndicator = drag.activeDragTransition
+    ? resolvePageIndicatorProjection({
+      displayPageCount,
+      displayPageIndex,
+      pageOffset: dragCurrentPageOffset,
+    })
+    : null;
+  const dragPreviewIndicator = drag.activeDragTransition
+    ? resolvePageIndicatorProjection({
+      displayPageCount,
+      displayPageIndex,
+      pageOffset: dragPreviewPageOffset,
+    })
+    : null;
+
   return (
     <div className="relative h-full w-full">
       <motion.div
@@ -336,6 +390,8 @@ export default function PagedReaderContent({
               <PagedPageFrame
                 chapter={drag.activeDragTransition.current.chapter}
                 headerBgClassName={headerBgClassName}
+                indicatorPageCount={dragCurrentIndicator?.pageCount}
+                indicatorPageIndex={dragCurrentIndicator?.pageIndex}
                 layout={drag.activeDragTransition.current.layout}
                 novelId={novelId}
                 onImageActivate={resolvedOnImageActivate}
@@ -361,6 +417,8 @@ export default function PagedReaderContent({
               <PagedPageFrame
                 chapter={drag.activeDragTransition.preview.chapter}
                 headerBgClassName={headerBgClassName}
+                indicatorPageCount={dragPreviewIndicator?.pageCount}
+                indicatorPageIndex={dragPreviewIndicator?.pageIndex}
                 layout={drag.activeDragTransition.preview.layout}
                 novelId={novelId}
                 onImageActivate={resolvedOnImageActivate}
@@ -377,37 +435,53 @@ export default function PagedReaderContent({
             </motion.div>
           </>
         ) : (
-          <AnimatePresence custom={pageTurnDirection} initial={false} mode="sync">
-            <motion.div
-              key={`${chapter.index}:${effectivePageIndex}`}
-              className="absolute inset-0 overflow-hidden"
-              custom={pageTurnDirection}
-              variants={variants}
-              initial="enter"
-              animate="center"
-              exit="exit"
-              transition={pageTurnAnimation.transition}
-            >
-              <PagedPageFrame
-                chapter={chapter}
-                headerBgClassName={headerBgClassName}
-                layout={currentPreviewTarget.layout}
-                novelId={novelId}
-                onImageActivate={resolvedOnImageActivate}
-                onRegisterImageElement={resolvedOnRegisterImageElement}
-                pageBgClassName={pageBgClassName}
-                pageCount={currentPreviewTarget.layout.pageSlices.length}
-                pageIndex={effectivePageIndex}
-                pageSlice={currentPreviewTarget.pageSlice}
-                pagedContentRef={pagedContentRef}
-                pagedViewportRef={handlePagedViewportRef}
-                readerTheme={readerTheme}
-                rootClassName={rootClassName}
-                rootStyle={rootStyle}
-                textClassName={textClassName}
-              />
-            </motion.div>
-          </AnimatePresence>
+          <>
+            <AnimatePresence custom={pageTurnDirection} initial={false} mode="sync">
+              <motion.div
+                key={`${chapter.index}:${effectivePageIndex}`}
+                className="absolute inset-0 overflow-hidden"
+                custom={pageTurnDirection}
+                variants={variants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={pageTurnAnimation.transition}
+              >
+                <PagedPageFrame
+                  chapter={chapter}
+                  headerBgClassName={headerBgClassName}
+                  indicatorPageCount={currentFrameIndicator.pageCount}
+                  indicatorPageIndex={currentFrameIndicator.pageIndex}
+                  layout={currentPreviewTarget.layout}
+                  novelId={novelId}
+                  onImageActivate={resolvedOnImageActivate}
+                  onRegisterImageElement={resolvedOnRegisterImageElement}
+                  pageBgClassName={pageBgClassName}
+                  pageCount={currentPreviewTarget.layout.pageSlices.length}
+                  pageIndex={effectivePageIndex}
+                  pageSlice={currentPreviewTarget.pageSlice}
+                  pagedContentRef={pagedContentRef}
+                  pagedViewportRef={handlePagedViewportRef}
+                  readerTheme={readerTheme}
+                  rootClassName={rootClassName}
+                  rootStyle={rootStyle}
+                  showPageIndicator={false}
+                  textClassName={textClassName}
+                />
+              </motion.div>
+            </AnimatePresence>
+            <ReaderPageHeader
+              className="pointer-events-none absolute inset-x-0 top-0 z-20"
+              headerBgClassName={headerBgClassName}
+              indicatorPageCount={currentFrameIndicator.pageCount}
+              indicatorPageIndex={currentFrameIndicator.pageIndex}
+              pageCount={currentPreviewTarget.layout.pageSlices.length}
+              pageIndex={effectivePageIndex}
+              readerTheme={readerTheme}
+              textClassName={textClassName}
+              title={chapter.title}
+            />
+          </>
         )}
       </motion.div>
     </div>

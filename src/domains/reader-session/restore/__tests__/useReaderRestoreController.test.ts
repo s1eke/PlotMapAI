@@ -672,10 +672,10 @@ describe('useReaderRestoreFlow', () => {
         blockIndex: 18,
         chapterIndex: 7,
         lineIndex: 1,
+        pageIndex: 2,
       }),
       mode: 'scroll',
     });
-    expect(result.current.pendingRestoreTargetRef.current?.locator?.pageIndex).toBeUndefined();
 
     act(() => {
       expect(result.current.handleRestoreSettled('completed')).toBe(false);
@@ -2093,10 +2093,10 @@ describe('useReaderRestoreFlow', () => {
         },
         contentRef: { current: makeContainer() },
         getCurrentAnchorRef: {
-          current: () => ({ chapterIndex: 5, chapterProgress: 0.2 } satisfies ScrollModeAnchor),
+          current: () => ({ chapterIndex: 4, chapterProgress: 0.2 } satisfies ScrollModeAnchor),
         },
         getCurrentOriginalLocatorRef: {
-          current: () => createLocator(),
+          current: () => createLocator({ chapterIndex: 4 }),
         },
       },
     });

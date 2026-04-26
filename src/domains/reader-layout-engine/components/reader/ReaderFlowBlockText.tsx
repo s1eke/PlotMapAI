@@ -1,6 +1,9 @@
 import type { CSSProperties } from 'react';
 
-import { READER_CONTENT_CLASS_NAMES } from '@shared/reader-rendering';
+import {
+  READER_CONTENT_CLASS_NAMES,
+  READER_CONTENT_TOKEN_DEFAULTS,
+} from '@shared/reader-rendering';
 import { cn } from '@shared/utils/cn';
 
 import {
@@ -22,13 +25,11 @@ import {
 } from './readerFlowBlockShared';
 
 interface ReaderFlowBlockTextProps {
-  chapterTitle?: string;
   positionStyle?: CSSProperties;
   textItem: RenderTextItem;
 }
 
 export function ReaderFlowBlockText({
-  chapterTitle,
   positionStyle,
   textItem,
 }: ReaderFlowBlockTextProps) {
@@ -53,16 +54,12 @@ export function ReaderFlowBlockText({
   const listPaddingStart = textItem.listContext
     ? Math.max(0, insets.listInset - insets.markerWidth - insets.markerGap) + insets.poemInset
     : insets.poemInset;
+  const hasTextOverride = typeof textItem.textOverride === 'string';
   const serializedText = serializeTextLines(textItem.lines);
   const hasRichLineFragments = Boolean(
-    textItem.richLineFragments?.some((line) => line.length > 0),
+    !hasTextOverride && textItem.richLineFragments?.some((line) => line.length > 0),
   );
-  let renderedText = serializedText;
-  if (textItem.kind === 'heading') {
-    renderedText = textItem.blockIndex === 0
-      ? chapterTitle ?? textItem.text
-      : textItem.text;
-  }
+  const renderedText = textItem.textOverride ?? serializedText;
 
   if (textItem.renderRole === 'hr') {
     return (
@@ -79,6 +76,7 @@ export function ReaderFlowBlockText({
           <div
             data-testid="reader-flow-hr"
             className={cn(getReaderContentBlockClassName({ kind: 'text', renderRole: 'hr' }), 'w-full')}
+            style={{ height: READER_CONTENT_TOKEN_DEFAULTS.hrHeightPx }}
           />
         </div>
       </div>
@@ -174,6 +172,13 @@ export function ReaderFlowBlockText({
   let content = textItem.kind === 'heading'
     ? (() => {
       const TagName = getHeadingTagName(textItem.headingLevel);
+      let headingWhiteSpace: CSSProperties['whiteSpace'] = 'pre';
+      if (hasTextOverride) {
+        headingWhiteSpace = 'normal';
+      } else if (hasRichLineFragments) {
+        headingWhiteSpace = undefined;
+      }
+
       return (
         <TagName
           data-testid="reader-flow-text-fragment"
@@ -184,12 +189,12 @@ export function ReaderFlowBlockText({
           )}
           style={{
             ...textStyle,
-            overflow: 'hidden',
-            overflowWrap: 'anywhere',
-            whiteSpace: hasRichLineFragments ? undefined : 'pre-wrap',
+            letterSpacing: `${READER_CONTENT_TOKEN_DEFAULTS.headingLetterSpacingEm}em`,
+            overflow: hasTextOverride ? undefined : 'hidden',
+            whiteSpace: headingWhiteSpace,
           }}
         >
-          {hasRichLineFragments && textItem.blockIndex !== 0
+          {hasRichLineFragments
             ? renderRichLineFragments(
               textItem.richLineFragments ?? [],
               `${textItem.blockIndex}:heading`,

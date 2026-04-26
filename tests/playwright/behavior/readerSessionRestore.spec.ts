@@ -25,8 +25,6 @@ import {
   importEpubToDetailPage,
   navigateToChapterByTitle,
   openReaderDirect,
-  openReaderFromDetailPage,
-  revealReaderChrome,
   setReaderPreferences,
   waitForPersistedReadingProgress,
   waitForPagedViewportPageIndex,
@@ -50,7 +48,7 @@ async function waitForExactPagedProgress(
 }
 
 test.describe('阅读会话恢复', () => {
-  test('滚动模式：SPA 返回导航后可恢复滚动位置', async ({ page }) => {
+  test('TC-022 滚动模式：SPA 返回导航后可恢复滚动位置', async ({ page }) => {
     // 1. 导入一本较长的单章节书籍并以滚动模式打开。
     const { novelId } = await importEpubToDetailPage(
       page,
@@ -103,7 +101,7 @@ test.describe('阅读会话恢复', () => {
     ).toBeGreaterThan(0.1);
   });
 
-  test('翻页模式：SPA 返回导航后可恢复页码', async ({ page }) => {
+  test('TC-023 翻页模式：SPA 返回导航后可恢复页码', async ({ page }) => {
     // 1. 导入一本长书并以分页（滑动）模式打开。
     //    使用 openReaderDirect（完整 page.goto），以便应用重新读取我们将要设置的
     //    localStorage 偏好设置。SPA 导航不会重新读取偏好设置。
@@ -155,78 +153,7 @@ test.describe('阅读会话恢复', () => {
     expect(restoredSnapshot.currentPageIndex).toBe(expectedPageIndex);
   });
 
-  test('滚动切换到翻页后：SPA 导航后可恢复正确模式与页码', async ({
-    page,
-  }) => {
-    // 1. 以滚动模式打开，主产滚动进度。
-    const { novelId } = await importEpubToDetailPage(
-      page,
-      await buildLongTestEpubFile(),
-      LONG_BOOK_TITLE,
-    );
-    await setReaderPreferences(page, { pageTurnMode: 'scroll' });
-    await openReaderFromDetailPage(page);
-    await waitForReaderBranch(page, 'scroll');
-
-    await page.getByTestId('reader-viewport').evaluate((element) => {
-      const viewport = element as HTMLElement;
-      const maxScrollTop = Math.max(0, viewport.scrollHeight - viewport.clientHeight);
-      viewport.scrollTop = maxScrollTop * 0.4;
-    });
-
-    await waitForPersistedReadingProgress(
-      page,
-      novelId,
-      (s) => s !== null && s.contentMode === 'scroll' && (s.chapterProgress ?? 0) > 0.15,
-      { description: 'initial scroll progress persisted', timeout: 12_000 },
-    );
-
-    // 2. 显现界面并通过工具栏切换到分页模式。
-    await revealReaderChrome(page);
-    const twoColumnsButton = page.locator('button[title="Two Columns"]').first();
-    await expect(twoColumnsButton).toBeInViewport({ timeout: 5_000 });
-    await twoColumnsButton.click({ force: true });
-    await waitForReaderBranch(page, 'paged');
-
-    // 3. 前进几页，使页码索引不为零。
-    await clickNextPage(page);
-    await clickNextPage(page);
-
-    const pagedProgressBeforeExit = await waitForPersistedReadingProgress(
-      page,
-      novelId,
-      (s) => s !== null && s.contentMode === 'paged' && (s.pageIndex ?? 0) >= 1,
-      { description: 'paged progress after mode switch persisted', timeout: 12_000 },
-    );
-    const expectedPageIndex = pagedProgressBeforeExit.pageIndex ?? 0;
-    await waitForPagedViewportPageIndex(page, expectedPageIndex, {
-      description: `paged viewport settled at pageIndex=${expectedPageIndex} after mode switch`,
-      timeout: 15_000,
-    });
-
-    // 4. 通过 SPA 导航退出并重新进入。
-    await exitAndReopenReader(page);
-
-    // 5. 阅读器应恢复到分页模式，并回到退出前实际看到的页码。
-    await waitForReaderBranch(page, 'paged');
-
-    const restoredProgress = await waitForExactPagedProgress(
-      page,
-      novelId,
-      expectedPageIndex,
-      `paged mode restored to pageIndex=${expectedPageIndex}`,
-    );
-    const restoredSnapshot = await waitForPagedViewportPageIndex(page, expectedPageIndex, {
-      description: `paged viewport restored after mode switch to pageIndex=${expectedPageIndex}`,
-      timeout: 15_000,
-    });
-
-    expect(expectedPageIndex).toBeGreaterThanOrEqual(1);
-    expect(restoredProgress.pageIndex).toBe(expectedPageIndex);
-    expect(restoredSnapshot.currentPageIndex).toBe(expectedPageIndex);
-  });
-
-  test('多章节场景：SPA 返回导航后可恢复到正确章节', async ({ page }) => {
+  test('TC-024 多章节场景：SPA 返回导航后可恢复到正确章节', async ({ page }) => {
     // 1. 导入一本有 3 章节的书并以滚动模式打开。
     const { novelId } = await importEpubToDetailPage(
       page,

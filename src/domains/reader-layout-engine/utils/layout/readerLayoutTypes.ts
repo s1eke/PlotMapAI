@@ -1,7 +1,7 @@
-import type { LayoutCursor, LayoutLine } from '@chenglou/pretext';
 import type {
   PaginationContainer,
   PaginationListContext,
+  ReaderLayoutCursor as SharedReaderLayoutCursor,
   RichBlock,
   RichInline,
   RichTableCell,
@@ -9,8 +9,12 @@ import type {
 } from '@shared/contracts';
 
 export const PAGED_VIEWPORT_TOP_PADDING_PX = 16;
+// 章节标题不来自正文段落；用一个命名哨兵值把这个约定显式化。
+export const CHAPTER_TITLE_PARAGRAPH_INDEX = -1;
 
 export type ReaderRenderVariant = 'original-scroll' | 'original-paged' | 'summary-shell';
+
+export type ReaderLayoutCursor = SharedReaderLayoutCursor;
 
 export interface ReaderLocator {
   chapterIndex: number;
@@ -21,8 +25,8 @@ export interface ReaderLocator {
   imageKey?: string;
   kind: 'heading' | 'text' | 'image';
   lineIndex?: number;
-  startCursor?: LayoutCursor;
-  endCursor?: LayoutCursor;
+  startCursor?: ReaderLayoutCursor;
+  endCursor?: ReaderLayoutCursor;
   edge?: 'start' | 'end';
   pageIndex?: number;
   textQuote?: {
@@ -91,6 +95,9 @@ export interface ReaderLayoutSignature {
   fontSize: number;
   lineSpacing: number;
   paragraphSpacing: number;
+  textLayoutPolicyKey?: string;
+  textLayoutPolicyVersion?: number;
+  richTextStrategyVersion?: number;
 }
 
 export interface ReaderViewportMetrics {
@@ -110,8 +117,19 @@ export interface ReaderImageLayoutConstraints {
   maxImageWidth?: number;
 }
 
-export interface ReaderMeasuredLine extends LayoutLine {
+export interface ReaderMeasuredLine {
+  end: ReaderLayoutCursor;
   lineIndex: number;
+  start: ReaderLayoutCursor;
+  text: string;
+  width: number;
+}
+
+export interface ReaderLineRange {
+  end: ReaderLayoutCursor;
+  lineIndex: number;
+  start: ReaderLayoutCursor;
+  width: number;
 }
 
 export interface VirtualBlockMetrics {
@@ -132,6 +150,7 @@ export interface VirtualBlockMetrics {
   height: number;
   lineHeightPx: number;
   lines: ReaderMeasuredLine[];
+  lineRanges?: ReaderLineRange[];
   marginAfter: number;
   marginBefore: number;
   richLineFragments?: RichInline[][];
@@ -172,6 +191,7 @@ export interface ReaderTextPageItem {
   lineHeightPx: number;
   lineStartIndex: number;
   lines: ReaderMeasuredLine[];
+  lineRanges?: ReaderLineRange[];
   listContext?: PaginationListContext;
   marginAfter: number;
   marginBefore: number;
@@ -257,6 +277,7 @@ export interface PaginatedChapterLayout {
 }
 
 export type StaticTextLine = ReaderMeasuredLine;
+export type StaticTextLineRange = ReaderLineRange;
 export type StaticScrollBlockNode = VirtualBlockMetrics;
 export type StaticPagedNode = ReaderPageItem;
 export type StaticReaderNode = StaticScrollBlockNode | StaticPagedNode;

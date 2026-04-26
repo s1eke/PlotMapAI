@@ -14,7 +14,10 @@ const pagedControllerTestState = vi.hoisted(() => ({
     previousChapterPreview: null,
   },
   currentPagedLocator: null as unknown,
+  pagedLayoutKey: '',
+  pagedLayoutSignature: null as unknown,
   pagedLayoutsByIndex: new Map<number, unknown>(),
+  pagedManifestsByIndex: new Map<number, unknown>(),
   readyChapterIndex: 0,
 }));
 const readerTraceMocks = vi.hoisted(() => ({
@@ -37,15 +40,75 @@ vi.mock('../../paged-runtime/internal', async () => {
   };
 });
 
-vi.mock('../../render-cache/internal', () => ({
-  useReaderRenderCache: vi.fn(() => ({
-    pagedLayouts: pagedControllerTestState.pagedLayoutsByIndex,
-  })),
-}));
+vi.mock('../../render-cache/internal', async () => {
+  const {
+    createReaderLayoutSignature,
+    serializeReaderLayoutSignature,
+  } = await vi.importActual<typeof import('../../layout-core/internal')>(
+    '../../layout-core/internal',
+  );
+  const pagedLayoutSignature = createReaderLayoutSignature({
+    columnCount: 1,
+    columnGap: 0,
+    fontSize: 18,
+    lineSpacing: 1.6,
+    pageHeight: 800,
+    paragraphSpacing: 16,
+    textWidth: 560,
+  });
+  pagedControllerTestState.pagedLayoutKey = serializeReaderLayoutSignature(pagedLayoutSignature);
+  pagedControllerTestState.pagedLayoutSignature = pagedLayoutSignature;
 
-vi.mock('../../layout-core/internal', () => ({
-  resolveCurrentPagedLocator: vi.fn(() => pagedControllerTestState.currentPagedLocator),
-}));
+  return {
+    useReaderRenderCache: vi.fn(() => ({
+      pagedLayoutSignature,
+      pagedLayouts: pagedControllerTestState.pagedLayoutsByIndex,
+      pagedManifests: new Map(
+        [
+          ...pagedControllerTestState.pagedManifestsByIndex.entries(),
+          ...Array.from(
+            pagedControllerTestState.pagedLayoutsByIndex.entries(),
+          ).map(([chapterIndex, layout]) => {
+            const pagedLayout = layout as {
+              pageSlices: Array<{
+                endLocator: ReaderLocator | null;
+                startLocator: ReaderLocator | null;
+              }>;
+            };
+            const firstPage = pagedLayout.pageSlices[0];
+            const lastPage = pagedLayout.pageSlices[pagedLayout.pageSlices.length - 1];
+            return [chapterIndex, {
+              blockCount: 0,
+              blockSummaries: [],
+              chapterIndex,
+              contentHash: `chapter-${chapterIndex}`,
+              endLocator: lastPage?.endLocator ?? null,
+              layoutKey: serializeReaderLayoutSignature(pagedLayoutSignature),
+              layoutSignature: pagedLayoutSignature,
+              pageCount: pagedLayout.pageSlices.length,
+              rendererVersion: 7,
+              scrollHeight: 0,
+              sourceVariants: ['original-paged'] as const,
+              startLocator: firstPage?.startLocator ?? null,
+              status: 'materialized' as const,
+            }];
+          }),
+        ],
+      ),
+    })),
+  };
+});
+
+vi.mock('../../layout-core/internal', async () => {
+  const actual = await vi.importActual<typeof import('../../layout-core/internal')>(
+    '../../layout-core/internal',
+  );
+
+  return {
+    ...actual,
+    resolveCurrentPagedLocator: vi.fn(() => pagedControllerTestState.currentPagedLocator),
+  };
+});
 
 vi.mock('@shared/reader-trace', () => ({
   isReaderTraceEnabled: () => readerTraceMocks.enabled,
@@ -88,6 +151,29 @@ function createPagedLayout(pageCount: number) {
     pageSlices: Array.from({ length: pageCount }, (_, index) => ({
       id: `page-${index}`,
     })),
+  };
+}
+
+function createPagedManifest(
+  chapterIndex: number,
+  pageCount: number,
+  status: 'estimated' | 'materialized' = 'estimated',
+  contentHash = `chapter-${chapterIndex}`,
+) {
+  return {
+    blockCount: status === 'materialized' ? pageCount : 0,
+    blockSummaries: [],
+    chapterIndex,
+    contentHash,
+    endLocator: null,
+    layoutKey: pagedControllerTestState.pagedLayoutKey,
+    layoutSignature: pagedControllerTestState.pagedLayoutSignature,
+    pageCount,
+    rendererVersion: 7,
+    scrollHeight: 0,
+    sourceVariants: ['original-paged'] as const,
+    startLocator: null,
+    status,
   };
 }
 
@@ -202,6 +288,7 @@ describe('usePagedReaderController', () => {
     };
     pagedControllerTestState.currentPagedLocator = null;
     pagedControllerTestState.pagedLayoutsByIndex = new Map();
+    pagedControllerTestState.pagedManifestsByIndex = new Map();
     pagedControllerTestState.readyChapterIndex = 0;
   });
 
@@ -263,6 +350,7 @@ describe('usePagedReaderController', () => {
     });
 
     expect(result.current.pageIndex).toBe(1);
+    expect(result.current.displayPageIndex).toBe(1);
     expect(result.current.pageTurnDirection).toBe('next');
     expect(result.current.pageTurnToken).toBe(1);
     expect(sessionCommands.setChapterIndex).not.toHaveBeenCalled();
@@ -281,6 +369,171 @@ describe('usePagedReaderController', () => {
         }),
       }));
     });
+  });
+
+  it('keeps display totals stable while page counts become exact within the current chapter', () => {
+    pagedControllerTestState.pagedLayoutsByIndex = new Map([
+      [0, createPagedLayout(3)],
+    ]);
+    pagedControllerTestState.readyChapterIndex = 0;
+
+    const { result, rerender, buildProps } = setupHook();
+
+    act(() => {
+      result.current.goToNextPage();
+    });
+
+    expect(result.current.displayPageIndex).toBe(1);
+    expect(result.current.displayPageCount).toBe(4);
+
+    act(() => {
+      pagedControllerTestState.pagedLayoutsByIndex = new Map([
+        [0, createPagedLayout(3)],
+        [1, createPagedLayout(6)],
+      ]);
+      rerender(buildProps());
+    });
+
+    expect(result.current.displayPageIndex).toBe(1);
+    expect(result.current.displayPageCount).toBe(4);
+  });
+
+  it('refreshes the display total once after entering a new chapter', async () => {
+    pagedControllerTestState.pagedLayoutsByIndex = new Map([
+      [0, createPagedLayout(1)],
+    ]);
+    pagedControllerTestState.readyChapterIndex = 0;
+
+    const { result, rerender, buildProps } = setupHook();
+
+    expect(result.current.displayPageCount).toBe(2);
+
+    act(() => {
+      pagedControllerTestState.pagedLayoutsByIndex = new Map([
+        [0, createPagedLayout(1)],
+        [1, createPagedLayout(6)],
+      ]);
+      rerender(buildProps());
+    });
+
+    expect(result.current.displayPageCount).toBe(2);
+
+    act(() => {
+      result.current.goToNextPage();
+    });
+
+    expect(result.current.displayPageIndex).toBe(1);
+    expect(result.current.displayPageCount).toBe(2);
+
+    act(() => {
+      rerender(buildProps({
+        currentChapter: createChapterContent(1, 2),
+        sessionSnapshot: {
+          chapterIndex: 1,
+        },
+      }));
+    });
+
+    await waitFor(() => {
+      expect(result.current.displayPageCount).toBe(7);
+    });
+    expect(result.current.displayPageIndex).toBe(1);
+
+    act(() => {
+      pagedControllerTestState.pagedLayoutsByIndex = new Map([
+        [0, createPagedLayout(1)],
+        [1, createPagedLayout(8)],
+      ]);
+      pagedControllerTestState.readyChapterIndex = 1;
+      rerender(buildProps({
+        currentChapter: createChapterContent(1, 2),
+        sessionSnapshot: {
+          chapterIndex: 1,
+        },
+      }));
+    });
+
+    expect(result.current.displayPageCount).toBe(7);
+
+    act(() => {
+      result.current.goToNextPage();
+    });
+
+    expect(result.current.displayPageIndex).toBe(2);
+    expect(result.current.displayPageCount).toBe(7);
+
+    act(() => {
+      result.current.goToPrevPage();
+    });
+
+    expect(result.current.displayPageIndex).toBe(1);
+    expect(result.current.displayPageCount).toBe(7);
+  });
+
+  it('does not downgrade exact chapter page counts when a visited chapter leaves the visible layout window', () => {
+    pagedControllerTestState.pagedLayoutsByIndex = new Map([
+      [0, createPagedLayout(1)],
+      [1, createPagedLayout(6)],
+    ]);
+    pagedControllerTestState.readyChapterIndex = 0;
+
+    const { result, rerender, buildProps } = setupHook();
+
+    expect(result.current.displayPageCount).toBe(7);
+
+    act(() => {
+      pagedControllerTestState.pagedLayoutsByIndex = new Map([
+        [0, createPagedLayout(1)],
+      ]);
+      pagedControllerTestState.pagedManifestsByIndex = new Map([
+        [1, createPagedManifest(1, 1, 'estimated')],
+      ]);
+      rerender(buildProps());
+    });
+
+    act(() => {
+      result.current.goToNextPage();
+    });
+
+    expect(result.current.displayPageIndex).toBe(1);
+    expect(result.current.displayPageCount).toBe(7);
+  });
+
+  it('decrements only the display current page during continuous previous-page turns', () => {
+    pagedControllerTestState.pagedLayoutsByIndex = new Map([
+      [0, createPagedLayout(3)],
+    ]);
+    pagedControllerTestState.readyChapterIndex = 0;
+
+    const { result } = setupHook();
+
+    act(() => {
+      result.current.goToNextPage();
+    });
+
+    act(() => {
+      result.current.goToPrevPage();
+    });
+
+    expect(result.current.pageIndex).toBe(0);
+    expect(result.current.displayPageIndex).toBe(0);
+  });
+
+  it('recalibrates the display current page for directory chapter jumps', () => {
+    pagedControllerTestState.pagedLayoutsByIndex = new Map([
+      [0, createPagedLayout(3)],
+      [1, createPagedLayout(2)],
+    ]);
+    pagedControllerTestState.readyChapterIndex = 0;
+
+    const { result } = setupHook();
+
+    act(() => {
+      result.current.goToChapter(1, 'end');
+    });
+
+    expect(result.current.displayPageIndex).toBe(4);
+    expect(result.current.displayPageCount).toBe(5);
   });
 
   it('synchronizes the runtime paged state immediately when layout-driven restores update the page index', async () => {
@@ -316,7 +569,8 @@ describe('usePagedReaderController', () => {
     ]);
     pagedControllerTestState.readyChapterIndex = 0;
 
-    const { beforeChapterChange, contextValue, result, sessionCommands } = setupHook();
+    const { beforeChapterChange, buildProps, contextValue, rerender, result, sessionCommands } =
+      setupHook();
 
     act(() => {
       result.current.goToNextPage();
@@ -327,6 +581,7 @@ describe('usePagedReaderController', () => {
     expect(contextValue.getChapterChangeSource()).toBe('navigation');
     expect(contextValue.getPendingPageTarget()).toBe('start');
     expect(result.current.pendingPageTarget).toBe('start');
+    expect(result.current.displayPageIndex).toBe(1);
     expect(sessionCommands.setChapterIndex).toHaveBeenCalledWith(1);
     expect(sessionCommands.persistReaderState).toHaveBeenLastCalledWith({
       canonical: {
@@ -335,9 +590,20 @@ describe('usePagedReaderController', () => {
       },
       hints: {
         chapterProgress: undefined,
+        pageIndex: undefined,
         contentMode: 'paged',
       },
     });
+    act(() => {
+      pagedControllerTestState.readyChapterIndex = 1;
+      rerender(buildProps({
+        currentChapter: createChapterContent(1, 2),
+        sessionSnapshot: {
+          chapterIndex: 1,
+        },
+      }));
+    });
+    expect(result.current.displayPageIndex).toBe(1);
     expect(result.current.pageTurnDirection).toBe('next');
     expect(result.current.pageTurnToken).toBe(1);
   });

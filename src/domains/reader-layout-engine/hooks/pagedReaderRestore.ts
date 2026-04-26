@@ -133,7 +133,13 @@ export function attemptPagedRestore({
       let resolvedTargetPage: number | null = null;
       const targetLocator = getReaderRestoreTargetLocator(target);
       const targetBoundary = getReaderRestoreTargetBoundary(target);
-      if (targetLocator) {
+      if (typeof target.pageIndex === 'number') {
+        resolvedTargetPage = Math.max(
+          0,
+          Math.min(totalPages - 1, Math.floor(target.pageIndex)),
+        );
+      }
+      if (resolvedTargetPage === null && targetLocator) {
         const resolvedLocatorPageIndex = layout
           ? findPageIndexForLocator(layout, targetLocator)
           : null;

@@ -2,6 +2,7 @@ import type { ChapterContent } from '@shared/contracts/reader';
 import type { ReaderImageDimensions } from '@domains/reader-media';
 import type {
   MeasuredChapterLayout,
+  ReaderMeasuredLine,
   ReaderImageLayoutConstraints,
   ReaderTypographyMetrics,
   VirtualBlockMetrics,
@@ -21,6 +22,10 @@ import {
 } from '../layout/richScroll';
 import { getRichInlinePlainText } from '@shared/text-processing';
 import { createRichLineFragments } from '../typography/richLineFragments';
+import {
+  createHeadingTextPrepareOptions,
+  DEFAULT_READER_TEXT_PREPARE_OPTIONS,
+} from '../layout/readerTextPolicy';
 
 import { measureCaptionLines, measureTableRows } from './readerBlockMeasurement';
 import { browserReaderTextLayoutEngine } from './readerTextMeasurement';
@@ -56,6 +61,9 @@ export function measureReaderBlocks(params: {
       const maxWidth = params.richAware
         ? getRichScrollHorizontalTextWidth(block, params.width)
         : params.width;
+      const prepareOptions = block.kind === 'heading'
+        ? createHeadingTextPrepareOptions(fontSizePx)
+        : DEFAULT_READER_TEXT_PREPARE_OPTIONS;
 
       if (block.renderRole === 'table' && block.tableRows) {
         const tableMetrics = measureTableRows({
@@ -106,15 +114,42 @@ export function measureReaderBlocks(params: {
             inlines: block.richChildren,
             lineHeightPx,
             maxWidth,
+            prepareOptions,
           })
           : null;
-        const lines = richLayout?.lines ?? params.textLayoutEngine.layoutLines({
+        const lineRanges = richLayout ? null : params.textLayoutEngine.walkLineRanges?.({
           font,
           fontSizePx,
-          lineHeightPx,
           maxWidth,
+          prepareOptions,
           text: block.text ?? '',
-        });
+        }) ?? null;
+        const rangeMaterializedLines = lineRanges && params.textLayoutEngine.materializeLineRange
+          ? lineRanges.map((range) => params.textLayoutEngine.materializeLineRange?.({
+            font,
+            fontSizePx,
+            lineHeightPx,
+            maxWidth,
+            prepareOptions,
+            range,
+            text: block.text ?? '',
+          }) ?? null)
+          : null;
+        const materializedLines = rangeMaterializedLines
+          ? rangeMaterializedLines.filter((line): line is ReaderMeasuredLine => Boolean(line))
+          : null;
+        const lines = richLayout?.lines ?? (
+          lineRanges && materializedLines && materializedLines.length === lineRanges.length
+            ? materializedLines
+            : params.textLayoutEngine.layoutLines({
+              font,
+              fontSizePx,
+              lineHeightPx,
+              maxWidth,
+              prepareOptions,
+              text: block.text ?? '',
+            })
+        );
         const contentHeight = lines.length * lineHeightPx;
 
         blockMetrics = {
@@ -126,6 +161,7 @@ export function measureReaderBlocks(params: {
           height: block.marginBefore + contentHeight + block.marginAfter,
           lineHeightPx,
           lines,
+          lineRanges: lineRanges ?? undefined,
           marginAfter: block.marginAfter,
           marginBefore: block.marginBefore,
           richLineFragments: richLayout?.richLineFragments

@@ -252,6 +252,65 @@ export function findVisibleBlockRange(
   };
 }
 
+export function findVisibleBlockRangeFromBlockSummaries(
+  blockSummaries: Array<{ height: number; startOffset: number }>,
+  totalHeight: number,
+  offsetTop: number,
+  viewportHeight: number,
+  overscanPx: number,
+): VisibleBlockRange {
+  if (blockSummaries.length === 0) {
+    return {
+      endIndex: -1,
+      startIndex: 0,
+    };
+  }
+
+  const viewportStart = offsetTop - overscanPx;
+  const viewportEnd = offsetTop + viewportHeight + overscanPx;
+  if (viewportEnd <= 0 || viewportStart >= totalHeight) {
+    return {
+      endIndex: -1,
+      startIndex: 0,
+    };
+  }
+
+  const clampedViewportStart = Math.max(0, viewportStart);
+  const clampedViewportEnd = Math.min(totalHeight, viewportEnd);
+  if (clampedViewportEnd <= clampedViewportStart) {
+    return {
+      endIndex: -1,
+      startIndex: 0,
+    };
+  }
+
+  let startIndex = -1;
+  let endIndex = -1;
+  for (let index = 0; index < blockSummaries.length; index += 1) {
+    const summary = blockSummaries[index];
+    const blockStart = summary.startOffset;
+    const blockEnd = summary.startOffset + summary.height;
+    if (startIndex === -1 && blockEnd >= clampedViewportStart) {
+      startIndex = index;
+    }
+    if (blockStart <= clampedViewportEnd) {
+      endIndex = index;
+    }
+  }
+
+  if (startIndex === -1 || endIndex === -1 || endIndex < startIndex) {
+    return {
+      endIndex: -1,
+      startIndex: 0,
+    };
+  }
+
+  return {
+    endIndex,
+    startIndex,
+  };
+}
+
 export function findLocatorForLayoutOffset(
   layout: MeasuredChapterLayout,
   offsetTop: number,

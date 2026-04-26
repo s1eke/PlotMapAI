@@ -10,7 +10,7 @@ import { shouldUseRichScrollBlocks } from '../layout/richScroll';
 
 export const READER_RENDER_CACHE_PERSISTED_LIMIT = 240;
 export const READER_RENDER_CACHE_TTL_MS = 14 * 24 * 60 * 60 * 1000;
-export const READER_RENDERER_VERSION = 6;
+export const READER_RENDERER_VERSION = 7;
 
 export type ReaderRenderCacheSource = 'memory' | 'dexie' | 'built';
 export type ReaderRenderStorageKind = 'render-tree' | 'manifest';
