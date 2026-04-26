@@ -265,8 +265,12 @@ export function useReaderRenderCache({
       return;
     }
 
+    if (!visibleTargetKeys.has(`${entry.chapterIndex}:${entry.variantFamily}`)) {
+      return;
+    }
+
     setCacheRevision((previous) => previous + 1);
-  }, []);
+  }, [visibleTargetKeys]);
 
   const { isPreheating, pendingPreheatCount } = useReaderRenderPreheater({
     currentChapterIndex,

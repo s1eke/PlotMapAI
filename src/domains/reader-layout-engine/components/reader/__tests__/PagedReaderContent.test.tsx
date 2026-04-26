@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createReaderContextWrapper } from '@test/readerRuntimeTestUtils';
 
@@ -273,10 +273,13 @@ function buildPagedContentProps(
     viewportMetrics.pagedColumnCount,
     viewportMetrics.pagedColumnGap,
   );
+  const currentLayout = overrides.currentLayout ?? defaultLayout;
 
   return {
     chapter,
-    currentLayout: overrides.currentLayout ?? defaultLayout,
+    currentLayout,
+    displayPageCount: currentLayout.pageSlices.length,
+    displayPageIndex: 0,
     novelId: 1,
     pageIndex: 0,
     pagedViewportRef: { current: null },
@@ -305,12 +308,20 @@ function renderPagedContent(
   });
 }
 
-function buildMultiPageLayout() {
+function buildMultiPageLayout({
+  chapterIndex = 0,
+  totalChapters = 1,
+}: {
+  chapterIndex?: number;
+  totalChapters?: number;
+} = {}) {
   const chapter = createChapter({
+    index: chapterIndex,
     plainText: Array.from(
       { length: 14 },
       (_, paragraphIndex) => `Paragraph ${paragraphIndex + 1} ${'alpha beta gamma delta epsilon '.repeat(8)}`,
     ).join('\n'),
+    totalChapters,
     wordCount: 1600,
   });
   const viewportMetrics = createReaderViewportMetrics(720, 1200, 720, 1200, 18);
@@ -701,17 +712,205 @@ describe('PagedReaderContent', () => {
     expect(screen.getByText(`1 / ${currentLayout.pageSlices.length}`)).toBeInTheDocument();
   });
 
+  it('renders the full-book display page indicator', () => {
+    const { chapter, currentLayout } = buildMultiPageLayout({
+      chapterIndex: 1,
+      totalChapters: 3,
+    });
+    const localPageCount = currentLayout.pageSlices.length;
+
+    const { container } = renderPagedContent({
+      chapter,
+      currentLayout,
+      displayPageCount: 18,
+      displayPageIndex: 6,
+      pageIndex: 1,
+    });
+
+    expect(screen.getByText('7 / 18')).toBeInTheDocument();
+    expect(screen.queryByText(`2 / ${localPageCount}`)).not.toBeInTheDocument();
+    const pageFrame = container.querySelector('[data-testid="paged-reader-page-frame"]');
+    expect(pageFrame).toHaveAttribute('data-page-index', '1');
+    expect(pageFrame).toHaveAttribute('data-page-count', String(localPageCount));
+    expect(pageFrame).toHaveAttribute('data-indicator-page-index', '6');
+    expect(pageFrame).toHaveAttribute('data-indicator-page-count', '18');
+  });
+
+  it('keeps the display page indicator outside animated page frames', () => {
+    const { chapter, currentLayout } = buildMultiPageLayout();
+
+    const { container } = renderPagedContent({
+      chapter,
+      currentLayout,
+      displayPageCount: 18,
+      displayPageIndex: 6,
+      pageIndex: 1,
+      pageTurnDirection: 'prev',
+      pageTurnToken: 2,
+    });
+
+    expect(screen.getAllByText('7 / 18')).toHaveLength(1);
+    const pageFrame = container.querySelector('[data-testid="paged-reader-page-frame"]');
+    const frameHeader = pageFrame?.firstElementChild?.firstElementChild;
+    expect(frameHeader).toBeInstanceOf(HTMLElement);
+    expect(within(frameHeader as HTMLElement).queryByText('7 / 18')).not.toBeInTheDocument();
+  });
+
   it('renders the pending end target page while parent pageIndex is still stale after a previous-chapter transition', () => {
     const { chapter, currentLayout } = buildMultiPageLayout();
 
     renderPagedContent({
       chapter,
       currentLayout,
+      displayPageIndex: currentLayout.pageSlices.length - 1,
       pageIndex: 0,
       pendingPageTarget: 'end',
     });
 
     expect(screen.getByText(`${currentLayout.pageSlices.length} / ${currentLayout.pageSlices.length}`)).toBeInTheDocument();
+  });
+
+  it('does not derive the display page from stale local pending target props', () => {
+    const { chapter, currentLayout } = buildMultiPageLayout();
+
+    renderPagedContent({
+      chapter,
+      currentLayout,
+      displayPageCount: 18,
+      displayPageIndex: 9,
+      pageIndex: 0,
+      pendingPageTarget: 'end',
+    });
+
+    expect(screen.getByText('10 / 18')).toBeInTheDocument();
+    expect(screen.queryByText(`1 / ${currentLayout.pageSlices.length}`)).not.toBeInTheDocument();
+  });
+
+  it('uses the controller-calibrated display page for a pending end target', () => {
+    const { chapter, currentLayout } = buildMultiPageLayout({
+      chapterIndex: 1,
+      totalChapters: 3,
+    });
+
+    renderPagedContent({
+      chapter,
+      currentLayout,
+      displayPageCount: 18,
+      displayPageIndex: 8,
+      pageIndex: 0,
+      pendingPageTarget: 'end',
+    });
+
+    expect(screen.getByText('9 / 18')).toBeInTheDocument();
+    expect(screen.queryByText('1 / 18')).not.toBeInTheDocument();
+  });
+
+  it('renders the next-chapter drag preview with the next display page indicator', () => {
+    const current = buildMultiPageLayout({
+      chapterIndex: 1,
+      totalChapters: 3,
+    });
+    const next = buildMultiPageLayout({
+      chapterIndex: 2,
+      totalChapters: 3,
+    });
+    const currentLastPageIndex = current.currentLayout.pageSlices.length - 1;
+    const { container } = renderPagedContent({
+      chapter: current.chapter,
+      currentLayout: current.currentLayout,
+      displayPageCount: 18,
+      displayPageIndex: 9,
+      nextChapterPreview: next.chapter,
+      nextLayout: next.currentLayout,
+      onRequestNextPage: vi.fn(),
+      pageIndex: currentLastPageIndex,
+    });
+    const interactiveLayer = getPagedInteractiveLayer(container);
+
+    fireEvent.pointerDown(interactiveLayer, {
+      buttons: 1,
+      clientX: 420,
+      clientY: 240,
+      pointerId: 1,
+      pointerType: 'touch',
+    });
+    fireEvent.pointerMove(interactiveLayer, {
+      buttons: 1,
+      clientX: 180,
+      clientY: 240,
+      pointerId: 1,
+      pointerType: 'touch',
+    });
+
+    const previewFrame = Array.from(
+      container.querySelectorAll('[data-testid="paged-reader-page-frame"]'),
+    ).find((element) => element.getAttribute('data-page-index') === '0');
+    expect(previewFrame).toHaveAttribute(
+      'data-indicator-page-index',
+      '10',
+    );
+    expect(previewFrame).toHaveAttribute('data-indicator-page-count', '18');
+  });
+
+  it('keeps a committed drag preview on the target display page after parent state advances', () => {
+    vi.useFakeTimers();
+    const { chapter, currentLayout } = buildMultiPageLayout();
+    const onRequestNextPage = vi.fn();
+    const initialProps = buildPagedContentProps({
+      chapter,
+      currentLayout,
+      displayPageCount: 150,
+      displayPageIndex: 99,
+      onRequestNextPage,
+      pageIndex: 0,
+    });
+    const { Wrapper } = createReaderContextWrapper();
+    const rendered = render(<PagedReaderContent {...initialProps} />, {
+      wrapper: Wrapper,
+    });
+    const interactiveLayer = getPagedInteractiveLayer(rendered.container);
+
+    fireEvent.pointerDown(interactiveLayer, {
+      buttons: 1,
+      clientX: 420,
+      clientY: 240,
+      pointerId: 1,
+      pointerType: 'touch',
+    });
+    fireEvent.pointerMove(interactiveLayer, {
+      buttons: 1,
+      clientX: 180,
+      clientY: 240,
+      pointerId: 1,
+      pointerType: 'touch',
+    });
+
+    const livePreviewFrame = Array.from(
+      rendered.container.querySelectorAll('[data-testid="paged-reader-page-frame"]'),
+    ).find((element) => element.getAttribute('data-page-index') === '1');
+    expect(livePreviewFrame).toHaveAttribute('data-indicator-page-index', '100');
+
+    fireEvent.pointerUp(interactiveLayer, {
+      clientX: 180,
+      clientY: 240,
+      pointerId: 1,
+      pointerType: 'touch',
+    });
+
+    expect(onRequestNextPage).toHaveBeenCalledTimes(1);
+    rendered.rerender(
+      <PagedReaderContent
+        {...initialProps}
+        displayPageIndex={100}
+        pageIndex={1}
+      />,
+    );
+
+    const committedPreviewFrame = Array.from(
+      rendered.container.querySelectorAll('[data-testid="paged-reader-page-frame"]'),
+    ).find((element) => element.getAttribute('data-page-index') === '1');
+    expect(committedPreviewFrame).toHaveAttribute('data-indicator-page-index', '100');
+    expect(screen.queryByText('102 / 150')).not.toBeInTheDocument();
   });
 
   it('renders one compact text node per paged fragment instead of one node per line', () => {
@@ -768,6 +967,8 @@ describe('PagedReaderContent', () => {
       <PagedReaderContent
         chapter={chapter}
         currentLayout={updatedLayout}
+        displayPageCount={updatedLayout.pageSlices.length}
+        displayPageIndex={0}
         novelId={1}
         pageIndex={0}
         pagedViewportRef={{ current: null }}

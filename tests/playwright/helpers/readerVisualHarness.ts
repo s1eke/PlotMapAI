@@ -176,6 +176,9 @@ export interface ReaderViewportSnapshot {
   currentPage: number | null;
   currentPageIndex: number | null;
   hasPagedInteractive: boolean;
+  indicatorPage: number | null;
+  indicatorPageCount: number | null;
+  indicatorPageIndex: number | null;
   maxScrollTop: number | null;
   overflowY: string | null;
   pageCount: number | null;
@@ -358,9 +361,30 @@ export async function readReaderViewportSnapshot(page: Page): Promise<ReaderView
       pageIndicator = indicatorText ?? null;
     }
 
+    const readDataNumber = (name: string): number | null => {
+      if (!(pageFrame instanceof HTMLElement)) {
+        return null;
+      }
+      const rawValue = pageFrame.dataset[name];
+      if (rawValue === undefined || rawValue.trim() === '') {
+        return null;
+      }
+      const parsedValue = Number(rawValue);
+      return Number.isFinite(parsedValue) ? parsedValue : null;
+    };
     const pageMatch = pageIndicator?.match(/^(\d+)\s*\/\s*(\d+)$/u) ?? null;
-    const currentPage = pageMatch ? Number(pageMatch[1]) : null;
-    const pageCount = pageMatch ? Number(pageMatch[2]) : null;
+    const dataIndicatorPageIndex = readDataNumber('indicatorPageIndex');
+    const dataIndicatorPageCount = readDataNumber('indicatorPageCount');
+    const indicatorPageIndex = pageMatch
+      ? Number(pageMatch[1]) - 1
+      : dataIndicatorPageIndex;
+    const indicatorPageCount = pageMatch ? Number(pageMatch[2]) : dataIndicatorPageCount;
+    const indicatorPage = indicatorPageIndex === null ? null : indicatorPageIndex + 1;
+    const localPageIndex = readDataNumber('pageIndex');
+    const localPageCount = readDataNumber('pageCount');
+    const currentPageIndex = localPageIndex ?? indicatorPageIndex;
+    const pageCount = localPageCount ?? indicatorPageCount;
+    const currentPage = currentPageIndex === null ? null : currentPageIndex + 1;
 
     return {
       branch,
@@ -368,6 +392,9 @@ export async function readReaderViewportSnapshot(page: Page): Promise<ReaderView
       currentPage,
       currentPageIndex: currentPage === null ? null : currentPage - 1,
       hasPagedInteractive: Boolean(pagedInteractive),
+      indicatorPage,
+      indicatorPageCount,
+      indicatorPageIndex,
       maxScrollTop,
       overflowY: style?.overflowY ?? null,
       pageCount,

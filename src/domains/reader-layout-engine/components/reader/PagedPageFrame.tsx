@@ -18,6 +18,8 @@ import ReaderPageHeader from './ReaderPageHeader';
 interface PagedPageFrameProps {
   chapter: ChapterContent;
   headerBgClassName: string;
+  indicatorPageCount?: number;
+  indicatorPageIndex?: number;
   layout: PaginatedChapterLayout;
   novelId: number;
   onImageActivate?: (payload: ReaderImageActivationPayload) => void;
@@ -34,12 +36,15 @@ interface PagedPageFrameProps {
   readerTheme: string;
   rootClassName: string;
   rootStyle: CSSProperties;
+  showPageIndicator?: boolean;
   textClassName: string;
 }
 
 export function PagedPageFrame({
   chapter,
   headerBgClassName,
+  indicatorPageCount,
+  indicatorPageIndex,
   layout,
   novelId,
   onImageActivate,
@@ -53,20 +58,35 @@ export function PagedPageFrame({
   readerTheme,
   rootClassName,
   rootStyle,
+  showPageIndicator = true,
   textClassName,
 }: PagedPageFrameProps) {
+  const hasIndicatorPage =
+    typeof indicatorPageCount === 'number'
+    && typeof indicatorPageIndex === 'number'
+    && indicatorPageCount > 0;
+  const resolvedIndicatorPageCount = hasIndicatorPage ? indicatorPageCount : pageCount;
+  const resolvedIndicatorPageIndex = hasIndicatorPage ? indicatorPageIndex : pageIndex;
+
   return (
     <div
       data-testid="paged-reader-page-frame"
+      data-indicator-page-count={resolvedIndicatorPageCount}
+      data-indicator-page-index={resolvedIndicatorPageIndex}
+      data-page-count={pageCount}
+      data-page-index={pageIndex}
       className={cn(rootClassName, 'flex h-full w-full flex-col')}
       style={rootStyle}
     >
       <div className={cn(READER_CONTENT_CLASS_NAMES.chapter, 'flex h-full w-full flex-col')}>
         <ReaderPageHeader
           headerBgClassName={headerBgClassName}
+          indicatorPageCount={resolvedIndicatorPageCount}
+          indicatorPageIndex={resolvedIndicatorPageIndex}
           pageCount={pageCount}
           pageIndex={pageIndex}
           readerTheme={readerTheme}
+          showPageIndicator={showPageIndicator}
           textClassName={textClassName}
           title={chapter.title}
         />

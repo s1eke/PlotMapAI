@@ -4,9 +4,12 @@ import { cn } from '@shared/utils/cn';
 interface ReaderPageHeaderProps {
   className?: string;
   headerBgClassName: string;
+  indicatorPageCount?: number;
+  indicatorPageIndex?: number;
   pageCount?: number;
   pageIndex?: number;
   readerTheme: string;
+  showPageIndicator?: boolean;
   textClassName: string;
   title: string;
 }
@@ -14,16 +17,27 @@ interface ReaderPageHeaderProps {
 export default function ReaderPageHeader({
   className,
   headerBgClassName,
+  indicatorPageCount,
+  indicatorPageIndex,
   pageCount,
   pageIndex,
   readerTheme,
+  showPageIndicator = true,
   textClassName,
   title,
 }: ReaderPageHeaderProps) {
+  const hasIndicatorPage =
+    typeof indicatorPageCount === 'number'
+    && typeof indicatorPageIndex === 'number'
+    && indicatorPageCount > 0;
+  const displayPageCount = hasIndicatorPage ? indicatorPageCount : pageCount;
+  const displayPageIndex = hasIndicatorPage ? indicatorPageIndex : pageIndex;
   const shouldShowPageIndicator =
-    typeof pageCount === 'number'
-    && typeof pageIndex === 'number'
-    && pageCount > 1;
+    showPageIndicator
+    &&
+    typeof displayPageCount === 'number'
+    && typeof displayPageIndex === 'number'
+    && displayPageCount > 0;
 
   return (
     <div
@@ -40,7 +54,7 @@ export default function ReaderPageHeader({
         </h1>
         {shouldShowPageIndicator ? (
           <div className="shrink-0 whitespace-nowrap text-xs font-medium text-text-secondary">
-            {pageIndex + 1} / {pageCount}
+            {displayPageIndex + 1} / {displayPageCount}
           </div>
         ) : null}
       </div>

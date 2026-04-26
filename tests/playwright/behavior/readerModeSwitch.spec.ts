@@ -7,6 +7,7 @@ import {
   enableReaderTrace,
   exitAndReopenReader,
   importFixtureToDetailPage,
+  navigateToChapterByTitle,
   openReaderFromDetailPage,
   readPersistedReadingProgress,
   readReaderViewportSnapshot,
@@ -758,6 +759,43 @@ test.describe('阅读模式切换回归', () => {
     assertContentAnchorStable(reloadedAnchor, baselineAnchor!, 'final reload');
   });
 
+  test('多章节翻页模式显示全书页码并保留章节内页码数据', async ({
+    page,
+  }) => {
+    const { novelId } = await importFixtureToDetailPage(page, 'multiChapterRich');
+    await openReaderFromDetailPage(page);
+    await waitForReaderBranch(page, 'scroll');
+
+    await navigateToChapterByTitle(page, 'chapter-2.xhtml');
+    await waitForPersistedReadingProgress(
+      page,
+      novelId,
+      (snapshot) => snapshot?.canonical.chapterIndex === 1,
+      {
+        description: 'waiting for chapter 2 after TOC navigation',
+        timeout: 12_000,
+      },
+    );
+
+    await clickToolbarMode(page, 'Two Columns');
+    await waitForReaderBranch(page, 'paged');
+    await waitForPagedProgressPersistence(page, novelId);
+
+    await expect.poll(async () => {
+      const snapshot = await readReaderViewportSnapshot(page);
+      return snapshot.branch === 'paged'
+        && snapshot.currentPageIndex !== null
+        && snapshot.pageCount !== null
+        && snapshot.indicatorPageIndex !== null
+        && snapshot.indicatorPageCount !== null
+        && snapshot.indicatorPageCount > snapshot.pageCount
+        && snapshot.indicatorPageIndex > snapshot.currentPageIndex;
+    }, {
+      message: 'full-book page indicator should be ahead of chapter-local page data in chapter 2',
+      timeout: 15_000,
+    }).toBe(true);
+  });
+
   test('多章节书籍在模式切换后仍保持位置', async ({
     page,
   }, testInfo) => {
@@ -846,6 +884,22 @@ test.describe('阅读模式切换回归', () => {
 
       // Page index must be a valid number (may be 0 if at chapter start)
       expect(pagedPersistedProgress.pageIndex).not.toBeNull();
+
+      if (iteration === 0) {
+        await expect.poll(async () => {
+          const snapshot = await readReaderViewportSnapshot(page);
+          return snapshot.branch === 'paged'
+            && snapshot.currentPageIndex !== null
+            && snapshot.pageCount !== null
+            && snapshot.indicatorPageIndex !== null
+            && snapshot.indicatorPageCount !== null
+            && snapshot.indicatorPageCount > snapshot.pageCount
+            && snapshot.indicatorPageIndex > snapshot.currentPageIndex;
+        }, {
+          message: 'paged header shows full-book page numbers while local page data stays chapter-scoped',
+          timeout: 15_000,
+        }).toBe(true);
+      }
 
       // Canonical block must be near baseline
       assertCanonicalNearBaseline(

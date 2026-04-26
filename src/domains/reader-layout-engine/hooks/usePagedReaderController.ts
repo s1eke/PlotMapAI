@@ -9,9 +9,7 @@ import {
 import { createCanonicalPositionFromNavigationIntent } from '@shared/utils/readerPosition';
 import {
   findPageIndexForLocator,
-  resolveGlobalPagePosition,
   resolveCurrentPagedLocator,
-  toGlobalPageIndex,
 } from '../layout-core/internal';
 import {
   usePagedChapterPreviews,
@@ -72,10 +70,6 @@ export function usePagedReaderController({
     usePagedReaderPageTurnState();
   const [pagedContentElement, setPagedContentElement] = useState<HTMLDivElement | null>(null);
   const [pagedViewportElement, setPagedViewportElement] = useState<HTMLDivElement | null>(null);
-  const pendingExactPageNavigationRef = useRef<{
-    pageIndex: number;
-    targetIndex: number;
-  } | null>(null);
   const replayDirectionalNavigationRef = useRef<DirectionalNavigationReplay>(() => {});
   usePagedReaderDisabledReset({
     enabled,
@@ -140,15 +134,26 @@ export function usePagedReaderController({
   const effectivePageCount = currentPagedLayout
     ? Math.max(1, currentPagedLayout.pageSlices.length)
     : pageCount;
-  const { globalPageCount, globalPageIndex, pagedNovelFlowIndex } =
+  const {
+    calibrateDisplayPage,
+    displayPageCount,
+    displayPageIndex,
+    displayPageState,
+    incrementDisplayPage,
+    pagedNovelFlowIndex,
+    suppressNextChapterCalibration,
+    suppressNextPageIndexCalibration,
+  } =
     usePagedReaderFlowProjection({
       chapterCount: chapters.length,
       chapterIndex,
-      effectivePageCount,
+      chapters,
+      currentChapterIndex: currentChapter?.index ?? null,
       enabled,
       novelId,
       pageIndex,
       renderCache,
+      sessionLocator,
     });
   const effectivePageCountRef = useRef(effectivePageCount);
   effectivePageCountRef.current = effectivePageCount;
@@ -222,26 +227,13 @@ export function usePagedReaderController({
       return false;
     }
 
-    const exactPageNavigation = pendingExactPageNavigationRef.current?.targetIndex === targetIndex
-      ? pendingExactPageNavigationRef.current
-      : null;
-    pendingExactPageNavigationRef.current = null;
-    const exactPageIndex = exactPageNavigation
-      ? Math.max(0, Math.floor(exactPageNavigation.pageIndex))
-      : null;
     beforeChapterChange?.();
     userInteractedRef.current = true;
     navigation.setChapterChangeSource('navigation');
-    navigation.setPendingPageIndex(exactPageIndex);
+    navigation.setPendingPageIndex(null);
     navigation.setPendingPageTarget(pageTarget);
     setPendingPageTarget(pageTarget);
     setChapterIndex(targetIndex);
-    const exactGlobalPageIndex = exactPageIndex === null || !pagedNovelFlowIndex
-      ? null
-      : toGlobalPageIndex(pagedNovelFlowIndex, {
-        chapterIndex: targetIndex,
-        localPageIndex: exactPageIndex,
-      });
     persistReaderState({
       canonical: createCanonicalPositionFromNavigationIntent({
         chapterIndex: targetIndex,
@@ -249,14 +241,7 @@ export function usePagedReaderController({
       }),
       hints: {
         chapterProgress: undefined,
-        globalFlow: exactGlobalPageIndex === null || !pagedNovelFlowIndex
-          ? undefined
-          : {
-            globalPageIndex: exactGlobalPageIndex,
-            layoutKey: pagedNovelFlowIndex.layoutKey,
-            sourceMode: 'paged',
-          },
-        pageIndex: exactPageIndex ?? undefined,
+        pageIndex: undefined,
         contentMode: 'paged',
       },
     });
@@ -265,7 +250,6 @@ export function usePagedReaderController({
     beforeChapterChange,
     chapters.length,
     navigation,
-    pagedNovelFlowIndex,
     persistReaderState,
     setChapterIndex,
     userInteractedRef,
@@ -291,42 +275,18 @@ export function usePagedReaderController({
       return false;
     }
 
-    const currentGlobalPageIndex = pagedNovelFlowIndex
-      ? toGlobalPageIndex(pagedNovelFlowIndex, {
-        chapterIndex,
-        localPageIndex: pageIndex,
-      })
-      : null;
-    const nextGlobalPosition = currentGlobalPageIndex === null || !pagedNovelFlowIndex
-      ? null
-      : resolveGlobalPagePosition(pagedNovelFlowIndex, currentGlobalPageIndex + 1);
-    if (nextGlobalPosition) {
-      if (nextGlobalPosition.chapterIndex === chapterIndex) {
-        if (nextGlobalPosition.localPageIndex !== pageIndex) {
-          hasPagedNavigationSinceLastPersistRef.current = true;
-          setPageIndexAndSyncRuntime(nextGlobalPosition.localPageIndex);
-          return true;
-        }
-      } else if (allowChapterTransition) {
-        pendingExactPageNavigationRef.current = {
-          pageIndex: nextGlobalPosition.localPageIndex,
-          targetIndex: nextGlobalPosition.chapterIndex,
-        };
-        requestChapterNavigation(
-          nextGlobalPosition.chapterIndex,
-          nextGlobalPosition.localPageIndex === 0 ? 'start' : 'end',
-        );
-        return true;
-      }
-    }
-
     if (pageIndex < effectivePageCount - 1) {
       hasPagedNavigationSinceLastPersistRef.current = true;
+      suppressNextPageIndexCalibration();
       setPageIndexAndSyncRuntime((previousPageIndex) => previousPageIndex + 1);
+      incrementDisplayPage(1);
       return true;
     }
 
     if (allowChapterTransition && currentChapter.hasNext && chapterIndex < chapters.length - 1) {
+      suppressNextChapterCalibration();
+      suppressNextPageIndexCalibration();
+      incrementDisplayPage(1);
       requestChapterNavigation(chapterIndex + 1, 'start');
       return true;
     }
@@ -338,11 +298,13 @@ export function usePagedReaderController({
     currentChapter,
     enabled,
     effectivePageCount,
+    incrementDisplayPage,
     isPageNavigationReady,
     pageIndex,
-    pagedNovelFlowIndex,
     requestChapterNavigation,
     setPageIndexAndSyncRuntime,
+    suppressNextChapterCalibration,
+    suppressNextPageIndexCalibration,
   ]);
 
   const stepPrevPage = useCallback((allowChapterTransition: boolean) => {
@@ -354,42 +316,18 @@ export function usePagedReaderController({
       return false;
     }
 
-    const currentGlobalPageIndex = pagedNovelFlowIndex
-      ? toGlobalPageIndex(pagedNovelFlowIndex, {
-        chapterIndex,
-        localPageIndex: pageIndex,
-      })
-      : null;
-    const previousGlobalPosition = currentGlobalPageIndex === null || !pagedNovelFlowIndex
-      ? null
-      : resolveGlobalPagePosition(pagedNovelFlowIndex, currentGlobalPageIndex - 1);
-    if (previousGlobalPosition) {
-      if (previousGlobalPosition.chapterIndex === chapterIndex) {
-        if (previousGlobalPosition.localPageIndex !== pageIndex) {
-          hasPagedNavigationSinceLastPersistRef.current = true;
-          setPageIndexAndSyncRuntime(previousGlobalPosition.localPageIndex);
-          return true;
-        }
-      } else if (allowChapterTransition) {
-        pendingExactPageNavigationRef.current = {
-          pageIndex: previousGlobalPosition.localPageIndex,
-          targetIndex: previousGlobalPosition.chapterIndex,
-        };
-        requestChapterNavigation(
-          previousGlobalPosition.chapterIndex,
-          previousGlobalPosition.localPageIndex === 0 ? 'start' : 'end',
-        );
-        return true;
-      }
-    }
-
     if (pageIndex > 0) {
       hasPagedNavigationSinceLastPersistRef.current = true;
+      suppressNextPageIndexCalibration();
       setPageIndexAndSyncRuntime((previousPageIndex) => previousPageIndex - 1);
+      incrementDisplayPage(-1);
       return true;
     }
 
     if (allowChapterTransition && currentChapter.hasPrev && chapterIndex > 0) {
+      suppressNextChapterCalibration();
+      suppressNextPageIndexCalibration();
+      incrementDisplayPage(-1);
       requestChapterNavigation(chapterIndex - 1, 'end');
       return true;
     }
@@ -399,11 +337,13 @@ export function usePagedReaderController({
     chapterIndex,
     currentChapter,
     enabled,
+    incrementDisplayPage,
     isPageNavigationReady,
     pageIndex,
-    pagedNovelFlowIndex,
     requestChapterNavigation,
     setPageIndexAndSyncRuntime,
+    suppressNextChapterCalibration,
+    suppressNextPageIndexCalibration,
   ]);
 
   useLayoutEffect(() => {
@@ -441,8 +381,15 @@ export function usePagedReaderController({
   }, [recordAnimatedPageTurn, requestDirectionalNavigation, stepPrevPage]);
 
   const goToChapter = useCallback((targetIndex: number, pageTarget: PageTarget = 'start') => {
+    if (targetIndex >= 0 && targetIndex < chapters.length) {
+      calibrateDisplayPage({
+        chapterIndex: targetIndex,
+        localPageIndex: pageTarget === 'end' ? Number.MAX_SAFE_INTEGER : 0,
+        reason: 'directory-jump',
+      });
+    }
     requestChapterNavigation(targetIndex, pageTarget);
-  }, [requestChapterNavigation]);
+  }, [calibrateDisplayPage, chapters.length, requestChapterNavigation]);
 
   const goToNextPage = useCallback(() => {
     performNextPageTurn(true);
@@ -504,8 +451,9 @@ export function usePagedReaderController({
     handlePagedViewportRef,
     nextChapterPreview,
     nextPagedLayout,
-    globalPageCount,
-    globalPageIndex,
+    displayPageCount,
+    displayPageIndex,
+    displayPageState,
     pageCount: effectivePageCount,
     pageIndex,
     pagedNovelFlowIndex,

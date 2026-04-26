@@ -1173,14 +1173,16 @@ describe('useReaderRenderCache', () => {
       );
     });
 
-    expect(renderCacheMock.persistReaderRenderCacheEntry).toHaveBeenCalledWith(
-      expect.objectContaining({
-        chapterIndex: 2,
-        storageKind: 'manifest',
-        tree: null,
-        variantFamily: 'original-paged',
-      }),
-    );
+    await waitFor(() => {
+      expect(renderCacheMock.persistReaderRenderCacheEntry).toHaveBeenCalledWith(
+        expect.objectContaining({
+          chapterIndex: 2,
+          storageKind: 'manifest',
+          tree: null,
+          variantFamily: 'original-paged',
+        }),
+      );
+    });
     expect(renderCacheMock.buildStaticRenderManifest).toHaveBeenCalled();
     expect(renderCacheMock.buildStaticRenderTree).not.toHaveBeenCalledWith(
       expect.objectContaining({
@@ -1188,6 +1190,54 @@ describe('useReaderRenderCache', () => {
         variantFamily: 'original-scroll',
       }),
     );
+  });
+
+  it('后台远章节 manifest 落盘时不重拉全书 scroll manifests', async () => {
+    const stalledChapter = createDeferred<ChapterContent>();
+    const fetchChapterContent = vi.fn(async (index: number) => {
+      if (index === 1) {
+        return stalledChapter.promise;
+      }
+
+      return createChapter(index, 3);
+    });
+    renderReaderRenderCacheHook({
+      chapters: [
+        { index: 0, title: 'Chapter 1', wordCount: 120 },
+        { index: 1, title: 'Chapter 2', wordCount: 120 },
+        { index: 2, title: 'Chapter 3', wordCount: 120 },
+      ],
+      currentChapter: createChapter(0, 3),
+      fetchChapterContent,
+      scrollChapters: [{ chapter: createChapter(0, 3), index: 0 }],
+    });
+
+    await waitFor(() => {
+      expect(fetchChapterContent).toHaveBeenCalledWith(1, expect.objectContaining({
+        signal: expect.any(AbortSignal),
+      }));
+    });
+    renderCacheMock.getReaderRenderCacheRecordsForNovelVariantFromDexie.mockClear();
+
+    stalledChapter.resolve(createChapter(1, 3));
+
+    await waitFor(() => {
+      expect(renderCacheMock.persistReaderRenderCacheEntry).toHaveBeenCalledWith(
+        expect.objectContaining({
+          chapterIndex: 1,
+          storageKind: 'manifest',
+          tree: null,
+          variantFamily: 'original-scroll',
+        }),
+      );
+    });
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(renderCacheMock.getReaderRenderCacheRecordsForNovelVariantFromDexie)
+      .not.toHaveBeenCalled();
   });
 
   it('upgrades manifest-only dexie hits to full render trees for near render targets', async () => {

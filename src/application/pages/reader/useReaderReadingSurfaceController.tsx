@@ -75,6 +75,8 @@ function buildPagedContentProps(
     chapter: renderableChapter,
     currentLayout: pagedController.currentPagedLayout,
     disableAnimation: isRestoringPosition,
+    displayPageCount: pagedController.displayPageCount,
+    displayPageIndex: pagedController.displayPageIndex,
     headerBgClassName: preferences.headerBg,
     interactionLocked,
     nextChapterPreview: pagedController.nextChapterPreview,

@@ -82,7 +82,6 @@ export function useScrollReaderWindowing(params: {
     retainedFocusedWindowChapterIndex,
     scrollAnchorSnapshotRef,
     scrollChapterBodyElementsRef,
-    scrollModeChapters,
     setScrollModeChapters,
     setVisibleScrollBlockRangeByChapter,
   } = params;
@@ -165,7 +164,6 @@ export function useScrollReaderWindowing(params: {
     enabled,
     pendingRestoreTargetRef,
     retainedFocusedWindowChapterIndex,
-    scrollModeChapters,
     setScrollModeChapters,
   ]);
 }

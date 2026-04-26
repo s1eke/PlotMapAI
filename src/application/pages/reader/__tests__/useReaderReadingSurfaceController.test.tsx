@@ -62,6 +62,16 @@ const surfaceMocks = vi.hoisted(() => {
     pagedController: {
       currentPagedLayout: null,
       currentPagedLayoutChapterIndex: null,
+      displayPageCount: 1,
+      displayPageIndex: 0,
+      displayPageState: {
+        basisLocator: null,
+        calibrationReason: 'initial' as const,
+        displayCurrentPage: 1,
+        displayPageIndex: 0,
+        displayTotalPages: 1,
+        layoutKey: 'test-layout',
+      },
       goToChapter: vi.fn(),
       goToNextPage: vi.fn(),
       goToNextPageSilently: vi.fn(),
@@ -77,6 +87,7 @@ const surfaceMocks = vi.hoisted(() => {
       pageIndex: 0,
       pageTurnDirection: 'next' as const,
       pageTurnToken: 1,
+      pagedNovelFlowIndex: null as unknown,
       pendingPageTarget: null,
       previousChapterPreview: null,
       previousPagedLayout: null,
@@ -214,6 +225,9 @@ describe('useReaderReadingSurfaceController', () => {
     surfaceMocks.sessionSnapshot.mode = 'summary';
     surfaceMocks.sessionSnapshot.viewMode = 'summary';
     surfaceMocks.sessionSnapshot.isPagedMode = false;
+    surfaceMocks.pagedController.displayPageCount = 1;
+    surfaceMocks.pagedController.displayPageIndex = 0;
+    surfaceMocks.pagedController.pagedNovelFlowIndex = null;
     surfaceMocks.restoreFlow.modeSwitchError = null;
     surfaceMocks.scrollController.renderableScrollLayouts = [];
   });
@@ -384,6 +398,45 @@ describe('useReaderReadingSurfaceController', () => {
     result.current.viewport.handleViewportScroll();
     expect(surfaceMocks.scrollController.handleContentScroll).toHaveBeenCalledTimes(1);
     expect(surfaceMocks.restoreFlow.handleContentScroll).not.toHaveBeenCalled();
+  });
+
+  it('builds paged content props with the display page projection', () => {
+    surfaceMocks.sessionSnapshot.mode = 'paged';
+    surfaceMocks.sessionSnapshot.viewMode = 'original';
+    surfaceMocks.sessionSnapshot.isPagedMode = true;
+    surfaceMocks.pagedController.displayPageCount = 18;
+    surfaceMocks.pagedController.displayPageIndex = 6;
+
+    const { Wrapper } = createReaderContextWrapper();
+    const { result } = renderHook(() => useReaderReadingSurfaceController({
+      analysisController: {
+        analyzeChapter: vi.fn(),
+        getChapterAnalysis: vi.fn(),
+        getStatus: vi.fn(),
+        renderSummaryPanel: vi.fn(() => 'summary-panel'),
+      },
+      novelId: 1,
+      preferences: surfaceMocks.preferences,
+    }), {
+      wrapper: Wrapper,
+    });
+
+    const contentProps = result.current.viewport.buildContentProps({
+      imageHandlers: {
+        onImageActivate: vi.fn(),
+        onRegisterImageElement: vi.fn(),
+      },
+      interactionLocked: false,
+    });
+
+    expect(contentProps.pagedContentProps).toMatchObject({
+      chapter: surfaceMocks.chapter,
+      displayPageCount: 18,
+      displayPageIndex: 6,
+      pageIndex: 0,
+    });
+    expect(contentProps.scrollContentProps).toBeUndefined();
+    expect(contentProps.summaryContentProps).toBeUndefined();
   });
 
   it('retries reader restore when debug retry event is dispatched', () => {
